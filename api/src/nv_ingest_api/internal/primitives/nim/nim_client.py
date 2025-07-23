@@ -5,10 +5,10 @@
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from typing import Optional
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import requests
@@ -90,6 +90,10 @@ class NimClient:
 
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
+
+        if model_name == "yolox_ensemble":
+            model_name = "yolox"
+
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
 
@@ -144,7 +148,9 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=batch_data, **kwargs)
+        parsed_output = self.model_interface.parse_output(
+            response, protocol=self.protocol, data=batch_data, model_name=model_name, **kwargs
+        )
         return parsed_output, batch_data
 
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
@@ -173,10 +179,10 @@ class NimClient:
         try:
             # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.get("force_max_batch_size", False)
+            max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
+            force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
             max_batch_size = (
-                min(batch_size, max_requested_batch_size)
+                max(1, min(batch_size, max_requested_batch_size))
                 if not force_requested_batch_size
                 else max_requested_batch_size
             )
@@ -186,7 +192,11 @@ class NimClient:
 
             # 3. Format the input based on protocol.
             formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
+                data,
+                protocol=self.protocol,
+                max_batch_size=max_batch_size,
+                model_name=model_name,
+                **kwargs,
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
@@ -196,13 +206,15 @@ class NimClient:
             #    We enumerate the batches so that we can later reassemble results in order.
             results = [None] * len(formatted_batches)
             with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                futures = []
+                future_to_idx = {}
                 for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
                     future = executor.submit(
                         self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
                     )
-                    futures.append((idx, future))
-                for idx, future in futures:
+                    future_to_idx[future] = idx
+
+                for future in as_completed(future_to_idx.keys()):
+                    idx = future_to_idx[future]
                     results[idx] = future.result()
 
             # 5. Process the parsed outputs for each batch using its corresponding batch_data.
@@ -227,7 +239,9 @@ class NimClient:
 
         return all_results
 
-    def _grpc_infer(self, formatted_input: np.ndarray, model_name: str, **kwargs) -> np.ndarray:
+    def _grpc_infer(
+        self, formatted_input: Union[list, list[np.ndarray]], model_name: str, **kwargs
+    ) -> Union[list, list[np.ndarray]]:
         """
         Perform inference using the gRPC protocol.
 
@@ -243,19 +257,27 @@ class NimClient:
         np.ndarray
             The output of the model as a numpy array.
         """
+        if not isinstance(formatted_input, list):
+            formatted_input = [formatted_input]
 
         parameters = kwargs.get("parameters", {})
-        output_names = kwargs.get("outputs", ["output"])
-        dtype = kwargs.get("dtype", "FP32")
-        input_name = kwargs.get("input_name", "input")
+        output_names = kwargs.get("output_names", ["output"])
+        dtypes = kwargs.get("dtypes", ["FP32"])
+        input_names = kwargs.get("input_names", ["input"])
 
-        input_tensors = grpcclient.InferInput(input_name, formatted_input.shape, datatype=dtype)
-        input_tensors.set_data_from_numpy(formatted_input)
+        input_tensors = []
+        for input_name, input_data, dtype in zip(input_names, formatted_input, dtypes):
+            input_tensors.append(grpcclient.InferInput(input_name, input_data.shape, datatype=dtype))
+
+        for idx, input_data in enumerate(formatted_input):
+            input_tensors[idx].set_data_from_numpy(input_data)
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
+
         response = self.client.infer(
-            model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
+            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
         )
+
         logger.debug(f"gRPC inference response: {response}")
 
         if len(outputs) == 1:

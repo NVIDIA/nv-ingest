@@ -215,7 +215,6 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
         min_replicas=0,
         max_replicas=max_replicas,
     )
-
     return stage_name
 
 
@@ -223,15 +222,15 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
     yolox_table_structure_grpc, yolox_table_structure_http, yolox_auth, yolox_table_structure_protocol = (
         get_nim_service("yolox_table_structure")
     )
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
     table_extractor_config = TableExtractorSchema(
         **{
             "endpoint_config": {
                 "yolox_endpoints": (yolox_table_structure_grpc, yolox_table_structure_http),
                 "yolox_infer_protocol": yolox_table_structure_protocol,
-                "paddle_endpoints": (paddle_grpc, paddle_http),
-                "paddle_infer_protocol": paddle_protocol,
+                "ocr_endpoints": (ocr_grpc, ocr_http),
+                "ocr_infer_protocol": ocr_protocol,
                 "auth_token": yolox_auth,
             }
         }
@@ -242,7 +241,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.20),
     )
 
     return stage_name
@@ -252,15 +251,15 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
     yolox_graphic_elements_grpc, yolox_graphic_elements_http, yolox_auth, yolox_graphic_elements_protocol = (
         get_nim_service("yolox_graphic_elements")
     )
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
     chart_extractor_config = ChartExtractorSchema(
         **{
             "endpoint_config": {
                 "yolox_endpoints": (yolox_graphic_elements_grpc, yolox_graphic_elements_http),
                 "yolox_infer_protocol": yolox_graphic_elements_protocol,
-                "paddle_endpoints": (paddle_grpc, paddle_http),
-                "paddle_infer_protocol": paddle_protocol,
+                "ocr_endpoints": (ocr_grpc, ocr_http),
+                "ocr_infer_protocol": ocr_protocol,
                 "auth_token": yolox_auth,
             }
         }
@@ -271,21 +270,21 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.20),
     )
 
     return stage_name
 
 
 def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="infographic_extractor"):
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
     infographic_content_extractor_config = InfographicExtractorSchema(
         **{
             "endpoint_config": {
-                "paddle_endpoints": (paddle_grpc, paddle_http),
-                "paddle_infer_protocol": paddle_protocol,
-                "auth_token": paddle_auth,
+                "ocr_endpoints": (ocr_grpc, ocr_http),
+                "ocr_infer_protocol": ocr_protocol,
+                "auth_token": ocr_auth,
             }
         }
     )
@@ -295,7 +294,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=2,
     )
 
     return stage_name
@@ -317,7 +316,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=2,
     )
 
     return stage_name
@@ -383,11 +382,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=AudioExtractorStage,
-        config=audio_extractor_config,
-        min_replicas=0,
-        max_replicas=1,
+        name=stage_name, stage_actor=AudioExtractorStage, config=audio_extractor_config, min_replicas=0, max_replicas=2
     )
 
     return stage_name
@@ -400,7 +395,7 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=2,
     )
 
     return stage_name
@@ -630,3 +625,10 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
         start_simple_message_broker(source_config.broker_client.model_dump())
 
     return source_name
+
+
+def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14):
+    if default_cpu_count is None:
+        default_cpu_count = _system_resource_probe.get_cpu_count()
+
+    return int(max(1, (default_cpu_count * percentage_of_cpu)))

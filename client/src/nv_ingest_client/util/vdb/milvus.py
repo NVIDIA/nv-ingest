@@ -34,7 +34,7 @@ from pymilvus.bulk_writer import RemoteBulkWriter
 from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus.orm.types import CONSISTENCY_STRONG
+from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
 from nv_ingest_client.util.transport import infer_microservice
 from nv_ingest_client.util.vdb.adt_vdb import VDB
@@ -42,7 +42,7 @@ from nv_ingest_client.util.vdb.adt_vdb import VDB
 
 logger = logging.getLogger(__name__)
 
-CONSISTENCY = CONSISTENCY_STRONG
+CONSISTENCY = CONSISTENCY_BOUNDED
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -325,6 +325,7 @@ def create_nvingest_index_params(
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )

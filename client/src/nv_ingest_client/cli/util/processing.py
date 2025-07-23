@@ -477,11 +477,12 @@ def create_and_process_jobs(
                     future_response, trace_id = handle_future_result(future)
                     trace_ids[source_name] = trace_id
 
+                    first_page = future_response["data"][0]
+
                     file_page_counts: Dict[str, int] = {
-                        page["metadata"]["source_metadata"]["source_name"]: page["metadata"]["content_metadata"][
-                            "hierarchy"
-                        ]["page_count"]
-                        for page in future_response["data"]
+                        first_page["metadata"]["source_metadata"]["source_name"]: first_page["metadata"][
+                            "content_metadata"
+                        ]["hierarchy"]["page_count"]
                     }
 
                     if output_directory:
