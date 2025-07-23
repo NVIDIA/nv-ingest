@@ -281,19 +281,6 @@ stages:
     runs_after:
       - "text_embedder"
 
-  - name: "udf_stage"
-    type: "stage"
-    phase: 5  # RESPONSE
-    callable: "nv_ingest_api.internal.meta.udf:udf_stage_callable_fn"
-    task_filters: ["udf"]
-    config:
-      ignore_empty_udf: true
-    replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "embedding_storage"
-
   - name: "broker_response"
     type: "stage"
     phase: 5  # RESPONSE
@@ -395,9 +382,6 @@ edges:
     to: "embedding_storage"
     queue_size: 32
   - from: "embedding_storage"
-    to: "udf_stage"
-    queue_size: 32
-  - from: "udf_stage"
     to: "broker_response"
     queue_size: 32
 

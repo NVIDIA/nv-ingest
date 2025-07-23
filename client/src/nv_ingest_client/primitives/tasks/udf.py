@@ -10,6 +10,7 @@ import importlib.util
 import logging
 import importlib
 import inspect
+import ast
 from typing import Dict, Optional, Union
 
 from nv_ingest_api.internal.enums.common import PipelinePhase
@@ -64,14 +65,62 @@ def _load_function_from_file_path(file_path: str, function_name: str):
         raise ValueError(f"Failed to load function '{function_name}' from file '{file_path}': {e}")
 
 
+def _extract_function_with_context(file_path: str, function_name: str) -> str:
+    """
+    Extract a function from a file while preserving the full module context.
+
+    This includes all imports, module-level variables, and other functions
+    that the target function might depend on.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the Python file containing the function
+    function_name : str
+        Name of the function to extract
+
+    Returns
+    -------
+    str
+        Complete module source code with the target function
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            module_source = f.read()
+
+        # Parse the module to verify the function exists
+        try:
+            tree = ast.parse(module_source)
+            function_found = False
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == function_name:
+                    function_found = True
+                    break
+
+            if not function_found:
+                raise ValueError(f"Function '{function_name}' not found in file '{file_path}'")
+
+        except SyntaxError as e:
+            raise ValueError(f"Syntax error in file '{file_path}': {e}")
+
+        return module_source
+
+    except FileNotFoundError:
+        raise ValueError(f"File not found: {file_path}")
+    except Exception as e:
+        raise ValueError(f"Failed to read file '{file_path}': {e}")
+
+
 def _resolve_udf_function(udf_function_spec: str) -> str:
     """
     Resolve UDF function specification to function string.
 
-    Supports three formats:
+    Supports four formats:
     1. Inline function string: 'def my_func(control_message): ...'
-    2. Import path: 'my_module.my_function'
-    3. File path: '/path/to/file.py:my_function' or '/path/to/file.py' (assumes 'process' function)
+    2. Module path with colon: 'my_module.my_submodule:my_function' (preserves imports)
+    3. File path: '/path/to/file.py:my_function'
+    4. Legacy import path: 'my_module.my_function' (function name only, no imports)
     """
     if udf_function_spec.strip().startswith("def "):
         # Already an inline function string
@@ -80,33 +129,39 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
     elif ".py:" in udf_function_spec:
         # File path format: /path/to/file.py:function_name
         file_path, function_name = udf_function_spec.split(":", 1)
-        func = _load_function_from_file_path(file_path, function_name)
-
-        # Get the source code of the function
-        try:
-            source = inspect.getsource(func)
-            return source
-        except (OSError, TypeError) as e:
-            raise ValueError(f"Could not get source code for function '{function_name}': {e}")
+        return _extract_function_with_context(file_path, function_name)
 
     elif udf_function_spec.endswith(".py"):
-        # File path format without function name: /path/to/file.py (assumes 'process' function)
-        file_path = udf_function_spec
-        function_name = "process"  # Default function name
-        func = _load_function_from_file_path(file_path, function_name)
+        # File path format without function name - this is an error
+        raise ValueError(
+            f"File path '{udf_function_spec}' is missing function name. "
+            f"Use format 'file.py:function_name' to specify which function to use."
+        )
 
-        # Get the source code of the function
+    elif ":" in udf_function_spec and ".py:" not in udf_function_spec:
+        # Module path format with colon: my_module.submodule:function_name
+        # This preserves imports and module context
+        module_path, function_name = udf_function_spec.split(":", 1)
+
         try:
-            source = inspect.getsource(func)
-            return source
-        except (OSError, TypeError) as e:
-            raise ValueError(f"Could not get source code for function '{function_name}': {e}")
+            # Import the module to get its file path
+            module = importlib.import_module(module_path)
+            module_file = inspect.getfile(module)
+
+            # Extract the function with full module context
+            return _extract_function_with_context(module_file, function_name)
+
+        except ImportError as e:
+            raise ValueError(f"Failed to import module '{module_path}': {e}")
+        except Exception as e:
+            raise ValueError(f"Failed to resolve module path '{module_path}': {e}")
 
     elif "." in udf_function_spec:
-        # Import path format: module.submodule.function
+        # Legacy import path format: module.submodule.function
+        # This only extracts the function source without imports (legacy behavior)
         func = _load_function_from_import_path(udf_function_spec)
 
-        # Get the source code of the function
+        # Get the source code of the function only
         try:
             source = inspect.getsource(func)
             return source
@@ -125,10 +180,11 @@ class UDFTask(Task):
     during the ingestion pipeline. The UDF function must accept a control_message
     parameter and return an IngestControlMessage.
 
-    Supports three UDF function specification formats:
+    Supports four UDF function specification formats:
     1. Inline function string: 'def my_func(control_message): ...'
-    2. Import path: 'my_module.my_function'
-    3. File path: '/path/to/file.py:my_function' or '/path/to/file.py' (assumes 'process' function)
+    2. Module path with colon: 'my_module.my_submodule:my_function' (preserves imports)
+    3. File path: '/path/to/file.py:my_function'
+    4. Legacy import path: 'my_module.my_function' (function name only, no imports)
     """
 
     def __init__(

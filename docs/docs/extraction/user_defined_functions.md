@@ -29,20 +29,42 @@ def my_custom_processor(control_message: IngestControlMessage) -> IngestControlM
 
 ### 2. Submit via CLI
 
-Save your function to a file and submit it to run before a specific pipeline stage:
+The CLI supports all UDF function specification formats. Here are examples of each:
 
+#### Inline Function String
 ```bash
-# Submit UDF to run before the text embedding stage
+# Submit inline UDF function
+nv-ingest-cli \
+    --doc /path/to/document.pdf \
+    --output-directory ./output \
+    --task 'udf:{"udf_function": "def my_processor(control_message): print(\"Processing...\"); return control_message", "udf_function_name": "my_processor", "target_stage": "text_embedder", "run_before": true}'
+```
+
+#### Module Path with Colon (Recommended)
+```bash
+# Submit UDF from importable module (preserves all imports and context)
+nv-ingest-cli \
+    --doc /path/to/document.pdf \
+    --output-directory ./output \
+    --task 'udf:{"udf_function": "my_package.processors:enhance_metadata", "target_stage": "text_embedder", "run_after": true}'
+```
+
+#### File Path
+```bash
+# Submit UDF from file path
 nv-ingest-cli \
     --doc /path/to/document.pdf \
     --output-directory ./output \
     --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "target_stage": "text_embedder", "run_before": true}'
+```
 
-# Submit UDF to run after the text embedding stage
+#### Legacy Import Path (Limited)
+```bash
+# Submit UDF using legacy dot notation (function only, no imports)
 nv-ingest-cli \
     --doc /path/to/document.pdf \
     --output-directory ./output \
-    --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "target_stage": "text_embedder", "run_after": true}'
+    --task 'udf:{"udf_function": "my_package.processors.basic_processor", "target_stage": "text_embedder", "run_after": true}'
 ```
 
 ### 3. Submit via Python Client
@@ -261,6 +283,9 @@ UDFs can be executed at different stages of the pipeline by specifying the `targ
 - `table_extractor` - Table structure extraction
 - `chart_extractor` - Chart and graphic extraction
 
+**Post-processing Stages (Phase 2):**
+> **Note:** There are currently no Phase 2 stages in the default pipeline. This phase is reserved for future use and may include stages for content validation, quality assessment, or intermediate processing steps between extraction and mutation phases.
+
 **Mutation Stages (Phase 3):**
 - `image_filter` - Image filtering and validation
 - `image_dedup` - Image deduplication
@@ -350,30 +375,79 @@ def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ### UDF Function Specification Formats
 
-#### File Path with Function Name
+NV-Ingest supports four different formats for specifying UDF functions:
+
+### 1. Inline Function String
+Define your function directly as a string:
+
 ```python
-# File: /path/to/my_processors.py
-def process_documents(control_message: IngestControlMessage) -> IngestControlMessage:
-    # ... processing logic ...
+udf_function = """
+def my_custom_processor(control_message):
+    # Your processing logic here
+    payload = control_message.payload()
+    # Modify the payload as needed
     return control_message
+"""
 ```
+
+### 2. Module Path with Colon (Recommended)
+Reference a function from an importable module while preserving all imports and context:
+
+```python
+# Format: 'module.submodule:function_name'
+udf_function = "my_package.processors.text_utils:enhance_metadata"
+```
+
+**Benefits:**
+- ✅ Preserves all module-level imports (`import pandas as pd`, etc.)
+- ✅ Includes helper functions and variables the UDF depends on
+- ✅ Maintains full execution context
+- ✅ Best for complex UDFs with dependencies
+
+### 3. File Path
+Reference a function from a specific Python file:
+
+```python
+# With function name: 'path/to/file.py:function_name'
+udf_function = "/path/to/my_udfs.py:process_documents"
+
+# Without function name (assumes 'process' function)
+udf_function = "/path/to/my_udfs.py"
+```
+
+**Benefits:**
+- ✅ Preserves all file-level imports and context
+- ✅ Works with files not in Python path
+- ✅ Good for standalone UDF files
+
+### 4. Legacy Import Path (Limited)
+Reference a function using dot notation (legacy format):
+
+```python
+# Format: 'module.submodule.function_name'
+udf_function = "my_package.processors.text_utils.enhance_metadata"
+```
+
+**Limitations:**
+- ⚠️ Only extracts the function source code
+- ⚠️ Does NOT include module imports or dependencies
+- ⚠️ May fail if function depends on imports
+- ⚠️ Use format #2 instead for better reliability
+
+## Recommendation
+
+**Use format #2 (Module Path with Colon)** for most use cases as it provides the best balance of functionality and reliability by preserving the complete execution context your UDF needs.
+
+### UDF Function Specification Examples
 
 ```bash
 # CLI usage
---task 'udf:{"udf_function": "/path/to/my_processors.py:process_documents"}'
+--task 'udf:{"udf_function": "path/to/my_processors.py:process_documents"}'
 ```
 
-#### Import Path Format
 ```python
-# File: my_package/processors.py
-def advanced_processor(control_message: IngestControlMessage) -> IngestControlMessage:
-    # ... processing logic ...
-    return control_message
-```
-
-```bash
-# CLI usage (if my_package is in Python path)
---task 'udf:{"udf_function": "my_package.processors:advanced_processor"}'
+# Python client usage
+ingestor.udf(udf_function="my_package.processors.text_utils:enhance_metadata")
 ```
 
 ### Error Handling

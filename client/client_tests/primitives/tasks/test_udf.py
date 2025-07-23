@@ -466,5 +466,5 @@ def test_udf_task_function_resolution_file_path_error():
     )
 
     # Should raise an error when trying to resolve
-    with pytest.raises(ValueError, match="Failed to load function"):
+    with pytest.raises(ValueError, match="File not found"):
         task._resolve_udf_function()
