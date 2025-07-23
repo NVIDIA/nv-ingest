@@ -322,7 +322,7 @@ stages:
 
   - name: "drain"
     type: "sink"
-    phase: 6
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:

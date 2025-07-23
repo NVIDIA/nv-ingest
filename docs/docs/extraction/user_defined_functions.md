@@ -48,22 +48,45 @@ nv-ingest-cli \
 ### 3. Submit via Python Client
 
 ```python
-from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.client.interface import Ingestor
 
-client = NvIngestClient()
-client.add_document("/path/to/document.pdf")
-client.udf(
-    udf_function="my_file.py:my_custom_processor",
-    target_stage="text_embedder",
-    run_before=True
-)
+# Create an Ingestor instance with default client
+ingestor = Ingestor()
 
-# Submit UDF to run after the text embedding stage
-client.udf(
-    udf_function="my_file.py:my_custom_processor",
-    target_stage="text_embedder",
-    run_after=True
-)
+# Add documents and configure UDF to run before text embedding
+results = ingestor.files("/path/to/document.pdf") \
+    .extract() \
+    .udf(
+        udf_function="my_file.py:my_custom_processor",
+        target_stage="text_embedder",
+        run_before=True
+    ) \
+    .embed() \
+    .store() \
+    .ingest()
+
+# Alternative: UDF to run after text embedding stage
+results = ingestor.files("/path/to/document.pdf") \
+    .extract() \
+    .embed() \
+    .udf(
+        udf_function="my_file.py:my_custom_processor", 
+        target_stage="text_embedder",
+        run_after=True
+    ) \
+    .store() \
+    .ingest()
+
+# Using phase-based targeting (legacy approach)
+results = ingestor.files("/path/to/document.pdf") \
+    .extract() \
+    .udf(
+        udf_function="my_file.py:my_custom_processor",
+        phase="embed"  # or phase=4
+    ) \
+    .embed() \
+    .store() \
+    .ingest()
 ```
 
 ---

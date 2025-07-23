@@ -30,15 +30,24 @@ class DummyConfig(BaseModel):
 
 def test_stage_processes_message_with_model_config(ray_startup_and_shutdown):
     def fn(control_message: IngestControlMessage, stage_config: DummyConfig) -> IngestControlMessage:
-        control_message.set_metadata("bar", stage_config.bar)
-        return control_message
+        print(f"DEBUG: fn called with stage_config.bar = {stage_config.bar}")
+        try:
+            control_message.set_metadata("bar", stage_config.bar)
+            print(f"DEBUG: set_metadata completed, metadata now: {control_message.get_metadata('bar')}")
+            return control_message
+        except Exception as e:
+            print(f"DEBUG: Exception in fn: {e}")
+            raise
 
     Stage = wrap_callable_as_stage(fn, DummyConfig)
     cfg = DummyConfig(foo=5, bar="quux")
     stage = Stage.remote(config=cfg)
     message = IngestControlMessage()
     message.payload(pd.DataFrame())
+    print(f"DEBUG: Before calling on_data, message metadata: {message.get_metadata('bar')}")
     out = ray.get(stage.on_data.remote(message))
+    print(f"DEBUG: After calling on_data, out metadata: {out.get_metadata('bar')}")
+    something = out
     assert out.get_metadata("bar") == "quux"
 
 

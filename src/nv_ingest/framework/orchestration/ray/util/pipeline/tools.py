@@ -11,7 +11,6 @@ import ray
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 from nv_ingest_api.util.imports.callable_signatures import (
@@ -95,7 +94,6 @@ def wrap_callable_as_stage(
 
         @traceable(trace_name)
         @nv_ingest_node_failure_try_except(annotation_id=trace_name, raise_on_failure=False)
-        @filter_by_task(required_tasks=required_tasks if required_tasks else [])
         def on_data(self, control_message):
             """
             Processes a control message using the wrapped function.
@@ -110,6 +108,13 @@ def wrap_callable_as_stage(
             IngestControlMessage
                 The processed message, or the original on failure.
             """
+            # Apply task filtering if required_tasks is specified and not empty
+            if required_tasks:
+                # Check if message has any of the required tasks
+                message_tasks = {task.type for task in control_message.get_tasks()}
+                if not any(task in message_tasks for task in required_tasks):
+                    return control_message
+
             try:
                 return fn(control_message, self.validated_config)
             except Exception as e:
