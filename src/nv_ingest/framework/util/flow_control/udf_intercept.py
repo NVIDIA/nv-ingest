@@ -6,6 +6,7 @@ import functools
 import hashlib
 import inspect
 import logging
+import os
 import time
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass
@@ -286,6 +287,11 @@ def udf_intercept_hook(stage_name: Optional[str] = None, enable_run_before: bool
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Check if UDF processing is globally disabled
+            if os.getenv("INGEST_DISABLE_UDF_PROCESSING"):
+                logger.debug("UDF processing is disabled via INGEST_DISABLE_UDF_PROCESSING environment variable")
+                return func(*args, **kwargs)
+
             # Determine the stage name to use
             resolved_stage_name = stage_name
 

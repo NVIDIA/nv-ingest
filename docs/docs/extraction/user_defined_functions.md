@@ -406,7 +406,7 @@ Reference a function from a specific Python file:
 
 ```python
 # With function name: 'path/to/file.py:function_name'
-udf_function = "/path/to/my_udfs.py:process_documents"
+udf_function = "/path/to/my_udfs.py:my_custom_processor"
 
 # Without function name (assumes 'process' function)
 udf_function = "/path/to/my_udfs.py"
@@ -447,6 +447,92 @@ udf_function = "my_package.processors.text_utils.enhance_metadata"
 ingestor.udf(udf_function="my_package.processors.text_utils:enhance_metadata")
 ```
 
+## Integrating with NVIDIA NIMs
+
+NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NV-Ingest pipeline.
+
+### Quick NIM Integration
+
+```python
+from nv_ingest_api.internal.primitives.control_message import IngestControlMessage
+from nv_ingest_api.util.nim import create_inference_client
+from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
+import os
+
+def document_analysis_with_nim(control_message: IngestControlMessage) -> IngestControlMessage:
+    """UDF that uses a NIM to analyze document content."""
+    
+    # Create NIM client for text analysis
+    model_interface = VLMModelInterface()
+    client = create_inference_client(
+        endpoints=(
+            os.getenv("ANALYSIS_NIM_GRPC", "grpc://analysis-nim:8001"),
+            os.getenv("ANALYSIS_NIM_HTTP", "http://analysis-nim:8000")
+        ),
+        model_interface=model_interface,
+        auth_token=os.getenv("NGC_API_KEY"),
+        infer_protocol="http"
+    )
+    
+    df = control_message.payload()
+    
+    for idx, row in df.iterrows():
+        if row.get("content"):
+            try:
+                # Perform NIM inference
+                results = client.infer(
+                    data={
+                        "base64_images": [row.get("image_data", "")],
+                        "prompt": f"Analyze this document: {row['content'][:500]}"
+                    },
+                    model_name="llava-1.5-7b-hf"
+                )
+                
+                # Add analysis to DataFrame
+                df.at[idx, "nim_analysis"] = results[0] if results else "No analysis"
+                
+            except Exception as e:
+                print(f"NIM inference failed: {e}")
+                df.at[idx, "nim_analysis"] = "Analysis failed"
+    
+    control_message.payload(df)
+    return control_message
+```
+
+### Environment Configuration
+
+Set these environment variables for your NIM endpoints:
+
+```bash
+# NIM service endpoints
+export ANALYSIS_NIM_GRPC="grpc://your-nim-service:8001"
+export ANALYSIS_NIM_HTTP="http://your-nim-service:8000"
+
+# Authentication (if required)
+export NGC_API_KEY="your-ngc-api-key"
+```
+
+### Available NIM Interfaces
+
+NV-Ingest provides several pre-built model interfaces:
+
+- **VLMModelInterface**: Vision-Language Models for image analysis and captioning
+- **EmbeddingModelInterface**: Text embedding generation
+- **OCRModelInterface**: Optical Character Recognition
+- **YoloxModelInterface**: Object detection and page element extraction
+
+### Creating Custom NIM Integrations
+
+For detailed guidance on creating custom NIM integrations, including:
+
+- Custom ModelInterface implementation
+- Protocol handling (gRPC vs HTTP)
+- Batch processing optimization
+- Error handling and debugging
+- Performance best practices
+
+See the comprehensive [**NimClient Usage Guide**](nimclient_usage.md).
+
 ### Error Handling
 
 The NV-Ingest system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
@@ -458,75 +544,390 @@ The NV-Ingest system automatically catches all exceptions that occur within UDF 
 
 You do not need to implement extensive error handling within your UDF - focus on your core processing logic and let the system handle failures gracefully.
 
+### Performance Considerations
+
+UDFs execute within the NV-Ingest pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
+
+#### Pipeline Impact
+
+**Global Slowdown on Congested Stages:**
+- UDFs run synchronously within pipeline stages, blocking other processing until completion
+- Heavy-weight UDFs on high-traffic stages (e.g., `text_embedder`, `pdf_extractor`) can create bottlenecks
+- A single slow UDF can reduce throughput for the entire pipeline
+- Consider the stage's typical workload when designing UDF complexity
+
+**Stage Selection Strategy:**
+```python
+# ❌ Avoid heavy processing on high-throughput stages
+ingestor.udf(
+    udf_function="heavy_ml_processing.py:complex_analysis",
+    target_stage="text_embedder",  # High-traffic stage - will slow everything down
+    run_before=True
+)
+
+# ✅ Better: Use less congested stages or run after processing
+ingestor.udf(
+    udf_function="heavy_ml_processing.py:complex_analysis", 
+    target_stage="embedding_storage",  # Lower-traffic stage
+    run_before=True
+)
+```
+
+#### Memory Management
+
+**Memory Consumption:**
+- UDFs share memory with the pipeline worker processes
+- Excessive memory usage can trigger out-of-memory (OOM) kills
+- Large DataFrame modifications can cause memory spikes
+- Memory leaks in UDFs accumulate over time and destabilize workers
+
+**Best Practices:**
+```python
+# ❌ Memory-intensive operations
+def memory_heavy_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    df = control_message.payload()
+    
+    # Creates large temporary objects
+    large_temp_data = [expensive_computation(row) for row in df.itertuples()]
+    
+    # Multiple DataFrame copies
+    df_copy1 = df.copy()
+    df_copy2 = df.copy()
+    df_copy3 = df.copy()
+    
+    return control_message
+
+# ✅ Memory-efficient approach
+def memory_efficient_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    df = control_message.payload()
+    
+    try:
+        # Load model once and reuse (consider caching)
+        model = get_cached_model()
+        
+        # Batch processing with error handling
+        batch_results = []
+        for i in range(0, len(df), chunk_size):
+            chunk = df.iloc[i:i+chunk_size]
+            # Process chunk in-place
+            for idx in chunk.index:
+                df.at[idx, 'new_field'] = efficient_computation(df.at[idx, 'content'])
+        
+        df['result'] = batch_results
+        
+    except Exception as e:
+        logger.error(f"UDF failed: {e}")
+        # Return original message on failure
+        return control_message
+    finally:
+        # Explicit cleanup if needed
+        cleanup_resources()
+    
+    control_message.payload(df)
+    return control_message
+```
+
+#### Computational Complexity
+
+**CPU-Intensive Operations:**
+- Complex algorithms can monopolize CPU resources
+- Long-running computations block the pipeline stage
+- Consider computational complexity relative to document size
+
+**I/O Operations:**
+- File system access, network requests, and database queries add latency
+- Synchronous I/O blocks the entire pipeline stage
+- External service dependencies introduce failure points
+
+```python
+# ❌ Blocking I/O in UDF
+def blocking_io_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    df = control_message.payload()
+    
+    for idx, row in df.iterrows():
+        # Blocks pipeline for each external call
+        result = requests.get(f"https://api.example.com/process/{row['id']}")
+        df.at[idx, 'external_data'] = result.json()
+    
+    control_message.payload(df)
+    return control_message
+
+# ✅ Batch processing with timeouts
+def efficient_io_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    df = control_message.payload()
+    
+    # Batch requests and set reasonable timeouts
+    ids = df['id'].tolist()
+    try:
+        response = requests.post(
+            "https://api.example.com/batch_process",
+            json={"ids": ids},
+            timeout=5.0  # Prevent hanging
+        )
+        results = response.json()
+        
+        # Update DataFrame efficiently
+        df['external_data'] = df['id'].map(results.get)
+        
+    except requests.RequestException as e:
+        logger.warning(f"External API failed: {e}")
+        df['external_data'] = None  # Graceful fallback
+    
+    control_message.payload(df)
+    return control_message
+```
+
+#### System Stability Risks
+
+**Segmentation Faults:**
+- Native library crashes (C extensions) can kill worker processes
+- Segfaults may leave the pipeline in an unstable state
+- Worker restarts cause job failures and processing delays
+
+**Resource Exhaustion:**
+- File descriptor leaks from unclosed resources
+- Thread pool exhaustion from concurrent operations
+
+**Common Stability Issues:**
+```python
+# ❌ Potential stability risks
+def risky_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    """UDF with potential stability risks."""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        df = control_message.get_payload()
+        logger.info(f"Processing {len(df)} documents")
+        
+        # Load model repeatedly (memory intensive)
+        model = load_large_ml_model()
+        
+        # Native library calls without error handling
+        for idx, row in df.iterrows():
+            result = unsafe_native_function(row['content'])  # Could segfault
+            df.at[idx, 'result'] = result
+        
+        logger.info("UDF processing completed successfully")
+        control_message.payload(df)
+        return control_message
+        
+    except Exception as e:
+        logger.error(f"UDF failed: {e}", exc_info=True)
+        # Return original message on failure
+        return control_message
+    finally:
+        # No explicit cleanup
+        pass
+
+# ✅ Stable approach with resource management
+def stable_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    """UDF with proper resource management."""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        df = control_message.get_payload()
+        logger.info(f"Processing {len(df)} documents")
+        
+        # Load model once and reuse (consider caching)
+        model = get_cached_model()
+        
+        # Batch processing with error handling
+        batch_results = []
+        for i in range(0, len(df), chunk_size):
+            chunk = df.iloc[i:i+chunk_size]
+            # Process chunk in-place
+            for idx in chunk.index:
+                df.at[idx, 'new_field'] = efficient_computation(df.at[idx, 'content'])
+        
+        df['result'] = batch_results
+        
+        logger.info("UDF processing completed successfully")
+        control_message.payload(df)
+        return control_message
+        
+    except Exception as e:
+        logger.error(f"UDF failed: {e}", exc_info=True)
+        # Return original message on failure
+        return control_message
+    finally:
+        # Explicit cleanup if needed
+        cleanup_resources()
+```
+
+#### Performance Monitoring
+
+**Key Metrics to Monitor:**
+- UDF execution time per document
+- Memory usage during UDF execution
+- Pipeline stage throughput before/after UDF deployment
+- Worker process restart frequency
+- Job failure rates
+
+**Profiling UDFs:**
+```python
+import time
+import psutil
+import logging
+
+def profiled_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    """UDF with profiling."""
+    logger = logging.getLogger(__name__)
+    
+    start_time = time.time()
+    start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+    
+    df = control_message.payload()
+    
+    # Your UDF logic here
+    # ... processing ...
+    
+    end_time = time.time()
+    end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+    
+    execution_time = end_time - start_time
+    memory_delta = end_memory - start_memory
+    
+    if execution_time > 5.0:  # Log slow UDFs
+        logger.warning(f"Slow UDF execution: {execution_time:.2f}s")
+    
+    if memory_delta > 100:  # Log high memory usage
+        logger.warning(f"High memory usage: {memory_delta:.2f}MB")
+    
+    control_message.payload(df)
+    return control_message
+```
+
+#### Recommendations
+
+**Development Guidelines:**
+1. **Profile Early:** Test UDFs with realistic data volumes
+2. **Optimize for Stage:** Consider the target stage's typical workload
+3. **Limit Complexity:** Keep UDFs focused and lightweight
+4. **Handle Errors:** Implement graceful fallbacks for external dependencies
+5. **Monitor Impact:** Track pipeline performance after UDF deployment
+
+**Production Deployment:**
+1. **Gradual Rollout:** Deploy UDFs to a subset of documents first
+2. **Resource Limits:** Set appropriate memory and CPU limits
+3. **Monitoring:** Implement alerting for performance degradation
+4. **Rollback Plan:** Have a quick way to disable problematic UDFs
+
+**When to Avoid UDFs:**
+- For simple metadata additions that could be done post-processing
+- When external service dependencies are unreliable
+- For computationally expensive operations that could be batched offline
+- When the processing logic changes frequently
+
+Remember: UDFs are powerful but should be used judiciously. Poor UDF design can significantly impact the entire pipeline's performance and stability.
+
 ### Debugging and Testing
 
-#### Local Testing
+## Global UDF Control
+
+You can globally disable all UDF processing using an environment variable:
+
+```bash
+# Disable all UDF execution across the entire pipeline
+export INGEST_DISABLE_UDF_PROCESSING=1
+```
+
+**When to Use:**
+Setting `INGEST_DISABLE_UDF_PROCESSING` to any non-empty value will disable all UDF processing across the entire pipeline. This is useful for:
+
+- **Debugging:** Isolate pipeline issues by removing UDF interference
+- **Performance Testing:** Measure baseline pipeline throughput without UDF overhead
+- **Emergency Situations:** Quickly disable UDFs causing instability or crashes
+- **Maintenance:** Temporary bypass during troubleshooting or system updates
+- **Rollback:** Quick way to disable problematic UDFs in production
+
+**Behavior:**
+When disabled, all UDF tasks remain in control messages but are not executed. The pipeline runs normally without any UDF processing overhead, allowing you to verify that issues are UDF-related.
+
+```bash
+# Examples of values that disable UDF processing
+export INGEST_DISABLE_UDF_PROCESSING=1
+export INGEST_DISABLE_UDF_PROCESSING=true
+export INGEST_DISABLE_UDF_PROCESSING=disable
+export INGEST_DISABLE_UDF_PROCESSING=any_non_empty_value
+
+# UDF processing is enabled (default behavior)
+unset INGEST_DISABLE_UDF_PROCESSING
+# OR
+export INGEST_DISABLE_UDF_PROCESSING=""
+```
+
+## Testing UDFs
+
+When developing and testing UDFs, consider these approaches:
+
+### Local Testing
+
+Test your UDF functions in isolation before deploying them to the pipeline:
+
 ```python
-# Create a test script to validate your UDF
 import pandas as pd
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 def test_my_udf():
     # Create test data
-    test_data = pd.DataFrame({
-        'document_type': ['pdf'],
-        'source_type': ['file'],
-        'source_file': ['test.pdf'],
-        'id': ['test_id_1'],
-        'content': ['This is test content'],
-        'metadata': [{'content': 'This is test content', 'source_metadata': {}}]
+    test_df = pd.DataFrame({
+        'content': ['test document 1', 'test document 2'],
+        'metadata': [{'source': 'test1'}, {'source': 'test2'}]
     })
     
-    # Create test control message
+    # Create control message
     control_message = IngestControlMessage()
-    control_message.payload(test_data)
+    control_message.payload(test_df)
     
     # Test your UDF
     result = my_custom_processor(control_message)
     
-    # Validate results
-    result_df = result.payload()
-    print("Result DataFrame:")
+    # Verify results
+    result_df = result.get_payload()
     print(result_df)
+    assert 'custom_field' in result_df.iloc[0]['metadata']
+
+# Run the test
+test_my_udf()
+```
+
+### Pipeline Integration Testing
+
+Test UDFs in a controlled pipeline environment:
+
+1. **Start with small datasets** to verify basic functionality
+2. **Use the disable flag** to compare pipeline behavior with/without UDFs
+3. **Monitor resource usage** during UDF execution
+4. **Test error scenarios** to ensure graceful failure handling
+
+### Common Debugging Techniques
+
+```python
+import logging
+
+def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+    """UDF with comprehensive debugging."""
+    logger = logging.getLogger(__name__)
     
-    return result
-
-if __name__ == "__main__":
-    test_my_udf()
+    try:
+        df = control_message.get_payload()
+        logger.info(f"Processing {len(df)} documents")
+        
+        # Log input data structure
+        logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+        logger.debug(f"Sample row: {df.iloc[0].to_dict()}")
+        
+        # Your processing logic here
+        for idx, row in df.iterrows():
+            logger.debug(f"Processing row {idx}: {row.get('content', '')[:50]}...")
+            # ... your logic ...
+        
+        logger.info("UDF processing completed successfully")
+        control_message.payload(df)
+        return control_message
+        
+    except Exception as e:
+        logger.error(f"UDF failed: {e}", exc_info=True)
+        # Return original message on failure
+        return control_message
 ```
-
-#### Common Issues and Solutions
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `TypeError: Parameter must be annotated` | Missing type annotations | Add proper type annotations to function signature |
-| `ValueError: UDF must return IngestControlMessage` | Not returning control message | Always return the control_message parameter |
-| `Payload cannot be None` | Not setting payload after modification | Call `control_message.payload(df)` after DataFrame changes |
-| Function not found | Incorrect function name or path | Verify file path and function name are correct |
-
-### CLI Reference
-
-#### Basic UDF Submission
-```bash
-nv-ingest-cli \
-    --doc /path/to/document.pdf \
-    --output-directory ./output \
-    --task 'udf:{"udf_function": "path/to/udf.py:function_name", "target_stage": "text_extractor", "run_before": true}'
-```
-
-#### Multiple UDFs
-```bash
-nv-ingest-cli \
-    --doc /path/to/document.pdf \
-    --output-directory ./output \
-    --task 'udf:{"udf_function": "validator.py:validate_input", "target_stage": "text_extractor", "run_before": true}' \
-    --task 'udf:{"udf_function": "enhancer.py:enhance_content", "target_stage": "text_embedder", "run_after": true}'
-```
-
----
-
-## Conclusion
-
-UDFs provide a powerful way to customize the NV-Ingest pipeline for your specific needs. Start with simple metadata enhancements and gradually build more sophisticated processing logic as needed. Remember to follow the signature requirements, handle errors gracefully, and test your UDFs thoroughly before deployment.
-
-For more information about the metadata structure and available fields, see the [metadata documentation](metadata_documentation.md).
