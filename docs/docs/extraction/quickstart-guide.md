@@ -31,7 +31,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     Password: <Your Key>
     ```
    
-4. Create a .env file that contains your NVIDIA Build API key.
+4. Create an .env file that contains your NVIDIA Build API key.
 
     !!! note
 

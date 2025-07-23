@@ -37,7 +37,7 @@ Use the following procedure to prepare your environment.
 
         To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
-2. Set or create a .env file that contains your NVIDIA Build API key and other environment variables.
+2. Set or create an .env file that contains your NVIDIA Build API key and other environment variables.
 
     !!! note
 
