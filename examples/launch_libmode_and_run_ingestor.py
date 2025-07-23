@@ -8,7 +8,6 @@ import time
 import sys
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
@@ -61,13 +60,12 @@ def run_ingestor():
 
 
 def main():
-    # Load the pipeline configuration from the YAML file
-    config_path = os.path.join(project_root, "config/default_libmode_pipeline.yaml")
-    ingest_config = load_pipeline_config(config_path)
-
+    """
+    Launch the libmode pipeline service and run the ingestor against it.
+    Uses the embedded default libmode pipeline configuration.
+    """
     try:
         pipeline = run_pipeline(
-            ingest_config,
             block=False,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,

@@ -6,14 +6,8 @@ import logging
 import os
 import sys
 
-
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -26,13 +20,11 @@ configure_local_logging(local_log_level)
 
 
 def main():
-    # Load the pipeline configuration from the YAML file
-    config_path = os.path.join(project_root, "./config/default_libmode_pipeline.yaml")
-    ingest_config = load_pipeline_config(config_path)
-
+    """
+    Launch the libmode pipeline service using the embedded default configuration.
+    """
     try:
         _ = run_pipeline(
-            ingest_config,
             block=True,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,

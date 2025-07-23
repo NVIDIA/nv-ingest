@@ -62,10 +62,10 @@ class PDFExtractorStage(RayActorStage):
             logger.exception(f"Error validating PDF extractor config: {e}")
             raise
 
-    @nv_ingest_node_failure_try_except(annotation_id="pdf_extractor", raise_on_failure=False)
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "pdf"})])
+    @nv_ingest_node_failure_try_except()
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting PDF content.

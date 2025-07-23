@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Union, Tuple, Optional, TextIO
 
 import ray
+import yaml
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipeline,
@@ -24,6 +25,8 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import start_simple_message_broker
 from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
+from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
 
 logger = logging.getLogger(__name__)
 
@@ -205,13 +208,14 @@ def _launch_pipeline(
 
 
 def run_pipeline(
-    pipeline_config: PipelineConfigSchema,
+    pipeline_config: Optional[PipelineConfigSchema] = None,
     block: bool = True,
     disable_dynamic_scaling: Optional[bool] = None,
     dynamic_memory_threshold: Optional[float] = None,
     run_in_subprocess: bool = False,
     stdout: Optional[TextIO] = None,
     stderr: Optional[TextIO] = None,
+    libmode: bool = True,
 ) -> Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]:
     """
     Launch and manage a pipeline, optionally in a subprocess.
@@ -223,8 +227,9 @@ def run_pipeline(
 
     Parameters
     ----------
-    pipeline_config : PipelineConfigSchema
+    pipeline_config : Optional[PipelineConfigSchema], default=None
         The validated configuration object used to construct and launch the pipeline.
+        If None and libmode is True, loads the default libmode pipeline.
     block : bool, default=True
         If True, blocks until the pipeline completes.
         If False, returns an interface to control the pipeline externally.
@@ -241,6 +246,9 @@ def run_pipeline(
     stderr : Optional[TextIO], default=None
         Optional file-like stream to which subprocess stderr should be redirected.
         If None, stderr is redirected to /dev/null.
+    libmode : bool, default=True
+        If True and pipeline_config is None, loads the default libmode pipeline configuration.
+        If False, requires pipeline_config to be provided.
 
     Returns
     -------
@@ -252,11 +260,35 @@ def run_pipeline(
 
     Raises
     ------
+    ValueError
+        If pipeline_config is None and libmode is False.
     RuntimeError
         If the subprocess fails to start or exits with an error.
     Exception
         Any other exceptions raised during pipeline launch or configuration.
     """
+    # Load default libmode pipeline if no config provided and libmode is True
+    if pipeline_config is None:
+        if libmode:
+            logger.info("Loading default libmode pipeline configuration")
+            # Substitute environment variables in the YAML content
+            substituted_content = substitute_env_vars_in_yaml_content(DEFAULT_LIBMODE_PIPELINE_YAML)
+
+            # Parse the substituted content with PyYAML
+            try:
+                processed_config = yaml.safe_load(substituted_content)
+            except yaml.YAMLError as e:
+                error_message = (
+                    f"Failed to parse default libmode pipeline YAML after environment variable substitution. "
+                    f"Error: {e}"
+                )
+                raise ValueError(error_message) from e
+
+            # Create PipelineConfigSchema from the processed config
+            pipeline_config = PipelineConfigSchema(**processed_config)
+        else:
+            raise ValueError("pipeline_config must be provided when libmode is False")
+
     if disable_dynamic_scaling is not None:
         pipeline_config.pipeline.disable_dynamic_scaling = disable_dynamic_scaling
     if dynamic_memory_threshold is not None:

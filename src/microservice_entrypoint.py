@@ -71,7 +71,7 @@ def cli(
 
     logger.debug(f"Ingest Configuration:\n{json.dumps(pipeline_config.model_dump(), indent=2)}")
 
-    run_pipeline(pipeline_config)
+    run_pipeline(pipeline_config, libmode=False)
 
 
 if __name__ == "__main__":
