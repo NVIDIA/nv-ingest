@@ -523,7 +523,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.20),
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.07, replica_limit=6),
     )
 
     return stage_name
@@ -628,8 +628,22 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
     return source_name
 
 
-def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14):
+def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14, replica_limit=None):
+    """
+    Calculate max replicas based on CPU percentage with optional upper limit.
+
+    Args:
+        default_cpu_count (int, optional): CPU cores to use. Auto-detected if None.
+        percentage_of_cpu (float, optional): CPU percentage to allocate. Defaults to 0.14.
+        replica_limit (int, optional): Upper bound for replicas. Defaults to None.
+
+    Returns:
+        int: Maximum replicas, at least 1.
+    """
     if default_cpu_count is None:
         default_cpu_count = _system_resource_probe.get_cpu_count()
 
-    return int(max(1, (default_cpu_count * percentage_of_cpu)))
+    _max_replicas = int(max(1, (default_cpu_count * percentage_of_cpu)))
+    if replica_limit is not None:
+        _max_replicas = min(_max_replicas, replica_limit)
+    return _max_replicas
