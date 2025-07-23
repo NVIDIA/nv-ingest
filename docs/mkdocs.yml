@@ -77,8 +77,6 @@ nav:
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
         - Telemetry: extraction/telemetry.md
-      - Customize Your Pipeline:
-        - Add User-defined Stages: extraction/user-defined-stages.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Content Metadata: extraction/content-metadata.md
