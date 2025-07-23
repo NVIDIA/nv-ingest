@@ -84,7 +84,6 @@ results = ingestor.files("/path/to/document.pdf") \
         run_before=True
     ) \
     .embed() \
-    .store() \
     .ingest()
 
 # Alternative: UDF to run after text embedding stage
@@ -96,7 +95,6 @@ results = ingestor.files("/path/to/document.pdf") \
         target_stage="text_embedder",
         run_after=True
     ) \
-    .store() \
     .ingest()
 
 # Using phase-based targeting (legacy approach)
@@ -107,7 +105,6 @@ results = ingestor.files("/path/to/document.pdf") \
         phase="embed"  # or phase=4
     ) \
     .embed() \
-    .store() \
     .ingest()
 ```
 
