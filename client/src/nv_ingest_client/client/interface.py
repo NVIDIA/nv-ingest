@@ -9,6 +9,8 @@ import glob
 import json
 import logging
 import os
+import math
+import heapq
 import shutil
 import tempfile
 import threading
@@ -71,6 +73,42 @@ def safe_filename(base_dir, filename, suffix=""):
     if len(filename) > allowed:
         filename = filename[:allowed]
     return filename + suffix
+
+
+def balanced_groups_flat_order(
+    file_paths,
+    group_size=32,
+    weight_fn=os.path.getsize,
+):
+    # 1) sizes, sorted big -> small
+    # Sort by weight (descending), then by filename (ascending) for ties
+    def sort_key(weight_path_tuple):
+        weight, path = weight_path_tuple
+        return (-weight, path.name)
+
+    files = sorted(((weight_fn(p), p) for p in file_paths), key=sort_key)
+    n = len(files)
+    num_bins = math.ceil(n / group_size)
+
+    # 2) bins + heap over current loads (only for bins that are not full yet)
+    bins = [[] for _ in range(num_bins)]
+    loads = [0] * num_bins
+    counts = [0] * num_bins
+    heap = [(0, i) for i in range(num_bins)]
+    heapq.heapify(heap)
+
+    # 3) place biggest first into the currently lightest bin
+    for size, path in files:
+        total, i = heapq.heappop(heap)
+        bins[i].append(path)
+        loads[i] += size
+        counts[i] += 1
+        if counts[i] < group_size:  # still has capacity
+            heapq.heappush(heap, (loads[i], i))
+
+    # 4) flatten (each consecutive block of `group_size` is a balanced batch)
+    balanced_ls = [p for b in bins for p in b]
+    return balanced_ls
 
 
 def ensure_job_specs(func):
@@ -366,7 +404,7 @@ class Ingestor:
                         shutil.copyfileobj(f, local_file)
                     local_files.append(local_path)
 
-        self._documents = local_files
+        self._documents = balanced_groups_flat_order(local_files)
         self._job_specs = BatchJobSpec(self._documents)
         self._all_local = True
 
