@@ -246,7 +246,7 @@ def generate_matching_files(file_sources):
 
 def balanced_groups_flat_order(
     file_paths,
-    group_size=32,
+    group_size=16,
     weight_fn=os.path.getsize,
 ):
     # 1) sizes, sorted big -> small
