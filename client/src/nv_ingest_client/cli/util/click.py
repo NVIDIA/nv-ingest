@@ -181,7 +181,32 @@ def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:
         the error details (e.g., expected property format), and show the input that was provided.
     """
     try:
-        return json.loads(options_str)
+        options = json.loads(options_str)
+
+        # Convert string boolean values to actual booleans for extract tasks
+        if task_id == "extract":
+            boolean_fields = [
+                "extract_text",
+                "extract_images",
+                "extract_tables",
+                "extract_charts",
+                "extract_infographics",
+                "extract_page_as_image",
+            ]
+            for field in boolean_fields:
+                if field in options:
+                    value = options[field]
+                    if isinstance(value, str):
+                        if value.lower() in ("true", "1", "yes", "on"):
+                            options[field] = True
+                        elif value.lower() in ("false", "0", "no", "off"):
+                            options[field] = False
+                        else:
+                            raise ValueError(
+                                f"Invalid boolean value for {field}: '{value}'. Use true/false, 1/0, yes/no, or on/off."
+                            )
+
+        return options
     except json.JSONDecodeError as e:
         error_message = (
             f"Invalid JSON format for task '{task_id}': {e.msg} at line {e.lineno} column {e.colno} (char {e.pos}). "

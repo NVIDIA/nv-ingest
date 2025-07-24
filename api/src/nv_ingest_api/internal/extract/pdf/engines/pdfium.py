@@ -423,10 +423,6 @@ def pdfium_extractor(
         pdfium_config = pdfium_config_raw
     else:
         raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
-    # Explicitly check for auth_token and log a warning if it's missing.
-    if not pdfium_config.auth_token:
-        logger.warning("auth_token is missing from the pdfium_config. NIM client may fail authentication.")
-
     # --- End extractor_config extraction ---
 
     logger.debug("Extracting PDF with pdfium backend.")
