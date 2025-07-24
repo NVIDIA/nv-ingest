@@ -329,7 +329,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
-| envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"` |  |
+| envVars.VLM_CAPTION_ENDPOINT | string | `"https://integrate.api.nvidia.com/v1/chat/completions"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |

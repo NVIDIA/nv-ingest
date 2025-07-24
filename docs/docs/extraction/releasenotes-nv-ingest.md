@@ -6,6 +6,41 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+
+
+## Release 25.7.0
+
+The NeMo Retriever extraction 25.7.0 release TODO, including the following:
+
+- TODO
+- TODO
+
+- New notebook for [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
+- New documentation about how to [Add User-defined Stages to Your NeMo Retriever Extraction Pipeline](user-defined-stages.md).
+- Expanded documentation about how to use [Library Mode](quickstart-library-mode.md).
+
+
+### Breaking Changes
+
+There are no breaking changes in this version.
+
+### Upgrade
+
+QA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/main/helm/values.yaml).
+GA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/TODO/helm/values.yaml).
+
+
+
+## Release 25.6.3
+
+The NeMo Retriever extraction 25.6.3 release is a patch release 
+that updates the client's dependency on [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) to the latest stable version.
+
+Only the release branch and the `nv-ingest-client` package have been updated in 25.6.3. 
+The previously released 25.6.2 container on NGC remains unchanged.
+
+
+
 ## Release 25.6.2
 
 The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and feature expansions, including the following:

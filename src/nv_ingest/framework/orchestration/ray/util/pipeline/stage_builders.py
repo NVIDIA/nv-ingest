@@ -57,6 +57,7 @@ from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema impo
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
+from nv_ingest.framework.orchestration.ray.util.env_config import DYNAMIC_MEMORY_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
     total_memory_mb = psutil.virtual_memory().total / (1024**2)
 
     # Allocate up to 75% of memory to this stage, using a 10GB high watermark per worker.
-    allocatable_memory_for_stage_mb = total_memory_mb * 0.75
+    allocatable_memory_for_stage_mb = total_memory_mb * DYNAMIC_MEMORY_THRESHOLD
     memory_based_replicas = int(allocatable_memory_for_stage_mb / 10_000.0)
 
     # Cap the number of replicas by the number of available CPU cores.
@@ -522,7 +523,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.07, replica_limit=6),
     )
 
     return stage_name
@@ -627,8 +628,22 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
     return source_name
 
 
-def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14):
+def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14, replica_limit=None):
+    """
+    Calculate max replicas based on CPU percentage with optional upper limit.
+
+    Args:
+        default_cpu_count (int, optional): CPU cores to use. Auto-detected if None.
+        percentage_of_cpu (float, optional): CPU percentage to allocate. Defaults to 0.14.
+        replica_limit (int, optional): Upper bound for replicas. Defaults to None.
+
+    Returns:
+        int: Maximum replicas, at least 1.
+    """
     if default_cpu_count is None:
         default_cpu_count = _system_resource_probe.get_cpu_count()
 
-    return int(max(1, (default_cpu_count * percentage_of_cpu)))
+    _max_replicas = int(max(1, (default_cpu_count * percentage_of_cpu)))
+    if replica_limit is not None:
+        _max_replicas = min(_max_replicas, replica_limit)
+    return _max_replicas

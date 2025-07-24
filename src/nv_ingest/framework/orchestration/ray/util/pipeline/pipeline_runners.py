@@ -23,16 +23,19 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipelineInterface,
 )
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
+from nv_ingest.framework.orchestration.ray.util.env_config import (
+    DISABLE_DYNAMIC_SCALING,
+    DYNAMIC_MEMORY_THRESHOLD,
+    DYNAMIC_MEMORY_KP,
+    DYNAMIC_MEMORY_KI,
+    DYNAMIC_MEMORY_EMA_ALPHA,
+    DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
+    DYNAMIC_MEMORY_PENALTY_FACTOR,
+    DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
+    DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def str_to_bool(value: str) -> bool:
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-DISABLE_DYNAMIC_SCALING = str_to_bool(os.environ.get("INGEST_DISABLE_DYNAMIC_SCALING", "false"))
-DYNAMIC_MEMORY_THRESHOLD = float(os.environ.get("INGEST_DYNAMIC_MEMORY_THRESHOLD", 0.75))
 
 
 class PipelineCreationSchema(BaseModel):
@@ -88,7 +91,7 @@ class PipelineCreationSchema(BaseModel):
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
+        "https://integrate.api.nvidia.com/v1/chat/completions",
     )
     vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
 
@@ -235,7 +238,15 @@ def _launch_pipeline(
     dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
 
     scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
+        dynamic_memory_scaling=dynamic_memory_scaling,
+        dynamic_memory_threshold=dynamic_memory_threshold,
+        pid_kp=DYNAMIC_MEMORY_KP,
+        pid_ki=DYNAMIC_MEMORY_KI,
+        pid_ema_alpha=DYNAMIC_MEMORY_EMA_ALPHA,
+        pid_target_queue_depth=DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
+        pid_penalty_factor=DYNAMIC_MEMORY_PENALTY_FACTOR,
+        pid_error_boost_factor=DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
+        rcm_memory_safety_buffer_fraction=DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
     )
 
     pipeline = RayPipeline(scaling_config=scaling_config)

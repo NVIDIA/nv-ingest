@@ -9,7 +9,9 @@ import pytest
 from unittest.mock import patch, MagicMock, ANY
 
 import nv_ingest_api.internal.extract.pdf.engines.pdfium as module_under_test
-from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements_using_image_ensemble
+from nv_ingest_api.internal.extract.pdf.engines.pdfium import (
+    _extract_page_elements_using_image_ensemble,
+)
 from nv_ingest_api.util.metadata.aggregators import CroppedImageWithContent
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
@@ -50,7 +52,7 @@ def dummy_extractor_config():
                     "source_location": "s3://bucket/file.pdf",
                     "collection_id": "col123",
                     "partition_id": 1,
-                    "access_level": "public",
+                    "access_level": -1,
                 }
             },
         },
@@ -58,14 +60,34 @@ def dummy_extractor_config():
         "table_output_format": "markdown",
         "extract_images_method": "simple",
         "extract_images_params": {},
-        "pdfium_config": {"workers_per_progress_engine": 2, "yolox_endpoints": ("grpc", "http")},
+        "pdfium_config": {
+            "workers_per_progress_engine": 2,
+            "yolox_endpoints": ("grpc", "http"),
+        },
     }
+
+
+@pytest.fixture
+def pdf_stream_test_page_form_pdf():
+    with open("data/test-page-form.pdf", "rb") as f:
+        pdf_stream = io.BytesIO(f.read())
+    return pdf_stream
+
+
+@pytest.fixture
+def pdf_stream_test_shapes_pdf():
+    with open("data/test-shapes.pdf", "rb") as f:
+        pdf_stream = io.BytesIO(f.read())
+    return pdf_stream
 
 
 @pytest.mark.xfail(reason="TODO: Fix this test")
 def test_extract_page_elements_happy_path(dummy_pages):
     # Mock inference result to return dummy annotations for each page
-    dummy_inference_results = [{"dummy_annotation": "page0"}, {"dummy_annotation": "page1"}]
+    dummy_inference_results = [
+        {"dummy_annotation": "page0"},
+        {"dummy_annotation": "page1"},
+    ]
 
     mock_yolox_client = MagicMock()
     mock_yolox_client.infer.return_value = dummy_inference_results
@@ -475,7 +497,10 @@ def test_pdfium_extractor_happy_path(
 @patch(f"{MODULE_UNDER_TEST}.extract_pdf_metadata")
 @patch(f"{MODULE_UNDER_TEST}.libpdfium.PdfDocument")
 def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metadata):
-    with pytest.raises(ValueError, match="`extractor_config` must include a valid 'row_data' dictionary."):
+    with pytest.raises(
+        ValueError,
+        match="`extractor_config` must include a valid 'row_data' dictionary.",
+    ):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
             extract_text=True,
@@ -508,7 +533,10 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
             extract_tables=True,
             extract_charts=True,
             extract_page_as_image=True,
-            extractor_config={"row_data": {"source_id": "abc"}, "text_depth": "invalid_depth"},
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "text_depth": "invalid_depth",
+            },
         )
 
     with pytest.raises(ValueError, match="Invalid table_output_format: invalid_format"):
@@ -520,14 +548,20 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
             extract_tables=True,
             extract_charts=True,
             extract_page_as_image=True,
-            extractor_config={"row_data": {"source_id": "abc"}, "table_output_format": "invalid_format"},
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "table_output_format": "invalid_format",
+            },
         )
 
 
 @patch(f"{MODULE_UNDER_TEST}.extract_pdf_metadata")
 @patch(f"{MODULE_UNDER_TEST}.libpdfium.PdfDocument")
 def test_pdfium_extractor_invalid_pdfium_config_raises(mock_pdf_doc, mock_extract_metadata):
-    with pytest.raises(ValueError, match="`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance."):
+    with pytest.raises(
+        ValueError,
+        match="`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.",
+    ):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
             extract_text=True,
@@ -536,5 +570,94 @@ def test_pdfium_extractor_invalid_pdfium_config_raises(mock_pdf_doc, mock_extrac
             extract_tables=True,
             extract_charts=True,
             extract_page_as_image=True,
-            extractor_config={"row_data": {"source_id": "abc"}, "pdfium_config": "not_a_dict"},
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "pdfium_config": "not_a_dict",
+            },
         )
+
+
+def test_pdfium_extractor_page_form(pdf_stream_test_page_form_pdf, dummy_extractor_config):
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "simple"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 18
+    assert all(data[0].value == "image" for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 841 for data in extracted_data)
+
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "group"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 1
+    assert extracted_data[0][0].value == "image"
+    assert extracted_data[0][1]["image_metadata"]["image_location"] == (
+        306,
+        219,
+        524,
+        375,
+    )
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 841 for data in extracted_data)
+
+
+def test_pdfium_extractor_shapes_grouped(pdf_stream_test_shapes_pdf, dummy_extractor_config):
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "group"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_shapes_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 3
+    assert all(data[0].value == "image" for data in extracted_data)
+    assert extracted_data[0][1]["image_metadata"]["image_location"] == (
+        149,
+        33,
+        549,
+        308,
+    )
+    assert extracted_data[1][1]["image_metadata"]["image_location"] == (
+        36,
+        56,
+        131,
+        114,
+    )
+    assert extracted_data[2][1]["image_metadata"]["image_location"] == (538, 0, 561, 33)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 419 for data in extracted_data)
