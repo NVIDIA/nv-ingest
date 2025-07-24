@@ -275,8 +275,9 @@ def balanced_groups_flat_order(
         if counts[i] < group_size:  # still has capacity
             heapq.heappush(heap, (loads[i], i))
 
-    # 4) flatten (each consecutive block of `group_size` is a balanced batch)
-    balanced_ls = [p for b in bins for p in b]
+    # 4) sort bins by cumulative size (largest first), then flatten
+    sorted_bins = [bins[i] for _, i in sorted(zip(loads, range(num_bins)), reverse=True)]
+    balanced_ls = [p for b in sorted_bins for p in b]
     return balanced_ls
 
 
