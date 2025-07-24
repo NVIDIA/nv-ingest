@@ -253,7 +253,7 @@ def balanced_groups_flat_order(
     # Sort by weight (descending), then by filename (ascending) for ties
     def sort_key(weight_path_tuple):
         weight, path = weight_path_tuple
-        return (-weight, path.name)
+        return (-weight, path)
 
     files = sorted(((weight_fn(p), p) for p in file_paths), key=sort_key)
     n = len(files)
