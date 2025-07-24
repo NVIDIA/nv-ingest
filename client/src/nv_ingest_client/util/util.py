@@ -8,6 +8,8 @@ import logging
 import os
 import time
 import typing
+import math
+import heapq
 from typing import Dict
 from typing import List
 
@@ -240,6 +242,43 @@ def generate_matching_files(file_sources):
         for file_path in glob.glob(pattern, recursive=True):
             if os.path.isfile(file_path):
                 yield file_path
+
+
+def balanced_groups_flat_order(
+    file_paths,
+    group_size=32,
+    weight_fn=os.path.getsize,
+):
+    # 1) sizes, sorted big -> small
+    # Sort by weight (descending), then by filename (ascending) for ties
+    def sort_key(weight_path_tuple):
+        weight, path = weight_path_tuple
+        return (-weight, path.name)
+
+    files = sorted(((weight_fn(p), p) for p in file_paths), key=sort_key)
+    n = len(files)
+    num_bins = math.ceil(n / group_size)
+
+    # 2) bins + heap over current loads (only for bins that are not full yet)
+    bins = [[] for _ in range(num_bins)]
+    loads = [0] * num_bins
+    counts = [0] * num_bins
+    heap = [(0, i) for i in range(num_bins)]
+    heapq.heapify(heap)
+
+    # 3) place biggest first into the currently lightest bin
+    for size, path in files:
+        total, i = heapq.heappop(heap)
+        bins[i].append(path)
+        loads[i] += size
+        counts[i] += 1
+        if counts[i] < group_size:  # still has capacity
+            heapq.heappush(heap, (loads[i], i))
+
+    # 4) flatten (each consecutive block of `group_size` is a balanced batch)
+    balanced_ls = [p for b in bins for p in b]
+    return balanced_ls
+
 
 
 def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
