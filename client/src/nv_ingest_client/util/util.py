@@ -280,7 +280,6 @@ def balanced_groups_flat_order(
     return balanced_ls
 
 
-
 def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
     """
     Create and job specifications (JobSpecs) for a batch of files.
