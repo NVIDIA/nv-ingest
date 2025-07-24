@@ -8,17 +8,19 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 
 
-## Release 25.7.0
+## Release 25.7.1
 
-The NeMo Retriever extraction 25.7.0 release TODO, including the following:
+The NeMo Retriever extraction 25.7.1 release adds new hardware and software support, and other improvements, including the following:
 
-- TODO
-- TODO
-
-- New notebook for [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
-- New documentation about how to [Add User-defined Stages to Your NeMo Retriever Extraction Pipeline](user-defined-stages.md).
+- Add support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
+- Add support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
+- Add support for nemoretriever-ocr. For details, refer to [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
+- Add support for Llama Nemotron VLM 8b NIM for image captioning. For details, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+- Add support for custom vector database implementations. For details, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
+- Add support for custom Lambda stages.  For details, refer to [Add User-defined Stages to Your NeMo Retriever Extraction Pipeline](user-defined-stages.md).
 - Expanded documentation about how to use [Library Mode](quickstart-library-mode.md).
-
+- Add support for Integer, float, boolean, and array in custom metadata during Milvus entity creation.
+- Add support for running more than one VLM at a time by using Helm.  For details, refer to [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
 
 ### Breaking Changes
 
