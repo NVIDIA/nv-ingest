@@ -91,7 +91,7 @@ class PipelineCreationSchema(BaseModel):
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
+        "https://integrate.api.nvidia.com/v1/chat/completions",
     )
     vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
 
