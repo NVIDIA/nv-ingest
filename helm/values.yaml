@@ -858,7 +858,7 @@ prometheus:
 ## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"] Endpoint for embedding service
 ## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for embedding service
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
-## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"] Endpoint for VLM caption service
+## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://integrate.api.nvidia.com/v1/chat/completions"] Endpoint for VLM caption service
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"] Model name for VLM caption service
 ## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
@@ -902,7 +902,7 @@ envVars:
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
+  VLM_CAPTION_ENDPOINT: "https://integrate.api.nvidia.com/v1/chat/completions"
   VLM_CAPTION_MODEL_NAME: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
   AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
