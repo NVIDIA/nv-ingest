@@ -218,6 +218,7 @@ class Ingestor:
         self._client = client
         self._job_queue_id = job_queue_id
         self._vdb_bulk_upload = None
+        self._purge_results_after_vdb_upload = True
 
         if self._client is None:
             client_kwargs = filter_function_kwargs(NvIngestClient, **kwargs)
@@ -235,6 +236,21 @@ class Ingestor:
 
         self._output_config = None
         self._created_temp_output_dir = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._output_config and (self._output_config["cleanup"] is True):
+            dir_to_cleanup = self._output_config["output_directory"]
+            try:
+                shutil.rmtree(dir_to_cleanup)
+            except FileNotFoundError:
+                logger.warning(
+                    f"Directory to be cleaned up not found (might have been removed already): {dir_to_cleanup}"
+                )
+            except OSError as e:
+                logger.error(f"Error removing {dir_to_cleanup}: {e}")
 
     def _create_client(self, **kwargs) -> None:
         """
@@ -435,7 +451,7 @@ class Ingestor:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
-                file_suffix = f".{file_ext}.results.jsonl"
+                file_suffix = f".{file_ext.strip('.')}.results.jsonl"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
@@ -554,6 +570,10 @@ class Ingestor:
                 raise RuntimeError(f"Failed to ingest documents, unable to complete vdb bulk upload: {failures}")
 
             self._vdb_bulk_upload.run(results)
+
+            if self._purge_results_after_vdb_upload:
+                logger.info("Purging saved results from disk after successful VDB upload.")
+                self._purge_saved_results(results)
 
         return_failures = _return_failures
 
@@ -818,12 +838,15 @@ class Ingestor:
 
         return self
 
-    def vdb_upload(self, **kwargs: Any) -> "Ingestor":
+    def vdb_upload(self, purge_results_after_upload: bool = True, **kwargs: Any) -> "Ingestor":
         """
         Adds a VdbUploadTask to the batch job specification.
 
         Parameters
         ----------
+        purge_results_after_upload : bool, optional
+            If True, the saved result files will be deleted from disk after a successful
+            upload. This requires `save_to_disk()` to be active. Defaults to True
         kwargs : dict
             Parameters specific to the VdbUploadTask.
 
@@ -842,12 +865,14 @@ class Ingestor:
             raise ValueError(f"Invalid type for op: {type(vdb_op)}, must be type VDB or str.")
 
         self._vdb_bulk_upload = vdb_op
+        self._purge_results_after_vdb_upload = purge_results_after_upload
 
         return self
 
     def save_to_disk(
         self,
         output_directory: Optional[str] = None,
+        cleanup: bool = True,
     ) -> "Ingestor":
         if not output_directory:
             self._created_temp_output_dir = tempfile.mkdtemp(prefix="ingestor_results_")
@@ -855,10 +880,45 @@ class Ingestor:
 
         self._output_config = {
             "output_directory": output_directory,
+            "cleanup": cleanup,
         }
         ensure_directory_with_permissions(output_directory)
 
         return self
+
+    def _purge_saved_results(self, saved_results: List[LazyLoadedList]):
+        """
+        Deletes the .jsonl files associated with the results and the temporary
+        output directory if it was created by this Ingestor instance.
+        """
+        if not self._output_config:
+            logger.warning("Purge requested, but save_to_disk was not configured. No files to purge.")
+            return
+
+        deleted_files_count = 0
+        for result_item in saved_results:
+            if isinstance(result_item, LazyLoadedList) and hasattr(result_item, "filepath"):
+                filepath = result_item.filepath
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        deleted_files_count += 1
+                        logger.debug(f"Purged result file: {filepath}")
+                except OSError as e:
+                    logger.error(f"Error purging result file {filepath}: {e}", exc_info=True)
+
+        logger.info(f"Purged {deleted_files_count} saved result file(s).")
+
+        if self._created_temp_output_dir:
+            logger.info(f"Removing temporary output directory: {self._created_temp_output_dir}")
+            try:
+                shutil.rmtree(self._created_temp_output_dir)
+                self._created_temp_output_dir = None  # Reset flag after successful removal
+            except OSError as e:
+                logger.error(
+                    f"Error removing temporary output directory {self._created_temp_output_dir}: {e}",
+                    exc_info=True,
+                )
 
     @ensure_job_specs
     def caption(self, **kwargs: Any) -> "Ingestor":
