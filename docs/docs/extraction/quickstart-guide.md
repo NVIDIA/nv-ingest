@@ -45,7 +45,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-5. (Optional) For faster OCR performance, you can use the NemoRetriever OCR container instead of the default PaddleOCR. Currently, the NemoRetriever OCR container is in early access preview. Set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr and then set these values in your .env file:
 
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1

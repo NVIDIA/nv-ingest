@@ -26,21 +26,29 @@ This includes the following:
 
 ## Hardware Requirements
 
-The following are the hardware requirements to run NeMo Retriever Extraction.
+NeMo Retriever extraction supports the following GPU hardware.
 
+- [RTX Pro 6000 Blackwell Workstation Edition](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/)
+- [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
+- [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
+- [A100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/a100/)
+- [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/)
+- [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
 
-| GPU Option                                    | B200   | H100        | A100        | A10G   | L40S   |
-|-----------------------------------------------|--------|-------------|-------------|--------|--------|
-| Family                                        | SXM    | SXM or PCIe | SXM or PCIe | —      | —      |
-| Memory                                        | 192GB  | 80GB        | 80GB        | 24GB   | 48GB   |
-| Core Features Total GPUs                      | 1      | 1           | 1           | 1      | 1      |
-| Core Features Total Disk Space                | ~150GB | ~150GB      | ~150GB      | ~150GB | ~150GB |
-| Audio Additional Dedicated GPUs               | 1      | 1           | 1           | 1      | 1      |
-| Audio Additional Disk Space                   | ~37GB  | ~37GB       | ~37GB       | ~37GB  | ~37GB  |
-| nemoretriever-parse Additional Dedicated GPUs | 1      | 1           | 1           | 1      | 1      |
-| nemoretriever-parse Additional Disk Space     | ~16GB  | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
-| VLM Additional Dedicated GPUs                 | 1      | 1           | 1           | 1      | 1      |
-| VLM Additional Disk Space                     | ~16GB  | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
+The following are the hardware requirements to run NeMo Retriever extraction.
+
+| GPU Option                                    | RTX Pro 6000 | B200   | H100        | A100        | A10G   | L40S   |
+|-----------------------------------------------|--------------|--------|-------------|-------------|--------|--------|
+| Family                                        | PCIe         | SXM    | SXM or PCIe | SXM or PCIe | —      | —      |
+| Memory                                        | 96GB         | 192GB  | 80GB        | 80GB        | 24GB   | 48GB   |
+| Core Features Total GPUs                      | 1            | 1      | 1           | 1           | 1      | 1      |
+| Core Features Total Disk Space                | ~150GB       | ~150GB | ~150GB      | ~150GB      | ~150GB | ~150GB |
+| Audio Additional Dedicated GPUs               | 1            | 1      | 1           | 1           | 1      | 1      |
+| Audio Additional Disk Space                   | ~37GB        | ~37GB  | ~37GB       | ~37GB       | ~37GB  | ~37GB  |
+| nemoretriever-parse Additional Dedicated GPUs | 1            | 1      | 1           | 1           | 1      | 1      |
+| nemoretriever-parse Additional Disk Space     | ~16GB        | ~16GB  | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
+| VLM Additional Dedicated GPUs                 | 1            | 1      | 1           | 1           | 1      | 1      |
+| VLM Additional Disk Space                     | ~16GB        | ~16GB  | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
 
 
 
