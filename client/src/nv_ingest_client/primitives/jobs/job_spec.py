@@ -264,15 +264,16 @@ class BatchJobSpec:
         """
         from nv_ingest_client.util.util import create_job_specs_for_batch
         from nv_ingest_client.util.util import generate_matching_files
+        from nv_ingest_client.util.util import balanced_groups_flat_order
 
         if isinstance(files, str):
             files = [files]
 
         matching_files = list(generate_matching_files(files))
+        matching_files = balanced_groups_flat_order(matching_files)
         if not matching_files:
             logger.warning(f"No files found matching {files}.")
             return
-
         job_specs = create_job_specs_for_batch(matching_files)
         for job_spec in job_specs:
             self.add_job_spec(job_spec)

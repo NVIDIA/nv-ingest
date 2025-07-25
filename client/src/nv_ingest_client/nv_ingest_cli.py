@@ -126,7 +126,7 @@ Tasks and Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1'.
+      Default: 'https://integrate.api.nvidia.com/v1/chat/completions'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b

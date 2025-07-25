@@ -132,7 +132,7 @@ To specify a different API endpoint, pass additional parameters to `caption`.
 
 ```python
 ingestor = ingestor.caption(
-    endpoint_url="https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
+    endpoint_url="https://integrate.api.nvidia.com/v1/chat/completions",
     model_name="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     api_key="nvapi-"
 )

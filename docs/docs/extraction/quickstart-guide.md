@@ -44,25 +44,22 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
 
-    !!! tip "Performance Optimization: Faster OCR"
 
-    For faster OCR performance, you can use the new EA NemoRetriever OCR container instead of the default PaddleOCR. Set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the NemoRetriever OCR container instead of the default PaddleOCR. Currently, the NemoRetriever OCR container is in early access preview. Set these values in your .env file:
 
-        ```
-        OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-        OCR_TAG=latest
-        OCR_MODEL_NAME=scene_text
-        ```
-
-        Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
-
-        Note: This OCR option is currently in preview and not yet the default.
+    ```
+    OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    OCR_TAG=latest
+    OCR_MODEL_NAME=scene_text
+    ```
+        
+   Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
    
-5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+6. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -70,7 +67,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -88,7 +85,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
+9. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES

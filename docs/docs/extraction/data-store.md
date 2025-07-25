@@ -65,3 +65,5 @@ Ingestor(client=client)
 You can ingest to other data stores by using the `Ingestor.vdb_upload` method; 
 however, you must configure other data stores and connections yourself. 
 NeMo Retriever extraction does not provide connections to other data sources. 
+
+For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).

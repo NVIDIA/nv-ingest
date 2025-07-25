@@ -60,6 +60,13 @@ class IngestPipelineBuilder:
         scaling_config = ScalingConfig(
             dynamic_memory_scaling=not config.pipeline.disable_dynamic_scaling,
             dynamic_memory_threshold=config.pipeline.dynamic_memory_threshold,
+            pid_kp=config.pipeline.pid_controller.kp,
+            pid_ki=config.pipeline.pid_controller.ki,
+            pid_ema_alpha=config.pipeline.pid_controller.ema_alpha,
+            pid_target_queue_depth=config.pipeline.pid_controller.target_queue_depth,
+            pid_penalty_factor=config.pipeline.pid_controller.penalty_factor,
+            pid_error_boost_factor=config.pipeline.pid_controller.error_boost_factor,
+            rcm_memory_safety_buffer_fraction=config.pipeline.pid_controller.rcm_memory_safety_buffer_fraction,
         )
         self._pipeline: RayPipeline = RayPipeline(scaling_config=scaling_config)
         self._system_resource_probe: SystemResourceProbe = system_resource_probe or SystemResourceProbe()

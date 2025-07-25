@@ -393,8 +393,18 @@ edges:
     to: "drain"
     queue_size: 32
 
-# Optional pipeline-wide settings
+# Pipeline Runtime Configuration
+# These parameters control dynamic scaling and PID controller behavior
+# All values can be overridden by environment variables from env_config.py
 pipeline:
   disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
   dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
+  pid_controller:
+    kp: $INGEST_DYNAMIC_MEMORY_KP|0.2
+    ki: $INGEST_DYNAMIC_MEMORY_KI|0.01
+    ema_alpha: $INGEST_DYNAMIC_MEMORY_EMA_ALPHA|0.1
+    target_queue_depth: $INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH|0
+    penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
+    error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
+    rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
   launch_simple_broker: false

@@ -28,6 +28,7 @@ from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
 from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -140,6 +141,7 @@ def _run_pipeline_process(
 def _launch_pipeline(
     pipeline_config: PipelineConfigSchema,
     block: bool,
+    disable_dynamic_scaling: bool = False,
 ) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
@@ -168,6 +170,12 @@ def _launch_pipeline(
                 ),
             },
         )
+
+    # Handle disable_dynamic_scaling parameter override
+    if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:
+        # Directly modify the pipeline config to disable dynamic scaling
+        pipeline_config.pipeline.disable_dynamic_scaling = True
+        logger.info("Dynamic scaling disabled via function parameter override")
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()
@@ -330,6 +338,7 @@ def run_pipeline(
     pipeline, total_elapsed = _launch_pipeline(
         pipeline_config,
         block=block,
+        disable_dynamic_scaling=disable_dynamic_scaling,
     )
 
     if block:

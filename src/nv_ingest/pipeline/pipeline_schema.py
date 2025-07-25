@@ -151,6 +151,43 @@ class EdgeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PIDControllerConfig(BaseModel):
+    """
+    Configuration for the PID controller used in dynamic scaling.
+
+    Attributes
+    ----------
+    kp : float
+        Proportional gain for the PID controller.
+    ki : float
+        Integral gain for the PID controller.
+    ema_alpha : float
+        Exponential moving average alpha for the PID controller.
+    target_queue_depth : int
+        Target queue depth for the PID controller.
+    penalty_factor : float
+        Penalty factor for the PID controller.
+    error_boost_factor : float
+        Error boost factor for the PID controller.
+    rcm_memory_safety_buffer_fraction : float
+        Resource constraint manager memory safety buffer fraction.
+    """
+
+    kp: float = Field(0.2, gt=0.0, description="Proportional gain for the PID controller.")
+    ki: float = Field(0.01, ge=0.0, description="Integral gain for the PID controller.")
+    ema_alpha: float = Field(
+        0.1, ge=0.0, le=1.0, description="Exponential moving average alpha for the PID controller."
+    )
+    target_queue_depth: int = Field(0, ge=0, description="Target queue depth for the PID controller.")
+    penalty_factor: float = Field(0.1, ge=0.0, description="Penalty factor for the PID controller.")
+    error_boost_factor: float = Field(1.5, gt=0.0, description="Error boost factor for the PID controller.")
+    rcm_memory_safety_buffer_fraction: float = Field(
+        0.15, ge=0.0, le=1.0, description="Resource constraint manager memory safety buffer fraction."
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PipelineRuntimeConfig(BaseModel):
     """
     Configuration for the pipeline's runtime behavior.
@@ -161,11 +198,18 @@ class PipelineRuntimeConfig(BaseModel):
         If True, disables the dynamic scaling of stage replicas.
     dynamic_memory_threshold : float
         The memory utilization threshold (0.0 to 1.0) for dynamic scaling decisions.
+    pid_controller : PIDControllerConfig
+        Configuration for the PID controller used in dynamic scaling.
+    launch_simple_broker : bool
+        If True, launches a simple message broker for the pipeline.
     """
 
     disable_dynamic_scaling: bool = Field(False, description="Disable dynamic scaling of stage replicas.")
     dynamic_memory_threshold: float = Field(
         0.75, ge=0.0, le=0.95, description="Memory utilization threshold for dynamic scaling."
+    )
+    pid_controller: PIDControllerConfig = Field(
+        default_factory=PIDControllerConfig, description="PID controller configuration for dynamic scaling."
     )
     launch_simple_broker: bool = Field(False, description="Launch a simple message broker for the pipeline.")
 
