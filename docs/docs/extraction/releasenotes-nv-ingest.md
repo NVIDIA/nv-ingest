@@ -12,8 +12,8 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 The NeMo Retriever extraction 25.7.1 release adds new hardware and software support, and other improvements, including the following:
 
-- Add support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
-- Add support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
+- Add functional support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
+- Add functional support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
 - Add support for nemoretriever-ocr. For details, refer to [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
 - Add support for Llama Nemotron VLM 8b NIM for image captioning. For details, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 - Add support for custom vector database implementations. For details, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
