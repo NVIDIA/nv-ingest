@@ -12,12 +12,8 @@ from typing import Any
 from typing import Dict
 from typing import Literal
 from typing import Optional
-from typing import get_args
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import field_validator
-from pydantic import model_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
 
 from .task_base import Task
 
@@ -64,142 +60,9 @@ _Type_Extract_Method_PDF = Literal[
     "unstructured_io",
 ]
 
-_Type_Extract_Method_DOCX = Literal["python_docx", "haystack", "unstructured_local", "unstructured_service"]
+_Type_Extract_Images_Method = Literal["group", "yolox"]
 
-_Type_Extract_Method_PPTX = Literal["python_pptx", "haystack", "unstructured_local", "unstructured_service"]
-
-_Type_Extract_Method_Image = Literal["image"]
-
-_Type_Extract_Method_Audio = Literal["audio"]
-
-_Type_Extract_Method_Text = Literal["txt"]
-
-_Type_Extract_Method_Html = Literal["markitdown"]
-
-_Type_Extract_Method_Map = {
-    "bmp": get_args(_Type_Extract_Method_Image),
-    "docx": get_args(_Type_Extract_Method_DOCX),
-    "html": get_args(_Type_Extract_Method_Html),
-    "jpeg": get_args(_Type_Extract_Method_Image),
-    "jpg": get_args(_Type_Extract_Method_Image),
-    "pdf": get_args(_Type_Extract_Method_PDF),
-    "png": get_args(_Type_Extract_Method_Image),
-    "pptx": get_args(_Type_Extract_Method_PPTX),
-    "text": get_args(_Type_Extract_Method_Text),
-    "tiff": get_args(_Type_Extract_Method_Image),
-    "txt": get_args(_Type_Extract_Method_Text),
-    "mp3": get_args(_Type_Extract_Method_Audio),
-    "wav": get_args(_Type_Extract_Method_Audio),
-}
-
-_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium", "nemoretriever_parse"]
-
-_Type_Extract_Tables_Method_DOCX = Literal["python_docx",]
-
-_Type_Extract_Tables_Method_PPTX = Literal["python_pptx",]
-
-_Type_Extract_Tables_Method_Map = {
-    "pdf": get_args(_Type_Extract_Tables_Method_PDF),
-    "docx": get_args(_Type_Extract_Tables_Method_DOCX),
-    "pptx": get_args(_Type_Extract_Tables_Method_PPTX),
-}
-
-_Type_Extract_Images_Method = Literal["simple", "group"]
-
-
-class ExtractTaskSchema(BaseModel):
-    document_type: str
-    extract_method: str = None  # Initially allow None to set a smart default
-    extract_text: bool = True
-    extract_images: bool = True
-    extract_images_method: str = "group"
-    extract_images_params: Optional[Dict[str, Any]] = None
-    extract_tables: bool = True
-    extract_tables_method: str = "yolox"
-    extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
-    extract_infographics: bool = False
-    extract_page_as_image: bool = False
-    extract_audio_params: Optional[Dict[str, Any]] = None
-    text_depth: str = "document"
-    paddle_output_format: Optional[str] = None
-    table_output_format: str = "pseudo_markdown"
-
-    @model_validator(mode="after")
-    @classmethod
-    def set_default_extract_method(cls, values):
-        document_type = values.document_type.lower()  # Ensure case-insensitive comparison
-        extract_method = values.extract_method
-        paddle_output_format = values.paddle_output_format
-
-        if document_type not in _DEFAULT_EXTRACTOR_MAP:
-            raise ValueError(
-                f"Unsupported document type: {document_type}."
-                f" Supported types are: {list(_DEFAULT_EXTRACTOR_MAP.keys())}"
-            )
-
-        if extract_method is None:
-            values.extract_method = _DEFAULT_EXTRACTOR_MAP[document_type]
-
-        if paddle_output_format is not None:
-            logger.warning(
-                "`paddle_output_format` is deprecated and will be removed in a future release. "
-                "Please use `table_output_format` instead."
-            )
-            values.table_output_format = paddle_output_format
-
-        return values
-
-    @field_validator("extract_charts")
-    def set_default_extract_charts(cls, v, values):
-        # `extract_charts` is initially set to None for backward compatibility.
-        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract_charts: true} enables both
-        # table and chart extraction.
-        # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
-        extract_charts = v
-        if extract_charts is None:
-            extract_charts = values.data.get("extract_tables")
-
-        return extract_charts
-
-    @field_validator("extract_method")
-    def extract_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
-
-        # Skip validation for text-like types, since they do not have 'extract' stages.
-        if document_type in ["txt", "text", "json", "md", "sh"]:
-            return
-
-        valid_methods = set(_Type_Extract_Method_Map[document_type])
-        if v not in valid_methods:
-            raise ValueError(f"extract_method must be one of {valid_methods}")
-
-        return v
-
-    @field_validator("document_type")
-    def document_type_must_be_supported(cls, v):
-        if v.lower() not in _DEFAULT_EXTRACTOR_MAP:
-            raise ValueError(
-                f"Unsupported document type '{v}'. Supported types are: {', '.join(_DEFAULT_EXTRACTOR_MAP.keys())}"
-            )
-        return v.lower()
-
-    @field_validator("extract_tables_method")
-    def extract_tables_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
-        valid_methods = set(_Type_Extract_Tables_Method_Map[document_type])
-        if v not in valid_methods:
-            raise ValueError(f"extract_method must be one of {valid_methods}")
-        return v
-
-    @field_validator("extract_images_method")
-    def extract_images_method_must_be_valid(cls, v):
-        if v.lower() not in get_args(_Type_Extract_Images_Method):
-            raise ValueError(
-                f"Unsupported document type '{v}'. Supported types are: {', '.join(_Type_Extract_Images_Method)}"
-            )
-        return v.lower()
-
-    model_config = ConfigDict(extra="forbid")
+_Type_Extract_Tables_Method_PDF = Literal["yolox", "paddle"]
 
 
 class ExtractTask(Task):
@@ -210,7 +73,7 @@ class ExtractTask(Task):
     def __init__(
         self,
         document_type,
-        extract_method: _Type_Extract_Method_PDF = "pdfium",
+        extract_method: _Type_Extract_Method_PDF = None,
         extract_text: bool = False,
         extract_images: bool = False,
         extract_tables: bool = False,
@@ -230,19 +93,62 @@ class ExtractTask(Task):
         """
         super().__init__()
 
-        self._document_type = document_type
+        # Set default extract_method if None
+        if extract_method is None:
+            # Handle both string and enum inputs
+            if hasattr(document_type, "value"):
+                document_type_str = document_type.value
+            else:
+                document_type_str = document_type
+            document_type_lower = document_type_str.lower()
+            if document_type_lower not in _DEFAULT_EXTRACTOR_MAP:
+                raise ValueError(
+                    f"Unsupported document type: {document_type}."
+                    f" Supported types are: {list(_DEFAULT_EXTRACTOR_MAP.keys())}"
+                )
+            extract_method = _DEFAULT_EXTRACTOR_MAP[document_type_lower]
+
+        # Set default extract_charts if None
+        if extract_charts is None:
+            extract_charts = extract_tables
+
+        # Build params dict for API schema validation
+        extract_params = {
+            "extract_text": extract_text,
+            "extract_images": extract_images,
+            "extract_images_method": extract_images_method,
+            "extract_tables": extract_tables,
+            "extract_tables_method": extract_tables_method,
+            "extract_charts": extract_charts,
+            "extract_infographics": extract_infographics,
+            "extract_page_as_image": extract_page_as_image,
+            "text_depth": text_depth,
+            "table_output_format": table_output_format,
+        }
+
+        # Add optional parameters if provided
+        if extract_images_params:
+            extract_params["extract_images_params"] = extract_images_params
+        if extract_audio_params:
+            extract_params["extract_audio_params"] = extract_audio_params
+
+        # Use the API schema for validation
+        validated_data = IngestTaskExtractSchema(
+            document_type=document_type,
+            method=extract_method,
+            params=extract_params,
+        )
+
+        # Store validated data
+        self._document_type = validated_data.document_type
+        self._extract_method = validated_data.method
         self._extract_audio_params = extract_audio_params
         self._extract_images = extract_images
-        self._extract_method = extract_method
         self._extract_tables = extract_tables
         self._extract_images_method = extract_images_method
         self._extract_images_params = extract_images_params
         self._extract_tables_method = extract_tables_method
-        # `extract_charts` is initially set to None for backward compatibility.
-        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
-        # table and chart extraction.
-        # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
-        self._extract_charts = extract_charts if extract_charts is not None else extract_tables
+        self._extract_charts = extract_charts
         self._extract_infographics = extract_infographics
         self._extract_page_as_image = extract_page_as_image
         self._extract_text = extract_text
@@ -256,34 +162,27 @@ class ExtractTask(Task):
         """
         info = ""
         info += "Extract Task:\n"
-        info += f"  document type: {self._document_type}\n"
-        info += f"  extract method: {self._extract_method}\n"
-        info += f"  extract text: {self._extract_text}\n"
-        info += f"  extract images: {self._extract_images}\n"
-        info += f"  extract tables: {self._extract_tables}\n"
-        info += f"  extract charts: {self._extract_charts}\n"
-        info += f"  extract infographics: {self._extract_infographics}\n"
-        info += f"  extract page as image: {self._extract_page_as_image}\n"
-        info += f"  extract images method: {self._extract_images_method}\n"
-        info += f"  extract tables method: {self._extract_tables_method}\n"
-        info += f"  text depth: {self._text_depth}\n"
+        info += f"  document_type: {self._document_type.value}\n"
+        info += f"  extract_method: {self._extract_method}\n"
+        info += f"  extract_text: {self._extract_text}\n"
+        info += f"  extract_images: {self._extract_images}\n"
+        info += f"  extract_tables: {self._extract_tables}\n"
+        info += f"  extract_charts: {self._extract_charts}\n"
+        info += f"  extract_infographics: {self._extract_infographics}\n"
+        info += f"  extract_page_as_image: {self._extract_page_as_image}\n"
+        info += f"  text_depth: {self._text_depth}\n"
         info += f"  table_output_format: {self._table_output_format}\n"
-
-        if self._extract_images_params:
-            info += f"  extract images params: {self._extract_images_params}\n"
-        if self._extract_audio_params:
-            info += f"  extract audio params: {self._extract_audio_params}\n"
         return info
 
     def to_dict(self) -> Dict:
         """
-        Convert to a dict for submission to redis (fixme)
+        Convert to a dict for submission to redis
         """
         extract_params = {
             "extract_text": self._extract_text,
             "extract_images": self._extract_images,
-            "extract_tables": self._extract_tables,
             "extract_images_method": self._extract_images_method,
+            "extract_tables": self._extract_tables,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "extract_infographics": self._extract_infographics,
@@ -306,7 +205,7 @@ class ExtractTask(Task):
 
         task_properties = {
             "method": self._extract_method,
-            "document_type": self._document_type,
+            "document_type": self._document_type.value,
             "params": extract_params,
         }
 
@@ -339,4 +238,4 @@ class ExtractTask(Task):
 
     @property
     def document_type(self):
-        return self._document_type
+        return self._document_type.value

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import atexit
+import json
 import logging
 import multiprocessing
 import os
@@ -14,107 +15,25 @@ from datetime import datetime
 from typing import Union, Tuple, Optional, TextIO
 
 import ray
-from pydantic import BaseModel, ConfigDict
+import yaml
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipeline,
-    ScalingConfig,
     RayPipelineSubprocessInterface,
     RayPipelineInterface,
 )
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
-from nv_ingest.framework.orchestration.ray.util.env_config import (
-    DISABLE_DYNAMIC_SCALING,
-    DYNAMIC_MEMORY_THRESHOLD,
-    DYNAMIC_MEMORY_KP,
-    DYNAMIC_MEMORY_KI,
-    DYNAMIC_MEMORY_EMA_ALPHA,
-    DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
-    DYNAMIC_MEMORY_PENALTY_FACTOR,
-    DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
-    DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
-)
+from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import start_simple_message_broker
+from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
+from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
+
 
 logger = logging.getLogger(__name__)
 
 
-class PipelineCreationSchema(BaseModel):
-    """
-    Schema for pipeline creation configuration.
-
-    Contains all parameters required to set up and execute the pipeline,
-    including endpoints, API keys, and processing options.
-    """
-
-    arrow_default_memory_pool: str = os.getenv("ARROW_DEFAULT_MEMORY_POOL", "system")
-
-    # Audio processing settings
-    audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
-    audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
-    audio_infer_protocol: str = os.getenv("AUDIO_INFER_PROTOCOL", "grpc")
-
-    # Embedding model settings
-    embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
-
-    # General pipeline settings
-    ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
-    max_ingest_process_workers: str = os.getenv("MAX_INGEST_PROCESS_WORKERS", "16")
-
-    # Messaging configuration
-    message_client_host: str = os.getenv("MESSAGE_CLIENT_HOST", "localhost")
-    message_client_port: str = os.getenv("MESSAGE_CLIENT_PORT", "7671")
-    message_client_type: str = os.getenv("MESSAGE_CLIENT_TYPE", "simple")
-
-    # NeMo Retriever settings
-    nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
-    )
-    nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
-    nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
-
-    # API keys
-    ngc_api_key: str = os.getenv("NGC_API_KEY", "")
-    nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-
-    # Observability settings
-    otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
-
-    # OCR settings
-    ocr_http_endpoint: str = os.getenv("OCR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
-    ocr_infer_protocol: str = os.getenv("OCR_INFER_PROTOCOL", "http")
-    ocr_model_name: str = os.getenv("OCR_MODEL_NAME", "paddle")
-
-    # Task queue settings
-    REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
-
-    # Vision language model settings
-    vlm_caption_endpoint: str = os.getenv(
-        "VLM_CAPTION_ENDPOINT",
-        "https://integrate.api.nvidia.com/v1/chat/completions",
-    )
-    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
-
-    # YOLOX image processing settings
-    yolox_graphic_elements_http_endpoint: str = os.getenv(
-        "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
-    )
-    yolox_graphic_elements_infer_protocol: str = os.getenv("YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL", "http")
-
-    # YOLOX page elements settings
-    yolox_http_endpoint: str = os.getenv(
-        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
-    )
-    yolox_infer_protocol: str = os.getenv("YOLOX_INFER_PROTOCOL", "http")
-
-    # YOLOX table structure settings
-    yolox_table_structure_http_endpoint: str = os.getenv(
-        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
-    )
-    yolox_table_structure_infer_protocol: str = os.getenv("YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL", "http")
-
-    model_config = ConfigDict(extra="forbid")
+def str_to_bool(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def redirect_os_fds(stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = None):
@@ -177,9 +96,7 @@ def kill_pipeline_process_group(pid: int):
 
 
 def _run_pipeline_process(
-    ingest_config: PipelineCreationSchema,
-    disable_dynamic_scaling: Optional[bool],
-    dynamic_memory_threshold: Optional[float],
+    pipeline_config: PipelineConfigSchema,
     raw_stdout: Optional[TextIO] = None,
     raw_stderr: Optional[TextIO] = None,
 ):
@@ -189,7 +106,7 @@ def _run_pipeline_process(
 
     Parameters
     ----------
-    ingest_config : PipelineCreationSchema
+    pipeline_config : PipelineConfigSchema
         Validated pipeline configuration.
     disable_dynamic_scaling : Optional[bool]
         Whether to disable dynamic scaling.
@@ -213,10 +130,8 @@ def _run_pipeline_process(
 
     try:
         _launch_pipeline(
-            ingest_config,
+            pipeline_config,
             block=True,
-            disable_dynamic_scaling=disable_dynamic_scaling,
-            dynamic_memory_threshold=dynamic_memory_threshold,
         )
     except Exception as e:
         sys.__stderr__.write(f"Subprocess pipeline run failed: {e}\n")
@@ -224,77 +139,91 @@ def _run_pipeline_process(
 
 
 def _launch_pipeline(
-    ingest_config: PipelineCreationSchema,
+    pipeline_config: PipelineConfigSchema,
     block: bool,
-    disable_dynamic_scaling: bool = None,
-    dynamic_memory_threshold: float = None,
+    disable_dynamic_scaling: bool = False,
 ) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
-    dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
-    if disable_dynamic_scaling is not None:
-        dynamic_memory_scaling = not disable_dynamic_scaling
+    if not ray.is_initialized():
+        ray.init(
+            namespace="nv_ingest_ray",
+            logging_level=logging.getLogger().getEffectiveLevel(),
+            ignore_reinit_error=True,
+            dashboard_host="0.0.0.0",
+            dashboard_port=8265,
+            _system_config={
+                "local_fs_capacity_threshold": 0.9,
+                "object_spilling_config": json.dumps(
+                    {
+                        "type": "filesystem",
+                        "params": {
+                            "directory_path": [
+                                "/tmp/ray_spill_testing_0",
+                                "/tmp/ray_spill_testing_1",
+                                "/tmp/ray_spill_testing_2",
+                                "/tmp/ray_spill_testing_3",
+                            ],
+                            "buffer_size": 100_000_000,
+                        },
+                    },
+                ),
+            },
+        )
 
-    dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
-
-    scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling,
-        dynamic_memory_threshold=dynamic_memory_threshold,
-        pid_kp=DYNAMIC_MEMORY_KP,
-        pid_ki=DYNAMIC_MEMORY_KI,
-        pid_ema_alpha=DYNAMIC_MEMORY_EMA_ALPHA,
-        pid_target_queue_depth=DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
-        pid_penalty_factor=DYNAMIC_MEMORY_PENALTY_FACTOR,
-        pid_error_boost_factor=DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
-        rcm_memory_safety_buffer_fraction=DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
-    )
-
-    pipeline = RayPipeline(scaling_config=scaling_config)
-    start_abs = datetime.now()
+    # Handle disable_dynamic_scaling parameter override
+    if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:
+        # Directly modify the pipeline config to disable dynamic scaling
+        pipeline_config.pipeline.disable_dynamic_scaling = True
+        logger.info("Dynamic scaling disabled via function parameter override")
 
     # Set up the ingestion pipeline
-    _ = setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
+    start_abs = datetime.now()
+    ingest_pipeline = IngestPipelineBuilder(pipeline_config)
+    ingest_pipeline.build()
 
     # Record setup time
     end_setup = start_run = datetime.now()
-    setup_elapsed = (end_setup - start_abs).total_seconds()
-    logger.info(f"Pipeline setup completed in {setup_elapsed:.2f} seconds")
+    setup_time = (end_setup - start_abs).total_seconds()
+    logger.info(f"Pipeline setup complete in {setup_time:.2f} seconds")
 
     # Run the pipeline
     logger.debug("Running pipeline")
-    pipeline.start()
+    ingest_pipeline.start()
 
     if block:
         try:
+            # Block indefinitely until a KeyboardInterrupt is received
             while True:
                 time.sleep(5)
         except KeyboardInterrupt:
             logger.info("Interrupt received, shutting down pipeline.")
-            pipeline.stop()
+            ingest_pipeline.stop()
             ray.shutdown()
             logger.info("Ray shutdown complete.")
 
         # Record execution times
         end_run = datetime.now()
-        run_elapsed = (end_run - start_run).total_seconds()
+        run_time = (end_run - start_run).total_seconds()
         total_elapsed = (end_run - start_abs).total_seconds()
 
-        logger.info(f"Pipeline run completed in {run_elapsed:.2f} seconds")
+        logger.info(f"Pipeline execution time: {run_time:.2f} seconds")
         logger.info(f"Total time elapsed: {total_elapsed:.2f} seconds")
 
         return None, total_elapsed
     else:
-        return pipeline, 0.0
+        return ingest_pipeline.ray_pipeline, 0.0
 
 
 def run_pipeline(
-    ingest_config: PipelineCreationSchema,
+    pipeline_config: Optional[PipelineConfigSchema] = None,
     block: bool = True,
     disable_dynamic_scaling: Optional[bool] = None,
     dynamic_memory_threshold: Optional[float] = None,
     run_in_subprocess: bool = False,
     stdout: Optional[TextIO] = None,
     stderr: Optional[TextIO] = None,
+    libmode: bool = True,
 ) -> Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]:
     """
     Launch and manage a pipeline, optionally in a subprocess.
@@ -306,17 +235,16 @@ def run_pipeline(
 
     Parameters
     ----------
-    ingest_config : PipelineCreationSchema
+    pipeline_config : Optional[PipelineConfigSchema], default=None
         The validated configuration object used to construct and launch the pipeline.
+        If None and libmode is True, loads the default libmode pipeline.
     block : bool, default=True
         If True, blocks until the pipeline completes.
         If False, returns an interface to control the pipeline externally.
     disable_dynamic_scaling : Optional[bool], default=None
-        If True, disables dynamic memory scaling. Overrides global configuration if set.
-        If None, uses the default or globally defined behavior.
+        If provided, overrides the `disable_dynamic_scaling` setting from the pipeline config.
     dynamic_memory_threshold : Optional[float], default=None
-        The memory usage threshold (as a float between 0 and 1) that triggers autoscaling,
-        if dynamic scaling is enabled. Defaults to the globally configured value if None.
+        If provided, overrides the `dynamic_memory_threshold` setting from the pipeline config.
     run_in_subprocess : bool, default=False
         If True, launches the pipeline in a separate Python subprocess using `multiprocessing.Process`.
         If False, runs the pipeline in the current process.
@@ -326,6 +254,9 @@ def run_pipeline(
     stderr : Optional[TextIO], default=None
         Optional file-like stream to which subprocess stderr should be redirected.
         If None, stderr is redirected to /dev/null.
+    libmode : bool, default=True
+        If True and pipeline_config is None, loads the default libmode pipeline configuration.
+        If False, requires pipeline_config to be provided.
 
     Returns
     -------
@@ -337,25 +268,50 @@ def run_pipeline(
 
     Raises
     ------
+    ValueError
+        If pipeline_config is None and libmode is False.
     RuntimeError
         If the subprocess fails to start or exits with an error.
     Exception
         Any other exceptions raised during pipeline launch or configuration.
     """
+    # Load default libmode pipeline if no config provided and libmode is True
+    if pipeline_config is None:
+        if libmode:
+            logger.info("Loading default libmode pipeline configuration")
+            # Substitute environment variables in the YAML content
+            substituted_content = substitute_env_vars_in_yaml_content(DEFAULT_LIBMODE_PIPELINE_YAML)
+
+            # Parse the substituted content with PyYAML
+            try:
+                processed_config = yaml.safe_load(substituted_content)
+            except yaml.YAMLError as e:
+                error_message = (
+                    f"Failed to parse default libmode pipeline YAML after environment variable substitution. "
+                    f"Error: {e}"
+                )
+                raise ValueError(error_message) from e
+
+            # Create PipelineConfigSchema from the processed config
+            pipeline_config = PipelineConfigSchema(**processed_config)
+        else:
+            raise ValueError("pipeline_config must be provided when libmode is False")
+
+    if disable_dynamic_scaling is not None:
+        pipeline_config.pipeline.disable_dynamic_scaling = disable_dynamic_scaling
+    if dynamic_memory_threshold is not None:
+        pipeline_config.pipeline.dynamic_memory_threshold = dynamic_memory_threshold
+    if pipeline_config.pipeline.launch_simple_broker:
+        start_simple_message_broker({})
+
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
-        if (ingest_config.ngc_api_key is None or ingest_config.ngc_api_key == "") and (
-            ingest_config.nvidia_api_key is None or ingest_config.nvidia_api_key == ""
-        ):
-            logger.warning("NGC_API_KEY or NVIDIA_API_KEY are not set. NIM Related functions will not work.")
 
         ctx = multiprocessing.get_context("fork")
         process = ctx.Process(
             target=_run_pipeline_process,
             args=(
-                ingest_config,
-                disable_dynamic_scaling,
-                dynamic_memory_threshold,
+                pipeline_config,
                 stdout,  # raw_stdout
                 stderr,  # raw_stderr
             ),
@@ -380,10 +336,9 @@ def run_pipeline(
 
     # Run inline
     pipeline, total_elapsed = _launch_pipeline(
-        ingest_config,
+        pipeline_config,
         block=block,
         disable_dynamic_scaling=disable_dynamic_scaling,
-        dynamic_memory_threshold=dynamic_memory_threshold,
     )
 
     if block:

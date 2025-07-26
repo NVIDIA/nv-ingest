@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import ray
 
@@ -31,8 +31,8 @@ class ImageFilterStage(RayActorStage):
       3. Updates the message payload with the filtered DataFrame.
     """
 
-    def __init__(self, config: ImageFilterSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageFilterSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageFilterStage configuration validated successfully.")

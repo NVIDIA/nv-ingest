@@ -222,6 +222,7 @@ class TestTaskTypeEnum(unittest.TestCase):
         self.assertEqual(TaskTypeEnum.CAPTION, "caption")
         self.assertEqual(TaskTypeEnum.EMBED, "embed")
         self.assertEqual(TaskTypeEnum.TABLE_DATA_EXTRACT, "table_data_extract")
+        self.assertEqual(TaskTypeEnum.UDF, "udf")
 
     def test_enum_inheritance(self):
         """Test that the enum inherits from both str and Enum."""
