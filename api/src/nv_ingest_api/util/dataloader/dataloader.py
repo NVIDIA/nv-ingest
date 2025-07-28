@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright (c) 2025, NVIDIA CORPORATION.
-import fsspec
-from upath import UPath as Path
+from pathlib import Path
 from abc import ABC, abstractmethod
 import queue
 import threading
@@ -46,17 +45,19 @@ class LoaderInterface(ABC):
         pass
 
 
-def _probe(filename="pipe:", cmd="ffprobe", format=None, file_handle=None, timeout=None, **kwargs):
-    args = [cmd, "-show_format", "-show_streams", "-of", "json"]
+def _probe(filename, format=None, file_handle=None, timeout=None, **kwargs):
+    args = ["ffprobe", "-show_format", "-show_streams", "-of", "json"]
     args += ffmpeg._utils.convert_kwargs_to_cmd_line_args(kwargs)
-    args += ["pipe:"]
-
+    if file_handle:
+        args += ["pipe:"]
+    else:
+        args += [filename]
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     communicate_kwargs = {}
     if timeout is not None:
         communicate_kwargs["timeout"] = timeout
     if file_handle:
-        communicate_kwargs["input"] = file_handle
+        communicate_kwargs["input"] = file_handle if file_handle else filename
     out, err = p.communicate(**communicate_kwargs)
     if p.returncode != 0:
         raise ffmpeg._run.Error("ffprobe", out, err)
@@ -68,7 +69,61 @@ class MediaInterface(LoaderInterface):
     def __init__(self):
         self.path_metadata = {}
 
-    def split(self, input_path: str, output_dir: str, split_interval: int = 0, split_type: SplitType = SplitType.SIZE):
+    def probe_media(self, path_file: Path, split_interval: int, split_type: SplitType, file_handle=None):
+        num_splits = None
+        duration = None
+        probe = None
+        sample_rate = None
+        try:
+            file_size = path_file.stat().st_size
+            if file_handle:
+                probe = _probe("pipe:", format=path_file.suffix, file_handle=file_handle)
+            else:
+                probe = _probe(str(path_file), format=path_file.suffix)
+            if probe["streams"][0]["codec_type"] == "video":
+                sample_rate = float(probe["streams"][0]["avg_frame_rate"].split("/")[0])
+                duration = float(probe["format"]["duration"])
+            elif probe["streams"][0]["codec_type"] == "audio":
+                sample_rate = float(probe["streams"][0]["sample_rate"])
+                bitrate = probe["format"]["bit_rate"]
+                duration = (file_size * 8) / float(bitrate)
+            num_splits = self.find_num_splits(file_size, sample_rate, duration, split_interval, split_type)
+        except ffmpeg.Error as e:
+            logging.error(f"FFmpeg error for file {path_file}: {e.stderr.decode()}")
+        except ValueError as e:
+            logging.error(f"Error finding number of splits for file {path_file}: {e}")
+        return probe, num_splits, duration
+
+    def get_audio_from_video(self, input_path: str, output_dir: str, cache_path: str = None):
+        """
+        Get the audio from a video file.
+        input_path: str, path to the video file
+        output_dir: str, path to the output directory
+        cache_path: str, path to the cache directory
+        """
+        path_file = Path(input_path)
+        file_name = path_file.stem
+        suffix = path_file.suffix
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_pattern = output_dir / f"{file_name}_audio{suffix}"
+        capture_output, capture_error = (
+            ffmpeg.input(str(input_path))
+            .output(str(output_pattern), c="copy", map="0:a")
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        print(f"Capture output: {capture_output}")
+        print(f"Capture error: {capture_error}")
+        print(f"Audio from {input_path} saved to {output_pattern}")
+
+    def split(
+        self,
+        input_path: str,
+        output_dir: str,
+        split_interval: int = 0,
+        split_type: SplitType = SplitType.SIZE,
+        cache_path: str = None,
+    ):
         """
         Split a media file into smaller chunks of `split_interval` size.
         input_path: str, path to the media file
@@ -77,7 +132,6 @@ class MediaInterface(LoaderInterface):
         split_type: SplitType, type of split to perform, either size, time, or frame
         """
         import ffmpeg
-        from upath import UPath as Path
 
         path_file = Path(input_path)
         file_name = path_file.stem
@@ -86,36 +140,35 @@ class MediaInterface(LoaderInterface):
         output_dir.mkdir(parents=True, exist_ok=True)
         output_pattern = output_dir / f"{file_name}_chunk_%04d{suffix}"
         num_splits = 0
+        cache_path = cache_path if cache_path else output_dir
         try:
-            with fsspec.open(input_path, "rb") as f_in:
-                probe = _probe("pipe:", format=suffix, file_handle=f_in.read())
-                print(f"Probe: {probe}")
-                bitrate = float(probe["format"]["bit_rate"])
-                sample_rate = float(probe["streams"][0]["sample_rate"])
-                file_size = path_file.stat().st_size
-                duration = (file_size * 8) / bitrate
-                num_splits = self.find_num_splits(file_size, bitrate, sample_rate, duration, split_interval, split_type)
-                self.path_metadata[input_path] = {
-                    "bitrate": bitrate,
-                    "sample_rate": sample_rate,
-                    "file_size": file_size,
-                    "duration": duration,
-                    "num_channels": probe["streams"][0]["channels"],
-                }
-                segment_time = math.ceil(duration / num_splits)
-                f_in.seek(0)
-                (
-                    ffmpeg.input(
-                        "pipe:",
-                    )
-                    .output(str(output_pattern), f="segment", segment_time=segment_time, c="copy", map="0")
-                    .run(capture_stdout=True, capture_stderr=True, input=f_in.read())
+            probe = None
+            probe, num_splits, duration = self.probe_media(path_file, split_interval, split_type)
+            segment_time = math.ceil(duration / num_splits)
+            output_kwargs = {
+                "f": "segment",
+                "segment_time": segment_time,
+                "c": "copy",
+                "map": "0",
+            }
+            if suffix == ".mp4":
+                output_kwargs.update(
+                    {
+                        "force_key_frames": f"expr:gte(t,n_forced*{segment_time})",
+                        "crf": 22,
+                        "g": 50,
+                        "sc_threshold": 0,
+                    }
                 )
-                print(f"Split {input_path} into {num_splits} chunks")
+            capture_output, capture_error = (
+                ffmpeg.input(str(input_path))
+                .output(str(output_pattern), **output_kwargs)
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+            logging.debug(f"Split {input_path} into {num_splits} chunks")
+            self.path_metadata[input_path] = probe
         except ffmpeg.Error as e:
             logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
-        except ValueError as e:
-            logging.error(f"Error finding number of splits for file {input_path}: {e}")
         files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
         print(f"Files: {files}")
         return files
@@ -123,7 +176,6 @@ class MediaInterface(LoaderInterface):
     def find_num_splits(
         self,
         file_size: int,
-        bitrate: float,
         sample_rate: float,
         duration: float,
         split_interval: int,
@@ -132,7 +184,6 @@ class MediaInterface(LoaderInterface):
         """
         Find the number of splits for a media file based on the split type and interval.
         file_size: int, size of the media file in bytes
-        bitrate: float, bitrate of the media file in bits per second
         sample_rate: float, sample rate of the media file in samples per second
         duration: float, duration of the media file in seconds
         split_interval: int, size of the chunk to split the media file into depending on the split type
