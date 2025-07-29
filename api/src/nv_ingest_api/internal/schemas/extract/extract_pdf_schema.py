@@ -55,10 +55,6 @@ class PDFiumConfigSchema(BaseModel):
         """
         Validates the gRPC and HTTP services for all endpoints.
 
-        Note: YOLOX endpoints are only required when table/chart/infographic extraction
-        is enabled. Since this schema doesn't have access to extraction flags,
-        we allow empty endpoints and let the extraction logic validate when needed.
-
         Parameters
         ----------
         values : dict
@@ -72,7 +68,7 @@ class PDFiumConfigSchema(BaseModel):
         Raises
         ------
         ValueError
-            If both gRPC and HTTP services are empty for any endpoint when they are required.
+            If both gRPC and HTTP services are empty for any endpoint.
         """
 
         for model_name in ["yolox"]:
@@ -81,8 +77,9 @@ class PDFiumConfigSchema(BaseModel):
             grpc_service = _clean_service(grpc_service)
             http_service = _clean_service(http_service)
 
-            # Allow empty endpoints - validation will happen at extraction time
-            # when we know if table/chart/infographic extraction is actually enabled
+            if not grpc_service and not http_service:
+                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
+
             values[endpoint_name] = (grpc_service, http_service)
 
             protocol_name = f"{model_name}_infer_protocol"
