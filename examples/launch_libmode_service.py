@@ -21,7 +21,10 @@ configure_local_logging(local_log_level)
 
 def main():
     # Possibly override config parameters
-    config_data = {}
+    config_data = {
+        # Configure to use Python pipeline framework instead of Ray
+        "pipeline_framework": "ray"
+    }
 
     # Filter out None values to let the schema defaults handle them
     config_data = {key: value for key, value in config_data.items() if value is not None}

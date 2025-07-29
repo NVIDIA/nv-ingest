@@ -16,15 +16,21 @@ from typing import Any, Dict
 from nv_ingest.framework.orchestration.python.python_pipeline import PythonPipeline
 from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
     PythonMessageBrokerTaskSource,
+    PythonMessageBrokerTaskSourceConfig,
+    SimpleClientConfig as SourceSimpleClientConfig,
 )
 from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
     PythonMessageBrokerTaskSink,
+    PythonMessageBrokerTaskSinkConfig,
+    SimpleClientConfig as SinkSimpleClientConfig,
 )
-from nv_ingest.framework.orchestration.python.stages.meta.metadata_injector import PythonMetadataInjectorStage
+from nv_ingest.framework.orchestration.python.stages.injectors.metadata_injector import (
+    PythonMetadataInjectionStage,
+)
 from nv_ingest.framework.orchestration.python.stages.extractors.pdf_extractor import PythonPDFExtractorStage
 from nv_ingest.framework.orchestration.python.stages.extractors.image_extractor import PythonImageExtractorStage
 from nv_ingest.framework.orchestration.python.stages.extractors.docx_extractor import PythonDocxExtractorStage
-from nv_ingest.framework.orchestration.python.stages.extractors.pptx_extractor import PythonPptxExtractorStage
+from nv_ingest.framework.orchestration.python.stages.extractors.pptx_extractor import PythonPPTXExtractorStage
 from nv_ingest.framework.orchestration.python.stages.extractors.audio_extractor import PythonAudioExtractorStage
 from nv_ingest.framework.orchestration.python.stages.extractors.html_extractor import PythonHtmlExtractorStage
 from nv_ingest.framework.orchestration.python.stages.extractors.table_extractor import PythonTableExtractorStage
@@ -40,25 +46,22 @@ from nv_ingest.framework.orchestration.python.stages.transforms.text_embed impor
 from nv_ingest.framework.orchestration.python.stages.storage.store_embeddings import PythonEmbeddingStorageStage
 from nv_ingest.framework.orchestration.python.stages.storage.image_storage import PythonImageStorageStage
 
-from nv_ingest_api.schemas.message_broker_task_source_schema import MessageBrokerTaskSourceConfigSchema
-from nv_ingest_api.schemas.message_broker_task_sink_schema import MessageBrokerTaskSinkConfigSchema
-from nv_ingest_api.schemas.metadata_injector_schema import MetadataInjectorSchema
-from nv_ingest_api.schemas.pdf_extractor_schema import PDFExtractorSchema
-from nv_ingest_api.schemas.image_extractor_schema import ImageExtractorSchema
-from nv_ingest_api.schemas.docx_extractor_schema import DocxExtractorSchema
-from nv_ingest_api.schemas.pptx_extractor_schema import PptxExtractorSchema
-from nv_ingest_api.schemas.audio_extractor_schema import AudioExtractorSchema
-from nv_ingest_api.schemas.html_extractor_schema import HtmlExtractorSchema
-from nv_ingest_api.schemas.table_extractor_schema import TableExtractorSchema
-from nv_ingest_api.schemas.chart_extractor_schema import ChartExtractorSchema
-from nv_ingest_api.schemas.infographic_extractor_schema import InfographicExtractorSchema
-from nv_ingest_api.schemas.image_dedup_schema import ImageDedupSchema
-from nv_ingest_api.schemas.image_filter_schema import ImageFilterSchema
-from nv_ingest_api.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
-from nv_ingest_api.schemas.text_splitter_schema import TextSplitterSchema
-from nv_ingest_api.schemas.text_embedding_schema import TextEmbeddingSchema
-from nv_ingest_api.schemas.embedding_storage_schema import EmbeddingStorageSchema
-from nv_ingest_api.schemas.image_storage_schema import ImageStorageModuleSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_html_schema import HtmlExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
+from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ def start_broker_in_process(host: str = "localhost", port: int = 7671, max_queue
     from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessageBroker
 
     def run_broker():
-        broker = SimpleMessageBroker(host=host, port=port, max_queue_size=max_queue_size)
+        broker = SimpleMessageBroker(host=host, port=int(port), max_queue_size=max_queue_size)
         logger.info(f"Starting SimpleMessageBroker on {host}:{port}")
         broker.serve_forever()
 
@@ -109,6 +112,7 @@ def get_pipeline_config() -> Dict[str, Any]:
         "message_client_host": os.getenv("MESSAGE_CLIENT_HOST", "localhost"),
         "message_client_port": int(os.getenv("MESSAGE_CLIENT_PORT", "7671")),
         "message_client_type": os.getenv("MESSAGE_CLIENT_TYPE", "simple"),
+        "task_queue_name": "ingest_task_queue",
         "nvidia_api_key": os.getenv("NVIDIA_API_KEY", ""),
         "ngc_api_key": os.getenv("NGC_API_KEY", ""),
         "yolox_http_endpoint": os.getenv(
@@ -173,24 +177,27 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     ########################################################################################################
     ## Source stage
     ########################################################################################################
-    source_config = MessageBrokerTaskSourceConfigSchema(
-        message_client_host=config["message_client_host"],
-        message_client_port=config["message_client_port"],
-        message_client_type=config["message_client_type"],
+    source_config = PythonMessageBrokerTaskSourceConfig(
+        broker_client=SourceSimpleClientConfig(
+            host=config["message_client_host"],
+            port=config["message_client_port"],
+        ),
+        task_queue=config["task_queue_name"],
+        poll_interval=1.0,
     )
     pipeline.add_source(
         name="message_broker_task_source",
-        stage_actor=PythonMessageBrokerTaskSource,
+        source_actor=PythonMessageBrokerTaskSource(source_config),
         config=source_config,
     )
 
     ########################################################################################################
     ## Insertion and Pre-processing stages
     ########################################################################################################
-    metadata_injector_config = MetadataInjectorSchema()
+    metadata_injector_config = {}
     pipeline.add_stage(
         name="metadata_injector",
-        stage_actor=PythonMetadataInjectorStage,
+        stage_actor=PythonMetadataInjectionStage(metadata_injector_config),
         config=metadata_injector_config,
     )
 
@@ -198,58 +205,91 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     ## Primitive extraction stages
     ########################################################################################################
     pdf_config = PDFExtractorSchema(
-        yolox_endpoints=[(config["yolox_http_endpoint"], config["yolox_infer_protocol"])],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "pdfium_config": {
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+                "yolox_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+                "yolox_infer_protocol": config["yolox_infer_protocol"],
+            },
+            "nemoretriever_parse_config": {
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+                "nemoretriever_parse_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+                "nemoretriever_parse_infer_protocol": config["yolox_infer_protocol"],
+                "nemoretriever_parse_model_name": "nvidia/nemoretriever-parse",
+                "yolox_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+                "yolox_infer_protocol": config["yolox_infer_protocol"],
+            },
+        }
     )
     pipeline.add_stage(
         name="pdf_extractor",
-        stage_actor=PythonPDFExtractorStage,
+        stage_actor=PythonPDFExtractorStage(pdf_config),
         config=pdf_config,
     )
 
-    image_config = ImageExtractorSchema(
-        ocr_endpoints=[(config["ocr_http_endpoint"], config["ocr_infer_protocol"])],
-        ocr_model_name=config["ocr_model_name"],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+    image_config = ImageConfigSchema(
+        **{
+            "yolox_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+            "yolox_infer_protocol": config["yolox_infer_protocol"],
+            "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+        }
     )
     pipeline.add_stage(
         name="image_extractor",
-        stage_actor=PythonImageExtractorStage,
+        stage_actor=PythonImageExtractorStage(image_config),
         config=image_config,
     )
 
-    docx_config = DocxExtractorSchema()
+    docx_config = DocxExtractorSchema(
+        **{
+            "docx_extraction_config": {
+                "yolox_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+                "yolox_infer_protocol": config["yolox_infer_protocol"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
+    )
     pipeline.add_stage(
         name="docx_extractor",
-        stage_actor=PythonDocxExtractorStage,
+        stage_actor=PythonDocxExtractorStage(docx_config),
         config=docx_config,
     )
 
-    pptx_config = PptxExtractorSchema()
+    pptx_config = PPTXExtractorSchema(
+        **{
+            "pptx_extraction_config": {
+                "yolox_endpoints": (config["yolox_http_endpoint"], config["yolox_http_endpoint"]),
+                "yolox_infer_protocol": config["yolox_infer_protocol"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
+    )
     pipeline.add_stage(
         name="pptx_extractor",
-        stage_actor=PythonPptxExtractorStage,
+        stage_actor=PythonPPTXExtractorStage(pptx_config),
         config=pptx_config,
     )
 
     audio_config = AudioExtractorSchema(
-        audio_endpoints=[(config["audio_grpc_endpoint"], config["audio_infer_protocol"])],
-        audio_function_id=config["audio_function_id"],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "audio_extraction_config": {
+                "audio_endpoints": (config["audio_grpc_endpoint"], config["audio_grpc_endpoint"]),
+                "audio_infer_protocol": config["audio_infer_protocol"],
+                "function_id": config["audio_function_id"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
     )
     pipeline.add_stage(
         name="audio_extractor",
-        stage_actor=PythonAudioExtractorStage,
+        stage_actor=PythonAudioExtractorStage(audio_config),
         config=audio_config,
     )
 
     html_config = HtmlExtractorSchema()
     pipeline.add_stage(
         name="html_extractor",
-        stage_actor=PythonHtmlExtractorStage,
+        stage_actor=PythonHtmlExtractorStage(html_config),
         config=html_config,
     )
 
@@ -259,65 +299,83 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     image_dedup_config = ImageDedupSchema()
     pipeline.add_stage(
         name="image_dedup",
-        stage_actor=PythonImageDedupStage,
+        stage_actor=PythonImageDedupStage(image_dedup_config),
         config=image_dedup_config,
     )
 
     image_filter_config = ImageFilterSchema()
     pipeline.add_stage(
         name="image_filter",
-        stage_actor=PythonImageFilterStage,
+        stage_actor=PythonImageFilterStage(image_filter_config),
         config=image_filter_config,
     )
 
     table_config = TableExtractorSchema(
-        yolox_table_structure_endpoints=[
-            (config["yolox_table_structure_http_endpoint"], config["yolox_table_structure_infer_protocol"])
-        ],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "endpoint_config": {
+                "yolox_endpoints": (
+                    config["yolox_table_structure_http_endpoint"],
+                    config["yolox_table_structure_http_endpoint"],
+                ),
+                "yolox_infer_protocol": config["yolox_table_structure_infer_protocol"],
+                "ocr_endpoints": (config["ocr_http_endpoint"], config["ocr_http_endpoint"]),
+                "ocr_infer_protocol": config["ocr_infer_protocol"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
     )
     pipeline.add_stage(
         name="table_extractor",
-        stage_actor=PythonTableExtractorStage,
+        stage_actor=PythonTableExtractorStage(table_config),
         config=table_config,
     )
 
     chart_config = ChartExtractorSchema(
-        yolox_graphic_elements_endpoints=[
-            (config["yolox_graphic_elements_http_endpoint"], config["yolox_graphic_elements_infer_protocol"])
-        ],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "endpoint_config": {
+                "yolox_endpoints": (
+                    config["yolox_graphic_elements_http_endpoint"],
+                    config["yolox_graphic_elements_http_endpoint"],
+                ),
+                "yolox_infer_protocol": config["yolox_graphic_elements_infer_protocol"],
+                "ocr_endpoints": (config["ocr_http_endpoint"], config["ocr_http_endpoint"]),
+                "ocr_infer_protocol": config["ocr_infer_protocol"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
     )
     pipeline.add_stage(
         name="chart_extractor",
-        stage_actor=PythonChartExtractorStage,
+        stage_actor=PythonChartExtractorStage(chart_config),
         config=chart_config,
     )
 
     infographic_config = InfographicExtractorSchema(
-        yolox_graphic_elements_endpoints=[
-            (config["yolox_graphic_elements_http_endpoint"], config["yolox_graphic_elements_infer_protocol"])
-        ],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "endpoint_config": {
+                "ocr_endpoints": (config["ocr_http_endpoint"], config["ocr_http_endpoint"]),
+                "ocr_infer_protocol": config["ocr_infer_protocol"],
+                "auth_token": config["nvidia_api_key"] or config["ngc_api_key"] or "",
+            }
+        }
     )
     pipeline.add_stage(
         name="infographic_extractor",
-        stage_actor=PythonInfographicExtractorStage,
+        stage_actor=PythonInfographicExtractorStage(infographic_config),
         config=infographic_config,
     )
 
     image_caption_config = ImageCaptionExtractionSchema(
-        vlm_caption_endpoint=config["vlm_caption_endpoint"],
-        vlm_caption_model_name=config["vlm_caption_model_name"],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "api_key": config["nvidia_api_key"] or config["ngc_api_key"] or "api_key",
+            "endpoint_url": config["vlm_caption_endpoint"],
+            "model_name": config["vlm_caption_model_name"],
+            "prompt": "Caption the content of this image:",
+        }
     )
     pipeline.add_stage(
         name="image_caption",
-        stage_actor=PythonImageCaptionStage,
+        stage_actor=PythonImageCaptionStage(image_caption_config),
         config=image_caption_config,
     )
 
@@ -327,19 +385,20 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     text_splitter_config = TextSplitterSchema()
     pipeline.add_stage(
         name="text_splitter",
-        stage_actor=PythonTextSplitterStage,
+        stage_actor=PythonTextSplitterStage(text_splitter_config),
         config=text_splitter_config,
     )
 
     text_embedding_config = TextEmbeddingSchema(
-        embedding_nim_endpoint=config["embedding_nim_endpoint"],
-        embedding_nim_model_name=config["embedding_nim_model_name"],
-        nvidia_api_key=config["nvidia_api_key"],
-        ngc_api_key=config["ngc_api_key"],
+        **{
+            "api_key": config["nvidia_api_key"] or config["ngc_api_key"] or "default_api_key",
+            "embedding_nim_endpoint": config["embedding_nim_endpoint"],
+            "embedding_model": config["embedding_nim_model_name"],
+        }
     )
     pipeline.add_stage(
         name="text_embedding",
-        stage_actor=PythonTextEmbeddingStage,
+        stage_actor=PythonTextEmbeddingStage(text_embedding_config),
         config=text_embedding_config,
     )
 
@@ -349,28 +408,30 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     embedding_storage_config = EmbeddingStorageSchema()
     pipeline.add_stage(
         name="embedding_storage",
-        stage_actor=PythonEmbeddingStorageStage,
+        stage_actor=PythonEmbeddingStorageStage(embedding_storage_config),
         config=embedding_storage_config,
     )
 
     image_storage_config = ImageStorageModuleSchema()
     pipeline.add_stage(
         name="image_storage",
-        stage_actor=PythonImageStorageStage,
+        stage_actor=PythonImageStorageStage(image_storage_config),
         config=image_storage_config,
     )
 
     ########################################################################################################
     ## Sink stage
     ########################################################################################################
-    sink_config = MessageBrokerTaskSinkConfigSchema(
-        message_client_host=config["message_client_host"],
-        message_client_port=config["message_client_port"],
-        message_client_type=config["message_client_type"],
+    sink_config = PythonMessageBrokerTaskSinkConfig(
+        broker_client=SinkSimpleClientConfig(
+            host=config["message_client_host"],
+            port=config["message_client_port"],
+        ),
+        poll_interval=0.1,
     )
     pipeline.add_sink(
         name="message_broker_task_sink",
-        stage_actor=PythonMessageBrokerTaskSink,
+        sink_actor=PythonMessageBrokerTaskSink(sink_config),
         config=sink_config,
     )
 

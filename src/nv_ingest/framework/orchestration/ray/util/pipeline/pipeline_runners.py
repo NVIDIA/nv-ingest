@@ -370,7 +370,7 @@ def _launch_pipeline(
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline
-    _ = _setup_pipeline_with_framework(pipeline, ingest_config.dict())
+    _ = _setup_pipeline_with_framework(pipeline, ingest_config.model_dump())
 
     # Record setup time
     end_setup = start_run = datetime.now()
