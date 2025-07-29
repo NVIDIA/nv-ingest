@@ -5,13 +5,14 @@
 import atexit
 import logging
 import multiprocessing
+import json
 import os
 import signal
 import sys
 import time
 from ctypes import CDLL, c_int
 from datetime import datetime
-from typing import Union, Tuple, Optional, TextIO
+from typing import Union, Tuple, Optional, TextIO, Dict, Any
 
 import ray
 from pydantic import BaseModel, ConfigDict
@@ -84,6 +85,9 @@ class PipelineCreationSchema(BaseModel):
     ocr_http_endpoint: str = os.getenv("OCR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
     ocr_infer_protocol: str = os.getenv("OCR_INFER_PROTOCOL", "http")
     ocr_model_name: str = os.getenv("OCR_MODEL_NAME", "paddle")
+
+    # Pipeline framework selection
+    pipeline_framework: str = os.getenv("PIPELINE_FRAMEWORK", "ray")
 
     # Task queue settings
     REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
@@ -176,25 +180,76 @@ def kill_pipeline_process_group(pid: int):
         print(f"Failed to kill subprocess group: {e}")
 
 
+def _setup_pipeline_with_framework(pipeline, ingest_config: Dict[str, Any]) -> str:
+    """
+    Proxy function to set up pipeline based on the configured framework.
+
+    This function acts as a switch between Ray and Python pipeline setup
+    based on the 'pipeline_framework' configuration value.
+
+    Parameters
+    ----------
+    pipeline : Union[RayPipeline, PythonPipeline]
+        The pipeline instance to configure.
+    ingest_config : Dict[str, Any]
+        Configuration dictionary containing pipeline_framework and other settings.
+
+    Returns
+    -------
+    str
+        The ID of the sink stage.
+
+    Raises
+    ------
+    ValueError
+        If an unsupported pipeline_framework is specified.
+    ImportError
+        If Python pipeline dependencies are not available.
+    """
+    framework = ingest_config.get("pipeline_framework", "ray")
+
+    logger.info(f"Setting up pipeline with framework: {framework}")
+
+    if framework == "ray":
+        return setup_ingestion_pipeline(pipeline, ingest_config)
+    elif framework == "python":
+        try:
+            from nv_ingest.framework.orchestration.python.util.pipeline.pipeline_builders import (
+                setup_python_ingestion_pipeline,
+            )
+
+            return setup_python_ingestion_pipeline(pipeline, ingest_config)
+        except ImportError as e:
+            logger.error(f"Failed to import Python pipeline dependencies: {e}")
+            raise ImportError(
+                "Python pipeline framework is not available. " "Ensure all Python pipeline dependencies are installed."
+            ) from e
+    else:
+        raise ValueError(f"Unsupported pipeline framework: {framework}. Must be 'ray' or 'python'.")
+
+
 def _run_pipeline_process(
     ingest_config: PipelineCreationSchema,
     disable_dynamic_scaling: Optional[bool],
     dynamic_memory_threshold: Optional[float],
     raw_stdout: Optional[TextIO] = None,
     raw_stderr: Optional[TextIO] = None,
-):
+) -> None:
     """
-    Subprocess entrypoint to launch the pipeline. Redirects all output to the provided
-    file-like streams or /dev/null if not specified.
+    Run the pipeline in a separate process.
+
+    This function is designed to be executed in a subprocess and handles
+    the complete lifecycle of pipeline execution, including Ray initialization
+    (if using Ray framework), pipeline setup, execution, and cleanup.
 
     Parameters
     ----------
     ingest_config : PipelineCreationSchema
-        Validated pipeline configuration.
+        The validated configuration object used to construct and launch the pipeline.
     disable_dynamic_scaling : Optional[bool]
-        Whether to disable dynamic scaling.
+        If True, disables dynamic memory scaling. If None, uses the default behavior.
     dynamic_memory_threshold : Optional[float]
-        Threshold for triggering scaling.
+        The memory usage threshold for autoscaling. If None, uses the default value.
     raw_stdout : Optional[TextIO]
         Destination for stdout. Defaults to /dev/null.
     raw_stderr : Optional[TextIO]
@@ -211,16 +266,61 @@ def _run_pipeline_process(
     sys.stdout = raw_stdout or open(os.devnull, "w")
     sys.stderr = raw_stderr or open(os.devnull, "w")
 
+    framework = ingest_config.pipeline_framework
+
+    # Only initialize Ray if using Ray framework
+    if framework == "ray":
+        current_level = logging.getLogger().getEffectiveLevel()
+        ray_context = ray.init(
+            namespace="nv_ingest_ray",
+            logging_level=current_level,
+            ignore_reinit_error=True,
+            dashboard_host="0.0.0.0",
+            dashboard_port=8265,
+            _system_config={
+                "local_fs_capacity_threshold": 0.9,
+                "object_spilling_config": json.dumps(
+                    {
+                        "type": "filesystem",
+                        "params": {
+                            "directory_path": [
+                                "/tmp/ray_spill_testing_0",
+                                "/tmp/ray_spill_testing_1",
+                                "/tmp/ray_spill_testing_2",
+                                "/tmp/ray_spill_testing_3",
+                            ],
+                            "buffer_size": 100_000_000,
+                        },
+                    },
+                ),
+            },
+        )
+        logger.info(f"Ray initialized with context: {ray_context}")
+    else:
+        logger.info(f"Using {framework} framework - skipping Ray initialization")
+
     try:
-        _launch_pipeline(
+        _, total_elapsed = _launch_pipeline(
             ingest_config,
             block=True,
             disable_dynamic_scaling=disable_dynamic_scaling,
             dynamic_memory_threshold=dynamic_memory_threshold,
         )
+        logger.info(f"Pipeline completed successfully in {total_elapsed:.2f} seconds")
     except Exception as e:
+        logger.error(f"Pipeline execution failed: {e}")
         sys.__stderr__.write(f"Subprocess pipeline run failed: {e}\n")
         raise
+    finally:
+        # Only shutdown Ray if it was initialized
+        if framework == "ray":
+            try:
+                ray.shutdown()
+                logger.info("Ray shutdown completed")
+            except Exception as e:
+                logger.warning(f"Error during Ray shutdown: {e}")
+        else:
+            logger.info(f"{framework} pipeline process completed")
 
 
 def _launch_pipeline(
@@ -231,29 +331,46 @@ def _launch_pipeline(
 ) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
-    dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
-    if disable_dynamic_scaling is not None:
-        dynamic_memory_scaling = not disable_dynamic_scaling
+    framework = ingest_config.pipeline_framework
+    logger.info(f"Using pipeline framework: {framework}")
 
-    dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
+    if framework == "ray":
+        dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
+        if disable_dynamic_scaling is not None:
+            dynamic_memory_scaling = not disable_dynamic_scaling
 
-    scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling,
-        dynamic_memory_threshold=dynamic_memory_threshold,
-        pid_kp=DYNAMIC_MEMORY_KP,
-        pid_ki=DYNAMIC_MEMORY_KI,
-        pid_ema_alpha=DYNAMIC_MEMORY_EMA_ALPHA,
-        pid_target_queue_depth=DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
-        pid_penalty_factor=DYNAMIC_MEMORY_PENALTY_FACTOR,
-        pid_error_boost_factor=DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
-        rcm_memory_safety_buffer_fraction=DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
-    )
+        dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
 
-    pipeline = RayPipeline(scaling_config=scaling_config)
+        scaling_config = ScalingConfig(
+            dynamic_memory_scaling=dynamic_memory_scaling,
+            dynamic_memory_threshold=dynamic_memory_threshold,
+            pid_kp=DYNAMIC_MEMORY_KP,
+            pid_ki=DYNAMIC_MEMORY_KI,
+            pid_ema_alpha=DYNAMIC_MEMORY_EMA_ALPHA,
+            pid_target_queue_depth=DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH,
+            pid_penalty_factor=DYNAMIC_MEMORY_PENALTY_FACTOR,
+            pid_error_boost_factor=DYNAMIC_MEMORY_ERROR_BOOST_FACTOR,
+            rcm_memory_safety_buffer_fraction=DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION,
+        )
+
+        pipeline = RayPipeline(scaling_config=scaling_config)
+    elif framework == "python":
+        try:
+            from nv_ingest.framework.orchestration.python.python_pipeline import PythonPipeline
+
+            pipeline = PythonPipeline()
+        except ImportError as e:
+            logger.error(f"Failed to import Python pipeline: {e}")
+            raise ImportError(
+                "Python pipeline framework is not available. " "Ensure all Python pipeline dependencies are installed."
+            ) from e
+    else:
+        raise ValueError(f"Unsupported pipeline framework: {framework}. Must be 'ray' or 'python'.")
+
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline
-    _ = setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
+    _ = _setup_pipeline_with_framework(pipeline, ingest_config.dict())
 
     # Record setup time
     end_setup = start_run = datetime.now()
@@ -271,8 +388,11 @@ def _launch_pipeline(
         except KeyboardInterrupt:
             logger.info("Interrupt received, shutting down pipeline.")
             pipeline.stop()
-            ray.shutdown()
-            logger.info("Ray shutdown complete.")
+            if framework == "ray":
+                ray.shutdown()
+                logger.info("Ray shutdown complete.")
+            else:
+                logger.info("Python pipeline shutdown complete.")
 
         # Record execution times
         end_run = datetime.now()
