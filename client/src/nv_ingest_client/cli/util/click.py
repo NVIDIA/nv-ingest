@@ -155,6 +155,40 @@ TaskType = Union[
 ]
 
 
+def convert_string_booleans(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert string boolean values to actual booleans in a dictionary.
+
+    Handles common string representations of booleans:
+    - "true", "True", "TRUE" -> True
+    - "false", "False", "FALSE" -> False
+    - Other values remain unchanged
+
+    Parameters
+    ----------
+    data : Dict[str, Any]
+        Dictionary that may contain string boolean values
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary with string booleans converted to actual booleans
+    """
+    converted = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            lower_value = value.lower()
+            if lower_value == "true":
+                converted[key] = True
+            elif lower_value == "false":
+                converted[key] = False
+            else:
+                converted[key] = value
+        else:
+            converted[key] = value
+    return converted
+
+
 def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:
     """
     Parse the task options string as JSON.
@@ -178,7 +212,9 @@ def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:
         the error details (e.g., expected property format), and show the input that was provided.
     """
     try:
-        return json.loads(options_str)
+        options = json.loads(options_str)
+        options = convert_string_booleans(options)
+        return options
     except json.JSONDecodeError as e:
         error_message = (
             f"Invalid JSON format for task '{task_id}': {e.msg} at line {e.lineno} column {e.colno} (char {e.pos}). "

@@ -34,6 +34,10 @@ from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_s
 from nv_ingest.framework.orchestration.python.stages.injectors.metadata_injector import (
     PythonMetadataInjectionStage,
 )
+from nv_ingest.framework.orchestration.python.stages.extractors.pdf_extractor import (
+    PythonPDFExtractorStage,
+)
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -158,7 +162,7 @@ def main():
             logger.error(f"✗ Broker connection test failed: {e}")
 
         # Step 5: Create pipeline using new interface
-        logger.info("Creating pipeline with metadata injection...")
+        logger.info("Creating pipeline with PDF extraction and metadata injection...")
         pipeline = PythonPipeline()
 
         # Add source using new interface
@@ -169,10 +173,23 @@ def main():
         metadata_injector = PythonMetadataInjectionStage(metadata_injector_config)
         pipeline.add_stage(name="metadata_injector", stage_actor=metadata_injector, config=metadata_injector_config)
 
+        # Add PDF extractor stage
+        pdf_extractor_config = PDFExtractorSchema(
+            pdfium_config={
+                "yolox_endpoints": ("localhost:8001", "localhost:8000"),  # Default endpoints
+                "yolox_infer_protocol": "http",
+                "auth_token": None,
+                "nim_batch_size": 4,
+                "workers_per_progress_engine": 5,
+            }
+        )
+        pdf_extractor = PythonPDFExtractorStage(pdf_extractor_config)
+        pipeline.add_stage(name="pdf_extractor", stage_actor=pdf_extractor, config=pdf_extractor_config)
+
         # Add sink using new interface
         pipeline.add_sink(name="message_broker_sink", sink_actor=sink, config=sink_config)
 
-        logger.info("Pipeline created with source → metadata_injector → sink")
+        logger.info("Pipeline created with source → metadata_injector → pdf_extractor → sink")
 
         # Step 6: Start pipeline in background
         logger.info("Starting pipeline...")
