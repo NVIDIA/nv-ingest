@@ -94,27 +94,24 @@ class MediaInterface(LoaderInterface):
             logging.error(f"Error finding number of splits for file {path_file}: {e}")
         return probe, num_splits, duration
 
-    def get_audio_from_video(self, input_path: str, output_dir: str, cache_path: str = None):
+    def get_audio_from_video(self, input_path: str, output_file: str, cache_path: str = None):
         """
         Get the audio from a video file.
         input_path: str, path to the video file
         output_dir: str, path to the output directory
         cache_path: str, path to the cache directory
         """
-        path_file = Path(input_path)
-        file_name = path_file.stem
-        suffix = path_file.suffix
-        output_dir = Path(output_dir)
+        output_path = Path(output_file)
+        output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_pattern = output_dir / f"{file_name}_audio{suffix}"
         capture_output, capture_error = (
             ffmpeg.input(str(input_path))
-            .output(str(output_pattern), c="copy", map="0:a")
+            .output(str(output_path), c="copy", map="0:a")
             .run(capture_stdout=True, capture_stderr=True)
         )
         print(f"Capture output: {capture_output}")
         print(f"Capture error: {capture_error}")
-        print(f"Audio from {input_path} saved to {output_pattern}")
+        print(f"Audio from {input_path} saved to {output_path}")
 
     def split(
         self,
@@ -247,7 +244,14 @@ class DataLoader:
         self.files_completed = []
         self.split_type = split_type
         # process the file immediately on instantiation
+
+    def _split(self):
         self.files_completed = self.interface.split(self.path, self.output_dir, self.split_interval, self.split_type)
+
+    def get_audio(self, output_file: str = "extracted_audio.mp3"):
+        output_path = Path(self.output_dir) / output_file
+        self.interface.get_audio_from_video(self.path, output_path)
+        return output_path
 
     def __next__(self):
         payload = self.queue.get()
@@ -269,6 +273,8 @@ class DataLoader:
                 self.queue.queue.clear()
 
     def __iter__(self):
+        if len(self.files_completed) == 0:
+            self._split()
         self.stop()
         self.thread_stop = False
         self.thread = threading.Thread(
@@ -284,6 +290,8 @@ class DataLoader:
         return self
 
     def __getitem__(self, index):
+        if len(self.files_completed) == 0:
+            self._split()
         try:
             with open(self.files_completed[index], "rb") as f:
                 return f.read()

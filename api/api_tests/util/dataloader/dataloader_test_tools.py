@@ -2,8 +2,10 @@ import os
 import numpy as np
 import subprocess
 import wave
+from pathlib import Path
 import math
 from moviepy.video.VideoClip import ColorClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.video.compositing.CompositeVideoClip import concatenate_videoclips
 
 
@@ -78,7 +80,7 @@ def create_test_mp3(filepath, duration_seconds=6.0, sample_rate=44100, target_si
     return filepath
 
 
-def create_test_file(filepath, fps=24, width=100, height=100, file_size_mb=100):
+def create_test_file(filepath, fps=24, width=100, height=100, file_size_mb=100, add_audio=False):
     # Create a ColorClip
     duration = (file_size_mb * 1024 * 1024) / (fps * width * height * 3)
     sub_duration = math.ceil(duration / 3)
@@ -86,9 +88,13 @@ def create_test_file(filepath, fps=24, width=100, height=100, file_size_mb=100):
     clip2 = ColorClip((width, height), color=(0, 255, 0), duration=sub_duration)
     clip3 = ColorClip((width, height), color=(0, 0, 255), duration=duration - 2 * sub_duration)
 
-    # create_test_mp3(f"{file_path}", duration_seconds=600, target_size_mb=test_file_size_mb)
     clip = concatenate_videoclips([clip1, clip2, clip3])
-
+    if add_audio:
+        audio_path = Path(filepath)
+        audio_path = audio_path.with_suffix(".mp3")
+        create_test_mp3(audio_path, duration_seconds=duration, target_size_mb=file_size_mb)
+        audio_clip = AudioFileClip(audio_path)
+        clip = clip.with_audio(audio_clip.with_duration(duration))
     codec_type = {
         ".mp4": "libx264",
         ".mkv": "libx264",

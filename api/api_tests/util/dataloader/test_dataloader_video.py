@@ -10,6 +10,7 @@ import subprocess
 import json
 import math
 from moviepy.video.io.VideoFileClip import VideoFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 from .dataloader_test_tools import create_test_file
 
 test_file_size_mb = 1000
@@ -122,3 +123,22 @@ def test_dataloader_getitem(temp_dir, file_type):
     # Test that accessing negative index raises an exception
     with pytest.raises(Exception):
         loader[-4]  # Should raise an exception for negative index
+
+
+def test_dataloader_audio(temp_dir):
+    """Test that DataLoader correctly splits WAV files based on size."""
+    # Create a WAV file that's 600MB
+    input_file = temp_dir / "large_input.mp4"
+    create_test_file(input_file, file_size_mb=test_file_size_mb, add_audio=True)
+    loader = DataLoader(path=str(input_file), output_dir=str(temp_dir), split_interval=100, interface=MediaInterface())
+
+    out_file = loader.get_audio(output_file="large_input_audio.mp3")
+    video_clip = VideoFileClip(str(input_file))
+    audio_clip = AudioFileClip(str(out_file))
+    assert int(audio_clip.duration) == int(video_clip.duration)
+    assert audio_clip.nchannels == 2
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+    assert out_file.suffix == ".mp3"
+    assert out_file.stem == "large_input_audio"
+    assert out_file.name == "large_input_audio.mp3"
