@@ -18,6 +18,7 @@ Note: In production/container environments, the broker should run externally.
 import logging
 import time
 import threading
+import os
 
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessageBroker
 from nv_ingest.framework.orchestration.python.python_pipeline import PythonPipeline
@@ -37,7 +38,67 @@ from nv_ingest.framework.orchestration.python.stages.injectors.metadata_injector
 from nv_ingest.framework.orchestration.python.stages.extractors.pdf_extractor import (
     PythonPDFExtractorStage,
 )
+from nv_ingest.framework.orchestration.python.stages.extractors.audio_extractor import (
+    PythonAudioExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.docx_extractor import (
+    PythonDocxExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.pptx_extractor import (
+    PythonPPTXExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.image_extractor import (
+    PythonImageExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.html_extractor import (
+    PythonHtmlExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.table_extractor import (
+    PythonTableExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.chart_extractor import (
+    PythonChartExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.extractors.infographic_extractor import (
+    PythonInfographicExtractorStage,
+)
+from nv_ingest.framework.orchestration.python.stages.mutate.image_filter import (
+    PythonImageFilterStage,
+)
+from nv_ingest.framework.orchestration.python.stages.mutate.image_dedup import (
+    PythonImageDedupStage,
+)
+from nv_ingest.framework.orchestration.python.stages.transforms.image_caption import (
+    PythonImageCaptionStage,
+)
+from nv_ingest.framework.orchestration.python.stages.transforms.text_splitter import (
+    PythonTextSplitterStage,
+)
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest.framework.orchestration.python.stages.transforms.text_embed import (
+    PythonTextEmbeddingStage,
+)
+from nv_ingest.framework.orchestration.python.stages.storage.store_embeddings import (
+    PythonEmbeddingStorageStage,
+)
+from nv_ingest.framework.orchestration.python.stages.storage.image_storage import (
+    PythonImageStorageStage,
+)
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_html_schema import HtmlExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
+from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
+from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -173,8 +234,8 @@ def main():
         metadata_injector = PythonMetadataInjectionStage(metadata_injector_config)
         pipeline.add_stage(name="metadata_injector", stage_actor=metadata_injector, config=metadata_injector_config)
 
-        # Add PDF extractor stage
-        pdf_extractor_config = PDFExtractorSchema(
+        # Add all extractor stages in correct order
+        pdf_config = PDFExtractorSchema(
             pdfium_config={
                 "yolox_endpoints": ("localhost:8001", "localhost:8000"),  # Default endpoints
                 "yolox_infer_protocol": "http",
@@ -183,13 +244,99 @@ def main():
                 "workers_per_progress_engine": 5,
             }
         )
-        pdf_extractor = PythonPDFExtractorStage(pdf_extractor_config)
-        pipeline.add_stage(name="pdf_extractor", stage_actor=pdf_extractor, config=pdf_extractor_config)
+        pipeline.add_stage(name="pdf_extractor", stage_actor=PythonPDFExtractorStage(pdf_config), config=pdf_config)
+
+        docx_config = DocxExtractorSchema()
+        pipeline.add_stage(name="docx_extractor", stage_actor=PythonDocxExtractorStage(docx_config), config=docx_config)
+
+        pptx_config = PPTXExtractorSchema()
+        pipeline.add_stage(name="pptx_extractor", stage_actor=PythonPPTXExtractorStage(pptx_config), config=pptx_config)
+
+        audio_config = AudioExtractorSchema()
+        pipeline.add_stage(
+            name="audio_extractor", stage_actor=PythonAudioExtractorStage(audio_config), config=audio_config
+        )
+
+        image_config = ImageExtractorSchema()
+        pipeline.add_stage(
+            name="image_extractor", stage_actor=PythonImageExtractorStage(image_config), config=image_config
+        )
+
+        html_config = HtmlExtractorSchema()
+        pipeline.add_stage(name="html_extractor", stage_actor=PythonHtmlExtractorStage(html_config), config=html_config)
+
+        table_config = TableExtractorSchema()
+        pipeline.add_stage(
+            name="table_extractor", stage_actor=PythonTableExtractorStage(table_config), config=table_config
+        )
+
+        chart_config = ChartExtractorSchema()
+        pipeline.add_stage(
+            name="chart_extractor", stage_actor=PythonChartExtractorStage(chart_config), config=chart_config
+        )
+
+        infographic_config = InfographicExtractorSchema()
+        pipeline.add_stage(
+            name="infographic_extractor",
+            stage_actor=PythonInfographicExtractorStage(infographic_config),
+            config=infographic_config,
+        )
+
+        # Add post-processing stages in correct order
+        image_filter_config = ImageFilterSchema()
+        pipeline.add_stage(
+            name="image_filter", stage_actor=PythonImageFilterStage(image_filter_config), config=image_filter_config
+        )
+
+        image_dedup_config = ImageDedupSchema()
+        pipeline.add_stage(
+            name="image_dedup", stage_actor=PythonImageDedupStage(image_dedup_config), config=image_dedup_config
+        )
+
+        image_caption_config = ImageCaptionExtractionSchema()
+        pipeline.add_stage(
+            name="image_caption", stage_actor=PythonImageCaptionStage(image_caption_config), config=image_caption_config
+        )
+
+        # Add transform stages
+        text_splitter_config = TextSplitterSchema()
+        pipeline.add_stage(
+            name="text_splitter", stage_actor=PythonTextSplitterStage(text_splitter_config), config=text_splitter_config
+        )
+
+        text_embedding_config = TextEmbeddingSchema(
+            api_key=os.environ.get("NVIDIA_API_KEY", "") or os.environ.get("NGC_API_KEY", ""),
+            embedding_nim_endpoint=os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1"),
+            embedding_model=os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2"),
+        )
+        pipeline.add_stage(
+            name="text_embedding",
+            stage_actor=PythonTextEmbeddingStage(text_embedding_config),
+            config=text_embedding_config,
+        )
+
+        # Add storage stages
+        embedding_storage_config = EmbeddingStorageSchema()
+        pipeline.add_stage(
+            name="embedding_storage",
+            stage_actor=PythonEmbeddingStorageStage(embedding_storage_config),
+            config=embedding_storage_config,
+        )
+
+        image_storage_config = ImageStorageModuleSchema()
+        pipeline.add_stage(
+            name="image_storage", stage_actor=PythonImageStorageStage(image_storage_config), config=image_storage_config
+        )
 
         # Add sink using new interface
         pipeline.add_sink(name="message_broker_sink", sink_actor=sink, config=sink_config)
 
-        logger.info("Pipeline created with source → metadata_injector → pdf_extractor → sink")
+        logger.info(
+            "Pipeline created with source → metadata_injector → pdf_extractor → docx_extractor"
+            " → pptx_extractor → audio_extractor → image_extractor → html_extractor → table_extractor "
+            "→ chart_extractor → infographic_extractor → image_filter → image_dedup → image_caption "
+            "→ text_splitter → text_embedding → embedding_storage → image_storage → sink"
+        )
 
         # Step 6: Start pipeline in background
         logger.info("Starting pipeline...")

@@ -144,10 +144,17 @@ RUN source activate nv_ingest_runtime && \
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 
+
+COPY ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl /workspace/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
+
+RUN source activate nv_ingest_runtime && \
+    pip install /workspace/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
+
 # Set entrypoint to tini with a custom entrypoint script
 ENTRYPOINT ["/opt/conda/envs/nv_ingest_runtime/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
 FROM nv_ingest_install AS development
+
 
 RUN source activate nv_ingest_runtime && \
     --mount=type=cache,target=/opt/conda/pkgs \
