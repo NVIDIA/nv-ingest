@@ -23,7 +23,7 @@ def main():
     # Possibly override config parameters
     config_data = {
         # Configure to use Python pipeline framework instead of Ray
-        "pipeline_framework": "ray"
+        "pipeline_framework": "python"
     }
 
     # Filter out None values to let the schema defaults handle them
