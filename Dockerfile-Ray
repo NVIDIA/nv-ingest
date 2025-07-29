@@ -145,7 +145,7 @@ RUN source activate nv_ingest_runtime && \
 RUN chmod +x /workspace/docker/entrypoint.sh
 
 
-COPY ray-latest-patch.whl /workspace/ray-latest-patch.whl
+COPY ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl /workspace/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
 
 RUN source activate nv_ingest_runtime && \
     pip install /workspace/ray-3.0.0.dev0-cp311-cp311-manylinux2014_x86_64.whl
