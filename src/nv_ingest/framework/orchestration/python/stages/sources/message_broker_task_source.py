@@ -61,7 +61,7 @@ class PythonMessageBrokerTaskSource:
     def __init__(self, config: PythonMessageBrokerTaskSourceConfig) -> None:
         self.config = config
         self._logger = logger
-        self._logger.debug("Initializing PythonMessageBrokerTaskSource with config: %s", config.dict())
+        self._logger.debug("Initializing PythonMessageBrokerTaskSource with config: %s", config)
 
         # Access validated configuration directly via self.config
         self.poll_interval = self.config.poll_interval

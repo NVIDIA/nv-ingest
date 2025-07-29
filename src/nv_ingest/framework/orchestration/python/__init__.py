@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .broker_starter import start_simple_message_broker
-from src.nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
+from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
     PythonMessageBrokerTaskSource,
 )
-from src.nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
+from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
     PythonMessageBrokerTaskSink,
 )
 from .pipeline import PythonPipeline

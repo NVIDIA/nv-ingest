@@ -7,10 +7,10 @@ import time
 from typing import List, Callable, Any, Optional
 from datetime import datetime
 
-from src.nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
+from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
     PythonMessageBrokerTaskSource,
 )
-from src.nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
+from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
     PythonMessageBrokerTaskSink,
 )
 
