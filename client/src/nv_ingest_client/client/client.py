@@ -987,16 +987,16 @@ class NvIngestClient:
         """
         # Handle None/default case
         if batch_size is None:
-            return 64
+            return 32
         
         # Validate type and range
         if not isinstance(batch_size, int):
-            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 64.")
-            return 64
+            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 32.")
+            return 32
         
         if batch_size < 1:
-            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 64.")
-            return 64
+            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 32.")
+            return 32
         
         # Performance guidance warnings
         if batch_size < 8:
@@ -1034,7 +1034,7 @@ class NvIngestClient:
         batch_size : int, optional
             Maximum number of jobs to process in each internal batch.
             Higher values may improve throughput but increase memory usage.
-            Must be >= 1. Default is 64.
+            Must be >= 1. Default is 32.
         concurrency_limit : int, optional
             Max number of simultaneous in-flight jobs. Default is 64.
         timeout : int, optional
