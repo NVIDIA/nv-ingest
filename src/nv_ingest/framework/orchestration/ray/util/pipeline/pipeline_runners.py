@@ -245,15 +245,15 @@ def _run_pipeline_process(
     Parameters
     ----------
     ingest_config : PipelineCreationSchema
-        The validated configuration object used to construct and launch the pipeline.
+        Configuration schema containing all pipeline parameters.
     disable_dynamic_scaling : Optional[bool]
-        If True, disables dynamic memory scaling. If None, uses the default behavior.
+        Whether to disable dynamic scaling for Ray pipelines.
     dynamic_memory_threshold : Optional[float]
-        The memory usage threshold for autoscaling. If None, uses the default value.
-    raw_stdout : Optional[TextIO]
-        Destination for stdout. Defaults to /dev/null.
-    raw_stderr : Optional[TextIO]
-        Destination for stderr. Defaults to /dev/null.
+        Memory threshold for dynamic scaling.
+    raw_stdout : Optional[TextIO], default=None
+        Raw stdout stream for subprocess output.
+    raw_stderr : Optional[TextIO], default=None
+        Raw stderr stream for subprocess output.
     """
     # Set the death signal for the subprocess
     set_pdeathsig()
@@ -267,51 +267,60 @@ def _run_pipeline_process(
     sys.stderr = raw_stderr or open(os.devnull, "w")
 
     framework = ingest_config.pipeline_framework
-
-    # Only initialize Ray if using Ray framework
-    if framework == "ray":
-        current_level = logging.getLogger().getEffectiveLevel()
-        ray_context = ray.init(
-            namespace="nv_ingest_ray",
-            logging_level=current_level,
-            ignore_reinit_error=True,
-            dashboard_host="0.0.0.0",
-            dashboard_port=8265,
-            _system_config={
-                "local_fs_capacity_threshold": 0.9,
-                "object_spilling_config": json.dumps(
-                    {
-                        "type": "filesystem",
-                        "params": {
-                            "directory_path": [
-                                "/tmp/ray_spill_testing_0",
-                                "/tmp/ray_spill_testing_1",
-                                "/tmp/ray_spill_testing_2",
-                                "/tmp/ray_spill_testing_3",
-                            ],
-                            "buffer_size": 100_000_000,
-                        },
-                    },
-                ),
-            },
-        )
-        logger.info(f"Ray initialized with context: {ray_context}")
-    else:
-        logger.info(f"Using {framework} framework - skipping Ray initialization")
+    broker_instance = None
+    broker_thread = None
 
     try:
-        _, total_elapsed = _launch_pipeline(
-            ingest_config,
+        # Initialize Ray only if using Ray framework
+        if framework == "ray":
+            import ray
+
+            current_level = logging.getLogger().getEffectiveLevel()
+            ray.init(
+                namespace="nv_ingest_ray",
+                logging_level=current_level,
+                ignore_reinit_error=True,
+                dashboard_host="0.0.0.0",
+                dashboard_port=8265,
+                _system_config={
+                    "local_fs_capacity_threshold": 0.9,
+                    "object_spilling_config": json.dumps(
+                        {
+                            "type": "filesystem",
+                            "params": {"directory_path": "/tmp/ray_spill"},
+                        }
+                    ),
+                },
+            )
+            logger.info("Ray initialized successfully")
+
+        # Launch the pipeline
+        pipeline, total_elapsed = _launch_pipeline(
+            ingest_config=ingest_config,
             block=True,
             disable_dynamic_scaling=disable_dynamic_scaling,
             dynamic_memory_threshold=dynamic_memory_threshold,
         )
-        logger.info(f"Pipeline completed successfully in {total_elapsed:.2f} seconds")
+
+        # Extract broker info if returned from Python pipeline
+        if framework == "python" and hasattr(pipeline, "_broker_info"):
+            broker_instance, broker_thread = pipeline._broker_info
+
+        logger.info(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds")
+
     except Exception as e:
         logger.error(f"Pipeline execution failed: {e}")
         sys.__stderr__.write(f"Subprocess pipeline run failed: {e}\n")
         raise
     finally:
+        # Cleanup broker for Python framework
+        if framework == "python" and broker_instance:
+            try:
+                logger.info("Shutting down SimpleMessageBroker in subprocess")
+                broker_instance.shutdown()
+            except Exception as e:
+                logger.warning(f"Error shutting down broker in subprocess: {e}")
+
         # Only shutdown Ray if it was initialized
         if framework == "ray":
             try:
@@ -333,6 +342,10 @@ def _launch_pipeline(
 
     framework = ingest_config.pipeline_framework
     logger.info(f"Using pipeline framework: {framework}")
+
+    # Store broker reference for cleanup
+    broker_instance = None
+    broker_thread = None
 
     if framework == "ray":
         dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
@@ -369,8 +382,12 @@ def _launch_pipeline(
 
     start_abs = datetime.now()
 
-    # Set up the ingestion pipeline
-    _ = _setup_pipeline_with_framework(pipeline, ingest_config.model_dump())
+    # Set up the ingestion pipeline - this may start a broker for Python framework
+    pipeline_setup_result = _setup_pipeline_with_framework(pipeline, ingest_config.model_dump())
+
+    # Extract broker info if returned from Python pipeline setup
+    if framework == "python" and isinstance(pipeline_setup_result, tuple):
+        _, broker_instance, broker_thread = pipeline_setup_result
 
     # Record setup time
     end_setup = start_run = datetime.now()
@@ -388,6 +405,15 @@ def _launch_pipeline(
         except KeyboardInterrupt:
             logger.info("Interrupt received, shutting down pipeline.")
             pipeline.stop()
+
+            # Cleanup broker for Python framework
+            if framework == "python" and broker_instance:
+                try:
+                    logger.info("Shutting down SimpleMessageBroker")
+                    broker_instance.shutdown()
+                except Exception as e:
+                    logger.warning(f"Error shutting down broker: {e}")
+
             if framework == "ray":
                 ray.shutdown()
                 logger.info("Ray shutdown complete.")

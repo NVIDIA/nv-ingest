@@ -11,7 +11,7 @@ mirroring the Ray pipeline builders but using PythonPipeline and PythonStage cla
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from nv_ingest.framework.orchestration.python.python_pipeline import PythonPipeline
 from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
@@ -81,19 +81,34 @@ def start_broker_in_process(host: str = "localhost", port: int = 7671, max_queue
         Port number for the broker.
     max_queue_size : int, default=1000
         Maximum queue size for the broker.
+
+    Returns
+    -------
+    tuple
+        A tuple containing (broker_instance, broker_thread) for cleanup purposes.
     """
     import threading
     from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessageBroker
 
+    broker = SimpleMessageBroker(host=host, port=int(port), max_queue_size=max_queue_size)
+
     def run_broker():
-        broker = SimpleMessageBroker(host=host, port=int(port), max_queue_size=max_queue_size)
-        logger.info(f"Starting SimpleMessageBroker on {host}:{port}")
-        broker.serve_forever()
+        try:
+            logger.info(f"Starting SimpleMessageBroker on {host}:{port}")
+            broker.serve_forever()
+        except Exception as e:
+            logger.error(f"Broker failed: {e}")
 
     broker_thread = threading.Thread(target=run_broker, daemon=True)
     broker_thread.start()
+
+    # Give broker time to start
+    import time
+
+    time.sleep(1)
+
     logger.info(f"SimpleMessageBroker started in background thread on {host}:{port}")
-    return broker_thread
+    return broker, broker_thread
 
 
 def get_pipeline_config() -> Dict[str, Any]:
@@ -144,7 +159,9 @@ def get_pipeline_config() -> Dict[str, Any]:
     }
 
 
-def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dict[str, Any] = None) -> str:
+def setup_python_ingestion_pipeline(
+    pipeline: PythonPipeline, ingest_config: Dict[str, Any] = None
+) -> Tuple[str, Any, Any]:
     """
     Set up the Python-based ingestion pipeline with all necessary stages.
 
@@ -157,22 +174,23 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     pipeline : PythonPipeline
         The Python pipeline instance to configure.
     ingest_config : Dict[str, Any], optional
-        Configuration dictionary for the pipeline. If None, uses environment defaults.
+        Configuration dictionary for the pipeline. If provided, it will be merged
+        with the default configuration.
 
     Returns
     -------
-    str
-        The ID of the sink stage (for compatibility with Ray version).
+    Tuple[str, Any, Any]
+        A tuple containing (pipeline_name, broker_instance, broker_thread) for cleanup purposes.
     """
-    logger.info("Setting up Python ingestion pipeline")
-
-    # Get configuration with environment defaults
+    # Get default configuration and merge with provided config
     config = get_pipeline_config()
     if ingest_config:
         config.update(ingest_config)
 
     # Start the message broker in a background thread
-    start_broker_in_process(host=config["message_client_host"], port=config["message_client_port"])
+    broker, broker_thread = start_broker_in_process(
+        host=config["message_client_host"], port=config["message_client_port"]
+    )
 
     ########################################################################################################
     ## Source stage
@@ -183,7 +201,7 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
             port=config["message_client_port"],
         ),
         task_queue=config["task_queue_name"],
-        poll_interval=1.0,
+        poll_interval=0.1,
     )
     pipeline.add_source(
         name="message_broker_task_source",
@@ -192,7 +210,7 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     )
 
     ########################################################################################################
-    ## Insertion and Pre-processing stages
+    ## Metadata injection stage
     ########################################################################################################
     metadata_injector_config = {}
     pipeline.add_stage(
@@ -202,7 +220,7 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
     )
 
     ########################################################################################################
-    ## Primitive extraction stages
+    ## Extractor stages
     ########################################################################################################
     pdf_config = PDFExtractorSchema(
         **{
@@ -435,5 +453,4 @@ def setup_python_ingestion_pipeline(pipeline: PythonPipeline, ingest_config: Dic
         config=sink_config,
     )
 
-    logger.info("Python ingestion pipeline setup completed")
-    return "message_broker_task_sink"  # Return sink ID for compatibility
+    return "python_ingestion_pipeline", broker, broker_thread
