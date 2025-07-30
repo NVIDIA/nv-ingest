@@ -5,7 +5,8 @@
 import logging
 import time
 import threading
-from typing import Any, Optional, List
+import multiprocessing
+from typing import Any, Optional, List, Dict, Tuple
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -14,144 +15,345 @@ from .stages.meta.python_stage_base import PythonStage
 logger = logging.getLogger(__name__)
 
 
+class PipelineEdge:
+    """Represents a directed edge between two stages in the pipeline."""
+
+    def __init__(self, from_stage: str, to_stage: str, queue_size: int = 1000):
+        self.from_stage = from_stage
+        self.to_stage = to_stage
+        self.queue = multiprocessing.Queue(maxsize=queue_size)
+        self.queue_size = queue_size
+
+
 class PythonPipeline:
     """
-    Simple Python-based pipeline orchestrator.
+    Python-based pipeline orchestrator with streaming asynchronous execution.
 
-    This orchestrator runs a linear chain of stages between a source and sink,
-    without Ray dependencies. It's designed for simple, local processing with
-    background execution capability.
+    This orchestrator supports both linear (legacy) and graph-based pipeline execution
+    using multiprocessing for true parallelism. Each stage runs in its own process
+    and communicates via multiprocessing queues.
 
-    Simplified design constraints:
-    - Only one source allowed
-    - Only one sink allowed
-    - Multiple stages allowed in linear order
-    - No queues (direct function chaining)
-    - Background execution when started
+    Features:
+    - Linear pipeline execution (backward compatible)
+    - Graph-based pipeline with add_edge method
+    - Multiprocessing-based stage execution
+    - Queue-based message passing between stages
+    - Graceful shutdown and lifecycle management
     """
 
-    def __init__(self):
-        """Initialize the Python pipeline."""
+    def __init__(self, enable_streaming: bool = True):
+        """
+        Initialize the Python pipeline.
+
+        Args:
+            enable_streaming: If True, enables streaming asynchronous execution with multiprocessing.
+                             If False, uses legacy linear synchronous execution.
+        """
+        # Legacy linear pipeline components
         self._source: Optional[Any] = None
         self._sink: Optional[Any] = None
         self._stages: List[PythonStage] = []
 
+        # Streaming pipeline components
+        self.enable_streaming = enable_streaming
+        self._stage_registry: Dict[str, Tuple[Any, BaseModel]] = {}  # name -> (stage_class, config)
+        self._edges: List[PipelineEdge] = []
+        self._processes: Dict[str, multiprocessing.Process] = {}
+        self._stage_queues: Dict[str, Dict[str, multiprocessing.Queue]] = {}  # stage_name -> {input/output: queue}
+
+        # Pipeline state
         self._running = False
         self._processing_thread: Optional[threading.Thread] = None
         self._processed_count = 0
         self._error_count = 0
         self.start_time: Optional[datetime] = None
 
-        logger.info("PythonPipeline initialized")
+        # Broker management for proper cleanup
+        self._broker_instance: Optional[Any] = None
+        self._broker_thread: Optional[threading.Thread] = None
+
+        logger.info(f"PythonPipeline initialized (streaming={'enabled' if enable_streaming else 'disabled'})")
+
+    def set_broker_instance(self, broker_instance: Any, broker_thread: Optional[threading.Thread] = None) -> None:
+        """
+        Set the broker instance for proper cleanup during pipeline shutdown.
+
+        Args:
+            broker_instance: The SimpleBroker instance
+            broker_thread: Optional broker thread for cleanup
+        """
+        self._broker_instance = broker_instance
+        self._broker_thread = broker_thread
+        logger.info("Broker instance registered with pipeline for cleanup")
 
     def add_source(self, *, name: str, source_actor: Any, config: BaseModel) -> "PythonPipeline":
         """
         Adds a source stage to the pipeline.
 
-        Parameters
-        ----------
-        name : str
-            The name of the source stage.
-        source_actor : Any
-            The source instance (must have get_message method).
-        config : BaseModel
-            The configuration for the source stage.
+        Args:
+            name: Name of the source stage
+            source_actor: Source stage class or instance
+            config: Configuration for the source stage
 
-        Returns
-        -------
-        PythonPipeline
-            The pipeline instance for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a source is already added.
+        Returns:
+            Self for method chaining
         """
-        if self._source is not None:
-            raise ValueError("Only one source is allowed in PythonPipeline")
+        if self.enable_streaming:
+            # For streaming mode, we need the class, not the instance
+            if hasattr(source_actor, "__class__") and not isinstance(source_actor, type):
+                # It's an instance, store the class and config
+                self._stage_registry[name] = (source_actor.__class__, config)
+            else:
+                # It's a class, store as-is
+                self._stage_registry[name] = (source_actor, config)
+            logger.info(f"Added streaming source stage: {name}")
+        else:
+            # Legacy behavior - handle both classes and instances
+            if isinstance(source_actor, type):
+                # It's a class, instantiate it
+                self._source = source_actor(config=config)
+            else:
+                # It's already an instance, use as-is
+                self._source = source_actor
 
-        self._source = source_actor
-        logger.info(f"Added source stage: {name}")
+            if self._source is not None and hasattr(self._source, "_source"):
+                # Check if we already have a source
+                logger.warning("Multiple sources detected in linear pipeline mode")
+
+            logger.info(f"Added linear source stage: {name}")
+
         return self
 
     def add_sink(self, *, name: str, sink_actor: Any, config: BaseModel) -> "PythonPipeline":
         """
         Adds a sink stage to the pipeline.
 
-        Parameters
-        ----------
-        name : str
-            The name of the sink stage.
-        sink_actor : Any
-            The sink instance (must have process_message method).
-        config : BaseModel
-            The configuration for the sink stage.
+        Args:
+            name: Name of the sink stage
+            sink_actor: Sink stage class or instance
+            config: Configuration for the sink stage
 
-        Returns
-        -------
-        PythonPipeline
-            The pipeline instance for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If a sink is already added.
+        Returns:
+            Self for method chaining
         """
-        if self._sink is not None:
-            raise ValueError("Only one sink is allowed in PythonPipeline")
+        if self.enable_streaming:
+            # For streaming mode, we need the class, not the instance
+            if hasattr(sink_actor, "__class__") and not isinstance(sink_actor, type):
+                # It's an instance, store the class and config
+                self._stage_registry[name] = (sink_actor.__class__, config)
+            else:
+                # It's a class, store as-is
+                self._stage_registry[name] = (sink_actor, config)
+            logger.info(f"Added streaming sink stage: {name}")
+        else:
+            # Legacy behavior - handle both classes and instances
+            if isinstance(sink_actor, type):
+                # It's a class, instantiate it
+                self._sink = sink_actor(config=config)
+            else:
+                # It's already an instance, use as-is
+                self._sink = sink_actor
 
-        self._sink = sink_actor
-        logger.info(f"Added sink stage: {name}")
+            if self._sink is not None and hasattr(self._sink, "_sink"):
+                # Check if we already have a sink
+                logger.warning("Multiple sinks detected in linear pipeline mode")
+
+            logger.info(f"Added linear sink stage: {name}")
+
         return self
 
     def add_stage(self, *, name: str, stage_actor: Any, config: BaseModel) -> "PythonPipeline":
         """
         Adds a processing stage to the pipeline.
 
-        Parameters
-        ----------
-        name : str
-            The name of the stage.
-        stage_actor : Any
-            The stage instance (must inherit from PythonStage with on_data method).
-        config : BaseModel
-            The configuration for the stage.
+        Args:
+            name: Name of the stage
+            stage_actor: Stage class or instance
+            config: Configuration for the stage
 
-        Returns
-        -------
-        PythonPipeline
-            The pipeline instance for method chaining.
+        Returns:
+            Self for method chaining
         """
-        if not isinstance(stage_actor, PythonStage):
-            raise ValueError(f"Stage {name} must inherit from PythonStage")
+        if self.enable_streaming:
+            # For streaming mode, we need the class, not the instance
+            if hasattr(stage_actor, "__class__") and not isinstance(stage_actor, type):
+                # It's an instance, store the class and config
+                self._stage_registry[name] = (stage_actor.__class__, config)
+            else:
+                # It's a class, store as-is
+                self._stage_registry[name] = (stage_actor, config)
+            logger.info(f"Added streaming stage: {name}")
+        else:
+            # Legacy behavior - handle both classes and instances
+            if isinstance(stage_actor, type):
+                # It's a class, instantiate it
+                stage_instance = stage_actor(config=config)
+            else:
+                # It's already an instance, use as-is
+                stage_instance = stage_actor
 
-        self._stages.append(stage_actor)
-        logger.info(f"Added processing stage: {name} (total stages: {len(self._stages)})")
+            self._stages.append(stage_instance)
+            logger.info(f"Added linear stage: {name}")
+
         return self
 
-    def build(self) -> None:
+    def add_edge(self, from_stage: str, to_stage: str, queue_size: int = 1000) -> "PythonPipeline":
         """
-        Build the pipeline and validate configuration.
+        Adds a directed edge between two stages in the streaming pipeline.
 
-        Raises
-        ------
-        ValueError
-            If source or sink is missing.
+        Args:
+            from_stage: Name of the source stage
+            to_stage: Name of the destination stage
+            queue_size: Maximum size of the queue between stages
+
+        Returns:
+            Self for method chaining
+
+        Raises:
+            ValueError: If streaming is not enabled or stages don't exist
         """
+        if not self.enable_streaming:
+            raise ValueError("add_edge is only available when streaming is enabled")
+
+        if from_stage not in self._stage_registry:
+            raise ValueError(f"Source stage '{from_stage}' not found in pipeline")
+
+        if to_stage not in self._stage_registry:
+            raise ValueError(f"Destination stage '{to_stage}' not found in pipeline")
+
+        edge = PipelineEdge(from_stage, to_stage, queue_size)
+        self._edges.append(edge)
+
+        logger.info(f"Added edge: {from_stage} -> {to_stage} (queue_size={queue_size})")
+        return self
+
+    def _setup_stage_queues(self) -> None:
+        """Set up input and output queues for each stage based on edges."""
+        # Initialize queue dictionaries for each stage
+        for stage_name in self._stage_registry:
+            self._stage_queues[stage_name] = {"inputs": [], "outputs": []}
+
+        # Assign queues based on edges
+        for edge in self._edges:
+            # Add output queue to source stage
+            self._stage_queues[edge.from_stage]["outputs"].append(edge.queue)
+            # Add input queue to destination stage
+            self._stage_queues[edge.to_stage]["inputs"].append(edge.queue)
+
+    def _run_stage_process(self, stage_name: str, stage_class: Any, config: BaseModel) -> None:
+        """
+        Run a single stage in its own process with queue-based message passing.
+
+        Args:
+            stage_name: Name of the stage
+            stage_class: Stage class to instantiate
+            config: Configuration for the stage
+        """
+        try:
+            # Create stage instance
+            stage_instance = stage_class(config=config)
+
+            # Get input and output queues for this stage
+            input_queues = self._stage_queues[stage_name]["inputs"]
+            output_queues = self._stage_queues[stage_name]["outputs"]
+
+            logger.info(f"Stage {stage_name} started with {len(input_queues)} inputs, {len(output_queues)} outputs")
+
+            # Set up stage queues
+            stage_instance._input_queues = input_queues
+            stage_instance._output_queues = output_queues
+
+            # Start the stage's processing loop
+            stage_instance._processing_loop()
+
+        except Exception as e:
+            logger.error(f"Error in stage {stage_name}: {e}")
+            raise
+
+    def start(self) -> None:
+        """Start the pipeline execution."""
+        if self._running:
+            logger.warning("Pipeline is already running")
+            return
+
+        self._running = True
+        self.start_time = datetime.now()
+
+        if self.enable_streaming:
+            self._start_streaming_pipeline()
+        else:
+            self._start_linear_pipeline()
+
+    def _start_streaming_pipeline(self) -> None:
+        """Start the streaming pipeline with multiprocessing."""
+        logger.info("Starting streaming pipeline with multiprocessing")
+
+        # Validate pipeline configuration
+        if not self._stage_registry:
+            raise ValueError("No stages configured for streaming pipeline")
+
+        if not self._edges:
+            logger.warning("No edges configured - stages will run independently")
+
+        # Set up queues between stages
+        self._setup_stage_queues()
+
+        # Validate that all stages have proper queue connections
+        for stage_name in self._stage_registry:
+            input_count = len(self._stage_queues[stage_name]["inputs"])
+            output_count = len(self._stage_queues[stage_name]["outputs"])
+            logger.info(f"Stage '{stage_name}': {input_count} inputs, {output_count} outputs")
+
+        # Start each stage in its own process
+        for stage_name, (stage_class, config) in self._stage_registry.items():
+            try:
+                process = multiprocessing.Process(
+                    target=self._run_stage_process, args=(stage_name, stage_class, config), name=f"Stage-{stage_name}"
+                )
+                process.start()
+                self._processes[stage_name] = process
+                logger.info(f"Started process for stage: {stage_name} (PID: {process.pid})")
+            except Exception as e:
+                logger.error(f"Failed to start stage {stage_name}: {e}")
+                # Clean up any already started processes
+                self._stop_streaming_pipeline()
+                raise
+
+    def _start_linear_pipeline(self) -> None:
+        """Start the legacy linear pipeline with threading."""
+        logger.info("Starting linear pipeline with threading")
+
         if self._source is None:
-            raise ValueError("Pipeline must have a source")
+            raise ValueError("No source stage configured")
         if self._sink is None:
-            raise ValueError("Pipeline must have a sink")
+            raise ValueError("No sink stage configured")
 
-        # Start all stages
-        if hasattr(self._source, "start"):
-            self._source.start()
-        if hasattr(self._sink, "start"):
-            self._sink.start()
-        for stage in self._stages:
-            stage.start()
+        self._processing_thread = threading.Thread(target=self._linear_processing_loop, daemon=True)
+        self._processing_thread.start()
 
-        logger.info(f"Pipeline built with 1 source, {len(self._stages)} stages, 1 sink")
+    def _linear_processing_loop(self) -> None:
+        """
+        Main processing loop that runs in a background thread.
+
+        Continuously processes messages until stopped.
+        """
+        logger.info("Pipeline processing loop started")
+
+        while self._running:
+            try:
+                # Process a single message
+                logger.debug("Pipeline processing loop iteration")
+                message_processed = self._process_single_message()
+
+                if not message_processed:
+                    # No message available, sleep briefly to avoid busy waiting
+                    time.sleep(0.1)
+
+            except Exception as e:
+                logger.error(f"Error in processing loop: {e}")
+                time.sleep(1.0)  # Sleep longer on error
+
+        logger.info("Pipeline processing loop stopped")
 
     def _process_single_message(self) -> bool:
         """
@@ -214,85 +416,83 @@ class PythonPipeline:
             logger.error(f"Pipeline processing failed: {e}")
             return False
 
-    def _processing_loop(self) -> None:
-        """
-        Main processing loop that runs in a background thread.
-
-        Continuously processes messages until stopped.
-        """
-        logger.info("Pipeline processing loop started")
-
-        while self._running:
-            try:
-                # Process a single message
-                logger.debug("Pipeline processing loop iteration")
-                message_processed = self._process_single_message()
-
-                if not message_processed:
-                    # No message available, sleep briefly to avoid busy waiting
-                    time.sleep(0.1)
-
-            except Exception as e:
-                logger.error(f"Error in processing loop: {e}")
-                time.sleep(1.0)  # Sleep longer on error
-
-        logger.info("Pipeline processing loop stopped")
-
-    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
-        """
-        Start the pipeline in a background thread.
-
-        Parameters
-        ----------
-        monitor_poll_interval : float
-            Unused, kept for interface compatibility.
-        scaling_poll_interval : float
-            Unused, kept for interface compatibility.
-        """
-        if self._running:
-            logger.warning("Pipeline is already running")
-            return
-
-        # Build pipeline if not already built
-        if not hasattr(self._source, "start") or not self._source._running:
-            self.build()
-
-        self._running = True
-        self.start_time = datetime.now()
-
-        # Reset statistics
-        self._processed_count = 0
-        self._error_count = 0
-
-        # Start the processing loop in a background thread
-        self._processing_thread = threading.Thread(target=self._processing_loop, daemon=True)
-        self._processing_thread.start()
-
-        logger.info("PythonPipeline started in background thread")
-
     def stop(self) -> None:
-        """
-        Stop the pipeline and perform cleanup.
-        """
+        """Stop the pipeline execution gracefully."""
         if not self._running:
             logger.warning("Pipeline is not running")
             return
 
+        logger.info("Stopping pipeline...")
         self._running = False
 
-        # Wait for processing thread to finish
+        if self.enable_streaming:
+            self._stop_streaming_pipeline()
+        else:
+            self._stop_linear_pipeline()
+
+        # Calculate final statistics
+        if self.start_time:
+            elapsed = (datetime.now() - self.start_time).total_seconds()
+            logger.info(
+                f"Pipeline stopped. Processed: {self._processed_count}, "
+                f"Errors: {self._error_count}, Elapsed: {elapsed:.2f}s"
+            )
+
+    def _stop_streaming_pipeline(self) -> None:
+        """Stop the streaming pipeline and terminate all processes."""
+        logger.info("Stopping streaming pipeline processes...")
+
+        # Send termination signals to all queues
+        for edge in self._edges:
+            try:
+                edge.queue.put(None, timeout=1.0)  # Sentinel value to stop processing
+            except:  # noqa
+                pass  # Queue might be full or closed
+
+        # Wait for processes to terminate gracefully
+        for stage_name, process in self._processes.items():
+            try:
+                process.join(timeout=5.0)
+                if process.is_alive():
+                    logger.warning(f"Force terminating stage: {stage_name}")
+                    process.terminate()
+                    process.join(timeout=2.0)
+                    if process.is_alive():
+                        logger.error(f"Failed to terminate stage: {stage_name}")
+                else:
+                    logger.info(f"Stage {stage_name} terminated gracefully")
+            except Exception as e:
+                logger.error(f"Error stopping stage {stage_name}: {e}")
+
+        self._processes.clear()
+
+        # Stop broker instance if registered
+        if self._broker_instance:
+            try:
+                logger.info("Shutting down broker instance...")
+                self._broker_instance.shutdown()
+                logger.info("Broker instance shutdown complete")
+            except Exception as e:
+                logger.error(f"Failed to shutdown broker instance: {e}")
+
+        # Stop broker thread if registered
+        if self._broker_thread and self._broker_thread.is_alive():
+            try:
+                logger.info("Waiting for broker thread to stop...")
+                self._broker_thread.join(timeout=5.0)
+                if self._broker_thread.is_alive():
+                    logger.warning("Broker thread did not stop gracefully within timeout")
+                else:
+                    logger.info("Broker thread stopped successfully")
+            except Exception as e:
+                logger.error(f"Error stopping broker thread: {e}")
+
+    def _stop_linear_pipeline(self) -> None:
+        """Stop the legacy linear pipeline."""
         if self._processing_thread and self._processing_thread.is_alive():
             self._processing_thread.join(timeout=5.0)
-
-        # Stop all components
-        if hasattr(self._source, "stop"):
-            self._source.stop()
-        if hasattr(self._sink, "stop"):
-            self._sink.stop()
-        for stage in self._stages:
-            stage.stop()
-
-        logger.info("PythonPipeline stopped")
+            if self._processing_thread.is_alive():
+                logger.warning("Processing thread did not stop gracefully")
 
     def get_stats(self) -> dict:
         """
@@ -318,10 +518,36 @@ class PythonPipeline:
             "elapsed_seconds": elapsed,
             "processing_rate_cps": processing_rate,
             "start_time": self.start_time.isoformat() if self.start_time else None,
-            "source_stats": getattr(self._source, "get_stats", lambda: {})(),
-            "sink_stats": getattr(self._sink, "get_stats", lambda: {})(),
-            "stage_stats": [stage.get_stats() for stage in self._stages],
+            "streaming_enabled": self.enable_streaming,
         }
+
+        if self.enable_streaming:
+            # Add streaming-specific statistics
+            stats.update(
+                {
+                    "active_processes": len([p for p in self._processes.values() if p.is_alive()]),
+                    "total_processes": len(self._processes),
+                    "edges_count": len(self._edges),
+                    "stages_count": len(self._stage_registry),
+                    "process_stats": {
+                        name: {
+                            "pid": process.pid if process.is_alive() else None,
+                            "is_alive": process.is_alive(),
+                            "exitcode": process.exitcode,
+                        }
+                        for name, process in self._processes.items()
+                    },
+                }
+            )
+        else:
+            # Add linear pipeline statistics
+            stats.update(
+                {
+                    "source_stats": getattr(self._source, "get_stats", lambda: {})(),
+                    "sink_stats": getattr(self._sink, "get_stats", lambda: {})(),
+                    "stage_stats": [stage.get_stats() for stage in self._stages],
+                }
+            )
 
         return stats
 

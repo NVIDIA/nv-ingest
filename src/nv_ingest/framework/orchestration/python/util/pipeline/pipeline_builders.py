@@ -99,7 +99,8 @@ def start_broker_in_process(host: str = "localhost", port: int = 7671, max_queue
         except Exception as e:
             logger.error(f"Broker failed: {e}")
 
-    broker_thread = threading.Thread(target=run_broker, daemon=True)
+    # Create non-daemon thread so it can be properly shut down
+    broker_thread = threading.Thread(target=run_broker, daemon=False)
     broker_thread.start()
 
     # Give broker time to start
@@ -191,6 +192,9 @@ def setup_python_ingestion_pipeline(
     broker, broker_thread = start_broker_in_process(
         host=config["message_client_host"], port=config["message_client_port"]
     )
+
+    # Register broker with pipeline for proper cleanup
+    pipeline.set_broker_instance(broker, broker_thread)
 
     ########################################################################################################
     ## Source stage
@@ -452,5 +456,35 @@ def setup_python_ingestion_pipeline(
         sink_actor=PythonMessageBrokerTaskSink(sink_config),
         config=sink_config,
     )
+
+    ########################################################################################################
+    ## Add edges for linear pipeline (like Ray pipeline)
+    ########################################################################################################
+    if pipeline.enable_streaming:
+        logger.info("Adding linear edges for streaming pipeline...")
+
+        # Create simple linear pipeline flow (like Ray pipeline does)
+        # source -> metadata_injector -> pdf_extractor -> docx_extractor -> ... -> sink
+
+        pipeline.add_edge("message_broker_task_source", "metadata_injector")
+        pipeline.add_edge("metadata_injector", "pdf_extractor")
+        pipeline.add_edge("pdf_extractor", "docx_extractor")
+        pipeline.add_edge("docx_extractor", "pptx_extractor")
+        pipeline.add_edge("pptx_extractor", "audio_extractor")
+        pipeline.add_edge("audio_extractor", "image_extractor")
+        pipeline.add_edge("image_extractor", "html_extractor")
+        pipeline.add_edge("html_extractor", "table_extractor")
+        pipeline.add_edge("table_extractor", "chart_extractor")
+        pipeline.add_edge("chart_extractor", "infographic_extractor")
+        pipeline.add_edge("infographic_extractor", "image_filter")
+        pipeline.add_edge("image_filter", "image_dedup")
+        pipeline.add_edge("image_dedup", "image_caption")
+        pipeline.add_edge("image_caption", "text_splitter")
+        pipeline.add_edge("text_splitter", "text_embedding")
+        pipeline.add_edge("text_embedding", "embedding_storage")
+        pipeline.add_edge("embedding_storage", "image_storage")
+        pipeline.add_edge("image_storage", "message_broker_task_sink")
+
+        logger.info("Linear streaming pipeline edges added successfully")
 
     return "python_ingestion_pipeline", broker, broker_thread

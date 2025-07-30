@@ -10,7 +10,8 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
+from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
+from ..meta.python_stage_base import PythonStage
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class PythonMessageBrokerTaskSinkConfig(BaseModel):
     poll_interval: float = Field(default=0.1, gt=0)
 
 
-class PythonMessageBrokerTaskSink:
+class PythonMessageBrokerTaskSink(PythonStage):
     """Python-based message broker task sink.
 
     Processes messages and sends results back to the Simple message broker.
@@ -51,6 +52,7 @@ class PythonMessageBrokerTaskSink:
     """
 
     def __init__(self, config: PythonMessageBrokerTaskSinkConfig) -> None:
+        super().__init__(config)
         self.config = config
         self._logger = logger
         self._logger.debug("Initializing PythonMessageBrokerTaskSink with config: %s", config.dict())

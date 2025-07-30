@@ -14,6 +14,7 @@ from nv_ingest_api.internal.primitives.control_message_task import ControlMessag
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_ingest_job
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
+from ..meta.python_stage_base import PythonStage
 import pandas as pd
 import uuid
 
@@ -51,7 +52,7 @@ class PythonMessageBrokerTaskSourceConfig(BaseModel):
     poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
 
 
-class PythonMessageBrokerTaskSource:
+class PythonMessageBrokerTaskSource(PythonStage):
     """Python-based message broker task source.
 
     Fetches messages from a Simple broker, processes them, and provides them to the pipeline.
@@ -59,9 +60,13 @@ class PythonMessageBrokerTaskSource:
     """
 
     def __init__(self, config: PythonMessageBrokerTaskSourceConfig) -> None:
+        super().__init__(config)
         self.config = config
         self._logger = logger
         self._logger.debug("Initializing PythonMessageBrokerTaskSource with config: %s", config)
+
+        # Mark this as a source stage for streaming pipeline
+        self.mark_as_source_stage()
 
         # Access validated configuration directly via self.config
         self.poll_interval = self.config.poll_interval
@@ -82,6 +87,20 @@ class PythonMessageBrokerTaskSource:
         self._pause_event.set()  # Initially not paused
 
         self._logger.debug("PythonMessageBrokerTaskSource initialized. Task queue: %s", self.task_queue)
+
+    def on_data(self, control_message: Any) -> Optional[Any]:
+        """
+        For source stages, this method is called by the streaming pipeline to generate messages.
+        The control_message parameter is ignored for source stages.
+        """
+        return self.get_message()
+
+    def _generate_source_message(self) -> Optional[Any]:
+        """
+        Generate a message for the streaming pipeline.
+        This method is called by the streaming processing loop.
+        """
+        return self.get_message()
 
     def _create_client(self):
         """Create the Simple broker client."""
