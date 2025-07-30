@@ -328,6 +328,12 @@ def create_nvingest_index_params(
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )
+            index_params.add_index(
+                field_name="vector",
+                index_name="dense_index",
+                index_type="FLAT",
+                metric_type="COSINE",
+            )
         else:
             index_params.add_index(
                 field_name="vector",

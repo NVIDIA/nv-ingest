@@ -96,7 +96,7 @@ class MediaInterface(LoaderInterface):
 
     def get_audio_from_video(self, input_path: str, output_file: str, cache_path: str = None):
         """
-        Get the audio from a video file.
+        Get the audio from a video file. if audio extraction fails, return None.
         input_path: str, path to the video file
         output_dir: str, path to the output directory
         cache_path: str, path to the cache directory
@@ -104,14 +104,16 @@ class MediaInterface(LoaderInterface):
         output_path = Path(output_file)
         output_dir = output_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        capture_output, capture_error = (
-            ffmpeg.input(str(input_path))
-            .output(str(output_path), c="copy", map="0:a")
-            .run(capture_stdout=True, capture_stderr=True)
-        )
-        print(f"Capture output: {capture_output}")
-        print(f"Capture error: {capture_error}")
-        print(f"Audio from {input_path} saved to {output_path}")
+        try:
+            capture_output, capture_error = (
+                ffmpeg.input(str(input_path))
+                .output(str(output_path), c="copy", map="0:a")
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+            return output_path
+        except ffmpeg.Error as e:
+            logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
+            return None
 
     def split(
         self,
@@ -120,13 +122,18 @@ class MediaInterface(LoaderInterface):
         split_interval: int = 0,
         split_type: SplitType = SplitType.SIZE,
         cache_path: str = None,
+        video_audio_separate: bool = False,
     ):
         """
-        Split a media file into smaller chunks of `split_interval` size.
+        Split a media file into smaller chunks of `split_interval` size. if
+        video_audio_separate is True and the file is a video, the audio will be
+        extracted from the video and saved to a separate files. Data can be returned
+        as a tuple of (video_files, audio_files) or just files (i.e. audio files).
         input_path: str, path to the media file
         output_dir: str, path to the output directory
         split_interval: the size of the chunk to split the media file into depending on the split type
         split_type: SplitType, type of split to perform, either size, time, or frame
+        video_audio_separate: bool, whether to separate the video and audio files
         """
         import ffmpeg
 
@@ -164,10 +171,21 @@ class MediaInterface(LoaderInterface):
             )
             logging.debug(f"Split {input_path} into {num_splits} chunks")
             self.path_metadata[input_path] = probe
+            print(capture_output)
+            print(capture_error)
         except ffmpeg.Error as e:
             logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
         files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
-        print(f"Files: {files}")
+        if video_audio_separate and suffix in [".mp4", ".mov", ".avi", ".mkv"]:
+            video_audio_files = []
+            for file in files:
+                file = Path(file)
+                audio_path = self.get_audio_from_video(file, file.with_suffix(".mp3"), cache_path)
+                if audio_path is not None:
+                    video_audio_files.append(audio_path)
+                else:
+                    logging.error(f"Failed to extract audio from {file}")
+            return list(zip(files, video_audio_files))
         return files
 
     def find_num_splits(
@@ -208,10 +226,18 @@ def load_data(queue: queue.Queue, paths: list[str], thread_stop: threading.Event
     file = None
     try:
         for file in paths:
-            if thread_stop:
-                return
-            with open(file, "rb") as f:
-                queue.put(f.read())
+            if isinstance(file, tuple):
+                video_file, audio_file = file
+                with open(video_file, "rb") as f:
+                    video = f.read()
+                with open(audio_file, "rb") as f:
+                    audio = f.read()
+                queue.put((video, audio))
+            else:
+                if thread_stop:
+                    return
+                with open(file, "rb") as f:
+                    queue.put(f.read())
     except Exception as e:
         logging.error(f"Error processing file {file}: {e}")
         queue.put(RuntimeError(f"Error processing file {file}: {e}"))
@@ -233,6 +259,7 @@ class DataLoader:
         split_interval: int = 450,
         interface: LoaderInterface = None,
         size: int = 2,
+        video_audio_separate: bool = False,
     ):
         self.thread = None
         self.thread_stop = False
@@ -243,15 +270,18 @@ class DataLoader:
         self.interface = interface
         self.files_completed = []
         self.split_type = split_type
+        self.video_audio_separate = video_audio_separate
         # process the file immediately on instantiation
+        self._split()
 
     def _split(self):
-        self.files_completed = self.interface.split(self.path, self.output_dir, self.split_interval, self.split_type)
-
-    def get_audio(self, output_file: str = "extracted_audio.mp3"):
-        output_path = Path(self.output_dir) / output_file
-        self.interface.get_audio_from_video(self.path, output_path)
-        return output_path
+        self.files_completed = self.interface.split(
+            self.path,
+            self.output_dir,
+            split_interval=self.split_interval,
+            split_type=self.split_type,
+            video_audio_separate=self.video_audio_separate,
+        )
 
     def __next__(self):
         payload = self.queue.get()
@@ -273,8 +303,6 @@ class DataLoader:
                 self.queue.queue.clear()
 
     def __iter__(self):
-        if len(self.files_completed) == 0:
-            self._split()
         self.stop()
         self.thread_stop = False
         self.thread = threading.Thread(
@@ -289,9 +317,10 @@ class DataLoader:
         self.thread.start()
         return self
 
+    def __len__(self):
+        return len(self.files_completed)
+
     def __getitem__(self, index):
-        if len(self.files_completed) == 0:
-            self._split()
         try:
             with open(self.files_completed[index], "rb") as f:
                 return f.read()

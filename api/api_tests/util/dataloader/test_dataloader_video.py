@@ -130,9 +130,16 @@ def test_dataloader_audio(temp_dir):
     # Create a WAV file that's 600MB
     input_file = temp_dir / "large_input.mp4"
     create_test_file(input_file, file_size_mb=test_file_size_mb, add_audio=True)
-    loader = DataLoader(path=str(input_file), output_dir=str(temp_dir), split_interval=100, interface=MediaInterface())
+    actual_size_mb = input_file.stat().st_size * 1e-6
+    # Initialize DataLoader
+    split_size_mb = math.ceil(actual_size_mb * 100) / (3 * 100)  # Should result in 3 chunks
+    loader = DataLoader(
+        path=str(input_file), output_dir=str(temp_dir), split_interval=split_size_mb, interface=MediaInterface()
+    )
 
-    out_file = loader.get_audio(output_file="large_input_audio.mp3")
+    output_path = temp_dir / "large_input_audio.mp3"
+
+    out_file = loader.interface.get_audio_from_video(input_file, output_file=str(output_path))
     video_clip = VideoFileClip(str(input_file))
     audio_clip = AudioFileClip(str(out_file))
     assert int(audio_clip.duration) == int(video_clip.duration)
@@ -142,3 +149,45 @@ def test_dataloader_audio(temp_dir):
     assert out_file.suffix == ".mp3"
     assert out_file.stem == "large_input_audio"
     assert out_file.name == "large_input_audio.mp3"
+
+
+def test_dataloader_video_audio_separate(temp_dir):
+    """Test that DataLoader correctly splits WAV files based on size."""
+    # Create a WAV file that's 600MB
+    input_file = temp_dir / "large_input.mp4"
+    create_test_file(input_file, file_size_mb=test_file_size_mb, add_audio=True)
+    actual_size_mb = input_file.stat().st_size * 1e-6
+    # Initialize DataLoader
+    split_size_mb = math.ceil(actual_size_mb * 100) / (3 * 100)  # Should result in 3 chunks
+    num_chunks = math.ceil(actual_size_mb / split_size_mb)
+    loader = DataLoader(
+        path=str(input_file),
+        output_dir=str(temp_dir),
+        split_interval=split_size_mb,
+        interface=MediaInterface(),
+        video_audio_separate=True,
+    )
+
+    assert len(loader.files_completed) == num_chunks
+
+    for chunk in loader:
+        if isinstance(chunk, tuple):
+            assert len(chunk) == 2
+            assert len(chunk[0]) > 0
+            assert len(chunk[1]) > 0
+
+    for idx, files in enumerate(loader.files_completed):
+        assert isinstance(files, tuple)
+        assert len(files) == 2
+        assert Path(files[0]).exists()
+        assert Path(files[1]).exists()
+        audio_file = Path(files[1])
+        assert audio_file.stat().st_size > 0
+        assert audio_file.suffix == ".mp3"
+        assert audio_file.stem == f"large_input_chunk_{idx:04d}"
+        assert audio_file.name == f"large_input_chunk_{idx:04d}.mp3"
+        video_file = Path(files[0])
+        assert video_file.stat().st_size > 0
+        assert video_file.suffix == ".mp4"
+        assert video_file.stem == f"large_input_chunk_{idx:04d}"
+        assert video_file.name == f"large_input_chunk_{idx:04d}.mp4"
