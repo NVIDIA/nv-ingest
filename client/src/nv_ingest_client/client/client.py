@@ -8,6 +8,7 @@ import concurrent
 import json
 import logging
 import math
+import os
 import time
 from collections import defaultdict
 from concurrent.futures import Future
@@ -977,7 +978,8 @@ class NvIngestClient:
         Parameters
         ----------
         batch_size : Optional[int]
-            The batch_size value to validate. None uses default.
+            The batch_size value to validate. None uses value from 
+            NV_INGEST_BATCH_SIZE environment variable or default 32.
         
         Returns
         -------
@@ -986,7 +988,10 @@ class NvIngestClient:
         """
         # Handle None/default case
         if batch_size is None:
-            return 32
+            try:
+                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
+            except ValueError:
+                batch_size = 32
         
         # Validate type and range
         if not isinstance(batch_size, int):
