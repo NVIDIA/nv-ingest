@@ -990,7 +990,7 @@ class NvIngestClient:
         # Handle None/default case
         if batch_size is None:
             try:
-                batch_size = int(os.getenv("NV_INGEST_BATCH_SIZE", "32"))
+                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
             except ValueError:
                 batch_size = 32
         
