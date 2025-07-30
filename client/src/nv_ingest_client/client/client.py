@@ -41,8 +41,8 @@ class DataDecodeException(Exception):
     Exception raised for errors in decoding data.
 
     Attributes:
-        message -- explanation of the error
-        data -- the data that failed to decode, optionally
+        message -- explanation of the error.
+        data -- the data that failed to decode, optionally.
     """
 
     def __init__(self, message="Data decoding error", data=None):
