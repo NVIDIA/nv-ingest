@@ -230,11 +230,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=TableExtractorStage,
-        config=table_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        name=stage_name, stage_actor=TableExtractorStage, config=table_extractor_config, min_replicas=1, max_replicas=1
     )
 
     return stage_name
@@ -262,8 +258,8 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         name=stage_name,
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -286,8 +282,8 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         name=stage_name,
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -308,8 +304,8 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         name=stage_name,
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -330,8 +326,8 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         name=stage_name,
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -352,8 +348,8 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         name=stage_name,
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -378,7 +374,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
         name=stage_name,
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,  # Audio extraction is a heavy IO bound operation with minimal CPU usage
     )
 
@@ -391,8 +387,8 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         name=stage_name,
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -412,8 +408,8 @@ def add_otel_tracer_stage(pipeline, default_cpu_count, stage_name="otel_tracer")
         name=stage_name,
         stage_actor=OpenTelemetryTracerStage,
         config=otel_tracer_config,
-        min_replicas=0,
-        max_replicas=2,
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -426,7 +422,7 @@ def add_image_dedup_stage(pipeline, default_cpu_count, stage_name="image_dedup")
         name=stage_name,
         stage_actor=ImageDedupStage,
         config=config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,
     )
 
@@ -440,7 +436,7 @@ def add_image_filter_stage(pipeline, default_cpu_count, stage_name="image_filter
         name=stage_name,
         stage_actor=ImageFilterStage,
         config=config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,
     )
 
@@ -456,8 +452,8 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         name=stage_name,
         stage_actor=TextSplitterStage,
         config=config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
@@ -488,7 +484,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
         name=stage_name,
         stage_actor=ImageCaptionTransformStage,
         config=config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,
     )
 
@@ -515,11 +511,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=TextEmbeddingTransformStage,
-        config=config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        name=stage_name, stage_actor=TextEmbeddingTransformStage, config=config, min_replicas=1, max_replicas=1
     )
 
     return stage_name
@@ -532,7 +524,7 @@ def add_embedding_storage_stage(pipeline, default_cpu_count, stage_name="embeddi
         name=stage_name,
         stage_actor=EmbeddingStorageStage,
         config=config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,
     )
 
@@ -545,7 +537,7 @@ def add_image_storage_stage(pipeline, default_cpu_count, stage_name="image_stora
         name=stage_name,
         stage_actor=ImageStorageStage,
         config=config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=1,
     )
 
@@ -583,8 +575,8 @@ def add_message_broker_response_stage(pipeline, default_cpu_count, stage_name="b
         name=stage_name,
         stage_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
-        min_replicas=0,
-        max_replicas=2,
+        min_replicas=1,
+        max_replicas=1,
     )
 
     return stage_name
