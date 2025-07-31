@@ -8,6 +8,7 @@ import concurrent
 import json
 import logging
 import math
+import os
 import time
 from collections import defaultdict
 from concurrent.futures import Future
@@ -971,10 +972,50 @@ class NvIngestClient:
 
         return [self._fetch_job_result(job_id, data_only=data_only) for job_id in job_ids]
 
+    def _validate_batch_size(self, batch_size: Optional[int]) -> int:
+        """
+        Validates and returns a sanitized batch_size value.
+        
+        Parameters
+        ----------
+        batch_size : Optional[int]
+            The batch_size value to validate. None uses value from 
+            NV_INGEST_BATCH_SIZE environment variable or default 32.
+        
+        Returns
+        -------
+        int
+            Validated batch_size value.
+        """
+        # Handle None/default case
+        if batch_size is None:
+            try:
+                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
+            except ValueError:
+                batch_size = 32
+        
+        # Validate type and range
+        if not isinstance(batch_size, int):
+            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 32.")
+            return 32
+        
+        if batch_size < 1:
+            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 32.")
+            return 32
+        
+        # Performance guidance warnings
+        if batch_size < 8:
+            logger.warning(f"batch_size {batch_size} is very small and may impact performance.")
+        elif batch_size > 128:
+            logger.warning(f"batch_size {batch_size} is large and may increase memory usage.")
+        
+        return batch_size
+
     def process_jobs_concurrently(
         self,
         job_indices: Union[str, List[str]],
         job_queue_id: Optional[str] = None,
+        batch_size: Optional[int] = None,
         concurrency_limit: int = 64,
         timeout: int = 100,
         max_job_retries: Optional[int] = None,
@@ -995,8 +1036,12 @@ class NvIngestClient:
             Single or multiple job indices to process.
         job_queue_id : str, optional
             Queue identifier for submission.
+        batch_size : int, optional
+            Maximum number of jobs to process in each internal batch.
+            Higher values may improve throughput but increase memory usage.
+            Must be >= 1. Default is 32.
         concurrency_limit : int, optional
-            Max number of simultaneous in-flight jobs. Default is 128.
+            Max number of simultaneous in-flight jobs. Default is 64.
         timeout : int, optional
             Timeout in seconds per fetch attempt. Default is 100.
         max_job_retries : int, optional
@@ -1034,13 +1079,16 @@ class NvIngestClient:
         if not job_indices:
             return ([], []) if return_failures else []
 
+        # Validate and set batch_size
+        validated_batch_size = self._validate_batch_size(batch_size)
+
         # Prepare timeout tuple for fetch calls
         effective_timeout: Tuple[int, None] = (timeout, None)
 
         # Delegate to the concurrent processor
         processor = _ConcurrentProcessor(
             client=self,
-            batch_size=64,
+            batch_size=validated_batch_size,
             job_indices=job_indices,
             job_queue_id=job_queue_id,
             timeout=effective_timeout,
