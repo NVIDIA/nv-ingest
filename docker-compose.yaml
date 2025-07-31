@@ -10,6 +10,7 @@ services:
 
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -20,7 +21,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${PAGE_ELEMENTS_CUDA_MEMORY_POOL_MB:-2048}
+      - NIM_TRITON_CPU_THREADS_PRE_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_PRE_PROCESSOR:-2}
+      - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_POST_PROCESSOR:-1}
+      - OMP_NUM_THREADS=2
       # NIM OpenTelemetry Settings
       - NIM_ENABLE_OTEL=0
       - NIM_OTEL_SERVICE_NAME=page-elements
@@ -42,6 +47,7 @@ services:
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -52,7 +58,9 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${GRAPHIC_ELEMENTS_CUDA_MEMORY_POOL_MB:-2048}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -64,6 +72,7 @@ services:
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8006:8000"
       - "8007:8001"
@@ -74,7 +83,9 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${TABLE_STRUCTURE_CUDA_MEMORY_POOL_MB:-2048}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -86,15 +97,16 @@ services:
     profiles:
       - table-structure
 
-  paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${PADDLE_TAG:-latest}
-    shm_size: 2gb
+  ocr:
+    image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8009:8000"
       - "8010:8001"
       - "8011:8002"
     user: root
     environment:
+      - OMP_NUM_THREADS=${OCR_OMP_NUM_THREADS:-8}
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
@@ -117,11 +129,13 @@ services:
       - "8013:8001"
       - "8014:8002"
     environment:
+      - CUDA_VISIBLE_DEVICES=0
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-30}
+      - OMP_NUM_THREADS=1
+      - NIM_TRITON_PERFORMANCE_MODE=throughput
     deploy:
       resources:
         reservations:
@@ -240,14 +254,15 @@ services:
     ports:
       # HTTP API
       - "7670:7670"
-      # Simple Broker
-      - "7671:7671"
+      # Simple Broker -- Uncomment if running SimpleBroker in the container
+      #- "7671:7671"
       # Ray Dashboards
       - "8265:8265"
     cap_add:
       - sys_nice
     environment:
       - ARROW_DEFAULT_MEMORY_POOL=system
+      - OMP_NUM_THREADS=1
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
@@ -257,8 +272,18 @@ services:
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_EDGE_BUFFER_SIZE=64
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
-      #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
-      #- INSTALL_AUDIO_EXTRACTION_DEPS=true
+      - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
+      - RAY_num_grpc_threads=1
+      # Dynamic Memory Scaling Configuration
+      # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
+      # - INGEST_DYNAMIC_MEMORY_KP=0.2
+      # - INGEST_DYNAMIC_MEMORY_KI=0.01
+      # - INGEST_DYNAMIC_MEMORY_EMA_ALPHA=0.1
+      # - INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH=0
+      # - INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR=0.1
+      # - INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR=1.5
+      # - INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION=0.15
+      # - INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
       #- MESSAGE_CLIENT_PORT=7671
@@ -277,15 +302,17 @@ services:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
-      # Self-hosted paddle endpoints.
-      - PADDLE_GRPC_ENDPOINT=paddle:8001
-      - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
-      - PADDLE_INFER_PROTOCOL=grpc
-      # build.nvidia.com hosted paddle endpoints.
-      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
-      #- PADDLE_INFER_PROTOCOL=http
+      # Self-hosted ocr endpoints.
+      - OCR_GRPC_ENDPOINT=ocr:8001
+      - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
+      - OCR_INFER_PROTOCOL=grpc
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
+      # build.nvidia.com hosted ocr endpoints.
+      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
+      #- OCR_INFER_PROTOCOL=http
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
       # Self-hosted redis endpoints.
+      - YOLOX_PAGE_IMAGE_FORMAT=JPEG # JPG is faster than PNG
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
@@ -304,7 +331,7 @@ services:
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
-      # 3. COMPONENTS_TO_READY_CHECK=YOLOX_HTTP_ENDPOINT, PADDLE_HTTP_ENDPOINT
+      # 3. COMPONENTS_TO_READY_CHECK=YOLOX_HTTP_ENDPOINT, OCR_HTTP_ENDPOINT
       #    comma separated list of HTTP environment variables for specific services to check for ready
       - COMPONENTS_TO_READY_CHECK=ALL
     healthcheck:

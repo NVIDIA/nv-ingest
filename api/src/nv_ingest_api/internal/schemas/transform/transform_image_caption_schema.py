@@ -8,7 +8,7 @@ from pydantic import ConfigDict, BaseModel
 
 class ImageCaptionExtractionSchema(BaseModel):
     api_key: str = "api_key"
-    endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
+    endpoint_url: str = "https://integrate.api.nvidia.com/v1/chat/completions"
     prompt: str = "Caption the content of this image:"
     model_name: str = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     raise_on_failure: bool = False

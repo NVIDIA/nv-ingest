@@ -250,7 +250,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         with queue_lock:
             if queue.empty():
                 # Return failure response immediately
-                response = ResponseSchema(response_code=1, response_reason="Queue is empty")
+                response = ResponseSchema(response_code=2, response_reason="Job not ready")
                 self._send_response(response)
                 return
             # Pop the message from the queue

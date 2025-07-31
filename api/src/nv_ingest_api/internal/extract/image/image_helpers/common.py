@@ -33,7 +33,6 @@ from PIL import Image
 from nv_ingest_api.internal.enums.common import AccessLevelEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YoloxPageElementsModelInterface,
-    get_yolox_model_name,
 )
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
@@ -202,11 +201,8 @@ def extract_page_elements_from_images(
 
     # Obtain yolox_version
     # Assuming that the http endpoint is at index 1
-    yolox_http_endpoint = config.yolox_endpoints[1]
-    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
-
     try:
-        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
+        model_interface = YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -220,8 +216,11 @@ def extract_page_elements_from_images(
         # Perform inference in a single call. The NimClient handles batching internally.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=trace_info,
             stage_name="pdf_extraction",
         )

@@ -9,7 +9,9 @@ import pytest
 from unittest.mock import patch, MagicMock, ANY
 
 import nv_ingest_api.internal.extract.pdf.engines.pdfium as module_under_test
-from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements_using_image_ensemble
+from nv_ingest_api.internal.extract.pdf.engines.pdfium import (
+    _extract_page_elements_using_image_ensemble,
+)
 from nv_ingest_api.util.metadata.aggregators import CroppedImageWithContent
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
@@ -50,22 +52,42 @@ def dummy_extractor_config():
                     "source_location": "s3://bucket/file.pdf",
                     "collection_id": "col123",
                     "partition_id": 1,
-                    "access_level": "public",
+                    "access_level": -1,
                 }
             },
         },
         "text_depth": "page",
-        "paddle_output_format": "markdown",
+        "table_output_format": "markdown",
         "extract_images_method": "simple",
         "extract_images_params": {},
-        "pdfium_config": {"workers_per_progress_engine": 2, "yolox_endpoints": ("grpc", "http")},
+        "pdfium_config": {
+            "workers_per_progress_engine": 2,
+            "yolox_endpoints": ("grpc", "http"),
+        },
     }
+
+
+@pytest.fixture
+def pdf_stream_test_page_form_pdf():
+    with open("data/test-page-form.pdf", "rb") as f:
+        pdf_stream = io.BytesIO(f.read())
+    return pdf_stream
+
+
+@pytest.fixture
+def pdf_stream_test_shapes_pdf():
+    with open("data/test-shapes.pdf", "rb") as f:
+        pdf_stream = io.BytesIO(f.read())
+    return pdf_stream
 
 
 @pytest.mark.xfail(reason="TODO: Fix this test")
 def test_extract_page_elements_happy_path(dummy_pages):
     # Mock inference result to return dummy annotations for each page
-    dummy_inference_results = [{"dummy_annotation": "page0"}, {"dummy_annotation": "page1"}]
+    dummy_inference_results = [
+        {"dummy_annotation": "page0"},
+        {"dummy_annotation": "page1"},
+    ]
 
     mock_yolox_client = MagicMock()
     mock_yolox_client.infer.return_value = dummy_inference_results
@@ -82,14 +104,12 @@ def test_extract_page_elements_happy_path(dummy_pages):
         result = _extract_page_elements_using_image_ensemble(
             dummy_pages,
             yolox_client=mock_yolox_client,
-            yolox_model_name="yolox",
             execution_trace_log=["dummy_trace"],
         )
 
         # Assert yolox_client called once
         mock_yolox_client.infer.assert_called_once_with(
             {"images": [dummy_pages[0][1], dummy_pages[1][1]]},
-            model_name="yolox",
             max_batch_size=module_under_test.YOLOX_MAX_BATCH_SIZE,
             trace_info=["dummy_trace"],
             stage_name="pdf_content_extractor",
@@ -114,7 +134,6 @@ def test_extract_page_elements_handles_timeout(dummy_pages):
             _extract_page_elements_using_image_ensemble(
                 dummy_pages,
                 yolox_client=mock_yolox_client,
-                yolox_model_name="yolox",
             )
         # Ensure _extract_page_element_images was never called
         mock_extract_images.assert_not_called()
@@ -297,15 +316,12 @@ def test_extract_page_images_happy_path(
 @patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
 @patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
-@patch(f"{MODULE_UNDER_TEST}.get_yolox_model_name")
 def test_extract_page_elements_happy_path2(
-    mock_get_model_name,
     mock_create_client,
     mock_extract_ensemble,
     mock_construct_metadata,
 ):
     # Setup dummy returns
-    mock_get_model_name.return_value = "custom_yolox"
     mock_client = MagicMock()
     mock_create_client.return_value = mock_client
     mock_element = MagicMock()
@@ -327,7 +343,7 @@ def test_extract_page_elements_happy_path2(
         extract_tables=True,
         extract_charts=False,
         extract_infographics=False,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
         auth_token="dummy_token",
@@ -335,24 +351,19 @@ def test_extract_page_elements_happy_path2(
     )
 
     # Assertions
-    mock_get_model_name.assert_called_once_with("http://dummy")
     mock_create_client.assert_called_once()
-    mock_extract_ensemble.assert_called_once_with(
-        dummy_pages, mock_client, "custom_yolox", execution_trace_log=dummy_trace_log
-    )
+    mock_extract_ensemble.assert_called_once_with(dummy_pages, mock_client, execution_trace_log=dummy_trace_log)
     assert mock_construct_metadata.call_count == 2
     assert result == ["meta_0", "meta_1"]
     mock_client.close.assert_called_once()
 
 
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
-@patch(f"{MODULE_UNDER_TEST}.get_yolox_model_name", side_effect=Exception("model error"))
 @patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
 @patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
 def test_extract_page_elements_fallback_to_default_model(
     mock_construct_metadata,
     mock_extract_ensemble,
-    mock_get_model_name,
     mock_create_client,
 ):
     # Fallback to 'yolox' if model name fetch fails
@@ -371,7 +382,7 @@ def test_extract_page_elements_fallback_to_default_model(
         extract_tables=False,
         extract_charts=True,
         extract_infographics=False,
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
     )
@@ -402,7 +413,7 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
         extract_tables=False,
         extract_charts=False,
         extract_infographics=False,  # all False => should be skipped
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", None),
         yolox_infer_protocol="http",
     )
@@ -413,6 +424,8 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
     mock_client.close.assert_called_once()
 
 
+@patch(f"{MODULE_UNDER_TEST}.construct_image_metadata_from_base64")
+@patch(f"{MODULE_UNDER_TEST}.numpy_to_base64")
 @patch(f"{MODULE_UNDER_TEST}.construct_text_metadata")
 @patch(f"{MODULE_UNDER_TEST}._extract_page_images")
 @patch(f"{MODULE_UNDER_TEST}.pdfium_pages_to_numpy")
@@ -426,6 +439,8 @@ def test_pdfium_extractor_happy_path(
     mock_pages_to_numpy,
     mock_extract_images,
     mock_construct_text_metadata,
+    mock_numpy_to_base64,
+    mock_construct_image_metadata_from_base64,
     dummy_pdf_stream,
     dummy_extractor_config,
 ):
@@ -452,6 +467,8 @@ def test_pdfium_extractor_happy_path(
     mock_extract_images.return_value = ["image_meta"]
     mock_pages_to_numpy.return_value = ([MagicMock()], [MagicMock()])
     mock_extract_elements.return_value = ["table_chart_meta"]
+    mock_numpy_to_base64.return_value = "image_base64"
+    mock_construct_image_metadata_from_base64.return_value = "page_image_meta"
 
     # Call
     result = module_under_test.pdfium_extractor(
@@ -461,6 +478,7 @@ def test_pdfium_extractor_happy_path(
         extract_infographics=True,
         extract_tables=True,
         extract_charts=True,
+        extract_page_as_image=True,
         extractor_config=dummy_extractor_config,
         execution_trace_log=[],
     )
@@ -473,67 +491,173 @@ def test_pdfium_extractor_happy_path(
     mock_pages_to_numpy.assert_called()
     mock_extract_elements.assert_called()
     mock_doc.close.assert_called_once()
-    assert result == ["text_meta", "image_meta", "table_chart_meta"]
+    assert result == ["text_meta", "image_meta", "page_image_meta", "table_chart_meta"]
 
 
 @patch(f"{MODULE_UNDER_TEST}.extract_pdf_metadata")
 @patch(f"{MODULE_UNDER_TEST}.libpdfium.PdfDocument")
 def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metadata):
-    with pytest.raises(ValueError, match="`extractor_config` must include a valid 'row_data' dictionary."):
+    with pytest.raises(
+        ValueError,
+        match="`extractor_config` must include a valid 'row_data' dictionary.",
+    ):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={},
         )
 
     with pytest.raises(ValueError, match="The 'row_data' dictionary must contain the 'source_id' key."):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={"row_data": {}},
         )
 
     with pytest.raises(ValueError, match="Invalid text_depth: invalid_depth"):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
-            extractor_config={"row_data": {"source_id": "abc"}, "text_depth": "invalid_depth"},
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "text_depth": "invalid_depth",
+            },
         )
 
-    with pytest.raises(ValueError, match="Invalid paddle_output_format: invalid_format"):
+    with pytest.raises(ValueError, match="Invalid table_output_format: invalid_format"):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
-            extractor_config={"row_data": {"source_id": "abc"}, "paddle_output_format": "invalid_format"},
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "table_output_format": "invalid_format",
+            },
         )
 
 
 @patch(f"{MODULE_UNDER_TEST}.extract_pdf_metadata")
 @patch(f"{MODULE_UNDER_TEST}.libpdfium.PdfDocument")
 def test_pdfium_extractor_invalid_pdfium_config_raises(mock_pdf_doc, mock_extract_metadata):
-    with pytest.raises(ValueError, match="`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance."):
+    with pytest.raises(
+        ValueError,
+        match="`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.",
+    ):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
-            extractor_config={"row_data": {"source_id": "abc"}, "pdfium_config": "not_a_dict"},
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
+            extractor_config={
+                "row_data": {"source_id": "abc"},
+                "pdfium_config": "not_a_dict",
+            },
         )
+
+
+def test_pdfium_extractor_page_form(pdf_stream_test_page_form_pdf, dummy_extractor_config):
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "simple"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 18
+    assert all(data[0].value == "image" for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 841 for data in extracted_data)
+
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "group"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 1
+    assert extracted_data[0][0].value == "image"
+    assert extracted_data[0][1]["image_metadata"]["image_location"] == (
+        306,
+        219,
+        524,
+        375,
+    )
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 841 for data in extracted_data)
+
+
+def test_pdfium_extractor_shapes_grouped(pdf_stream_test_shapes_pdf, dummy_extractor_config):
+    extractor_config = dummy_extractor_config.copy()
+    extractor_config["extract_images_method"] = "group"
+
+    extracted_data = module_under_test.pdfium_extractor(
+        pdf_stream_test_shapes_pdf,
+        extract_text=False,
+        extract_images=True,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=[],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 3
+    assert all(data[0].value == "image" for data in extracted_data)
+    assert extracted_data[0][1]["image_metadata"]["image_location"] == (
+        149,
+        33,
+        549,
+        308,
+    )
+    assert extracted_data[1][1]["image_metadata"]["image_location"] == (
+        36,
+        56,
+        131,
+        114,
+    )
+    assert extracted_data[2][1]["image_metadata"]["image_location"] == (538, 0, 561, 33)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
+    assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 419 for data in extracted_data)

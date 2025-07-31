@@ -64,7 +64,7 @@ if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
 
     echo "NV_INGEST_API_VERSION: $NV_INGEST_API_VERSION"
     NV_INGEST_API_VERSION="${NV_INGEST_API_VERSION}" GIT_ROOT="${GIT_ROOT}/api" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_api build."
@@ -84,7 +84,7 @@ if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
 
     echo "NV_INGEST_SERVICE_VERSION: $NV_INGEST_SERVICE_VERSION"
     NV_INGEST_SERVICE_VERSION="${NV_INGEST_SERVICE_VERSION}" GIT_ROOT="${GIT_ROOT}/src" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest build."
@@ -104,7 +104,7 @@ if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
 
     echo "NV_INGEST_CLIENT_VERSION: $NV_INGEST_CLIENT_VERSION"
     NV_INGEST_CLIENT_VERSION="${NV_INGEST_CLIENT_VERSION}" GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_client build."
