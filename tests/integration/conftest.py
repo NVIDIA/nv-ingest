@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.pipeline.config_loaders import load_pipeline_config
 
 
 @pytest.fixture(scope="session")
@@ -21,18 +21,22 @@ def pipeline_process():
 
     Uses:
     -----
+    - Loads pipeline configuration from YAML file.
     - Sets environment to disable dynamic scaling.
     - Starts the pipeline asynchronously (block=False).
     - Waits briefly to allow pipeline warm-up.
     - Ensures clean shutdown at session teardown.
     """
-    config = PipelineCreationSchema()
+    # Load pipeline configuration from the default pipeline YAML
+    pipeline_config_path = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH", "config/default_pipeline.yaml")
+    config = load_pipeline_config(pipeline_config_path)
 
+    # Set environment to disable dynamic scaling for testing
     os.environ["INGEST_DISABLE_DYNAMIC_SCALING"] = "True"
 
     pipeline = None
     try:
-        pipeline = run_pipeline(config, block=False, run_in_subprocess=True)
+        pipeline = run_pipeline(config, block=False, run_in_subprocess=True, disable_dynamic_scaling=True)
         time.sleep(5)  # Allow some warm-up time
         yield pipeline
     except KeyboardInterrupt:

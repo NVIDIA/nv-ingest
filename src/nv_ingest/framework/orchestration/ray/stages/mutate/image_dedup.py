@@ -4,6 +4,7 @@
 
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -31,8 +32,8 @@ class ImageDedupStage(RayActorStage):
       3. Updates the message payload with the deduplicated DataFrame.
     """
 
-    def __init__(self, config: ImageDedupSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageDedupSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageDedupStage configuration validated successfully.")

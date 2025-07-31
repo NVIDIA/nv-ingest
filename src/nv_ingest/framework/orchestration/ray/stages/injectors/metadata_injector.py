@@ -4,12 +4,14 @@
 
 from datetime import datetime
 import logging
+from typing import Optional
 import pandas as pd
-from typing import Any
 from pydantic import BaseModel
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.enums.common import (
     DocumentTypeEnum,
     ContentTypeEnum,
@@ -17,14 +19,13 @@ from nv_ingest_api.internal.enums.common import (
     TextTypeEnum,
     LanguageEnum,
 )
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentHierarchySchema
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
-# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -37,15 +38,16 @@ class MetadataInjectionStage(RayActorStage):
     injection is required, and if so, injects the appropriate metadata.
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None) -> None:
         # Call the base initializer to set attributes like self._running.
-        super().__init__(config)
+        super().__init__(config, stage_name=stage_name)
         # Additional initialization can be added here if necessary.
-        logger.info("MetadataInjectionStage initialized with config: %s", config)
+        self._logger.info("MetadataInjectionStage initialized with config: %s", config)
 
-    @traceable("metadata_injector")
     @nv_ingest_node_failure_try_except(annotation_id="metadata_injector", raise_on_failure=False)
-    def on_data(self, message: Any) -> Any:
+    @traceable()
+    @udf_intercept_hook()
+    def on_data(self, message: IngestControlMessage) -> IngestControlMessage:
         """
         Process an incoming IngestControlMessage by injecting metadata into its DataFrame payload.
 

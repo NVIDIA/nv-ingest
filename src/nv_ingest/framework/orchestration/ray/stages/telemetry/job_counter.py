@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel
 import ray
 
@@ -30,9 +30,9 @@ class JobCounterStage(RayActorStage):
     statistic each time it processes a message.
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None) -> None:
         # Ensure base attributes (e.g. self._running) are initialized.
-        super().__init__(config)
+        super().__init__(config, stage_name=stage_name)
         # The validated config should be a JobCounterSchema instance.
         self.validated_config: JobCounterSchema = config
         # Obtain the global stats' singleton.

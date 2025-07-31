@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import ray
 
@@ -16,6 +16,8 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExt
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +33,8 @@ class ChartExtractorStage(RayActorStage):
     and annotates the message metadata with extraction info.
     """
 
-    def __init__(self, config: ChartExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ChartExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             # logger.warning(
@@ -42,9 +44,10 @@ class ChartExtractorStage(RayActorStage):
             logger.exception("Error validating chart extractor config")
             raise e
 
-    @traceable("chart_extraction")
-    @filter_by_task(required_tasks=["chart_data_extract"])
     @nv_ingest_node_failure_try_except(annotation_id="chart_extraction", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["chart_data_extract"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting chart data.

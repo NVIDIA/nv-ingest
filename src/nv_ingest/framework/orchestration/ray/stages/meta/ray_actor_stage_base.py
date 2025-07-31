@@ -49,6 +49,9 @@ class RayActorStage(ABC):
     ----------
     config : BaseModel
         Configuration object for the stage.
+    stage_name : Optional[str]
+        Name of the stage from YAML pipeline configuration. Used by
+        stage-aware decorators for consistent naming.
     _input_queue : Optional[Any]
         Handle to the Ray queue from which input items are read.
         Expected to be set via `set_input_queue`.
@@ -80,7 +83,7 @@ class RayActorStage(ABC):
         Lock to protect access to shutdown-related state (`_shutting_down`).
     """
 
-    def __init__(self, config: BaseModel, log_to_stdout=False) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None, log_to_stdout=False) -> None:
         """
         Initialize the RayActorStage.
 
@@ -89,8 +92,14 @@ class RayActorStage(ABC):
         config : BaseModel
             Configuration object specific to the stage's behavior. Passed by
             the orchestrator during actor creation.
+        stage_name : Optional[str]
+            Name of the stage from YAML pipeline configuration. Used by
+            stage-aware decorators for consistent naming.
+        log_to_stdout : bool
+            Whether to enable stdout logging.
         """
         self.config: BaseModel = config
+        self.stage_name: Optional[str] = stage_name
         self._input_queue: Optional[Any] = None  # Ray Queue handle expected
         self._output_queue: Optional[Any] = None  # Ray Queue handle expected
         self._running: bool = False

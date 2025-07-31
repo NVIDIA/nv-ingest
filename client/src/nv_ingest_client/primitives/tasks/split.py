@@ -8,23 +8,12 @@
 
 import logging
 from typing import Dict
-from typing import Optional
 
-from pydantic import BaseModel
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class SplitTaskSchema(BaseModel):
-    tokenizer: Optional[str] = None
-    chunk_size: int = 1024
-    chunk_overlap: int = 150
-    params: dict = {}
-
-    class Config:
-        extra = "forbid"
 
 
 class SplitTask(Task):
@@ -37,16 +26,26 @@ class SplitTask(Task):
         tokenizer: str = None,
         chunk_size: int = 1024,
         chunk_overlap: int = 150,
-        params: dict = {},
-    ) -> None:
+        params: dict = None,
+    ):
         """
         Setup Split Task Config
         """
         super().__init__()
-        self._tokenizer = tokenizer
-        self._chunk_size = chunk_size
-        self._chunk_overlap = chunk_overlap
-        self._params = params
+
+        # Handle None params by converting to empty dict for backward compatibility
+        if params is None:
+            params = {}
+
+        # Use the API schema for validation
+        validated_data = IngestTaskSplitSchema(
+            tokenizer=tokenizer, chunk_size=chunk_size, chunk_overlap=chunk_overlap, params=params
+        )
+
+        self._tokenizer = validated_data.tokenizer
+        self._chunk_size = validated_data.chunk_size
+        self._chunk_overlap = validated_data.chunk_overlap
+        self._params = validated_data.params
 
     def __str__(self) -> str:
         """
