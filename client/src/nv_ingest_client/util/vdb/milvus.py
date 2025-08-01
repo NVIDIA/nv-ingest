@@ -1697,7 +1697,7 @@ class Milvus(VDB):
         meta_dataframe: Union[str, pd.DataFrame] = None,
         meta_source_field: str = None,
         meta_fields: list[str] = None,
-        stream: bool = False,
+        stream: bool = True,
         **kwargs,
     ):
         """
