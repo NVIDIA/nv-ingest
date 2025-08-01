@@ -975,13 +975,13 @@ class NvIngestClient:
     def _validate_batch_size(self, batch_size: Optional[int]) -> int:
         """
         Validates and returns a sanitized batch_size value.
-        
+
         Parameters
         ----------
         batch_size : Optional[int]
-            The batch_size value to validate. None uses value from 
+            The batch_size value to validate. None uses value from
             NV_INGEST_BATCH_SIZE environment variable or default 32.
-        
+
         Returns
         -------
         int
@@ -993,22 +993,22 @@ class NvIngestClient:
                 batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
             except ValueError:
                 batch_size = 32
-        
+
         # Validate type and range
         if not isinstance(batch_size, int):
             logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 32.")
             return 32
-        
+
         if batch_size < 1:
             logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 32.")
             return 32
-        
+
         # Performance guidance warnings
         if batch_size < 8:
             logger.warning(f"batch_size {batch_size} is very small and may impact performance.")
         elif batch_size > 128:
             logger.warning(f"batch_size {batch_size} is large and may increase memory usage.")
-        
+
         return batch_size
 
     def process_jobs_concurrently(
