@@ -850,6 +850,7 @@ def write_to_nvingest_collection(
     stream : bool, optional
         When true, the records will be inserted into milvus using the stream insert method.
     """
+    stream = True
     local_index = False
     connections.connect(uri=milvus_uri)
     if urlparse(milvus_uri).scheme:
@@ -895,6 +896,7 @@ def write_to_nvingest_collection(
         raise ValueError("No records with Embeddings to insert detected.")
     logger.info(f"{num_elements} elements to insert to milvus")
     logger.info(f"threshold for streaming is {threshold}")
+    logger.info(f"Stream is {stream}")
     if num_elements < threshold:
         stream = True
     if stream:
