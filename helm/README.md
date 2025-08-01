@@ -56,11 +56,11 @@ helm upgrade \
     --set image.tag="25.3.0"
 ```
 
--> [!NOTE]
--> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim.
--> Currently, the NemoRetriever OCR v1 container is in early access preview.
--> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
--> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
+> [!NOTE]
+> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim.
+> Currently, the NemoRetriever OCR v1 container is in early access preview.
+> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
