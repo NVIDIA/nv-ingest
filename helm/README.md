@@ -50,18 +50,17 @@ helm upgrade \
     --set ngcImagePullSecret.password="${NGC_API_KEY}" \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
+    --set paddleocr-nim.deployed=true \
+    --set nemoretriever-ocr.deployed=false \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set paddleocr-nim.deployed=true 
-    --set nemoretriever-ocr.deployed=false
     --set image.tag="25.3.0"
 ```
 
-> [!NOTE]
-> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim. 
-> Currently, the NemoRetriever OCR v1 container is in early access preview. 
-> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`. 
-> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md). 
-
+-> [!NOTE]
+-> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim.
+-> Currently, the NemoRetriever OCR v1 container is in early access preview.
+-> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
+-> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
@@ -318,12 +317,12 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
-| envVars.INGEST_DISABLE_DYNAMIC_SCALING | bool | `true` |  |
+| envVars.INGEST_DISABLE_DYNAMIC_SCALING | bool | `false` |  |
 | envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
 | envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
 | envVars.INSTALL_AUDIO_EXTRACTION_DEPS | string | `"true"` |  |
-| envVars.MAX_INGEST_PROCESS_WORKERS | int | `32` |  |
+| envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
 | envVars.MESSAGE_CLIENT_TYPE | string | `"redis"` |  |
@@ -336,7 +335,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NEMORETRIEVER_PARSE_MODEL_NAME | string | `"nvidia/nemoretriever-parse"` |  |
 | envVars.NV_INGEST_DEFAULT_TIMEOUT_MS | string | `"1234"` |  |
-| envVars.NV_INGEST_MAX_UTIL | int | `32` |  |
+| envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
 | envVars.OCR_GRPC_ENDPOINT | string | `"nv-ingest-ocr:8001"` |  |
 | envVars.OCR_HTTP_ENDPOINT | string | `"http://nv-ingest-ocr:8000/v1/infer"` |  |
 | envVars.OCR_INFER_PROTOCOL | string | `"grpc"` |  |
@@ -714,6 +713,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | readinessProbe.successThreshold | int | `1` |  |
 | readinessProbe.timeoutSeconds | int | `10` |  |
 | redis.auth.enabled | bool | `false` |  |
+| redis.image.tag | string | `"7.4.3-debian-12-r0"` |  |
 | redis.master.configmap | string | `"protected-mode no"` |  |
 | redis.master.persistence.size | string | `"50Gi"` |  |
 | redis.master.resources.limits.memory | string | `"12Gi"` |  |
