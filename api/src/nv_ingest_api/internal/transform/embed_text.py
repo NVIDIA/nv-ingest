@@ -367,8 +367,10 @@ def _get_pandas_image_content(row, modality="text"):
         image = row.get("content")
         content = _format_text_image_pair_input_string(text, image)
 
-    # A workaround to save memory.
-    row["content"] = ""
+    if subtype == "page_image":
+        # A workaround to save memory for full page images.
+        row["content"] = ""
+
     return content
 
 
