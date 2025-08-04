@@ -41,7 +41,7 @@ class ImageCaptionTransformStage(RayActorStage):
             logger.exception("Error validating caption extraction config")
             raise e
 
-    @nv_ingest_node_failure_try_except(annotation_id="image_captioning", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=["caption"])

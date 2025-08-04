@@ -24,6 +24,7 @@ from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_fail
 
 from nv_ingest_api.internal.primitives.tracing.logging import TaskResultStatus
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 
 @ray.remote
@@ -96,7 +97,8 @@ class OpenTelemetryTracerStage(RayActorStage):
 
         self._logger.debug(f"[Telemetry] Exported spans for message {job_id} with {event_count} total events.")
 
-    @nv_ingest_node_failure_try_except(annotation_id="otel_tracer", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
+    @udf_intercept_hook()
     def on_data(self, control_message: IngestControlMessage) -> Optional[Any]:
         try:
             do_trace_tagging = bool(control_message.get_metadata("config::add_trace_tagging"))

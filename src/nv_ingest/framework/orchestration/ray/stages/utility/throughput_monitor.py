@@ -9,6 +9,11 @@ from pydantic import BaseModel
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,9 @@ class ThroughputMonitorStage(RayActorStage):
         self.count = 0
         self.last_emit_time = None  # Timestamp when the last throughput measure was emitted
 
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     async def on_data(self, message: Any) -> Any:
         """
         Process an incoming control message. Increment the internal counter and, every 100 messages,

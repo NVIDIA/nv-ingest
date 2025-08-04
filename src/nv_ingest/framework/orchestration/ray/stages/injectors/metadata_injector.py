@@ -44,7 +44,7 @@ class MetadataInjectionStage(RayActorStage):
         # Additional initialization can be added here if necessary.
         self._logger.info("MetadataInjectionStage initialized with config: %s", config)
 
-    @nv_ingest_node_failure_try_except(annotation_id="metadata_injector", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     def on_data(self, message: IngestControlMessage) -> IngestControlMessage:

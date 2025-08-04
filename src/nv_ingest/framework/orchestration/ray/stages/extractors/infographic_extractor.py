@@ -39,7 +39,7 @@ class InfographicExtractorStage(RayActorStage):
             self._logger.exception(f"Error validating Infographic extractor config: {e}")
             raise
 
-    @nv_ingest_node_failure_try_except(annotation_id="infographic_extractor", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=["infographic_data_extract"])

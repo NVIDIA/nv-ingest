@@ -38,10 +38,10 @@ class TextSplitterStage(RayActorStage):
         self.validated_config: TextSplitterSchema = config
         logger.info("TextSplitterStage initialized with config: %s", config)
 
-    @nv_ingest_node_failure_try_except(annotation_id="text_splitter", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
-    @filter_by_task(["split"])
+    @filter_by_task(required_tasks=["split"])
     def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by splitting and tokenizing its text.

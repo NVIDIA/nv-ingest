@@ -43,7 +43,7 @@ class AudioExtractorStage(RayActorStage):
             self._logger.exception(f"Error validating Audio Extractor config: {e}")
             raise
 
-    @nv_ingest_node_failure_try_except(annotation_id="audio_extractor", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(mp3|wav)$"})])

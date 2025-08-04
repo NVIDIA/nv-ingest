@@ -42,7 +42,7 @@ class DocxExtractorStage(RayActorStage):
             logger.exception(f"Error validating DOCX Extractor config: {e}")
             raise
 
-    @nv_ingest_node_failure_try_except(annotation_id="docx_extractor", raise_on_failure=True)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "docx"})])

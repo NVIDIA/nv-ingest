@@ -6,6 +6,7 @@ import logging
 from typing import Optional
 
 import ray
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
@@ -50,8 +51,9 @@ class PPTXExtractorStage(RayActorStage):
             logger.exception(f"Error initializing or validating PPTX Extractor config: {e}")
             raise
 
-    @nv_ingest_node_failure_try_except(annotation_id="pptx_extractor", raise_on_failure=False)
-    @traceable("pptx_extractor")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "pptx"})])
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """

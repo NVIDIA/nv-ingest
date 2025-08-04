@@ -42,10 +42,10 @@ class EmbeddingStorageStage(RayActorStage):
             logger.exception(f"Error validating Embedding Storage config: {e}")
             raise
 
-    @traceable("embedding_storage")
-    @udf_intercept_hook(stage_name="embedding_storage")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=["store_embedding"])
-    @nv_ingest_node_failure_try_except(annotation_id="embedding_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by storing embeddings.

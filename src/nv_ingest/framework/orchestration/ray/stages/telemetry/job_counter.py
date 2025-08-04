@@ -14,6 +14,8 @@ from nv_ingest.framework.util.telemetry.global_stats import GlobalStats
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 
 # Import the JobCounter schema and global stats singleton.
 
@@ -38,7 +40,9 @@ class JobCounterStage(RayActorStage):
         # Obtain the global stats' singleton.
         self.stats = GlobalStats.get_instance()
 
-    @nv_ingest_node_failure_try_except(annotation_id="job_counter", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     async def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by counting jobs.

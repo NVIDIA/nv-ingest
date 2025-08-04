@@ -44,7 +44,7 @@ class ChartExtractorStage(RayActorStage):
             logger.exception("Error validating chart extractor config")
             raise e
 
-    @nv_ingest_node_failure_try_except(annotation_id="chart_extraction", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
     @filter_by_task(required_tasks=["chart_data_extract"])
