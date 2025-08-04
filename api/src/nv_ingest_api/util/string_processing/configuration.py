@@ -50,7 +50,9 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     for stage in config.stages:
         output.append(f"  - Stage: {stage.name} ({stage.type.value})")
         output.append(f"    Actor: {stage.actor}")
-        output.append(f"    Phase: {stage.phase.name}")
+        # Handle both enum and integer phase values
+        phase_display = stage.phase.name if hasattr(stage.phase, "name") else str(stage.phase)
+        output.append(f"    Phase: {phase_display}")
         dependencies = ", ".join(stage.runs_after) if stage.runs_after else "[]"
         output.append(f"    Dependencies: {dependencies}")
 
