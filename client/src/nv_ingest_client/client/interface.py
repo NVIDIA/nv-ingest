@@ -1049,6 +1049,37 @@ class Ingestor:
         output_directory: Optional[str] = None,
         cleanup: bool = True,
     ) -> "Ingestor":
+        """Configures the Ingestor to save results to disk instead of memory.
+
+        This method enables disk-based storage for ingestion results. When called,
+        the `ingest()` method will write the output for each processed document to a
+        separate JSONL file. The return value of `ingest()` will be a list of
+        `LazyLoadedList` objects, which are memory-efficient proxies to these files.
+
+        The output directory can be specified directly, via an environment variable,
+        or a temporary directory will be created automatically.
+
+        Parameters
+        ----------
+        output_directory : str, optional
+            The path to the directory where result files (.jsonl) will be saved.
+            If not provided, it defaults to the value of the environment variable
+            `NV_INGEST_CLIENT_SAVE_TO_DISK_OUTPUT_DIRECTORY`. If the environment
+            variable is also not set, a temporary directory will be created.
+            Defaults to None.
+        cleanup : bool, optional)
+            If True, the entire `output_directory` will be recursively deleted
+            when the Ingestor's context is exited (i.e., when used in a `with`
+            statement).
+            Defaults to True.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        output_directory = output_directory or os.getenv("NV_INGEST_CLIENT_SAVE_TO_DISK_OUTPUT_DIRECTORY")
+
         if not output_directory:
             self._created_temp_output_dir = tempfile.mkdtemp(prefix="ingestor_results_")
             output_directory = self._created_temp_output_dir
