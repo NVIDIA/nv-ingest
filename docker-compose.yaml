@@ -135,6 +135,7 @@ services:
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-30}
       - OMP_NUM_THREADS=1
+      # NOTE: NIM_TRITON_PERFORMANCE_MODE does not work for llama-3.2-nemoretriever-1b-vlm-embed-v1 and must be commented out.
       - NIM_TRITON_PERFORMANCE_MODE=throughput
     deploy:
       resources:
