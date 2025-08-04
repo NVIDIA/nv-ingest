@@ -52,7 +52,10 @@ def build_logging_config_from_env() -> LoggingConfig:
     """
     Build Ray LoggingConfig from environment variables.
 
-    Supported environment variables:
+    Package-level preset (sets all defaults):
+    - INGEST_RAY_LOG_LEVEL: PRODUCTION, DEVELOPMENT, DEBUG. Default: DEVELOPMENT
+
+    Individual environment variables (override preset defaults):
     - RAY_LOGGING_LEVEL: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Default: INFO
     - RAY_LOGGING_ENCODING: Log encoding format (TEXT, JSON). Default: TEXT
     - RAY_LOGGING_ADDITIONAL_ATTRS: Comma-separated list of additional standard logger attributes
@@ -63,6 +66,63 @@ def build_logging_config_from_env() -> LoggingConfig:
     - RAY_DISABLE_IMPORT_WARNING: Disable Ray import warnings (0/1). Default: 0
     - RAY_USAGE_STATS_ENABLED: Enable/disable usage stats collection (0/1). Default: 1
     """
+
+    # Apply package-level preset defaults first
+    preset_level = os.environ.get("INGEST_RAY_LOG_LEVEL", "DEVELOPMENT").upper()
+
+    # Define preset configurations
+    presets = {
+        "PRODUCTION": {
+            "RAY_LOGGING_LEVEL": "ERROR",
+            "RAY_LOGGING_ENCODING": "TEXT",
+            "RAY_LOGGING_ADDITIONAL_ATTRS": "",
+            "RAY_DEDUP_LOGS": "1",
+            "RAY_LOG_TO_DRIVER": "0",  # false
+            "RAY_LOGGING_ROTATE_BYTES": "1073741824",  # 1GB
+            "RAY_LOGGING_ROTATE_BACKUP_COUNT": "9",  # 10GB total
+            "RAY_DISABLE_IMPORT_WARNING": "1",
+            "RAY_USAGE_STATS_ENABLED": "0",
+        },
+        "DEVELOPMENT": {
+            "RAY_LOGGING_LEVEL": "INFO",
+            "RAY_LOGGING_ENCODING": "TEXT",
+            "RAY_LOGGING_ADDITIONAL_ATTRS": "",
+            "RAY_DEDUP_LOGS": "1",
+            "RAY_LOG_TO_DRIVER": "1",  # true
+            "RAY_LOGGING_ROTATE_BYTES": "1073741824",  # 1GB
+            "RAY_LOGGING_ROTATE_BACKUP_COUNT": "19",  # 20GB total
+            "RAY_DISABLE_IMPORT_WARNING": "0",
+            "RAY_USAGE_STATS_ENABLED": "1",
+        },
+        "DEBUG": {
+            "RAY_LOGGING_LEVEL": "DEBUG",
+            "RAY_LOGGING_ENCODING": "JSON",
+            "RAY_LOGGING_ADDITIONAL_ATTRS": "name,funcName,lineno",
+            "RAY_DEDUP_LOGS": "0",
+            "RAY_LOG_TO_DRIVER": "1",  # true
+            "RAY_LOGGING_ROTATE_BYTES": "536870912",  # 512MB
+            "RAY_LOGGING_ROTATE_BACKUP_COUNT": "39",  # 20GB total
+            "RAY_DISABLE_IMPORT_WARNING": "0",
+            "RAY_USAGE_STATS_ENABLED": "1",
+        },
+    }
+
+    # Validate preset level
+    if preset_level not in presets:
+        logger.warning(
+            f"Invalid INGEST_RAY_LOG_LEVEL '{preset_level}', using DEVELOPMENT. "
+            f"Valid presets: {list(presets.keys())}"
+        )
+        preset_level = "DEVELOPMENT"
+
+    # Apply preset defaults (only if env var not already set)
+    preset_config = presets[preset_level]
+    for key, default_value in preset_config.items():
+        if key not in os.environ:
+            os.environ[key] = default_value
+
+    logger.info(f"Applied Ray logging preset: {preset_level}")
+
     # Get log level from environment, default to INFO
     log_level = os.environ.get("RAY_LOGGING_LEVEL", "INFO").upper()
 
@@ -88,12 +148,12 @@ def build_logging_config_from_env() -> LoggingConfig:
         additional_log_standard_attrs = [attr.strip() for attr in additional_attrs_str.split(",") if attr.strip()]
 
     # Set log deduplication environment variable if specified
-    dedup_logs = os.environ.get("RAY_DEDUP_LOGS", True)
+    dedup_logs = os.environ.get("RAY_DEDUP_LOGS", "1")
     if dedup_logs is not None:
         os.environ["RAY_DEDUP_LOGS"] = str(dedup_logs)
 
     # Set log to driver environment variable if specified
-    log_to_driver = os.environ.get("RAY_LOG_TO_DRIVER", True)
+    log_to_driver = os.environ.get("RAY_LOG_TO_DRIVER", "1")
     if log_to_driver is not None:
         os.environ["RAY_LOG_TO_DRIVER"] = str(log_to_driver).lower()
 
@@ -117,12 +177,12 @@ def build_logging_config_from_env() -> LoggingConfig:
             os.environ["RAY_LOGGING_ROTATE_BACKUP_COUNT"] = "19"
 
     # Configure Ray internal logging verbosity
-    disable_import_warning = os.environ.get("RAY_DISABLE_IMPORT_WARNING")
+    disable_import_warning = os.environ.get("RAY_DISABLE_IMPORT_WARNING", "0")
     if disable_import_warning is not None:
         os.environ["RAY_DISABLE_IMPORT_WARNING"] = str(disable_import_warning)
 
     # Configure usage stats collection
-    usage_stats_enabled = os.environ.get("RAY_USAGE_STATS_ENABLED")
+    usage_stats_enabled = os.environ.get("RAY_USAGE_STATS_ENABLED", "1")
     if usage_stats_enabled is not None:
         os.environ["RAY_USAGE_STATS_ENABLED"] = str(usage_stats_enabled)
 
@@ -134,7 +194,7 @@ def build_logging_config_from_env() -> LoggingConfig:
     )
 
     logger.info(
-        f"Ray logging configured: level={log_level}, encoding={encoding}, "
+        f"Ray logging configured: preset={preset_level}, level={log_level}, encoding={encoding}, "
         f"additional_attrs={additional_log_standard_attrs}, "
         f"dedup_logs={os.environ.get('RAY_DEDUP_LOGS', '1')}, "
         f"log_to_driver={os.environ.get('RAY_LOG_TO_DRIVER', 'true')}, "
