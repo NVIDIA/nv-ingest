@@ -17,7 +17,7 @@ stages:
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      cpu_count_min: 0
+      cpu_count_min: 1
       cpu_count_max: 1
 
   # Pre-processing

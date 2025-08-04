@@ -18,7 +18,7 @@ class DefaultDrainSink(RayActorSinkStage):
         self._last_sunk_count = 0
         self._sunk_count = 0
 
-    @nv_ingest_node_failure_try_except(annotation_id="drain_sink", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
     def on_data(self, message: IngestControlMessage) -> IngestControlMessage:
         self._sunk_count += 1
 

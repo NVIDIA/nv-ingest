@@ -8,7 +8,7 @@ import os
 
 import click
 
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
+from nv_ingest.pipeline.config.loaders import load_pipeline_config
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
 from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config, dump_pipeline_to_graphviz
