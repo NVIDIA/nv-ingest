@@ -94,7 +94,7 @@ spec:
               value: "{{ .Values.logLevel }}"
             {{- if index .Values "nim-vlm-image-captioning" "deployed" }}
             - name: VLM_CAPTION_ENDPOINT
-              value: "nim-vlm-image-captioning:8000"
+              value: {{ index .Values "nim-vlm-image-captioning" "fullnameOverride" }}:8000
             {{- else }}
             - name: VLM_CAPTION_ENDPOINT
               value: "https://integrate.api.nvidia.com/v1/chat/completions"
