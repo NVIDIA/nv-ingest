@@ -32,7 +32,7 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
     Parameters
     ----------
     annotation_id : Optional[str]
-        A unique identifier for annotation. If None, will attempt to auto-detect
+        A unique identifier for annotation. If None, attempts to auto-detect
         from the stage instance's stage_name property.
     payload_can_be_empty : bool, optional
         If False, the message payload must not be null.
