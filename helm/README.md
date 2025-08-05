@@ -344,7 +344,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
-| envVars.VLM_CAPTION_ENDPOINT | string | `"https://integrate.api.nvidia.com/v1/chat/completions"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
@@ -563,7 +562,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nim-vlm-image-captioning.env[2].value | string | `"768"` |  |
 | nim-vlm-image-captioning.fullnameOverride | string | `"nim-vlm-image-captioning"` |  |
 | nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
-| nim-vlm-image-captioning.image.tag | string | `"1.8.4"` |  |
+| nim-vlm-image-captioning.image.tag | string | `"1"` |  |
 | nim-vlm-image-captioning.nim.grpcPort | int | `8001` |  |
 | nim-vlm-image-captioning.nim.logLevel | string | `"INFO"` |  |
 | nim-vlm-image-captioning.podSecurityContext.fsGroup | int | `1000` |  |
