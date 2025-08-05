@@ -129,8 +129,13 @@ stages:
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "pptx_extractor"
     type: "stage"
@@ -144,10 +149,14 @@ stages:
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|""
-
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "image_extractor"
     type: "stage"
@@ -161,10 +170,14 @@ stages:
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|""
-
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "html_extractor"
     type: "stage"
@@ -172,8 +185,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
     config: {}
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "infographic_extractor"
     type: "stage"
@@ -182,14 +200,20 @@ stages:
     config:
       endpoint_config:
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+          $OCR_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
+          $OCR_HTTP_ENDPOINT|""
         ]
-        ocr_infer_protocol: $OCR_INFER_PROTOCOL|http
+        function_id: $OCR_FUNCTION_ID|"6d4d5bf4-76df-4c0b-9e96-92d23fb41edb"
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "table_extractor"
     type: "stage"
@@ -209,8 +233,14 @@ stages:
         ocr_infer_protocol: $PADDLE_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 1000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 1000
+        limit: 6
 
   - name: "chart_extractor"
     type: "stage"
@@ -230,8 +260,14 @@ stages:
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 1000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 1000
+        limit: 6
 
   # Post-processing / Mutators
   - name: "image_filter"
@@ -239,22 +275,27 @@ stages:
     phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "chart_extractor"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "image_dedup"
     type: "stage"
     phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "image_filter"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
-  # Transforms and Synthesis
   - name: "text_splitter"
     type: "stage"
     phase: 4  # TRANSFORM
@@ -263,11 +304,15 @@ stages:
       chunk_size: 512
       chunk_overlap: 20
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 3
-    runs_after:
-      - "image_dedup"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 3
+      static_replicas:
+        strategy: "static"
+        value: 1
 
+  # Transforms and Synthesis
   - name: "image_caption"
     type: "stage"
     phase: 4  # TRANSFORM
@@ -278,10 +323,13 @@ stages:
       model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "text_splitter"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "text_embedder"
     type: "stage"
@@ -292,10 +340,13 @@ stages:
       embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
       embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"https://integrate.api.nvidia.com/v1"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
-    runs_after:
-      - "image_caption"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   # Storage and Output
   - name: "image_storage"
@@ -303,20 +354,26 @@ stages:
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "image_caption"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "embedding_storage"
     type: "stage"
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "text_embedder"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "broker_response"
     type: "stage"
@@ -328,32 +385,44 @@ stages:
         host: "localhost"
         port: 7671
     replicas:
-      cpu_count_min: 1
-      cpu_count_max: 2
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   # Telemetry and Drain
   - name: "otel_tracer"
     type: "stage"
-    phase: 5  # RESPONSE
+    phase: 6  # TELEMETRY
     actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
       otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
     runs_after:
       - "broker_response"
 
   - name: "drain"
     type: "sink"
-    phase: 5  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
-    config: {}
+    phase: 7  # DRAIN
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.drain_sink:DrainSinkStage"
     replicas:
-      cpu_count_min: 1
-      cpu_count_max: 1
-    runs_after:
-      - "otel_tracer"
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
 edges:
   # Intake

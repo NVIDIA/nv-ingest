@@ -135,7 +135,8 @@ def launch_pipeline(
     pipeline_config = resolve_static_replicas(pipeline_config)
 
     # Pretty print the final pipeline configuration (after replica resolution)
-    logger.info("\n" + pretty_print_pipeline_config(pipeline_config))
+    pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
+    logger.info("\n" + pretty_output)
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()
@@ -202,6 +203,13 @@ def run_pipeline_process(
         sys.stdout = stdout
     if stderr:
         sys.stderr = stderr
+
+    # Test output redirection
+    print("DEBUG: Direct print to stdout - should appear in parent process")
+    sys.stderr.write("DEBUG: Direct write to stderr - should appear in parent process\n")
+
+    # Test logging output
+    logger.info("DEBUG: Logger info - may not appear if logging handlers not redirected")
 
     try:
         # Launch the pipeline (blocking)
