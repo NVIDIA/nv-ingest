@@ -369,9 +369,18 @@ def _get_replica_display_info(stage, config):
                 # Strategy-based (should be resolved by now, but show strategy info)
                 strategy_config = replicas.static_replicas
                 strategy_name = strategy_config.strategy.value if hasattr(strategy_config, "strategy") else "unknown"
-                replica_parts.append(f"static-{strategy_name}")
+
+                # Show strategy details
+                strategy_details = []
                 if hasattr(strategy_config, "memory_per_replica_mb") and strategy_config.memory_per_replica_mb:
-                    replica_parts.append(f"{strategy_config.memory_per_replica_mb}MB/replica")
+                    strategy_details.append(f"{strategy_config.memory_per_replica_mb}MB/replica")
+                if hasattr(strategy_config, "cpu_percent") and strategy_config.cpu_percent:
+                    strategy_details.append(f"{strategy_config.cpu_percent*100:.0f}% CPU")
+                if hasattr(strategy_config, "limit") and strategy_config.limit:
+                    strategy_details.append(f"max {strategy_config.limit}")
+
+                detail_str = f" ({', '.join(strategy_details)})" if strategy_details else ""
+                replica_parts.append(f"static-{strategy_name}{detail_str}")
         else:
             # Fallback to legacy fields for static mode
             if replicas.cpu_count_max is not None:
@@ -381,9 +390,9 @@ def _get_replica_display_info(stage, config):
             else:
                 replica_parts.append("1 static")
     else:
-        # Dynamic scaling mode - show min-max range
-        min_val = "1"
-        max_val = "?"
+        # Dynamic scaling mode - show min-max range with strategy details
+        min_val = "0"
+        max_info = "?"
 
         # Get min replicas
         if hasattr(replicas, "min_replicas") and replicas.min_replicas is not None:
@@ -393,21 +402,53 @@ def _get_replica_display_info(stage, config):
         elif replicas.cpu_percent_min is not None:
             min_val = f"{replicas.cpu_percent_min*100:.0f}%"
 
-        # Get max replicas
+        # Get max replicas with detailed strategy information
         if hasattr(replicas, "max_replicas") and replicas.max_replicas is not None:
             if isinstance(replicas.max_replicas, int):
-                max_val = str(replicas.max_replicas)
+                max_info = str(replicas.max_replicas)
             else:
-                # Strategy-based max replicas
+                # Strategy-based max replicas - show strategy details
                 strategy_config = replicas.max_replicas
                 strategy_name = strategy_config.strategy.value if hasattr(strategy_config, "strategy") else "strategy"
-                max_val = f"{strategy_name}"
-        elif replicas.cpu_count_max is not None:
-            max_val = str(replicas.cpu_count_max)
-        elif replicas.cpu_percent_max is not None:
-            max_val = f"{replicas.cpu_percent_max*100:.0f}%"
 
-        replica_parts.append(f"{min_val}-{max_val} dynamic")
+                # Build detailed strategy information
+                strategy_details = []
+                if hasattr(strategy_config, "memory_per_replica_mb") and strategy_config.memory_per_replica_mb:
+                    strategy_details.append(f"{strategy_config.memory_per_replica_mb}MB/replica")
+                if hasattr(strategy_config, "cpu_percent") and strategy_config.cpu_percent:
+                    strategy_details.append(f"{strategy_config.cpu_percent*100:.1f}% CPU")
+                if hasattr(strategy_config, "value") and strategy_config.value:
+                    strategy_details.append(f"value={strategy_config.value}")
+                if hasattr(strategy_config, "limit") and strategy_config.limit:
+                    strategy_details.append(f"limit={strategy_config.limit}")
+
+                if strategy_details:
+                    max_info = f"{strategy_name} ({', '.join(strategy_details)})"
+                else:
+                    max_info = strategy_name
+        elif replicas.cpu_count_max is not None:
+            max_info = str(replicas.cpu_count_max)
+        elif replicas.cpu_percent_max is not None:
+            max_info = f"{replicas.cpu_percent_max*100:.0f}%"
+
+        # Show scaling range
+        replica_parts.append(f"{min_val}→{max_info} dynamic")
+
+        # Also show static strategy if available for comparison
+        if hasattr(replicas, "static_replicas") and replicas.static_replicas is not None:
+            if isinstance(replicas.static_replicas, int):
+                replica_parts.append(f"static={replicas.static_replicas}")
+            else:
+                static_strategy = replicas.static_replicas
+                static_name = static_strategy.strategy.value if hasattr(static_strategy, "strategy") else "static"
+                static_details = []
+                if hasattr(static_strategy, "memory_per_replica_mb") and static_strategy.memory_per_replica_mb:
+                    static_details.append(f"{static_strategy.memory_per_replica_mb}MB/replica")
+                if hasattr(static_strategy, "limit") and static_strategy.limit:
+                    static_details.append(f"limit={static_strategy.limit}")
+
+                detail_str = f" ({', '.join(static_details)})" if static_details else ""
+                replica_parts.append(f"static={static_name}{detail_str}")
 
     if replica_parts:
         return f" [{', '.join(replica_parts)}]"

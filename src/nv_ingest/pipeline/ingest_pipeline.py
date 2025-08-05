@@ -12,7 +12,12 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageConfig, StageType
+from nv_ingest.pipeline.pipeline_schema import (
+    PipelineConfigSchema,
+    StageConfig,
+    StageType,
+    ReplicaStrategyConfig,
+)
 from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
 from nv_ingest_api.util.imports.dynamic_resolvers import resolve_actor_class_from_path, resolve_callable_from_path
 from nv_ingest_api.util.introspection.class_inspect import (
@@ -205,12 +210,12 @@ class IngestPipelineBuilder:
                     if isinstance(replicas.max_replicas, int):
                         max_replicas = replicas.max_replicas
                     else:
-                        # ReplicaStrategyConfig - should be calculated at runtime by Ray
-                        # For now, use a reasonable default and let Ray handle dynamic scaling
-                        max_replicas = 4  # Conservative default for dynamic scaling
+                        # ReplicaStrategyConfig - calculate based on strategy and system resources
+                        max_replicas = self._calculate_strategy_based_replicas(
+                            stage_config.name, replicas.max_replicas, total_cpus
+                        )
                         logger.debug(
-                            f"Stage '{stage_config.name}': max_replicas is strategy-based, using default "
-                            f"{max_replicas} for dynamic scaling"
+                            f"Stage '{stage_config.name}': max_replicas calculated from strategy = {max_replicas}"
                         )
                 else:
                     # Legacy calculation
@@ -236,6 +241,76 @@ class IngestPipelineBuilder:
         elif replicas.cpu_percent_max is not None:
             return math.ceil(replicas.cpu_percent_max * total_cpus)
         else:
+            return 1
+
+    def _calculate_strategy_based_replicas(
+        self, stage_name: str, strategy_config: ReplicaStrategyConfig, total_cpus: int
+    ) -> int:
+        """
+        Calculate replica count based on ReplicaStrategyConfig for dynamic scaling.
+
+        Parameters
+        ----------
+        stage_name : str
+            Name of the stage for logging purposes.
+        strategy_config : ReplicaStrategyConfig
+            The replica strategy configuration.
+        total_cpus : int
+            Total available CPU cores.
+
+        Returns
+        -------
+        int
+            Calculated replica count.
+        """
+        from nv_ingest.pipeline.pipeline_schema import ReplicaCalculationStrategy
+
+        strategy = strategy_config.strategy
+
+        if strategy == ReplicaCalculationStrategy.STATIC:
+            return strategy_config.value or 1
+
+        elif strategy == ReplicaCalculationStrategy.CPU_PERCENTAGE:
+            cpu_percent = strategy_config.cpu_percent or 0.5
+            limit = strategy_config.limit or total_cpus
+            calculated = max(1, int(total_cpus * cpu_percent))
+            result = min(calculated, limit)
+            logger.debug(
+                f"Stage '{stage_name}': CPU_PERCENTAGE strategy: {cpu_percent:.1%} of {total_cpus} "
+                f"CPUs = {calculated}, limited to {result}"
+            )
+            return result
+
+        elif strategy == ReplicaCalculationStrategy.MEMORY_THRESHOLDING:
+            # For dynamic scaling, use a more aggressive memory allocation (80% vs 70% for static)
+            memory_per_replica_mb = strategy_config.memory_per_replica_mb or 1000
+            available_memory_mb = int(self._system_resource_probe.total_memory_mb * 0.8)
+            calculated = max(1, available_memory_mb // memory_per_replica_mb)
+            limit = strategy_config.limit or calculated
+            result = min(calculated, limit)
+            logger.debug(
+                f"Stage '{stage_name}': MEMORY_THRESHOLDING strategy: {available_memory_mb}"
+                f"MB / {memory_per_replica_mb}MB = {calculated}, limited to {result}"
+            )
+            return result
+
+        elif strategy == ReplicaCalculationStrategy.MEMORY_STATIC_GLOBAL_PERCENT:
+            # For dynamic scaling, this strategy behaves like memory_thresholding but with global threshold
+            memory_per_replica_mb = strategy_config.memory_per_replica_mb or 1000
+            # Use dynamic memory threshold from pipeline config, fallback to 0.8
+            dynamic_threshold = getattr(self._config.pipeline, "dynamic_memory_threshold", 0.8)
+            available_memory_mb = int(self._system_resource_probe.total_memory_mb * dynamic_threshold)
+            calculated = max(1, available_memory_mb // memory_per_replica_mb)
+            limit = strategy_config.limit or calculated
+            result = min(calculated, limit)
+            logger.debug(
+                f"Stage '{stage_name}': MEMORY_STATIC_GLOBAL_PERCENT strategy (dynamic): "
+                f"{available_memory_mb}MB / {memory_per_replica_mb}MB = {calculated}, limited to {result}"
+            )
+            return result
+
+        else:
+            logger.warning(f"Unknown replica strategy '{strategy}' for stage '{stage_name}', defaulting to 1 replica")
             return 1
 
     def _validate_dependencies(self) -> None:
