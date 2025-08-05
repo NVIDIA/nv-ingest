@@ -7,6 +7,7 @@
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 import logging
 import os
+from collections import defaultdict, deque
 
 # Optional import for graphviz
 try:
@@ -65,64 +66,54 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
         output.append(f"   • PID Target Queue Depth: {config.pipeline.pid_controller.target_queue_depth}")
         output.append(f"   • Memory Safety Buffer: {config.pipeline.pid_controller.rcm_memory_safety_buffer_fraction}")
 
-    # Create execution order based on dependencies and phases
-    def get_execution_order():
-        """Determine logical execution order of stages."""
-        # Group stages by phase first
-        phases_dict = {}
-        for stage in config.stages:
-            phase_name = stage.phase.name if hasattr(stage.phase, "name") else f"Phase_{stage.phase}"
-            if phase_name not in phases_dict:
-                phases_dict[phase_name] = []
-            phases_dict[phase_name].append(stage)
-
-        # Sort phases and within each phase, sort by dependencies
-        ordered_stages = []
-        for phase_name in sorted(phases_dict.keys()):
-            phase_stages = phases_dict[phase_name]
-
-            # Sort stages within phase by dependency order
-            # Sources first, then stages with fewer dependencies, then sinks
-            def stage_sort_key(stage):
-                if stage.type.value == "source":
-                    return (0, len(stage.runs_after) if stage.runs_after else 0, stage.name)
-                elif stage.type.value == "sink":
-                    return (2, len(stage.runs_after) if stage.runs_after else 0, stage.name)
-                else:
-                    return (1, len(stage.runs_after) if stage.runs_after else 0, stage.name)
-
-            phase_stages.sort(key=stage_sort_key)
-            ordered_stages.extend(phase_stages)
-
-        return ordered_stages, phases_dict
-
-    ordered_stages, phases_dict = get_execution_order()
-
     # Stage Execution Flow
     output.append("\n🔄 PIPELINE EXECUTION FLOW:")
     output.append("-" * 50)
 
-    current_phase = None
-    for stage in ordered_stages:
-        stage_phase = stage.phase.name if hasattr(stage.phase, "name") else f"Phase_{stage.phase}"
+    # Group stages by numeric phase for proper ordering - ignore the broken topological sort
+    phases_by_number = defaultdict(list)
+    for stage in config.stages:
+        # Extract the actual numeric phase value
+        phase_number = stage.phase
+        phases_by_number[phase_number].append(stage)
 
-        # Show phase header when we enter a new phase
-        if current_phase != stage_phase:
-            if current_phase is not None:
-                output.append("")  # Add spacing between phases
-            output.append(f"\n📊 {stage_phase}:")
-            current_phase = stage_phase
+    # Sort stages within each phase by dependencies and type
+    for phase_number in phases_by_number:
+        phase_stages = phases_by_number[phase_number]
 
-        # Stage info with proper indentation
-        stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
-        status_icon = "" if stage.enabled else " ⚠️ DISABLED"
+        # Simple dependency-aware sorting within phase
+        def stage_sort_key(stage):
+            # Sources first, then stages with fewer dependencies, then sinks
+            type_priority = 0 if stage.type.value == "source" else 2 if stage.type.value == "sink" else 1
+            dep_count = len(stage.runs_after) if stage.runs_after else 0
+            return (type_priority, dep_count, stage.name)
 
-        # Show dependencies inline for better flow understanding
-        deps_info = ""
-        if stage.runs_after:
-            deps_info = f" (after: {', '.join(stage.runs_after)})"
+        phase_stages.sort(key=stage_sort_key)
+        phases_by_number[phase_number] = phase_stages
 
-        output.append(f"   {stage_icon} {stage.name}{deps_info}{status_icon}")
+    # Display phases in numerical order
+    for phase_number in sorted(phases_by_number.keys()):
+        phase_stages = phases_by_number[phase_number]
+        if not phase_stages:
+            continue
+
+        # Get phase name for display
+        first_stage = phase_stages[0]
+        phase_name = first_stage.phase.name if hasattr(first_stage.phase, "name") else f"Phase_{first_stage.phase}"
+
+        output.append(f"\n📊 {phase_name}:")
+
+        for stage in phase_stages:
+            # Stage info with proper indentation
+            stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
+            status_icon = "" if stage.enabled else " ⚠️ DISABLED"
+
+            # Show dependencies inline for better flow understanding
+            deps_info = ""
+            if stage.runs_after:
+                deps_info = f" (after: {', '.join(stage.runs_after)})"
+
+            output.append(f"   {stage_icon} {stage.name}{deps_info}{status_icon}")
 
     # Pipeline Topology in Execution Order
     output.append("\n🔗 PIPELINE TOPOLOGY (Execution Flow):")
@@ -146,6 +137,7 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
 
     def show_stage_connections(stage_name, indent_level=0):
         """Recursively show stage connections in execution order."""
+
         if stage_name in shown_stages:
             return
 
@@ -201,53 +193,86 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     output.append("\n📋 DETAILED STAGE CONFIGURATION:")
     output.append("-" * 60)
 
-    for stage in ordered_stages:
-        # Stage header with type icon
-        stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
-        output.append(f"\n{stage_icon} STAGE: {stage.name}")
-        output.append(f"   Type: {stage.type.value}")
+    # Group stages by numeric phase for proper ordering
+    phases_by_number = defaultdict(list)
+    for stage in config.stages:
+        # Extract the actual numeric phase value
+        phase_number = stage.phase
+        phases_by_number[phase_number].append(stage)
 
-        # Actor or callable
-        if stage.actor:
-            output.append(f"   Actor: {stage.actor}")
-        elif stage.callable:
-            output.append(f"   Callable: {stage.callable}")
+    # Sort stages within each phase by dependencies and type
+    for phase_number in phases_by_number:
+        phase_stages = phases_by_number[phase_number]
 
-        # Phase with better formatting
-        phase_display = stage.phase.name if hasattr(stage.phase, "name") else str(stage.phase)
-        output.append(f"   Phase: {phase_display}")
+        # Simple dependency-aware sorting within phase
+        def stage_sort_key(stage):
+            # Sources first, then stages with fewer dependencies, then sinks
+            type_priority = 0 if stage.type.value == "source" else 2 if stage.type.value == "sink" else 1
+            dep_count = len(stage.runs_after) if stage.runs_after else 0
+            return (type_priority, dep_count, stage.name)
 
-        # Scaling configuration - handle both count and percentage based configs
-        replica_info = []
-        if stage.replicas.cpu_count_min is not None:
-            replica_info.append(f"{stage.replicas.cpu_count_min} min")
-        elif stage.replicas.cpu_percent_min is not None:
-            replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
+        phase_stages.sort(key=stage_sort_key)
+        phases_by_number[phase_number] = phase_stages
 
-        if stage.replicas.cpu_count_max is not None:
-            replica_info.append(f"{stage.replicas.cpu_count_max} max")
-        elif stage.replicas.cpu_percent_max is not None:
-            replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
+    # Display phases in numerical order
+    for phase_number in sorted(phases_by_number.keys()):
+        phase_stages = phases_by_number[phase_number]
+        if not phase_stages:
+            continue
 
-        if replica_info:
-            output.append(f"   Scaling: {' → '.join(replica_info)} replicas")
-        else:
-            output.append(f"   Scaling: Default")
+        # Get phase name for display
+        first_stage = phase_stages[0]
+        phase_name = first_stage.phase.name if hasattr(first_stage.phase, "name") else f"Phase_{first_stage.phase}"
 
-        # Dependencies
-        if stage.runs_after:
-            deps = ", ".join(stage.runs_after)
-            output.append(f"   Dependencies: {deps}")
-        else:
-            output.append(f"   Dependencies: None (can start immediately)")
+        output.append(f"\n📊 {phase_name}:")
 
-        # Enabled status
-        if not stage.enabled:
-            output.append(f"   Status: ⚠️  DISABLED")
+        for stage in phase_stages:
+            # Stage header with type icon
+            stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
+            output.append(f"\n{stage_icon} STAGE: {stage.name}")
+            output.append(f"   Type: {stage.type.value}")
 
-        # Task filters for callable stages
-        if stage.callable and stage.task_filters:
-            output.append(f"   Task Filters: {stage.task_filters}")
+            # Actor or callable
+            if stage.actor:
+                output.append(f"   Actor: {stage.actor}")
+            elif stage.callable:
+                output.append(f"   Callable: {stage.callable}")
+
+            # Phase with better formatting
+            phase_display = stage.phase.name if hasattr(stage.phase, "name") else str(stage.phase)
+            output.append(f"   Phase: {phase_display}")
+
+            # Scaling configuration - handle both count and percentage based configs
+            replica_info = []
+            if stage.replicas.cpu_count_min is not None:
+                replica_info.append(f"{stage.replicas.cpu_count_min} min")
+            elif stage.replicas.cpu_percent_min is not None:
+                replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
+
+            if stage.replicas.cpu_count_max is not None:
+                replica_info.append(f"{stage.replicas.cpu_count_max} max")
+            elif stage.replicas.cpu_percent_max is not None:
+                replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
+
+            if replica_info:
+                output.append(f"   Scaling: {' → '.join(replica_info)} replicas")
+            else:
+                output.append(f"   Scaling: Default")
+
+            # Dependencies
+            if stage.runs_after:
+                deps = ", ".join(stage.runs_after)
+                output.append(f"   Dependencies: {deps}")
+            else:
+                output.append(f"   Dependencies: None (can start immediately)")
+
+            # Enabled status
+            if not stage.enabled:
+                output.append(f"   Status: ⚠️  DISABLED")
+
+            # Task filters for callable stages
+            if stage.callable and stage.task_filters:
+                output.append(f"   Task Filters: {stage.task_filters}")
 
     # Summary Statistics
     enabled_stages = [s for s in config.stages if s.enabled]
@@ -266,7 +291,7 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     output.append(f"   • Processing: {len(processing_stages)}")
     output.append(f"   • Sinks: {len(sink_stages)}")
     output.append(f"   Total Edges: {len(config.edges)}")
-    output.append(f"   Execution Phases: {len(phases_dict)}")
+    output.append(f"   Execution Phases: {len(phases_by_number)}")
 
     output.append("\n" + "=" * 80)
     output.append("✅ Pipeline configuration loaded and ready for execution!")
