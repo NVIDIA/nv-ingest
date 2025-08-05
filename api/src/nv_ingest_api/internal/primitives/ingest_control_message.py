@@ -74,7 +74,7 @@ def remove_all_tasks_by_type(ctrl_msg, task: str):
     Returns
     -------
     list[dict]
-        A list of properties dictionaries for all removed tasks.
+        A list of dictionaries of properties for all removed tasks.
 
     Raises
     ------
