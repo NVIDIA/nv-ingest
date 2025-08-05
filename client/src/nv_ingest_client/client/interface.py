@@ -961,7 +961,7 @@ class Ingestor:
             3. File path: '/path/to/file.py:function_name'
         udf_function_name : str, optional
             Name of the function to execute from the UDF specification.
-            If not provided, will attempt to infer from udf_function.
+            If not provided, attempts to infer from udf_function.
         phase : Union[PipelinePhase, int, str], optional
             Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
             or numbers (1-4). Cannot be used with target_stage.
