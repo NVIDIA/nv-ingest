@@ -413,7 +413,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | milvus.etcd.replicaCount | int | `1` |  |
 | milvus.image.all.repository | string | `"milvusdb/milvus"` |  |
 | milvus.image.all.tag | string | `"v2.5.3-gpu"` |  |
-| milvus.minio.bucketName | string | `"a-bucket"` |  |
+| milvus.minio.bucketName | string | `"nv-ingest"` |  |
 | milvus.minio.mode | string | `"standalone"` |  |
 | milvus.minio.persistence.size | string | `"50Gi"` |  |
 | milvus.minio.persistence.storageClass | string | `nil` |  |
