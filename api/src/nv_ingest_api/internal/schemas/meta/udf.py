@@ -10,8 +10,8 @@ class UDFStageSchema(BaseModel):
     Schema for UDF stage configuration.
 
     The UDF function string should be provided in the task config. If no UDF function
-    is provided and ignore_empty_udf is True, the message will be returned unchanged.
-    If ignore_empty_udf is False, an error will be raised when no UDF function is provided.
+    is provided and ignore_empty_udf is True, the message is returned unchanged.
+    If ignore_empty_udf is False, an error is raised when no UDF function is provided.
     """
 
     ignore_empty_udf: bool = Field(
