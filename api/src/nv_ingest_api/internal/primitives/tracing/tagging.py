@@ -27,7 +27,7 @@ def traceable(trace_name: Optional[str] = None):
     ----------
     trace_name : str, optional
         A custom name for the trace entries in the message metadata. If not provided,
-        will attempt to use self.stage_name from the decorated method's instance,
+        attempts to use self.stage_name from the decorated method's instance,
         falling back to the function's name if neither is available.
 
     Returns
