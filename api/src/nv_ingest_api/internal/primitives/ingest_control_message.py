@@ -139,7 +139,7 @@ class IngestControlMessage:
 
     def remove_task(self, task_id: str) -> ControlMessageTask:
         """
-        Remove the first task with the given ID. Logs a warning if no task exists.
+        Remove the first task with the given ID. Warns if no task exists.
         """
         if task_id in self._tasks and self._tasks[task_id]:
             task = self._tasks[task_id].pop(0)
