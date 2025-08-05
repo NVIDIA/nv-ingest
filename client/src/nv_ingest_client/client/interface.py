@@ -718,7 +718,7 @@ class Ingestor:
             Returns self for chaining.
         """
         # Filter out deprecated parameters before API schema validation
-        # The EmbedTask constructor will handle these deprecated parameters with warnings
+        # The EmbedTask constructor handles these deprecated parameters with warnings
         filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ["text", "tables"]}
 
         _ = check_schema(IngestTaskEmbedSchema, filtered_kwargs, "embed", json.dumps(filtered_kwargs))
