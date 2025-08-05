@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from enum import Enum
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional, Set, Union
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from nv_ingest_api.internal.enums.common import PipelinePhase
@@ -19,25 +19,101 @@ class StageType(str, Enum):
     SINK = "sink"
 
 
+class ReplicaCalculationStrategy(str, Enum):
+    """
+    Strategy for calculating replica counts at runtime.
+    """
+
+    STATIC = "static"  # Fixed number of replicas
+    CPU_PERCENTAGE = "cpu_percentage"  # Percentage of available CPU cores
+    MEMORY_THRESHOLDING = "memory_thresholding"  # Based on memory allocation per replica
+    MEMORY_STATIC_GLOBAL_PERCENT = "memory_static_global_percent"  # Memory-safe calculation with budget limits
+
+
+class ReplicaStrategyConfig(BaseModel):
+    """
+    Configuration for a specific replica calculation strategy.
+
+    Attributes
+    ----------
+    strategy : ReplicaCalculationStrategy
+        The calculation strategy to use.
+    value : Optional[Union[int, float]]
+        The primary value for the strategy (e.g., static count, CPU percentage).
+    limit : Optional[int]
+        Optional upper limit for calculated replicas.
+    cpu_percent : Optional[float]
+        CPU percentage for CPU_PERCENTAGE strategy (0.0 to 1.0).
+    memory_per_replica_mb : Optional[int]
+        Expected memory usage per replica in MB.
+    memory_threshold_percent : Optional[float]
+        Memory threshold percentage for MEMORY_THRESHOLDING strategy (0.0 to 1.0).
+    max_memory_budget_mb : Optional[int]
+        Maximum memory budget for MEMORY_STATIC_GLOBAL_PERCENT strategy in MB.
+    """
+
+    strategy: ReplicaCalculationStrategy = Field(..., description="The calculation strategy to use.")
+    value: Optional[Union[int, float]] = Field(None, description="Primary value for the strategy.")
+    limit: Optional[int] = Field(None, description="Optional upper limit for calculated replicas.", ge=1)
+    cpu_percent: Optional[float] = Field(
+        None, description="CPU percentage for CPU_PERCENTAGE strategy.", ge=0.0, le=1.0
+    )
+    memory_per_replica_mb: Optional[int] = Field(None, description="Expected memory usage per replica in MB.", gt=0)
+    memory_threshold_percent: Optional[float] = Field(
+        None, description="Memory threshold percentage for MEMORY_THRESHOLDING strategy.", ge=0.0, le=1.0
+    )
+    max_memory_budget_mb: Optional[int] = Field(
+        None, description="Maximum memory budget for MEMORY_STATIC_GLOBAL_PERCENT strategy in MB.", gt=0
+    )
+
+    @model_validator(mode="after")
+    def validate_strategy_config(self):
+        """Validate that required fields are present for each strategy."""
+        if self.strategy == ReplicaCalculationStrategy.STATIC:
+            if self.value is None or not isinstance(self.value, int):
+                raise ValueError("STATIC strategy requires 'value' as an integer")
+        elif self.strategy == ReplicaCalculationStrategy.CPU_PERCENTAGE:
+            if self.cpu_percent is None:
+                if self.value is None or not isinstance(self.value, (int, float)):
+                    raise ValueError("CPU_PERCENTAGE strategy requires 'cpu_percent' or 'value' as a float")
+                self.cpu_percent = float(self.value)
+        elif self.strategy == ReplicaCalculationStrategy.MEMORY_THRESHOLDING:
+            if self.memory_per_replica_mb is None:
+                raise ValueError("MEMORY_THRESHOLDING strategy requires 'memory_per_replica_mb'")
+        elif self.strategy == ReplicaCalculationStrategy.MEMORY_STATIC_GLOBAL_PERCENT:
+            if self.memory_per_replica_mb is None:
+                raise ValueError("MEMORY_STATIC_GLOBAL_PERCENT strategy requires 'memory_per_replica_mb'")
+            # max_memory_budget_mb is optional - uses global static_memory_threshold if not provided
+        return self
+
+
 class ReplicaConfig(BaseModel):
     """
-    Configuration for stage replicas.
+    Configuration for stage replicas supporting both dynamic and static scaling modes.
 
-    Defines the min/max number of replicas for a stage, either as an absolute
-    count or a percentage of total CPU cores.
+    Defines the min/max number of replicas for a stage, either as absolute counts,
+    percentages of total CPU cores, or resource-based calculations. Supports different
+    configurations for dynamic vs static scaling modes.
 
     Attributes
     ----------
     cpu_count_min : Optional[int]
-        Absolute minimum number of replicas. Must be >= 0.
+        Absolute minimum number of replicas. Must be >= 0. (Legacy support)
     cpu_count_max : Optional[int]
-        Absolute maximum number of replicas. Must be >= 1.
+        Absolute maximum number of replicas. Must be >= 1. (Legacy support)
     cpu_percent_min : Optional[float]
-        Minimum number of replicas as a percentage (0.0 to 1.0) of total cores.
+        Minimum number of replicas as a percentage (0.0 to 1.0) of total cores. (Legacy support)
     cpu_percent_max : Optional[float]
-        Maximum number of replicas as a percentage (0.0 to 1.0) of total cores.
+        Maximum number of replicas as a percentage (0.0 to 1.0) of total cores. (Legacy support)
+    min_replicas : Optional[int]
+        Minimum number of replicas for both scaling modes. Must be >= 0.
+    max_replicas : Optional[Union[int, ReplicaStrategyConfig]]
+        Maximum replicas for dynamic scaling mode. Can be static int or strategy config.
+    static_replicas : Optional[Union[int, ReplicaStrategyConfig]]
+        Replica configuration for static scaling mode. Can be static int or strategy config.
     """
 
+    # Legacy fields for backward compatibility
     cpu_count_min: Optional[int] = Field(None, description="Absolute minimum number of replicas.", ge=0)
     cpu_count_max: Optional[int] = Field(None, description="Absolute maximum number of replicas.", ge=1)
     cpu_percent_min: Optional[float] = Field(
@@ -47,16 +123,74 @@ class ReplicaConfig(BaseModel):
         None, description="Maximum number of replicas as a percentage of total cores.", ge=0.0, le=1.0
     )
 
+    # New flexible replica configuration
+    min_replicas: Optional[int] = Field(None, description="Minimum number of replicas.", ge=0)
+    max_replicas: Optional[Union[int, ReplicaStrategyConfig]] = Field(
+        None, description="Maximum replicas for dynamic scaling mode."
+    )
+    static_replicas: Optional[Union[int, ReplicaStrategyConfig]] = Field(
+        None, description="Replica configuration for static scaling mode."
+    )
+
     @model_validator(mode="after")
     def check_exclusive_min_max(self) -> "ReplicaConfig":
         """
-        Validates that count and percent are not specified for min or max at the same time.
-        """
-        if self.cpu_count_min is not None and self.cpu_percent_min is not None:
-            raise ValueError("Cannot specify both 'cpu_count_min' and 'cpu_percent_min'")
+        Validates that replica configuration is consistent and complete.
 
-        if self.cpu_count_max is not None and self.cpu_percent_max is not None:
-            raise ValueError("Cannot specify both 'cpu_count_max' and 'cpu_percent_max'")
+        Ensures that:
+        1. Legacy fields (cpu_count_*, cpu_percent_*) are not mixed with new fields
+        2. At least one configuration method is specified
+        3. Min/max relationships are valid
+        """
+        legacy_fields = [self.cpu_count_min, self.cpu_count_max, self.cpu_percent_min, self.cpu_percent_max]
+        new_fields = [self.min_replicas, self.max_replicas, self.static_replicas]
+
+        has_legacy = any(field is not None for field in legacy_fields)
+        has_new = any(field is not None for field in new_fields)
+
+        if has_legacy and has_new:
+            raise ValueError(
+                "Cannot mix legacy replica fields (cpu_count_*, cpu_percent_*) with new fields "
+                "(min_replicas, max_replicas, static_replicas). Use one approach or the other."
+            )
+
+        if not has_legacy and not has_new:
+            # Set sensible defaults for new configuration
+            self.min_replicas = 0
+            self.max_replicas = 1
+
+        # Legacy validation (existing logic)
+        if has_legacy:
+            if self.cpu_count_min is not None and self.cpu_percent_min is not None:
+                raise ValueError("Cannot specify both cpu_count_min and cpu_percent_min")
+            if self.cpu_count_max is not None and self.cpu_percent_max is not None:
+                raise ValueError("Cannot specify both cpu_count_max and cpu_percent_max")
+
+            # Validate min <= max for legacy fields
+            if self.cpu_count_min is not None and self.cpu_count_max is not None:
+                if self.cpu_count_min > self.cpu_count_max:
+                    raise ValueError("cpu_count_min cannot be greater than cpu_count_max")
+            if self.cpu_percent_min is not None and self.cpu_percent_max is not None:
+                if self.cpu_percent_min > self.cpu_percent_max:
+                    raise ValueError("cpu_percent_min cannot be greater than cpu_percent_max")
+
+        # New configuration validation
+        if has_new:
+            # Validate min_replicas against max_replicas if both are static integers
+            if (
+                self.min_replicas is not None
+                and isinstance(self.max_replicas, int)
+                and self.min_replicas > self.max_replicas
+            ):
+                raise ValueError("min_replicas cannot be greater than max_replicas")
+
+            # Validate min_replicas against static_replicas if both are static integers
+            if (
+                self.min_replicas is not None
+                and isinstance(self.static_replicas, int)
+                and self.min_replicas > self.static_replicas
+            ):
+                raise ValueError("min_replicas cannot be greater than static_replicas")
 
         return self
 
@@ -190,16 +324,18 @@ class PIDControllerConfig(BaseModel):
 
 class PipelineRuntimeConfig(BaseModel):
     """
-    Configuration for the pipeline's runtime behavior.
+    Configuration for pipeline runtime behavior.
 
-    Attributes
+    Parameters
     ----------
     disable_dynamic_scaling : bool
-        If True, disables the dynamic scaling of stage replicas.
+        Whether to disable dynamic scaling of replicas (default: False).
     dynamic_memory_threshold : float
         The memory utilization threshold (0.0 to 1.0) for dynamic scaling decisions.
+    static_memory_threshold : float
+        Global memory threshold for static scaling mode (default: 0.75).
     pid_controller : PIDControllerConfig
-        Configuration for the PID controller used in dynamic scaling.
+        PID controller configuration for dynamic scaling.
     launch_simple_broker : bool
         If True, launches a simple message broker for the pipeline.
     """
@@ -207,6 +343,9 @@ class PipelineRuntimeConfig(BaseModel):
     disable_dynamic_scaling: bool = Field(False, description="Disable dynamic scaling of stage replicas.")
     dynamic_memory_threshold: float = Field(
         0.75, ge=0.0, le=0.95, description="Memory utilization threshold for dynamic scaling."
+    )
+    static_memory_threshold: float = Field(
+        0.75, ge=0.0, le=1.0, description="Global memory threshold for static scaling mode."
     )
     pid_controller: PIDControllerConfig = Field(
         default_factory=PIDControllerConfig, description="PID controller configuration for dynamic scaling."

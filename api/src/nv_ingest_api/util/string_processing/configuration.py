@@ -8,6 +8,8 @@ from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 import logging
 import os
 from collections import defaultdict, deque
+from typing import Dict, List, Set
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 # Optional import for graphviz
 try:
@@ -30,7 +32,7 @@ PHASE_COLORS = {
 logger = logging.getLogger(__name__)
 
 
-def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
+def pretty_print_pipeline_config(config: PipelineConfigSchema, config_path: str = None) -> str:
     """
     Generate a comprehensive, human-readable representation of a pipeline configuration.
 
@@ -42,6 +44,8 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     ----------
     config : PipelineConfigSchema
         The pipeline configuration to format and display.
+    config_path : str, optional
+        The file path of the configuration file to display in the header.
 
     Returns
     -------
@@ -53,18 +57,54 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     # Header with pipeline overview
     output.append("=" * 80)
     output.append(f"🚀 PIPELINE CONFIGURATION: {config.name}")
+    if config_path:
+        output.append(f"📁 Configuration File: {config_path}")
     output.append(f"📋 Description: {config.description}")
     output.append("=" * 80)
 
     # Runtime Configuration Summary
     if config.pipeline:
         output.append("\n⚙️  RUNTIME CONFIGURATION:")
-        output.append(
-            f"   • Dynamic Scaling: {'Enabled' if not config.pipeline.disable_dynamic_scaling else 'Disabled'}"
-        )
-        output.append(f"   • Memory Threshold: {config.pipeline.dynamic_memory_threshold}")
+        output.append(f"   • Dynamic Scaling: {'Disabled' if config.pipeline.disable_dynamic_scaling else 'Enabled'}")
+        output.append(f"   • Dynamic Memory Threshold: {config.pipeline.dynamic_memory_threshold:.1%}")
+        output.append(f"   • Static Memory Threshold: {config.pipeline.static_memory_threshold:.1%}")
+        output.append(f"   • PID Kp: {config.pipeline.pid_controller.kp}")
+        output.append(f"   • PID Ki: {config.pipeline.pid_controller.ki}")
+        output.append(f"   • PID EMA Alpha: {config.pipeline.pid_controller.ema_alpha}")
         output.append(f"   • PID Target Queue Depth: {config.pipeline.pid_controller.target_queue_depth}")
-        output.append(f"   • Memory Safety Buffer: {config.pipeline.pid_controller.rcm_memory_safety_buffer_fraction}")
+        output.append(f"   • PID Penalty Factor: {config.pipeline.pid_controller.penalty_factor}")
+        output.append(f"   • PID Error Boost Factor: {config.pipeline.pid_controller.error_boost_factor}")
+
+    # System Resource Information
+    system_probe = SystemResourceProbe()
+    details = system_probe.get_details()
+
+    output.append("\n🖥️ SYSTEM RESOURCE INFORMATION:")
+    output.append(f"   • Effective CPU Cores: {system_probe.effective_cores:.2f}")
+    output.append(f"   • CPU Detection Method: {system_probe.detection_method}")
+
+    if system_probe.total_memory_mb:
+        output.append(f"   • Total Memory: {system_probe.total_memory_mb / 1024:.2f} GB")
+        output.append(f"   • Memory Detection Method: {details.get('memory_detection_method', 'unknown')}")
+
+    # Show cgroup information if available
+    if details.get("cgroup_type"):
+        output.append(f"   • Container Runtime: {details['cgroup_type']} cgroups detected")
+        if details.get("cgroup_quota_cores"):
+            output.append(f"   • CPU Limit (cgroup): {details['cgroup_quota_cores']:.2f} cores")
+        if details.get("cgroup_memory_limit_bytes"):
+            cgroup_memory_gb = details["cgroup_memory_limit_bytes"] / (1024**3)
+            output.append(f"   • Memory Limit (cgroup): {cgroup_memory_gb:.2f} GB")
+    else:
+        output.append("   • Container Runtime: No cgroup limits detected (bare metal/VM)")
+
+    # Show static memory threshold if dynamic scaling is disabled
+    if config.pipeline.disable_dynamic_scaling:
+        threshold = config.pipeline.static_memory_threshold
+        available_memory_gb = (system_probe.total_memory_mb or 0) * threshold / 1024
+        output.append(
+            f"   • Static Memory Threshold: {threshold:.1%} ({available_memory_gb:.2f} GB available for replicas)"
+        )
 
     # Stage Execution Flow
     output.append("\n🔄 PIPELINE EXECUTION FLOW:")
@@ -113,7 +153,10 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
             if stage.runs_after:
                 deps_info = f" (after: {', '.join(stage.runs_after)})"
 
-            output.append(f"   {stage_icon} {stage.name}{deps_info}{status_icon}")
+            # Add replica information
+            replica_info = _get_replica_display_info(stage, config)
+
+            output.append(f"   {stage_icon} {stage.name}{deps_info}{replica_info}{status_icon}")
 
     # Pipeline Topology in Execution Order
     output.append("\n🔗 PIPELINE TOPOLOGY (Execution Flow):")
@@ -151,21 +194,24 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
         else:
             stage_icon = "❓"
 
+        # Add replica information
+        replica_info = _get_replica_display_info(stage_obj, config)
+
         # Show outgoing connections
         if stage_name in edge_map:
             targets = sorted(edge_map[stage_name])
             if len(targets) == 1:
-                output.append(f"{indent}{stage_icon} {stage_name} → {targets[0]}")
+                output.append(f"{indent}{stage_icon} {stage_name}{replica_info} → {targets[0]}")
                 # Recursively show the target's connections
                 show_stage_connections(targets[0], indent_level)
             else:
-                output.append(f"{indent}{stage_icon} {stage_name} → [{', '.join(targets)}]")
+                output.append(f"{indent}{stage_icon} {stage_name}{replica_info} → [{', '.join(targets)}]")
                 # Show each target's connections
                 for target in targets:
                     show_stage_connections(target, indent_level + 1)
         else:
             # Terminal stage (no outgoing connections)
-            output.append(f"{indent}{stage_icon} {stage_name} (terminal)")
+            output.append(f"{indent}{stage_icon} {stage_name}{replica_info} (terminal)")
 
     # Start with source stages (stages with no incoming edges)
     source_stages = []
@@ -187,7 +233,8 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     for stage in config.stages:
         if stage.name not in shown_stages:
             stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
-            output.append(f"   {stage_icon} {stage.name} (isolated)")
+            replica_info = _get_replica_display_info(stage, config)
+            output.append(f"   {stage_icon} {stage.name}{replica_info} (isolated)")
 
     # Detailed Stage Configuration (in execution order)
     output.append("\n📋 DETAILED STAGE CONFIGURATION:")
@@ -244,15 +291,16 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
 
             # Scaling configuration - handle both count and percentage based configs
             replica_info = []
-            if stage.replicas.cpu_count_min is not None:
-                replica_info.append(f"{stage.replicas.cpu_count_min} min")
-            elif stage.replicas.cpu_percent_min is not None:
-                replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
+            if stage.replicas:
+                if stage.replicas.cpu_count_min is not None:
+                    replica_info.append(f"{stage.replicas.cpu_count_min} min")
+                elif stage.replicas.cpu_percent_min is not None:
+                    replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
 
-            if stage.replicas.cpu_count_max is not None:
-                replica_info.append(f"{stage.replicas.cpu_count_max} max")
-            elif stage.replicas.cpu_percent_max is not None:
-                replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
+                if stage.replicas.cpu_count_max is not None:
+                    replica_info.append(f"{stage.replicas.cpu_count_max} max")
+                elif stage.replicas.cpu_percent_max is not None:
+                    replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
 
             if replica_info:
                 output.append(f"   Scaling: {' → '.join(replica_info)} replicas")
@@ -298,6 +346,73 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema) -> str:
     output.append("=" * 80)
 
     return "\n".join(output)
+
+
+def _get_replica_display_info(stage, config):
+    """Generate replica information display for a stage."""
+    if not stage or not stage.replicas:
+        return " [1 replica]"  # Default display
+
+    replicas = stage.replicas
+    replica_parts = []
+
+    # Check if dynamic scaling is disabled
+    dynamic_scaling_disabled = getattr(config.pipeline, "disable_dynamic_scaling", False)
+
+    if dynamic_scaling_disabled:
+        # Static scaling mode - show resolved static replica count
+        if hasattr(replicas, "static_replicas") and replicas.static_replicas is not None:
+            if isinstance(replicas.static_replicas, int):
+                # Resolved static replica count
+                replica_parts.append(f"{replicas.static_replicas} static")
+            else:
+                # Strategy-based (should be resolved by now, but show strategy info)
+                strategy_config = replicas.static_replicas
+                strategy_name = strategy_config.strategy.value if hasattr(strategy_config, "strategy") else "unknown"
+                replica_parts.append(f"static-{strategy_name}")
+                if hasattr(strategy_config, "memory_per_replica_mb") and strategy_config.memory_per_replica_mb:
+                    replica_parts.append(f"{strategy_config.memory_per_replica_mb}MB/replica")
+        else:
+            # Fallback to legacy fields for static mode
+            if replicas.cpu_count_max is not None:
+                replica_parts.append(f"{replicas.cpu_count_max} static")
+            elif replicas.cpu_percent_max is not None:
+                replica_parts.append(f"{replicas.cpu_percent_max*100:.0f}% static")
+            else:
+                replica_parts.append("1 static")
+    else:
+        # Dynamic scaling mode - show min-max range
+        min_val = "1"
+        max_val = "?"
+
+        # Get min replicas
+        if hasattr(replicas, "min_replicas") and replicas.min_replicas is not None:
+            min_val = str(replicas.min_replicas)
+        elif replicas.cpu_count_min is not None:
+            min_val = str(replicas.cpu_count_min)
+        elif replicas.cpu_percent_min is not None:
+            min_val = f"{replicas.cpu_percent_min*100:.0f}%"
+
+        # Get max replicas
+        if hasattr(replicas, "max_replicas") and replicas.max_replicas is not None:
+            if isinstance(replicas.max_replicas, int):
+                max_val = str(replicas.max_replicas)
+            else:
+                # Strategy-based max replicas
+                strategy_config = replicas.max_replicas
+                strategy_name = strategy_config.strategy.value if hasattr(strategy_config, "strategy") else "strategy"
+                max_val = f"{strategy_name}"
+        elif replicas.cpu_count_max is not None:
+            max_val = str(replicas.cpu_count_max)
+        elif replicas.cpu_percent_max is not None:
+            max_val = f"{replicas.cpu_percent_max*100:.0f}%"
+
+        replica_parts.append(f"{min_val}-{max_val} dynamic")
+
+    if replica_parts:
+        return f" [{', '.join(replica_parts)}]"
+    else:
+        return " [1 replica]"
 
 
 def dump_pipeline_to_graphviz(

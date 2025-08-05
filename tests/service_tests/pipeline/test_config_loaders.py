@@ -9,7 +9,8 @@ import os
 import tempfile
 import pytest
 from unittest.mock import patch
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
+
+from nv_ingest.pipeline.config.loaders import load_pipeline_config
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from pydantic import ValidationError
 

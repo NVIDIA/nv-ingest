@@ -11,7 +11,7 @@ import click
 from nv_ingest.pipeline.config.loaders import load_pipeline_config
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
-from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config, dump_pipeline_to_graphviz
+from nv_ingest_api.util.string_processing.configuration import dump_pipeline_to_graphviz
 
 _env_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if _env_log_level.upper() == "DEFAULT":
@@ -55,9 +55,6 @@ def cli(
         logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
         pipeline_config = load_pipeline_config(pipeline_config_path)
         logger.info("Pipeline configuration loaded and validated.")
-
-        # Pretty print the pipeline structure to the log
-        logger.info("\n" + pretty_print_pipeline_config(pipeline_config))
 
         # Generate visualization
         dump_pipeline_to_graphviz(pipeline_config, "./logs/running_pipeline.dot")

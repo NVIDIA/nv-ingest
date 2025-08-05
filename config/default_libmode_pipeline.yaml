@@ -17,8 +17,9 @@ stages:
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
+      min_replicas: 0
+      max_replicas: 1
+      static_replicas: 0
 
   # Pre-processing
   - name: "metadata_injector"

@@ -32,8 +32,14 @@ stages:
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+    runs_after: []
 
   # Pre-processing
   - name: "metadata_injector"
@@ -42,8 +48,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
     config: {}
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
     runs_after:
       - "source_stage"
 
@@ -74,8 +85,14 @@ stages:
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 16
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 10000 # Heuristic max consumption
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 10000
+        limit: 16
 
   - name: "audio_extractor"
     type: "stage"
@@ -91,8 +108,13 @@ stages:
         audio_infer_protocol: $AUDIO_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 2
 
   - name: "docx_extractor"
     type: "stage"

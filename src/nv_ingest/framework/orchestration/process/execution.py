@@ -27,6 +27,8 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
 )
 from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.config.replica_resolver import resolve_static_replicas
+from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +130,12 @@ def launch_pipeline(
         # Directly modify the pipeline config to disable dynamic scaling
         pipeline_config.pipeline.disable_dynamic_scaling = True
         logger.info("Dynamic scaling disabled via function parameter override")
+
+    # Resolve static replicas
+    pipeline_config = resolve_static_replicas(pipeline_config)
+
+    # Pretty print the final pipeline configuration (after replica resolution)
+    logger.info("\n" + pretty_print_pipeline_config(pipeline_config))
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()

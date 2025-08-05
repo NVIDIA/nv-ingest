@@ -7,7 +7,7 @@ import os
 import pytest
 import ray
 
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
+from nv_ingest.pipeline.config.loaders import load_pipeline_config
 from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageType
 
@@ -59,7 +59,7 @@ def test_load_and_build_default_pipeline(pipeline_config_file: str, ray_instance
         # Check the sink stage
         sink_stage_info = next((s for s in built_stages_info if s.is_sink), None)
         assert sink_stage_info is not None
-        assert sink_stage_info.name == "drain"
+        assert sink_stage_info.name == "default_drain"
 
     finally:
         ingest_pipeline.stop()

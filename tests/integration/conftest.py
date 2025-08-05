@@ -8,7 +8,7 @@ import time
 import pytest
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.pipeline.config_loaders import load_pipeline_config
+from nv_ingest.pipeline.config.loaders import load_pipeline_config
 
 
 @pytest.fixture(scope="session")

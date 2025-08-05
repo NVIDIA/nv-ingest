@@ -404,6 +404,10 @@ class PipelinePhase(int, Enum):
         Transform phase.
     RESPONSE : int
         Response phase.
+    TELEMETRY : int
+        Telemetry phase.
+    DRAIN : int
+        Drain phase.
     """
 
     PRE_PROCESSING = 0
@@ -412,6 +416,8 @@ class PipelinePhase(int, Enum):
     MUTATION = 3
     TRANSFORM = 4
     RESPONSE = 5
+    TELEMETRY = 6
+    DRAIN = 7
 
 
 class TableFormatEnum(str, Enum):

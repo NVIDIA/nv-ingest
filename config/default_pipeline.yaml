@@ -11,14 +11,19 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
-        client_type: "redis"
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
         host: $MESSAGE_CLIENT_HOST|"redis"
         port: $MESSAGE_CLIENT_PORT|6379
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      cpu_count_min: 1
-      cpu_count_max: 1
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   # Pre-processing
   - name: "metadata_injector"
@@ -27,8 +32,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
     config: {}
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
     runs_after:
       - "source_stage"
 
@@ -59,8 +69,14 @@ stages:
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 16
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 10000 # Heuristic max consumption
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 10000
+        limit: 16
 
   - name: "audio_extractor"
     type: "stage"
@@ -70,14 +86,19 @@ stages:
       audio_extraction_config:
         audio_endpoints: [
           $AUDIO_GRPC_ENDPOINT|"audio:50051",
-          $AUDIO_HTTP_ENDPOINT|""
+          $AUDIO_HTTP_ENDPOINT|"",
         ]
         function_id: $AUDIO_FUNCTION_ID|""
         audio_infer_protocol: $AUDIO_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 2
 
   - name: "docx_extractor"
     type: "stage"
@@ -87,13 +108,18 @@ stages:
       docx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|""
+          $YOLOX_HTTP_ENDPOINT|"",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "pptx_extractor"
     type: "stage"
@@ -103,13 +129,18 @@ stages:
       pptx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|""
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "image_extractor"
     type: "stage"
@@ -119,13 +150,18 @@ stages:
       image_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|""
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "html_extractor"
     type: "stage"
@@ -133,8 +169,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
     config: {}
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "infographic_extractor"
     type: "stage"
@@ -143,14 +184,19 @@ stages:
     config:
       endpoint_config:
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"graphic-elements:8001",
-          $OCR_HTTP_ENDPOINT|""
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "table_extractor"
     type: "stage"
@@ -160,18 +206,24 @@ stages:
       endpoint_config:
         yolox_endpoints: [
           $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"table-structure:8001",
-          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|""
+          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|"http://table-structure:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|grpc
         ocr_endpoints: [
           $OCR_GRPC_ENDPOINT|"ocr:8001",
-          $OCR_HTTP_ENDPOINT|""
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 1000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 1000
+        limit: 6
 
   - name: "chart_extractor"
     type: "stage"
@@ -191,8 +243,14 @@ stages:
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 1000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 1000
+        limit: 6
 
   # Post-processing / Mutators
   - name: "image_filter"
@@ -200,49 +258,60 @@ stages:
     phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "chart_extractor"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "image_dedup"
     type: "stage"
     phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "image_filter"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
-  # Transforms and Synthesis
   - name: "text_splitter"
     type: "stage"
-    phase: 4  # TRANSFORM
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
     config:
       chunk_size: 512
       chunk_overlap: 20
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 3
-    runs_after:
-      - "image_dedup"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 3
+      static_replicas:
+        strategy: "static"
+        value: 1
 
+  # Transforms and Synthesis
   - name: "image_caption"
     type: "stage"
     phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
-      endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
       model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "text_splitter"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "text_embedder"
     type: "stage"
@@ -253,10 +322,14 @@ stages:
       embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
       embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 4
-    runs_after:
-      - "image_caption"
+      min_replicas: 0
+      max_replicas:
+        strategy: "cpu_percentage"
+        cpu_percent: 0.07  # 7% of CPU cores
+        limit: 4           # Cap at 4 replicas
+      static_replicas:
+        strategy: "static"
+        value: 2
 
   # Storage and Output
   - name: "image_storage"
@@ -264,20 +337,26 @@ stages:
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "image_caption"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "embedding_storage"
     type: "stage"
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "text_embedder"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
   - name: "broker_response"
     type: "stage"
@@ -285,38 +364,47 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
       broker_client:
-        client_type: "redis"
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
         host: $MESSAGE_CLIENT_HOST|localhost
         port: $MESSAGE_CLIENT_PORT|6379
+      poll_interval: 0.1
     replicas:
-      cpu_count_min: 1
-      cpu_count_max: 2
-    runs_after:
-      - "embedding_storage"
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
 
-  # Telemetry and Drain
   - name: "otel_tracer"
     type: "stage"
-    phase: 5  # RESPONSE
+    phase: 6  # TELEMETRY
     actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
       otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
     replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
-    runs_after:
-      - "broker_response"
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
-  - name: "drain"
+  - name: "default_drain"
     type: "sink"
-    phase: 5
+    phase: 7  # DRAIN
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:
-      cpu_count_min: 1
-      cpu_count_max: 1
-    runs_after:
-      - "otel_tracer"
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
 edges:
   # Intake
@@ -390,15 +478,14 @@ edges:
     to: "otel_tracer"
     queue_size: 32
   - from: "otel_tracer"
-    to: "drain"
+    to: "default_drain"
     queue_size: 32
 
 # Pipeline Runtime Configuration
-# These parameters control dynamic scaling and PID controller behavior
-# All values can be overridden by environment variables from env_config.py
 pipeline:
   disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
   dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
+  static_memory_threshold: $INGEST_STATIC_MEMORY_THRESHOLD|0.75
   pid_controller:
     kp: $INGEST_DYNAMIC_MEMORY_KP|0.2
     ki: $INGEST_DYNAMIC_MEMORY_KI|0.01
@@ -407,4 +494,4 @@ pipeline:
     penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
     error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
     rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
-  launch_simple_broker: false
+  launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|false

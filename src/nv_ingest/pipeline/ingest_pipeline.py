@@ -167,16 +167,54 @@ class IngestPipelineBuilder:
 
         replicas = stage_config.replicas
         min_replicas, max_replicas = 1, 1
+
+        # Check if dynamic scaling is disabled by checking pipeline config
+        dynamic_scaling_disabled = getattr(self._config.pipeline, "disable_dynamic_scaling", False)
+
         if replicas and total_cpus:
-            if replicas.cpu_count_min is not None:
+            # Handle new replica configuration format
+            if hasattr(replicas, "min_replicas") and replicas.min_replicas is not None:
+                min_replicas = replicas.min_replicas
+            elif replicas.cpu_count_min is not None:  # Legacy support
                 min_replicas = replicas.cpu_count_min
-            elif replicas.cpu_percent_min is not None:
+            elif replicas.cpu_percent_min is not None:  # Legacy support
                 min_replicas = math.floor(replicas.cpu_percent_min * total_cpus)
 
-            if replicas.cpu_count_max is not None:
-                max_replicas = replicas.cpu_count_max
-            elif replicas.cpu_percent_max is not None:
-                max_replicas = math.ceil(replicas.cpu_percent_max * total_cpus)
+            # For max_replicas, prioritize based on scaling mode
+            if dynamic_scaling_disabled:
+                # Static scaling mode - use static_replicas if available
+                if hasattr(replicas, "static_replicas") and replicas.static_replicas is not None:
+                    if isinstance(replicas.static_replicas, int):
+                        # Use resolved static replica count
+                        max_replicas = replicas.static_replicas
+                        min_replicas = replicas.static_replicas  # In static mode, min == max
+                        logger.debug(f"Stage '{stage_config.name}': Using resolved static replicas = {max_replicas}")
+                    else:
+                        # Should not happen after resolve_static_replicas, but fallback to legacy
+                        logger.warning(
+                            f"Stage '{stage_config.name}': "
+                            "static_replicas not resolved to int, using legacy calculation"
+                        )
+                        max_replicas = self._calculate_legacy_max_replicas(replicas, total_cpus)
+                else:
+                    # No static_replicas defined, use legacy calculation
+                    max_replicas = self._calculate_legacy_max_replicas(replicas, total_cpus)
+            else:
+                # Dynamic scaling mode - use max_replicas
+                if hasattr(replicas, "max_replicas") and replicas.max_replicas is not None:
+                    if isinstance(replicas.max_replicas, int):
+                        max_replicas = replicas.max_replicas
+                    else:
+                        # ReplicaStrategyConfig - should be calculated at runtime by Ray
+                        # For now, use a reasonable default and let Ray handle dynamic scaling
+                        max_replicas = 4  # Conservative default for dynamic scaling
+                        logger.debug(
+                            f"Stage '{stage_config.name}': max_replicas is strategy-based, using default "
+                            f"{max_replicas} for dynamic scaling"
+                        )
+                else:
+                    # Legacy calculation
+                    max_replicas = self._calculate_legacy_max_replicas(replicas, total_cpus)
 
             # Ensure max_replicas is not less than min_replicas
             max_replicas = max(min_replicas, max_replicas)
@@ -191,6 +229,14 @@ class IngestPipelineBuilder:
         )
         logger.info(f"Added stage '{stage_config.name}' ({min_replicas}-{max_replicas} replicas) to the pipeline.")
         self._built_stages.add(stage_config.name)
+
+    def _calculate_legacy_max_replicas(self, replicas, total_cpus):
+        if replicas.cpu_count_max is not None:
+            return replicas.cpu_count_max
+        elif replicas.cpu_percent_max is not None:
+            return math.ceil(replicas.cpu_percent_max * total_cpus)
+        else:
+            return 1
 
     def _validate_dependencies(self) -> None:
         """
