@@ -80,7 +80,7 @@ def dummy_module(monkeypatch):
     # Since the classes are now global, we need to add them to the module's
     # __dict__ so they can be resolved by path, but we also need to handle
     # how they are injected into sys.modules.
-    # The key is that `resolve_obj_from_path` will look in sys.modules['dummy_mod']
+    # The key is that `resolve_obj_from_path` looks in sys.modules['dummy_mod']
     # which we are creating here.
     sys.modules["dummy_mod"] = mod
     yield mod
