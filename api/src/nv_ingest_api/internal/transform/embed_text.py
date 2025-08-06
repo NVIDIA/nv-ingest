@@ -10,12 +10,8 @@ from typing import Any, Dict, Tuple, Optional, Iterable, List
 import pandas as pd
 from openai import OpenAI
 
-from nv_ingest_api.internal.enums.common import ContentTypeEnum, StatusEnum, TaskTypeEnum
-from nv_ingest_api.internal.schemas.meta.metadata_schema import (
-    InfoMessageMetadataSchema,
-)
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
-from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -97,18 +93,14 @@ def _make_async_request(
         response["info_msg"] = None
 
     except Exception as err:
-        info_msg = {
-            "task": TaskTypeEnum.EMBED.value,
-            "status": StatusEnum.ERROR.value,
-            "message": f"Embedding error: {err}",
-            "filter": filter_errors,
-        }
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
+        # Truncate error message to prevent memory blowup from large text content
+        err_str = str(err)
+        if len(err_str) > 500:
+            truncated_err = err_str[:200] + "... [truncated to prevent memory blowup] ..." + err_str[-100:]
+        else:
+            truncated_err = err_str
 
-        response["embedding"] = [None] * len(prompts)
-        response["info_msg"] = validated_info_msg
-
-        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
+        raise RuntimeError(f"Embedding error occurred: {truncated_err}") from err
 
     return response
 
