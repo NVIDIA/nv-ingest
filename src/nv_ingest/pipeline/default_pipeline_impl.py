@@ -203,7 +203,6 @@ stages:
           $OCR_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
           $OCR_HTTP_ENDPOINT|""
         ]
-        function_id: $OCR_FUNCTION_ID|"6d4d5bf4-76df-4c0b-9e96-92d23fb41edb"
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
@@ -411,12 +410,13 @@ stages:
     runs_after:
       - "broker_response"
 
-  - name: "drain"
+  - name: "default_drain"
     type: "sink"
     phase: 7  # DRAIN
-    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.drain_sink:DrainSinkStage"
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
+    config: {}
     replicas:
-      min_replicas: 1
+      min_replicas: 0
       max_replicas:
         strategy: "static"
         value: 1
@@ -496,7 +496,7 @@ edges:
     to: "otel_tracer"
     queue_size: 32
   - from: "otel_tracer"
-    to: "drain"
+    to: "default_drain"
     queue_size: 32
 
 # Pipeline Runtime Configuration

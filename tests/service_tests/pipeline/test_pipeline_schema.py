@@ -39,13 +39,13 @@ def test_replica_config_valid_mixed():
 
 def test_replica_config_exclusive_min_fails():
     """Tests that validation fails if both count_min and percent_min are set."""
-    with pytest.raises(ValidationError, match="Cannot specify both 'cpu_count_min' and 'cpu_percent_min'"):
+    with pytest.raises(ValidationError, match="Cannot specify both cpu_count_min and cpu_percent_min"):
         ReplicaConfig(cpu_count_min=1, cpu_percent_min=0.1)
 
 
 def test_replica_config_exclusive_max_fails():
     """Tests that validation fails if both count_max and percent_max are set."""
-    with pytest.raises(ValidationError, match="Cannot specify both 'cpu_count_max' and 'cpu_percent_max'"):
+    with pytest.raises(ValidationError, match="Cannot specify both cpu_count_max and cpu_percent_max"):
         ReplicaConfig(cpu_count_max=2, cpu_percent_max=0.5)
 
 

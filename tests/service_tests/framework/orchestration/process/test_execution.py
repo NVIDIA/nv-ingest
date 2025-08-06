@@ -23,9 +23,13 @@ class TestLaunchPipeline:
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
     @patch("nv_ingest.framework.orchestration.process.execution.time.time")
     @patch("nv_ingest.framework.orchestration.process.execution.datetime")
-    def test_launch_pipeline_blocking(self, mock_datetime, mock_time, mock_builder_class, mock_ray_init):
+    def test_launch_pipeline_blocking(
+        self, mock_datetime, mock_time, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test launch_pipeline with blocking execution."""
         # Setup
         mock_config = Mock()
@@ -37,18 +41,24 @@ class TestLaunchPipeline:
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
 
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
+
         # Mock datetime for setup timing - use MagicMock to support magic methods
         start_time = MagicMock()
-        end_time = MagicMock()
-        mock_datetime.now.side_effect = [start_time, end_time, end_time, end_time]
+        end_setup = MagicMock()
+        end_run = MagicMock()
+        mock_datetime.now.side_effect = [start_time, end_setup, end_run]
 
-        # Mock time.time for elapsed calculation
-        mock_time.return_value = 100.0
+        # Mock the time difference calculations
+        setup_time_diff = MagicMock()
+        setup_time_diff.total_seconds.return_value = 5.0
+        end_setup.__sub__.return_value = setup_time_diff
 
-        # Mock the time difference calculation - configure the subtraction result
-        time_diff = MagicMock()
-        time_diff.total_seconds.return_value = 75.0
-        end_time.__sub__.return_value = time_diff
+        total_time_diff = MagicMock()
+        total_time_diff.total_seconds.return_value = 75.0
+        end_run.__sub__.return_value = total_time_diff
 
         # Execute - patch time.sleep to raise KeyboardInterrupt immediately
         with patch("nv_ingest.framework.orchestration.process.execution.time.sleep", side_effect=KeyboardInterrupt):
@@ -59,6 +69,8 @@ class TestLaunchPipeline:
         assert elapsed_time == 75.0
 
         mock_ray_init.assert_called_once()
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
         mock_builder.build.assert_called_once()
         mock_builder.start.assert_called_once()
@@ -66,16 +78,26 @@ class TestLaunchPipeline:
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
     @patch("nv_ingest.framework.orchestration.process.execution.time.time")
-    def test_launch_pipeline_non_blocking(self, mock_time, mock_builder_class, mock_ray_init):
+    def test_launch_pipeline_non_blocking(
+        self, mock_time, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test launch_pipeline with non-blocking execution."""
         # Setup
-        mock_config = Mock(spec=PipelineConfigSchema)
+        mock_config = Mock()
+        mock_config.pipeline = Mock()
+        mock_config.pipeline.disable_dynamic_scaling = False
         mock_pipeline = Mock(spec=RayPipeline)
 
         mock_builder = Mock(spec=IngestPipelineBuilder)
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
+
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
 
         mock_time.return_value = 200.0
 
@@ -87,13 +109,19 @@ class TestLaunchPipeline:
         assert elapsed_time is None
 
         mock_ray_init.assert_called_once()
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
         mock_builder.build.assert_called_once()
         mock_builder.start.assert_called_once()
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
-    def test_launch_pipeline_with_scaling_overrides(self, mock_builder_class, mock_ray_init):
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
+    def test_launch_pipeline_with_scaling_overrides(
+        self, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test launch_pipeline with dynamic scaling overrides."""
         # Setup - use flexible mock to support nested attribute access
         mock_config = Mock()
@@ -105,26 +133,41 @@ class TestLaunchPipeline:
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
 
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
+
         # Execute with overrides
         pipeline, elapsed_time = launch_pipeline(
             mock_config, block=False, disable_dynamic_scaling=True, dynamic_memory_threshold=0.8
         )
 
-        # Verify
+        # Verify that disable_dynamic_scaling was set to True due to override
+        assert mock_config.pipeline.disable_dynamic_scaling is True
         assert pipeline == mock_pipeline
         assert elapsed_time is None
 
         mock_ray_init.assert_called_once()
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
         mock_builder.build.assert_called_once()
         mock_builder.start.assert_called_once()
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
-    def test_launch_pipeline_builder_exception(self, mock_builder_class, mock_ray_init):
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
+    def test_launch_pipeline_builder_exception(
+        self, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test launch_pipeline when pipeline builder fails."""
         # Setup
-        mock_config = Mock(spec=PipelineConfigSchema)
+        mock_config = Mock()
+        mock_config.pipeline = Mock()
+        mock_config.pipeline.disable_dynamic_scaling = False
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
         mock_builder_class.side_effect = Exception("Builder failed")
 
         # Execute and verify exception is propagated
@@ -132,14 +175,24 @@ class TestLaunchPipeline:
             launch_pipeline(mock_config, block=False)
 
         mock_ray_init.assert_called_once()
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
     @patch("nv_ingest.framework.orchestration.process.execution.ray.shutdown")
     @patch("nv_ingest.framework.orchestration.process.execution.datetime")
     def test_launch_pipeline_keyboard_interrupt(
-        self, mock_datetime, mock_ray_shutdown, mock_builder_class, mock_ray_init
+        self,
+        mock_datetime,
+        mock_ray_shutdown,
+        mock_pretty_print,
+        mock_resolve_replicas,
+        mock_builder_class,
+        mock_ray_init,
     ):
         """Test launch_pipeline handles KeyboardInterrupt correctly."""
         # Setup - use flexible mock to support nested attribute access
@@ -151,6 +204,10 @@ class TestLaunchPipeline:
         mock_builder = Mock(spec=IngestPipelineBuilder)
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
+
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
 
         # Mock datetime for timing calculations - use MagicMock to support subtraction
         start_abs = MagicMock()
@@ -176,6 +233,8 @@ class TestLaunchPipeline:
         assert elapsed_time == 75.0  # total_elapsed from (end_run - start_abs).total_seconds()
 
         mock_ray_init.assert_called_once()
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
         mock_builder.build.assert_called_once()
         mock_builder.start.assert_called_once()
@@ -346,16 +405,26 @@ class TestExecutionIntegration:
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
     @patch("nv_ingest.framework.orchestration.process.execution.os.setpgrp")
-    def test_launch_and_run_pipeline_process_integration(self, mock_setpgrp, mock_builder_class, mock_ray_init):
+    def test_launch_and_run_pipeline_process_integration(
+        self, mock_setpgrp, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test integration between launch_pipeline and run_pipeline_process."""
         # Setup
-        mock_config = Mock(spec=PipelineConfigSchema)
+        mock_config = Mock()
+        mock_config.pipeline = Mock()
+        mock_config.pipeline.disable_dynamic_scaling = False
         mock_pipeline = Mock(spec=RayPipeline)
 
         mock_builder = Mock(spec=IngestPipelineBuilder)
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
+
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
 
         # Test run_pipeline_process calls launch_pipeline correctly
         with patch("nv_ingest.framework.orchestration.process.execution.launch_pipeline") as mock_launch:
@@ -391,22 +460,34 @@ class TestExecutionIntegration:
 
     @patch("nv_ingest.framework.orchestration.process.execution.ray.init")
     @patch("nv_ingest.framework.orchestration.process.execution.IngestPipelineBuilder")
-    def test_pipeline_configuration_handling(self, mock_builder_class, mock_ray_init):
+    @patch("nv_ingest.framework.orchestration.process.execution.resolve_static_replicas")
+    @patch("nv_ingest.framework.orchestration.process.execution.pretty_print_pipeline_config")
+    def test_pipeline_configuration_handling(
+        self, mock_pretty_print, mock_resolve_replicas, mock_builder_class, mock_ray_init
+    ):
         """Test that pipeline configuration is properly handled across functions."""
         # Setup
-        mock_config = Mock(spec=PipelineConfigSchema)
+        mock_config = Mock()  # Remove spec restriction to allow pipeline attribute
         mock_config.name = "test_pipeline"
         mock_config.description = "Test pipeline description"
+        mock_config.pipeline = Mock()
+        mock_config.pipeline.disable_dynamic_scaling = False
 
         mock_pipeline = Mock(spec=RayPipeline)
         mock_builder = Mock(spec=IngestPipelineBuilder)
         mock_builder._pipeline = mock_pipeline
         mock_builder_class.return_value = mock_builder
 
+        # Mock resolve_static_replicas to return the config unchanged
+        mock_resolve_replicas.return_value = mock_config
+        mock_pretty_print.return_value = "Mock pretty print output"
+
         # Test that configuration is passed correctly
         pipeline, elapsed_time = launch_pipeline(mock_config, block=False)
 
         # Verify configuration was used
+        mock_resolve_replicas.assert_called_once_with(mock_config)
+        mock_pretty_print.assert_called_once_with(mock_config, config_path=None)
         mock_builder_class.assert_called_once_with(mock_config)
         assert pipeline is mock_pipeline
 

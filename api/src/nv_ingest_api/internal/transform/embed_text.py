@@ -108,7 +108,7 @@ def _make_async_request(
         response["embedding"] = [None] * len(prompts)
         response["info_msg"] = validated_info_msg
 
-        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
+        raise RuntimeError(f"Embedding error occurred: {err}") from err
 
     return response
 
