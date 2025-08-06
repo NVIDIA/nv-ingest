@@ -104,7 +104,7 @@ def test_transform_create_text_embeddings_internal_with_only_empty_text(mock_asy
 
     result_df, trace = module_under_test.transform_create_text_embeddings_internal(
         df,
-        dummy_task_config,  # ✅ Now it's correctly injected as dict
+        dummy_task_config,  # Now it's correctly injected as dict
     )
 
     # Assert embedding was still added but is None
@@ -118,8 +118,8 @@ def test_transform_create_text_embeddings_internal_with_only_empty_text(mock_asy
 def test_async_runner_happy_path(mock_handler):
     # Arrange
     mock_handler.return_value = [
-        {"embedding": [[1, 2, 3], [4, 5, 6]], "info_msg": None},
-        {"embedding": [[7, 8, 9]], "info_msg": {"msg": "partial success"}},
+        {"embedding": [[1, 2, 3]], "info_msg": None},
+        {"embedding": [[4, 5, 6]], "info_msg": {"msg": "partial success"}},
     ]
 
     prompts = ["prompt1", "prompt2", "prompt3"]
@@ -148,8 +148,8 @@ def test_async_runner_happy_path(mock_handler):
         False,
         modalities=None,
     )
-    assert result["embeddings"] == [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-    assert result["info_msgs"] == [None, None, {"msg": "partial success"}]
+    assert result["embeddings"] == [[1, 2, 3], [4, 5, 6]]
+    assert result["info_msgs"] == [None, {"msg": "partial success"}]
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_request_handler")
@@ -333,5 +333,4 @@ def test_make_async_request_failure_returns_none_embedding_and_info_message(mock
         )
 
     # The raised error should have our validated info message attached in text
-    assert "Embedding error occurred. Info message:" in str(excinfo.value)
-    assert "Simulated client failure" in str(excinfo.value)
+    assert "Embedding error occurred: Simulated client failure" in str(excinfo.value)
