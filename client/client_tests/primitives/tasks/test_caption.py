@@ -2,8 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from nv_ingest_client.primitives.tasks.caption import CaptionTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_client.primitives.tasks.caption import CaptionTask, CaptionTaskSchema
 from pydantic import ValidationError
 
 
