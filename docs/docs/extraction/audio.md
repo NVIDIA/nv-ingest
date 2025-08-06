@@ -23,6 +23,10 @@ to transcribe audio files to text, which is then embedded by using the NeMo Retr
 
     Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements to run RIVA NIM, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
 
+!!! important
+
+    Librosa must be installed in the NV-Ingest container to perform audio ingestion. Edit docker-compose.yaml to set `INSTALL_AUDIO_EXTRACTION_DEPS=true`  to install Librosa during container startup.
+
 This Early Access pipeline enables users to now retrieve audio files at the segment level. 
 
 
