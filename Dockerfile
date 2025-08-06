@@ -92,6 +92,7 @@ ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
 SHELL ["/bin/bash", "-c"]
 
+COPY scripts scripts
 COPY tests tests
 COPY data data
 COPY api api
