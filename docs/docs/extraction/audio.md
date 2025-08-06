@@ -25,7 +25,7 @@ to transcribe audio files to text, which is then embedded by using the NeMo Retr
 
 !!! important
 
-    Librosa must be installed in the NV-Ingest container to perform audio ingestion. Edit docker-compose.yaml to set `INSTALL_AUDIO_EXTRACTION_DEPS=true`  to install Librosa during container startup.
+    To perform audio ingestion, [librosa](https://librosa.org/doc/latest/index.html) must be installed in the nv-ingest container. Edit docker-compose.yaml and set `INSTALL_AUDIO_EXTRACTION_DEPS=true`  to install librosa during container startup.
 
 This Early Access pipeline enables users to now retrieve audio files at the segment level. 
 
