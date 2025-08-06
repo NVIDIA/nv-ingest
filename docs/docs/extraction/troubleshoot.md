@@ -94,6 +94,14 @@ ERROR 2025-04-24 22:49:44.434 nimutils.py:68] }
 ...
 ```
 
+## Embedding service fails to start with an unsupported batch size error
+
+If you are using hardware where the embedding NIM uses the ONNX model profile, you must set `EMBEDDER_BATCH_SIZE=3` in your environment
+(e.g., in a `.env` file) to prevent the embedding service from failing to start due to an unsupported batch size error.
+For example, on certain hardware like RTX 6000, you might see an error that looks similar to the following.
+```bash
+ValueError: Configured max_batch_size (30) is larger than the model's supported max_batch_size (3).
+```
 
 
 ## Related Topics
