@@ -845,7 +845,7 @@ milvusDeployed: true
 ## @param milvus.standalone.persistence.persistentVolumeClaim.size [default: 50Gi] Size of the PVC for Milvus data
 ## @param milvus.standalone.persistence.persistentVolumeClaim.storageClass Storage class to use for the PVC
 ## @param milvus.minio.mode [default: standalone] MinIO deployment mode
-## @param milvus.minio.bucketName [default: a-bucket] Name of the MinIO bucket to create
+## @param milvus.minio.bucketName [default: nv-ingest] Name of the MinIO bucket to create
 ## @param milvus.minio.persistence.size [default: 50Gi] Size of the PVC for MinIO data
 ## @param milvus.minio.persistence.storageClass Storage class to use for MinIO PVC
 milvus:
@@ -861,7 +861,7 @@ milvus:
       storageClass: null
   minio:
     mode: standalone
-    bucketName: a-bucket
+    bucketName: nv-ingest
     persistence:
       size: 50Gi
       storageClass: null
@@ -1049,7 +1049,10 @@ envVars:
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://integrate.api.nvidia.com/v1/chat/completions"
+  # This environment variable is controled in the helm/deployment.yaml. There is a ternary operator that
+  # sets this value to "nim-vlm-image-captioning:8001" to use the locally deployed NIM if the nim-vlm-image-captioning.deployed
+  # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
+  # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
   AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
