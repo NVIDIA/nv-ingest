@@ -133,6 +133,10 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      # NOTE: The default EMBEDDER_BATCH_SIZE (30) is optimized for A100 and H100.
+      # The ONNX profile for this model, which is used on certain hardware like RTX 6000, only supports maximum batch size of 3.
+      # If you are using hardware where this NIM utilizes the ONNX model profile, you MUST set EMBEDDER_BATCH_SIZE=3 in your environment
+      # (e.g., in a .env file) to prevent the embedding service from failing to start due to an unsupported batch size error.
       - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-30}
       - OMP_NUM_THREADS=1
       # NOTE: NIM_TRITON_PERFORMANCE_MODE does not work for llama-3.2-nemoretriever-1b-vlm-embed-v1 and must be commented out.
