@@ -121,7 +121,7 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time, sys
+import logging, os, time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
