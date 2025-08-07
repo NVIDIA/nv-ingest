@@ -6,18 +6,15 @@ import logging
 from typing import Any, Optional
 
 import ray
-
-from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import set_trace_timestamps_with_parent_context
+from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
-from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_try_except,
-)
-
-from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +86,7 @@ class ChartExtractorStage(RayActorStage):
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:
-            for key, ts in execution_trace_log.items():
-                control_message.set_timestamp(key, ts)
+            parent_name = self.stage_name if self.stage_name else "chart_extractor"
+            set_trace_timestamps_with_parent_context(control_message, execution_trace_log, parent_name, logger)
 
         return control_message

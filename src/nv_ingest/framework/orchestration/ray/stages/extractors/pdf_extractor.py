@@ -7,17 +7,15 @@ import pandas as pd
 from typing import Any, Dict, Tuple, Optional
 import ray
 
-from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
-from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_try_except,
-)
 
+from nv_ingest_api.internal.primitives.tracing.tagging import set_trace_timestamps_with_parent_context, traceable
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +107,8 @@ class PDFExtractorStage(RayActorStage):
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:
-            for key, ts in execution_trace_log.items():
-                control_message.set_timestamp(key, ts)
+            # Use utility function to set trace timestamps with proper parent-child context
+            parent_name = self.stage_name or "pdf_extractor"
+            set_trace_timestamps_with_parent_context(control_message, execution_trace_log, parent_name, logger)
 
         return control_message

@@ -227,3 +227,62 @@ def traceable_func(trace_name=None, dedupe=True):
         return wrapper_inject_trace_info
 
     return decorator_inject_trace_info
+
+
+def set_trace_timestamps_with_parent_context(control_message, execution_trace_log: dict, parent_name: str, logger=None):
+    """
+    Set trace timestamps on a control message with proper parent-child context.
+
+    This utility function processes trace timestamps from an execution_trace_log and
+    ensures that child traces are properly namespaced under their parent context.
+    This resolves OpenTelemetry span hierarchy issues where child spans cannot
+    find their expected parent contexts.
+
+    Parameters
+    ----------
+    control_message : IngestControlMessage
+        The control message to set timestamps on
+    execution_trace_log : dict
+        Dictionary of trace keys to timestamp values from internal operations
+    parent_name : str
+        The parent stage name to use as context for child traces
+    logger : logging.Logger, optional
+        Logger for debug output of key transformations
+
+    Examples
+    --------
+    Basic usage in a stage:
+
+    >>> execution_trace_log = {"trace::entry::yolox_inference": ts1, "trace::exit::yolox_inference": ts2}
+    >>> set_trace_timestamps_with_parent_context(
+    ...     control_message, execution_trace_log, "pdf_extractor", logger
+    ... )
+
+    This transforms:
+    - trace::entry::yolox_inference -> trace::entry::pdf_extractor::yolox_inference
+    - trace::exit::yolox_inference  -> trace::exit::pdf_extractor::yolox_inference
+    """
+    if not execution_trace_log:
+        return
+
+    for key, ts in execution_trace_log.items():
+        enhanced_key = key
+
+        # Check if this is a child trace that needs parent context
+        if key.startswith("trace::") and "::" in key:
+            # Parse the trace key to extract the base trace name
+            parts = key.split("::")
+            if len(parts) >= 3:  # e.g., ["trace", "entry", "yolox_inference"]
+                trace_type = parts[1]  # "entry" or "exit"
+                child_name = "::".join(parts[2:])  # everything after trace::entry:: or trace::exit::
+
+                # Only rewrite if it doesn't already include the parent context
+                if not child_name.startswith(f"{parent_name}::"):
+                    # Rewrite to include parent context: trace::entry::pdf_extractor::yolox_inference
+                    enhanced_key = f"trace::{trace_type}::{parent_name}::{child_name}"
+
+                    if logger:
+                        logger.debug(f"Enhanced trace key: {key} -> {enhanced_key}")
+
+        # Set the timestamp with the (possibly enhanced) key
+        control_message.set_timestamp(enhanced_key, ts)

@@ -9,7 +9,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable, set_trace_timestamps_with_parent_context
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 from typing import Optional
@@ -63,7 +63,7 @@ class InfographicExtractorStage(RayActorStage):
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:
-            for key, ts in execution_trace_log.items():
-                control_message.set_timestamp(key, ts)
+            parent_name = self.stage_name if self.stage_name else "infographic_extractor"
+            set_trace_timestamps_with_parent_context(control_message, execution_trace_log, parent_name, logger)
 
         return control_message
