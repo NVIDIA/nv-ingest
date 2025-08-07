@@ -1,6 +1,8 @@
 # Environment Configuration Variables for NV-Ingest
 
-The following are the environment configuration variables that you can specify in your .env file.
+The following are the environment variables that you can use to configure [NeMo Retriever extraction](overview.md).
+You can specify these in your .env file or directly in your environment.
+
 
 ## General Environment Variables
 
@@ -25,3 +27,9 @@ These environment variables apply specifically when running NV-Ingest in library
 | Name                              | Example                                                 | Description |
 |-----------------------------------|---------------------------------------------------------|-------------|
 | `NVIDIA_API_KEY`                  | `nvapi-*************` <br/>                             | API key for NVIDIA-hosted NIM services. |
+
+
+
+## Related Topics
+
+- [Configure Ray Logging](https://docs.nvidia.com/nemo/retriever/latest/extraction/ray-logging/)

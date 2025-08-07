@@ -76,6 +76,7 @@ nav:
         - Filter Search Results: extraction/custom-metadata.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
+        - Configure Ray Logging: extraction/ray-logging.md
         - Telemetry: extraction/telemetry.md
       - Customize Your Pipeline:
         - Add User-defined Stages: extraction/user-defined-stages.md
