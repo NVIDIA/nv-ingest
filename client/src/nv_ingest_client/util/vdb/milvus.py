@@ -878,7 +878,7 @@ def write_to_nvingest_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     threshold: int = 1000,
     meta_dataframe=None,
     meta_source_field=None,
@@ -1525,7 +1525,7 @@ def embed_index_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
@@ -1562,7 +1562,7 @@ def embed_index_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
@@ -1670,7 +1670,7 @@ def reindex_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
@@ -1711,7 +1711,7 @@ def reindex_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
@@ -1819,7 +1819,7 @@ class Milvus(VDB):
         compute_bm25_stats: bool = True,
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
-        bucket_name: str = "a-bucket",
+        bucket_name: str = "nv-ingest",
         meta_dataframe: Union[str, pd.DataFrame] = None,
         meta_source_field: str = None,
         meta_fields: list[str] = None,
@@ -1847,7 +1847,7 @@ class Milvus(VDB):
             compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
             access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
             secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
             meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
                 containing metadata. Defaults to None.
             meta_source_field (str, optional): The field in the metadata that serves as the source identifier.

@@ -56,8 +56,6 @@ class TextEmbeddingTransformStage(RayActorStage):
         IngestControlMessage
             The updated message with text embeddings and trace info added.
         """
-        self._logger.info("TextEmbeddingTransformStage.on_data: Starting text embedding transformation.")
-
         # Get the DataFrame payload.
         df_payload = control_message.payload()
         self._logger.debug("TextEmbeddingTransformStage: Extracted payload with %d rows.", len(df_payload))
@@ -70,11 +68,9 @@ class TextEmbeddingTransformStage(RayActorStage):
         new_df, execution_trace_log = transform_create_text_embeddings_internal(
             df_payload, task_config=task_config, transform_config=self.validated_config
         )
-        self._logger.info("Text embedding transformation completed. New payload has %d rows.", len(new_df))
 
         # Update the control message payload.
         control_message.payload(new_df)
         # Annotate the message metadata with trace info.
         control_message.set_metadata("text_embedding_trace", execution_trace_log)
-        self._logger.info("Text embedding trace metadata added.")
         return control_message

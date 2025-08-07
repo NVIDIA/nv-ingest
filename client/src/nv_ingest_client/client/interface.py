@@ -538,10 +538,6 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
-        _return_failures = return_failures
-        if self._vdb_bulk_upload:
-            return_failures = True
-
         results, failures = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
@@ -570,15 +566,39 @@ class Ingestor:
 
         if self._vdb_bulk_upload:
             if len(failures) > 0:
-                raise RuntimeError(f"Failed to ingest documents, unable to complete vdb bulk upload: {failures}")
+                # Calculate success metrics
+                total_jobs = len(results) + len(failures)
+                successful_jobs = len(results)
 
-            self._vdb_bulk_upload.run(results)
+                if return_failures:
+                    # Emit message about partial success
+                    logger.warning(
+                        f"Job was not completely successful. "
+                        f"{successful_jobs} out of {total_jobs} records completed successfully. "
+                        f"Uploading successful results to vector database."
+                    )
 
-            if self._purge_results_after_vdb_upload:
-                logger.info("Purging saved results from disk after successful VDB upload.")
-                self._purge_saved_results(results)
+                    # Upload only the successful results
+                    if successful_jobs > 0:
+                        self._vdb_bulk_upload.run(results)
 
-        return_failures = _return_failures
+                        if self._purge_results_after_vdb_upload:
+                            logger.info("Purging saved results from disk after successful VDB upload.")
+                            self._purge_saved_results(results)
+
+                else:
+                    # Original behavior: raise RuntimeError
+                    raise RuntimeError(
+                        "Failed to ingest documents, unable to complete vdb bulk upload due to "
+                        f"no successful results. {len(failures)} out of {total_jobs} records failed "
+                    )
+            else:
+                # No failures - proceed with normal upload
+                self._vdb_bulk_upload.run(results)
+
+                if self._purge_results_after_vdb_upload:
+                    logger.info("Purging saved results from disk after successful VDB upload.")
+                    self._purge_saved_results(results)
 
         return (results, failures) if return_failures else results
 
