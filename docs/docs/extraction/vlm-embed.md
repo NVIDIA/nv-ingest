@@ -90,9 +90,9 @@ results = ingestor.ingest()
 For documents where the entire page layout is important (such as infographics, complex diagrams, or forms),
 you can configure nv-ingest to treat every page as a single image.
 
-!!! note "Experimental Feature"
+!!! note
 
-    The `extract_page_as_image` feature is experimental. Its behavior may change in future releases.
+    The extract_page_as_image feature is experimental. Its behavior may change in future releases.
 
 - The `extract method` uses the `extract_page_as_image=True` flag. All other extraction types should be set to False.
 - The `embed method` then processes these page images.
