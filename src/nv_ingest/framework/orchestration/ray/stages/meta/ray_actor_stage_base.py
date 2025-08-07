@@ -138,6 +138,14 @@ class RayActorStage(ABC):
 
         self._actor_id_str = self._get_actor_id_str()
 
+        # --- PyArrow Memory Management ---
+        # Time-based periodic cleanup to prevent long-term memory accumulation
+        self._memory_cleanup_interval_seconds = getattr(
+            config, "memory_cleanup_interval_seconds", 300
+        )  # 5 minutes default
+        self._last_memory_cleanup_time = time.time()
+        self._memory_cleanups_performed = 0
+
     @staticmethod
     def _get_actor_id_str() -> str:
         """
@@ -156,6 +164,46 @@ class RayActorStage(ABC):
         except Exception:
             # Fallback if running outside a Ray actor context or if context fails
             return "Actor (ID unavailable)"
+
+    def _force_arrow_memory_cleanup(self) -> None:
+        """
+        Force PyArrow memory pool to release unused memory back to the OS.
+
+        This method helps prevent long-term memory accumulation in actors that
+        process large DataFrames with PyArrow backend. Called periodically based
+        on the configured time interval.
+        """
+        try:
+            import gc
+            import pyarrow as pa
+
+            # Get current memory usage before cleanup
+            memory_pool = pa.default_memory_pool()
+            bytes_before = memory_pool.bytes_allocated()
+
+            # Force garbage collection first
+            gc.collect()
+
+            # Release unused memory from PyArrow memory pool
+            if hasattr(memory_pool, "release_unused"):
+                memory_pool.release_unused()
+
+            # Check results
+            bytes_after = memory_pool.bytes_allocated()
+            released = bytes_before - bytes_after
+            self._memory_cleanups_performed += 1
+
+            self._logger.info(
+                f"{self._actor_id_str}: Arrow cleanup #{self._memory_cleanups_performed}: "
+                f"released {released/(1024*1024):.1f}MB, "
+                f"{bytes_after/(1024*1024):.1f}MB remaining"
+            )
+
+        except ImportError:
+            # PyArrow not available - this is fine, just skip cleanup
+            self._logger.debug(f"{self._actor_id_str}: PyArrow not available for memory cleanup")
+        except Exception as e:
+            self._logger.warning(f"{self._actor_id_str}: Arrow memory cleanup failed: {e}")
 
     def _read_input(self) -> Optional[Any]:
         """
@@ -352,6 +400,12 @@ class RayActorStage(ABC):
                     # Step 3: Increment "processed" count after successful processing and output (if any).
                     # This is the primary path for "successful processing".
                     self.stats["processed"] += 1
+
+                    # Time-based PyArrow memory cleanup check
+                    current_time = time.time()
+                    if (current_time - self._last_memory_cleanup_time) >= self._memory_cleanup_interval_seconds:
+                        self._force_arrow_memory_cleanup()
+                        self._last_memory_cleanup_time = current_time
 
                 except ray.exceptions.ObjectLostError:
                     # This error is handled inside the loop to prevent the actor from crashing.
