@@ -42,48 +42,48 @@ The key to leveraging the multimodal model is to configure the `.extract()` and 
 Even when using the multimodal model, all extracted content (text, tables, charts) is treated as plain text by default.
 This provides a strong baseline for retrieval.
 
-    - The `extract` method is configured to pull out text and structured content.
-    - The `embed` method is called with no arguments.
+- The `extract` method is configured to pull out text and structured content.
+- The `embed` method is called with no arguments.
 
-    ```python
-    ingestor = (
-        Ingestor()
-        .files("./data/*.pdf")
-        .extract(
-            extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
-            extract_images=False,
-        )
-        .embed() # Default behavior embeds all content as text
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_images=False,
     )
-    results = ingestor.ingest()
-    ```
+    .embed() # Default behavior embeds all content as text
+)
+results = ingestor.ingest()
+```
 
 ### Embedding Structured Elements (Tables, Charts) as Images
 
 This is a common use case where standard text from a PDF is embedded as text, but visual elements like tables and charts are embedded as images.
 This allows the VLM to capture the spatial and structural information of the visual content.
 
-    - The `extract` method is configured to pull out text, tables, and charts.
-    - The `embed` method is configured with `structured_elements_modality="image"` to instruct the VLM to embed the extracted tables and charts as images.
+- The `extract` method is configured to pull out text, tables, and charts.
+- The `embed` method is configured with `structured_elements_modality="image"` to instruct the VLM to embed the extracted tables and charts as images.
 
-    ```python
-    ingestor = (
-        Ingestor()
-        .files("./data/*.pdf")
-        .extract(
-            extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
-            extract_images=False,
-        )
-        .embed(
-            structured_elements_modality="image",
-        )
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_images=False,
     )
-    results = ingestor.ingest()
-    ```
+    .embed(
+        structured_elements_modality="image",
+    )
+)
+results = ingestor.ingest()
+```
 
 ### Embedding Entire PDF Pages as Images
 
@@ -94,23 +94,23 @@ you can configure nv-ingest to treat every page as a single image.
 
     The `extract_page_as_image` feature is experimental. Its behavior may change in future releases.
 
-    - The `extract method` uses the `extract_page_as_image=True` flag. All other extraction types should be set to False.
-    - The `embed method` then processes these page images.
+- The `extract method` uses the `extract_page_as_image=True` flag. All other extraction types should be set to False.
+- The `embed method` then processes these page images.
 
-    ```python
-    ingestor = (
-        Ingestor()
-        .files("./data/*.pdf")
-        .extract(
-            extract_text=False,
-            extract_tables=False,
-            extract_charts=False,
-            extract_images=False,
-            extract_page_as_image=True,
-        )
-        .embed(
-            image_elements_modality="image",
-        )
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images=False,
+        extract_page_as_image=True,
     )
-    results = ingestor.ingest()
-    ```
+    .embed(
+        image_elements_modality="image",
+    )
+)
+results = ingestor.ingest()
+```
