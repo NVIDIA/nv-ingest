@@ -87,7 +87,7 @@ Library mode deployment of nv-ingest requires:
 
 ### Step 1: Prepare Your Environment
 
-Create a fresh Conda environment to install nv-ingest and dependencies.
+Create a fresh Python environment to install nv-ingest and dependencies.
 
 ```shell
 uv venv --python 3.12 nvingest && \
@@ -105,7 +105,7 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
+To confirm that you have activated your Python environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
 ```
 which python
@@ -121,7 +121,7 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time, sys
+import logging, os, time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
