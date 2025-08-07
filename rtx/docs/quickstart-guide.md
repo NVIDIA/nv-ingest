@@ -2,8 +2,15 @@
 
 Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
+## Step 1: Open the Windows Subsystem for Linux 2 - WSL2 - Distro
 
-## Step 1: Starting Containers
+[Install WSL2](https://assets.ngc.nvidia.com/products/api-catalog/rtx/NIMSetup.exe). For additional instructions refer to the [documentation](https://docs.nvidia.com/nim/wsl2/latest/getting-started.html#installation).
+
+Once installed, open the NVIDIA-Workbench WSL2 distro using the following command in the Windows terminal.
+
+`wsl -d NVIDIA-Workbench` 
+
+## Step 2: Starting Containers
 
 This example demonstrates how to use the provided [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml) to start all needed services with a few commands. Podman is the recommended container platform for running this project on Windows as it offers a free and open-source container solution, whereas Docker requires a commercial license for certain use cases.
 
@@ -13,25 +20,24 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you might want to configure.
+1. Install conda; see [documentation](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) for steps
 
-1. Git clone the repo:
+2. Git clone the repo:
 
     `git clone https://github.com/nvidia/nv-ingest`
 
-2. Change the directory to the cloned repo
+3. Change the directory to the cloned repo
    
     `cd nv-ingest`.
 
-3. Install podman compose
+4. Install podman compose
     ```
-    # conda not required but makes it easy to create a fresh Python environment
     conda create --name podman python=3.12.11
     conda activate podman
     pip install podman-compose>=1.1.0
     ```
 
-4. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
+5. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
 
     ```shell
     # This is required to access pre-built containers and NIM microservices
@@ -40,7 +46,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     Password: <Your Key>
     ```
    
-5. Create a .env file that contains your NVIDIA Build API key.
+6. Create a .env file that contains your NVIDIA Build API key.
 
     !!! note
 
@@ -53,11 +59,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
    
-6. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers:
+7. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers:
 
     `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`
 
-7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+8. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `podman-compose -f rtx/podman-compose.yaml --env-file .env --profile retrieval --profile table-structure up`
 
@@ -65,7 +71,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have configured log levels to be verbose. It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml).
 
-8. When core services have fully started, `nvidia-smi` should show processes like the following:
+9. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -83,7 +89,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-9. Observe the started containers with `podman ps`:
+10. Observe the started containers with `podman ps`:
 
     ```
     CONTAINER ID  IMAGE                                                       COMMAND               CREATED         STATUS                   PORTS                                                                                                                                                          NAMES
@@ -105,7 +111,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-## Step 2: Install Python Dependencies
+## Step 3: Install Python Dependencies
 
 You can interact with the NV-Ingest service from the host, or by using `podman exec` to run commands in the NV-Ingest container.
 
@@ -128,7 +134,7 @@ pip install nv-ingest-client==2025.3.10.dev20250310
     Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `podman exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
 
 
-## Step 3: Ingesting Documents
+## Step 4: Ingesting Documents
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
