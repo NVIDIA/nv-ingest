@@ -252,7 +252,7 @@ class RayPipeline(PipelineInterface):
             penalty_factor=self.scaling_config.pid_penalty_factor,
             error_boost_factor=self.scaling_config.pid_error_boost_factor,
         )
-        logger.info("PIDController initialized using ScalingConfig.")
+        logger.debug("PIDController initialized using ScalingConfig.")
 
         try:
             total_system_memory_bytes = psutil.virtual_memory().total
@@ -270,7 +270,7 @@ class RayPipeline(PipelineInterface):
             memory_threshold=absolute_memory_threshold_mb,
             memory_safety_buffer_fraction=self.scaling_config.rcm_memory_safety_buffer_fraction,
         )
-        logger.info("ResourceConstraintManager initialized using ScalingConfig.")
+        logger.debug("ResourceConstraintManager initialized using ScalingConfig.")
 
         # --- Instantiate Stats Collector ---
         self._stats_collection_interval_seconds = self.stats_config.collection_interval_seconds
@@ -282,7 +282,7 @@ class RayPipeline(PipelineInterface):
             ema_alpha=self.scaling_config.pid_ema_alpha,
         )
 
-        logger.info("RayStatsCollector initialized using StatsConfig.")
+        logger.debug("RayStatsCollector initialized using StatsConfig.")
 
     # --- Accessor Methods for Stat Collector (and internal use) ---
 

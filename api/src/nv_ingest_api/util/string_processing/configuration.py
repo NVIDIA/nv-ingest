@@ -19,6 +19,22 @@ try:
 except ImportError:
     GRAPHVIZ_AVAILABLE = False
 
+# Optional import for PyArrow
+try:
+    import pyarrow as pa
+
+    PYARROW_AVAILABLE = True
+except ImportError:
+    PYARROW_AVAILABLE = False
+
+# Optional import for Ray
+try:
+    import ray
+
+    RAY_AVAILABLE = True
+except ImportError:
+    RAY_AVAILABLE = False
+
 # Color palette for pipeline phases
 PHASE_COLORS = {
     "PRE_PROCESSING": "#e6e0d4",
@@ -105,6 +121,208 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema, config_path: str 
         output.append(
             f"   • Static Memory Threshold: {threshold:.1%} ({available_memory_gb:.2f} GB available for replicas)"
         )
+
+    # PyArrow Configuration Information
+    if PYARROW_AVAILABLE:
+        output.append("\n🏹 PYARROW CONFIGURATION:")
+
+        # Get default memory pool type from environment or PyArrow
+        arrow_memory_pool_env = os.environ.get("ARROW_DEFAULT_MEMORY_POOL")
+
+        try:
+            # Get actual memory pool information
+            default_pool = pa.default_memory_pool()
+            try:
+                # Get memory pool type using backend_name property
+                pool_type = default_pool.backend_name
+            except AttributeError:
+                # Fallback to class name parsing for older PyArrow versions
+                pool_type = type(default_pool).__name__.replace("MemoryPool", "").lower()
+
+            # Get pool statistics if available
+            pool_bytes_allocated = getattr(default_pool, "bytes_allocated", lambda: 0)()
+            pool_max_memory = getattr(default_pool, "max_memory", lambda: -1)()
+
+            output.append(f"   • Default Memory Pool: {pool_type}")
+            output.append(f"   • Environment Setting: ARROW_DEFAULT_MEMORY_POOL={arrow_memory_pool_env}")
+            output.append(f"   • Current Allocated: {pool_bytes_allocated / (1024**2):.2f} MB")
+
+            if pool_max_memory > 0:
+                output.append(f"   • Max Memory Limit: {pool_max_memory / (1024**2):.2f} MB")
+            else:
+                output.append("   • Max Memory Limit: No limit set")
+
+        except Exception as e:
+            output.append(f"   • Memory Pool: Unable to query ({str(e)})")
+
+        # Show PyArrow version and build info
+        output.append(f"   • PyArrow Version: {pa.__version__}")
+
+        # Check for memory mapping support
+        try:
+            memory_map_support = hasattr(pa, "memory_map") and hasattr(pa, "create_memory_map")
+            output.append(f"   • Memory Mapping Support: {'Available' if memory_map_support else 'Not available'}")
+        except Exception:
+            output.append("   • Memory Mapping Support: Unknown")
+
+    else:
+        output.append("\n🏹 PYARROW CONFIGURATION:")
+        output.append("   • PyArrow: Not available (not installed)")
+
+    # Ray Configuration Information
+    if RAY_AVAILABLE:
+        output.append("\n⚡ RAY CONFIGURATION:")
+
+        # Ray version and initialization status
+        try:
+            output.append(f"   • Ray Version: {ray.__version__}")
+
+            # Check if Ray is initialized
+            if ray.is_initialized():
+                output.append("   • Ray Status: Initialized")
+
+                # Get cluster information if available
+                try:
+                    cluster_resources = ray.cluster_resources()
+                    available_resources = ray.available_resources()
+
+                    total_cpus = cluster_resources.get("CPU", 0)
+                    available_cpus = available_resources.get("CPU", 0)
+                    total_memory = cluster_resources.get("memory", 0) / (1024**3)  # Convert to GB
+                    available_memory = available_resources.get("memory", 0) / (1024**3)
+
+                    output.append(f"   • Cluster CPUs: {available_cpus:.1f}/{total_cpus:.1f} available")
+                    if total_memory > 0:
+                        output.append(f"   • Cluster Memory: {available_memory:.2f}/{total_memory:.2f} GB available")
+
+                except Exception as e:
+                    output.append(f"   • Cluster Resources: Unable to query ({str(e)})")
+            else:
+                output.append("   • Ray Status: Not initialized")
+
+        except Exception as e:
+            output.append(f"   • Ray Status: Error querying ({str(e)})")
+
+        # Ray environment variables - threading configuration
+        ray_env_vars = ["RAY_num_grpc_threads", "RAY_num_server_call_thread", "RAY_worker_num_grpc_internal_threads"]
+
+        output.append("   • Threading Configuration:")
+        for var in ray_env_vars:
+            value = os.environ.get(var, "not set")
+            output.append(f"     - {var}: {value}")
+
+        # Additional Ray environment variables that might be relevant
+        other_ray_vars = [
+            "RAY_DEDUP_LOGS",
+            "RAY_LOG_TO_DRIVER",
+            "RAY_DISABLE_IMPORT_WARNING",
+            "RAY_USAGE_STATS_ENABLED",
+        ]
+
+        ray_other_set = []
+        for var in other_ray_vars:
+            value = os.environ.get(var)
+            if value is not None:
+                ray_other_set.append(f"{var}={value}")
+
+        if ray_other_set:
+            output.append("   • Other Ray Settings:")
+            for setting in ray_other_set:
+                output.append(f"     - {setting}")
+
+    else:
+        output.append("\n⚡ RAY CONFIGURATION:")
+        output.append("   • Ray: Not available (not installed)")
+
+    # Check if detailed stage configuration should be shown
+    show_detailed_stages = logger.isEnabledFor(logging.DEBUG)
+
+    if show_detailed_stages:
+        # Detailed Stage Configuration
+        output.append("\n📋 DETAILED STAGE CONFIGURATION:")
+        output.append("-" * 60)
+
+        # Group stages by numeric phase for proper ordering
+        phases_by_number = defaultdict(list)
+        for stage in config.stages:
+            # Extract the actual numeric phase value
+            phase_number = stage.phase
+            phases_by_number[phase_number].append(stage)
+
+        # Sort stages within each phase by dependencies and type
+        for phase_number in phases_by_number:
+            phase_stages = phases_by_number[phase_number]
+
+            # Simple dependency-aware sorting within phase
+            def stage_sort_key(stage):
+                # Sources first, then stages with fewer dependencies, then sinks
+                type_priority = 0 if stage.type.value == "source" else 2 if stage.type.value == "sink" else 1
+                dep_count = len(stage.runs_after) if stage.runs_after else 0
+                return (type_priority, dep_count, stage.name)
+
+            phase_stages.sort(key=stage_sort_key)
+            phases_by_number[phase_number] = phase_stages
+
+        # Display phases in numerical order
+        for phase_number in sorted(phases_by_number.keys()):
+            phase_stages = phases_by_number[phase_number]
+            if not phase_stages:
+                continue
+
+            # Get phase name for display
+            first_stage = phase_stages[0]
+            phase_name = first_stage.phase.name if hasattr(first_stage.phase, "name") else f"Phase_{first_stage.phase}"
+
+            output.append(f"\n📊 {phase_name}:")
+
+            for stage in phase_stages:
+                # Stage header with type icon
+                stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
+                output.append(f"\n{stage_icon} STAGE: {stage.name}")
+                output.append(f"   Type: {stage.type.value}")
+
+                # Actor or callable
+                if stage.actor:
+                    output.append(f"   Actor: {stage.actor}")
+                elif stage.callable:
+                    output.append(f"   Callable: {stage.callable}")
+
+                # Phase with better formatting
+                phase_display = stage.phase.name if hasattr(stage.phase, "name") else str(stage.phase)
+                output.append(f"   Phase: {phase_display}")
+
+                # Scaling configuration - handle both count and percentage based configs
+                replica_info = []
+                if stage.replicas:
+                    if stage.replicas.cpu_count_min is not None:
+                        replica_info.append(f"{stage.replicas.cpu_count_min} min")
+                    elif stage.replicas.cpu_percent_min is not None:
+                        replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
+
+                    if stage.replicas.cpu_count_max is not None:
+                        replica_info.append(f"{stage.replicas.cpu_count_max} max")
+                    elif stage.replicas.cpu_percent_max is not None:
+                        replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
+
+                if replica_info:
+                    output.append(f"   Scaling: {' → '.join(replica_info)} replicas")
+                else:
+                    output.append(f"   Scaling: Default")
+
+                # Dependencies
+                if stage.runs_after:
+                    deps = ", ".join(stage.runs_after)
+                    output.append(f"   Dependencies: {deps}")
+                else:
+                    output.append(f"   Dependencies: None (can start immediately)")
+
+                # Enabled status
+                if not stage.enabled:
+                    output.append(f"   Status: ⚠️  DISABLED")
+
+                # Task filters for callable stages
+                if stage.callable and stage.task_filters:
+                    output.append(f"   Task Filters: {stage.task_filters}")
 
     # Stage Execution Flow
     output.append("\n🔄 PIPELINE EXECUTION FLOW:")
@@ -235,92 +453,6 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema, config_path: str 
             stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
             replica_info = _get_replica_display_info(stage, config)
             output.append(f"   {stage_icon} {stage.name}{replica_info} (isolated)")
-
-    # Detailed Stage Configuration (in execution order)
-    output.append("\n📋 DETAILED STAGE CONFIGURATION:")
-    output.append("-" * 60)
-
-    # Group stages by numeric phase for proper ordering
-    phases_by_number = defaultdict(list)
-    for stage in config.stages:
-        # Extract the actual numeric phase value
-        phase_number = stage.phase
-        phases_by_number[phase_number].append(stage)
-
-    # Sort stages within each phase by dependencies and type
-    for phase_number in phases_by_number:
-        phase_stages = phases_by_number[phase_number]
-
-        # Simple dependency-aware sorting within phase
-        def stage_sort_key(stage):
-            # Sources first, then stages with fewer dependencies, then sinks
-            type_priority = 0 if stage.type.value == "source" else 2 if stage.type.value == "sink" else 1
-            dep_count = len(stage.runs_after) if stage.runs_after else 0
-            return (type_priority, dep_count, stage.name)
-
-        phase_stages.sort(key=stage_sort_key)
-        phases_by_number[phase_number] = phase_stages
-
-    # Display phases in numerical order
-    for phase_number in sorted(phases_by_number.keys()):
-        phase_stages = phases_by_number[phase_number]
-        if not phase_stages:
-            continue
-
-        # Get phase name for display
-        first_stage = phase_stages[0]
-        phase_name = first_stage.phase.name if hasattr(first_stage.phase, "name") else f"Phase_{first_stage.phase}"
-
-        output.append(f"\n📊 {phase_name}:")
-
-        for stage in phase_stages:
-            # Stage header with type icon
-            stage_icon = "📥" if stage.type.value == "source" else "📤" if stage.type.value == "sink" else "⚙️"
-            output.append(f"\n{stage_icon} STAGE: {stage.name}")
-            output.append(f"   Type: {stage.type.value}")
-
-            # Actor or callable
-            if stage.actor:
-                output.append(f"   Actor: {stage.actor}")
-            elif stage.callable:
-                output.append(f"   Callable: {stage.callable}")
-
-            # Phase with better formatting
-            phase_display = stage.phase.name if hasattr(stage.phase, "name") else str(stage.phase)
-            output.append(f"   Phase: {phase_display}")
-
-            # Scaling configuration - handle both count and percentage based configs
-            replica_info = []
-            if stage.replicas:
-                if stage.replicas.cpu_count_min is not None:
-                    replica_info.append(f"{stage.replicas.cpu_count_min} min")
-                elif stage.replicas.cpu_percent_min is not None:
-                    replica_info.append(f"{stage.replicas.cpu_percent_min*100:.1f}% min")
-
-                if stage.replicas.cpu_count_max is not None:
-                    replica_info.append(f"{stage.replicas.cpu_count_max} max")
-                elif stage.replicas.cpu_percent_max is not None:
-                    replica_info.append(f"{stage.replicas.cpu_percent_max*100:.1f}% max")
-
-            if replica_info:
-                output.append(f"   Scaling: {' → '.join(replica_info)} replicas")
-            else:
-                output.append(f"   Scaling: Default")
-
-            # Dependencies
-            if stage.runs_after:
-                deps = ", ".join(stage.runs_after)
-                output.append(f"   Dependencies: {deps}")
-            else:
-                output.append(f"   Dependencies: None (can start immediately)")
-
-            # Enabled status
-            if not stage.enabled:
-                output.append(f"   Status: ⚠️  DISABLED")
-
-            # Task filters for callable stages
-            if stage.callable and stage.task_filters:
-                output.append(f"   Task Filters: {stage.task_filters}")
 
     # Summary Statistics
     enabled_stages = [s for s in config.stages if s.enabled]

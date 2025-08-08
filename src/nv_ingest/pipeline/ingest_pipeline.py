@@ -232,7 +232,7 @@ class IngestPipelineBuilder:
             min_replicas=min_replicas,
             max_replicas=max_replicas,
         )
-        logger.info(f"Added stage '{stage_config.name}' ({min_replicas}-{max_replicas} replicas) to the pipeline.")
+        logger.debug(f"Added stage '{stage_config.name}' ({min_replicas}-{max_replicas} replicas) to the pipeline.")
         self._built_stages.add(stage_config.name)
 
     def _calculate_legacy_max_replicas(self, replicas, total_cpus):
