@@ -29,8 +29,8 @@ from nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import (
     MessageBrokerTaskSourceStage,
     MessageBrokerTaskSourceConfig,
-    start_simple_message_broker,
 )
+from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
 from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import ImageStorageStage
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage

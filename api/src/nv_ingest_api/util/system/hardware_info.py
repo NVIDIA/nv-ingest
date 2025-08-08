@@ -16,6 +16,11 @@ CGROUP_V1_CPU_DIR = "/sys/fs/cgroup/cpu"
 CGROUP_V1_CPUACCT_DIR = "/sys/fs/cgroup/cpuacct"  # Sometimes usage is here
 CGROUP_V2_CPU_FILE = "/sys/fs/cgroup/cpu.max"  # Standard path in v2 unified hierarchy
 
+# Memory cgroup paths
+CGROUP_V1_MEMORY_DIR = "/sys/fs/cgroup/memory"
+CGROUP_V2_MEMORY_FILE = "/sys/fs/cgroup/memory.max"  # v2 unified hierarchy
+CGROUP_V2_MEMORY_CURRENT = "/sys/fs/cgroup/memory.current"  # Current usage in v2
+
 
 class SystemResourceProbe:
     """
@@ -69,6 +74,13 @@ class SystemResourceProbe:
         self.cgroup_shares: Optional[int] = None
         self.cgroup_usage_percpu_us: Optional[list[int]] = None
         self.cgroup_usage_total_us: Optional[int] = None
+
+        # Memory Info
+        self.os_total_memory_bytes: Optional[int] = None
+        self.cgroup_memory_limit_bytes: Optional[int] = None
+        self.cgroup_memory_usage_bytes: Optional[int] = None
+        self.effective_memory_bytes: Optional[int] = None
+        self.memory_detection_method: str = "unknown"
 
         # --- Result ---
         # Raw limit before potential weighting
@@ -134,13 +146,13 @@ class SystemResourceProbe:
 
             if quota_us > 0 and period_us > 0:
                 self.cgroup_quota_cores = quota_us / period_us
-                logger.info(
+                logger.debug(
                     f"Cgroup v1 quota detected: {quota_us} us / {period_us} us = {self.cgroup_quota_cores:.2f}"
                     f" effective cores"
                 )
                 return True
             elif quota_us == -1:
-                logger.info("Cgroup v1 quota detected: Unlimited (-1)")
+                logger.debug("Cgroup v1 quota detected: Unlimited (-1)")
                 # No quota limit, but we know it's cgroup v1
                 return True  # Return true because we identified the type
             else:
@@ -149,7 +161,7 @@ class SystemResourceProbe:
         elif shares is not None:  # If only shares are readable, still note it's v1
             self.cgroup_type = "v1"
             self.cgroup_shares = shares
-            logger.info(f"Cgroup v1 shares detected: {shares} (no quota found)")
+            logger.debug(f"Cgroup v1 shares detected: {shares} (no quota found)")
             return True
 
         return False
@@ -171,13 +183,13 @@ class SystemResourceProbe:
                     period_us = int(period_str)
                     self.cgroup_period_us = period_us
                     if quota_str == "max":
-                        logger.info("Cgroup v2 quota detected: Unlimited ('max')")
+                        logger.debug("Cgroup v2 quota detected: Unlimited ('max')")
                         return True  # Identified type, no quota limit
                     else:
                         quota_us = int(quota_str)
                         if quota_us > 0 and period_us > 0:
                             self.cgroup_quota_cores = quota_us / period_us
-                            logger.info(
+                            logger.debug(
                                 f"Cgroup v2 quota detected: {quota_us} us / {period_us}"
                                 f" us = {self.cgroup_quota_cores:.2f} effective cores"
                             )
@@ -204,7 +216,7 @@ class SystemResourceProbe:
             affinity = os.sched_getaffinity(0)  # 0 for current process
             count = len(affinity)
             if count > 0:
-                logger.info(f"Detected {count} cores via os.sched_getaffinity.")
+                logger.debug(f"Detected {count} cores via os.sched_getaffinity.")
                 return count
             else:
                 logger.warning("os.sched_getaffinity(0) returned 0 or empty set.")
@@ -247,9 +259,9 @@ class SystemResourceProbe:
                 logger.error(f"os.cpu_count() failed: {e}")
 
         if logical:
-            logger.info(f"Detected {logical} logical cores via {source}.")
+            logger.debug(f"Detected {logical} logical cores via {source}.")
         if physical:
-            logger.info(f"Detected {physical} physical cores via {source}.")
+            logger.debug(f"Detected {physical} physical cores via {source}.")
 
         return logical, physical
 
@@ -282,7 +294,7 @@ class SystemResourceProbe:
             weighted_cores = (physical_part * 1.0) + (hyperthread_part * self.hyperthread_weight)
 
             if weighted_cores != N:  # Log only if weighting changes the value
-                logger.info(
+                logger.debug(
                     f"Applying hyperthread weight ({self.hyperthread_weight:.2f}) to "
                     f"logical limit {logical_limit} (System: {P}P/{self.os_logical_cores}L): "
                     f"Effective weighted cores = {weighted_cores:.2f}"
@@ -308,6 +320,137 @@ class SystemResourceProbe:
             logger.debug(f"Skipping hyperthread weight calculation for logical limit {logical_limit}.")
             return float(logical_limit)  # Return the original limit as float
 
+    # --- Memory Detection Methods ---
+    @staticmethod
+    def _get_os_memory() -> Optional[int]:
+        """Gets total system memory in bytes using psutil or /proc/meminfo."""
+        # Try psutil first
+        if psutil:
+            try:
+                memory = psutil.virtual_memory()
+                total_bytes = memory.total
+                if total_bytes and total_bytes > 0:
+                    logger.debug(f"Detected {total_bytes / (1024**3):.2f} GB system memory via psutil.")
+                    return total_bytes
+            except Exception as e:
+                logger.warning(f"psutil.virtual_memory() failed: {e}. Falling back to /proc/meminfo.")
+
+        # Fallback to /proc/meminfo
+        try:
+            if os.path.exists("/proc/meminfo"):
+                with open("/proc/meminfo", "r") as f:
+                    for line in f:
+                        if line.startswith("MemTotal:"):
+                            # MemTotal is in KB
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                total_kb = int(parts[1])
+                                total_bytes = total_kb * 1024
+                                logger.debug(
+                                    f"Detected {total_bytes / (1024**3):.2f} GB system memory via /proc/meminfo."
+                                )
+                                return total_bytes
+                            break
+        except (IOError, ValueError, PermissionError) as e:
+            logger.warning(f"Failed to read /proc/meminfo: {e}")
+
+        logger.error("Could not determine system memory from any source.")
+        return None
+
+    def _read_memory_cgroup_v2(self) -> bool:
+        """Attempts to read Cgroup v2 memory limits."""
+        if not os.path.exists(CGROUP_V2_MEMORY_FILE):
+            logger.debug(f"Cgroup v2 memory.max file not found: {CGROUP_V2_MEMORY_FILE}")
+            return False
+
+        logger.debug(f"Checking Cgroup v2 memory limits in {CGROUP_V2_MEMORY_FILE}")
+        content = self._read_file_str(CGROUP_V2_MEMORY_FILE)
+        if content:
+            try:
+                if content == "max":
+                    logger.debug("Cgroup v2 memory limit: unlimited")
+                    return True
+                else:
+                    limit_bytes = int(content)
+                    self.cgroup_memory_limit_bytes = limit_bytes
+                    logger.debug(f"Cgroup v2 memory limit: {limit_bytes / (1024**3):.2f} GB")
+
+                    # Also try to read current usage
+                    usage_content = self._read_file_str(CGROUP_V2_MEMORY_CURRENT)
+                    if usage_content:
+                        try:
+                            usage_bytes = int(usage_content)
+                            self.cgroup_memory_usage_bytes = usage_bytes
+                            logger.debug(f"Cgroup v2 memory usage: {usage_bytes / (1024**3):.2f} GB")
+                        except ValueError:
+                            logger.debug(f"Could not parse memory.current: '{usage_content}'")
+
+                    return True
+            except ValueError:
+                logger.warning(f"Could not parse Cgroup v2 memory.max content: '{content}'")
+        return False
+
+    def _read_memory_cgroup_v1(self) -> bool:
+        """Attempts to read Cgroup v1 memory limits."""
+        if not os.path.exists(CGROUP_V1_MEMORY_DIR):
+            logger.debug(f"Cgroup v1 memory dir not found: {CGROUP_V1_MEMORY_DIR}")
+            return False
+
+        logger.debug(f"Checking Cgroup v1 memory limits in {CGROUP_V1_MEMORY_DIR}")
+
+        # Try memory.limit_in_bytes
+        limit_bytes = self._read_file_int(os.path.join(CGROUP_V1_MEMORY_DIR, "memory.limit_in_bytes"))
+        usage_bytes = self._read_file_int(os.path.join(CGROUP_V1_MEMORY_DIR, "memory.usage_in_bytes"))
+
+        if limit_bytes is not None:
+            # Cgroup v1 often shows very large values (like 9223372036854775807) for unlimited
+            # We consider values >= 2^63-1 or >= system memory * 100 as unlimited
+            if limit_bytes >= 9223372036854775807 or (
+                self.os_total_memory_bytes and limit_bytes >= self.os_total_memory_bytes * 100
+            ):
+                logger.debug("Cgroup v1 memory limit: unlimited (very large value)")
+                return True
+            else:
+                self.cgroup_memory_limit_bytes = limit_bytes
+                logger.debug(f"Cgroup v1 memory limit: {limit_bytes / (1024**3):.2f} GB")
+
+                if usage_bytes is not None:
+                    self.cgroup_memory_usage_bytes = usage_bytes
+                    logger.debug(f"Cgroup v1 memory usage: {usage_bytes / (1024**3):.2f} GB")
+
+                return True
+
+        return False
+
+    def _detect_memory(self):
+        """Performs memory detection sequence."""
+        logger.debug("Starting memory detection...")
+
+        # 1. Get OS level memory first
+        self.os_total_memory_bytes = self._get_os_memory()
+
+        # 2. Try Cgroup v2 memory limits
+        cgroup_memory_detected = self._read_memory_cgroup_v2()
+
+        # 3. Try Cgroup v1 if v2 not found or didn't yield a limit
+        if not cgroup_memory_detected or self.cgroup_memory_limit_bytes is None:
+            cgroup_memory_detected = self._read_memory_cgroup_v1()
+
+        # 4. Determine effective memory
+        if self.cgroup_memory_limit_bytes is not None and self.os_total_memory_bytes is not None:
+            # Use the smaller of cgroup limit and system memory
+            self.effective_memory_bytes = min(self.cgroup_memory_limit_bytes, self.os_total_memory_bytes)
+            self.memory_detection_method = "cgroup_limited"
+            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024**3):.2f} GB (cgroup limited)")
+        elif self.os_total_memory_bytes is not None:
+            # No cgroup limit, use system memory
+            self.effective_memory_bytes = self.os_total_memory_bytes
+            self.memory_detection_method = "system_memory"
+            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024**3):.2f} GB (system memory)")
+        else:
+            logger.error("Could not determine effective memory limit")
+            self.memory_detection_method = "failed"
+
     def _detect(self):
         """Performs the detection sequence and applies weighting."""
         logger.debug("Starting effective core count detection...")
@@ -325,7 +468,10 @@ class SystemResourceProbe:
         # 4. Get OS Affinity
         self.os_sched_affinity_cores = self._get_os_affinity()
 
-        # --- 5. Determine the RAW Limit (before weighting) ---
+        # 5. Detect Memory
+        self._detect_memory()
+
+        # --- 6. Determine the RAW Limit (before weighting) ---
         raw_limit = float("inf")
         raw_method = "unknown"
 
@@ -361,9 +507,9 @@ class SystemResourceProbe:
 
         self.raw_limit_value = raw_limit
         self.raw_limit_method = raw_method
-        logger.info(f"Raw CPU limit determined: {self.raw_limit_value:.2f} (Method: {self.raw_limit_method})")
+        logger.debug(f"Raw CPU limit determined: {self.raw_limit_value:.2f} (Method: {self.raw_limit_method})")
 
-        # --- 6. Apply Weighting (if applicable) ---
+        # --- 7. Apply Weighting (if applicable) ---
         final_effective_cores = raw_limit
         final_method = raw_method
 
@@ -394,12 +540,24 @@ class SystemResourceProbe:
         self.effective_cores = final_effective_cores
         self.detection_method = final_method  # The method for the final value
 
-        logger.info(
+        logger.debug(
             f"Effective CPU core limit determined: {self.effective_cores:.2f} " f"(Method: {self.detection_method})"
         )
 
     def get_effective_cores(self) -> Optional[float]:
         """Returns the primary result: the effective core limit, potentially weighted."""
+        return self.effective_cores
+
+    @property
+    def total_memory_mb(self) -> Optional[float]:
+        """Returns the effective memory limit in megabytes."""
+        if self.effective_memory_bytes is not None:
+            return self.effective_memory_bytes / (1024 * 1024)
+        return None
+
+    @property
+    def cpu_count(self) -> Optional[float]:
+        """Returns the effective CPU count for compatibility."""
         return self.effective_cores
 
     def get_details(self) -> Dict[str, Any]:
@@ -426,5 +584,12 @@ class SystemResourceProbe:
             "cgroup_shares": self.cgroup_shares,
             "cgroup_usage_total_us": self.cgroup_usage_total_us,
             "cgroup_usage_percpu_us": self.cgroup_usage_percpu_us,
+            # Memory information
+            "effective_memory_bytes": self.effective_memory_bytes,
+            "effective_memory_mb": self.total_memory_mb,
+            "memory_detection_method": self.memory_detection_method,
+            "os_total_memory_bytes": self.os_total_memory_bytes,
+            "cgroup_memory_limit_bytes": self.cgroup_memory_limit_bytes,
+            "cgroup_memory_usage_bytes": self.cgroup_memory_usage_bytes,
             "platform": platform.system(),
         }

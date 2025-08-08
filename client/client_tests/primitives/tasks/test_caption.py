@@ -2,43 +2,43 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from nv_ingest_client.primitives.tasks.caption import CaptionTask, CaptionTaskSchema
-from pydantic import ValidationError
+import pytest
+
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_client.primitives.tasks.caption import CaptionTask
 
 
-def test_valid_schema_initialization():
-    """Test valid initialization of CaptionTaskSchema with all fields."""
-    schema = CaptionTaskSchema(api_key="test_key", endpoint_url="http://example.com", prompt="Generate a caption")
+def test_caption_task_schema_valid_all_fields():
+    """Test valid initialization of IngestTaskCaptionSchema with all fields."""
+    schema = IngestTaskCaptionSchema(api_key="test_key", endpoint_url="http://example.com", prompt="Generate a caption")
     assert schema.api_key == "test_key"
     assert schema.endpoint_url == "http://example.com"
     assert schema.prompt == "Generate a caption"
+    assert schema.model_name is None
 
 
-def test_partial_schema_initialization():
-    """Test valid initialization of CaptionTaskSchema with some fields omitted."""
-    schema = CaptionTaskSchema(api_key="test_key")
+def test_caption_task_schema_valid_partial_fields():
+    """Test valid initialization of IngestTaskCaptionSchema with some fields omitted."""
+    schema = IngestTaskCaptionSchema(api_key="test_key")
     assert schema.api_key == "test_key"
     assert schema.endpoint_url is None
     assert schema.prompt is None
+    assert schema.model_name is None
 
 
-def test_empty_schema_initialization():
-    """Test valid initialization of CaptionTaskSchema with no fields."""
-    schema = CaptionTaskSchema()
+def test_caption_task_schema_valid_no_fields():
+    """Test valid initialization of IngestTaskCaptionSchema with no fields."""
+    schema = IngestTaskCaptionSchema()
     assert schema.api_key is None
     assert schema.endpoint_url is None
     assert schema.prompt is None
+    assert schema.model_name is None
 
 
-def test_schema_invalid_extra_field():
-    """Test that CaptionTaskSchema raises an error with extra fields."""
-    try:
-        CaptionTaskSchema(api_key="test_key", extra_field="invalid")
-    except ValidationError as e:
-        assert "extra_field" in str(e)
-
-
-# Testing CaptionTask
+def test_caption_task_schema_invalid_extra_fields():
+    """Test that IngestTaskCaptionSchema raises an error with extra fields."""
+    with pytest.raises(ValueError):
+        IngestTaskCaptionSchema(api_key="test_key", extra_field="invalid")
 
 
 def test_caption_task_initialization():
@@ -115,10 +115,10 @@ def test_caption_task_to_dict_empty_fields():
 
 # Execute tests
 if __name__ == "__main__":
-    test_valid_schema_initialization()
-    test_partial_schema_initialization()
-    test_empty_schema_initialization()
-    test_schema_invalid_extra_field()
+    test_caption_task_schema_valid_all_fields()
+    test_caption_task_schema_valid_partial_fields()
+    test_caption_task_schema_valid_no_fields()
+    test_caption_task_schema_invalid_extra_fields()
     test_caption_task_initialization()
     test_caption_task_partial_initialization()
     test_caption_task_empty_initialization()

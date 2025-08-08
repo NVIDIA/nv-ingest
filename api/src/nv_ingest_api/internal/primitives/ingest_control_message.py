@@ -5,10 +5,11 @@
 import copy
 import re
 from datetime import datetime
+from collections import defaultdict
+from typing import Any, Dict, Generator, List, Optional, Union
 
 import logging
 import pandas as pd
-from typing import Any, Dict, Generator, Union
 
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
 
@@ -55,6 +56,52 @@ def remove_task_by_type(ctrl_msg, task: str):
     return removed_task.properties
 
 
+def remove_all_tasks_by_type(ctrl_msg, task: str):
+    """
+    Remove all tasks from the control message by matching their type.
+
+    This function iterates over the tasks in the control message, finds all tasks
+    whose type matches the provided task string, removes them, and returns their
+    properties as a list.
+
+    Parameters
+    ----------
+    ctrl_msg : IngestControlMessage
+        The control message from which to remove the tasks.
+    task : str
+        The task type to remove.
+
+    Returns
+    -------
+    list[dict]
+        A list of dictionaries of properties for all removed tasks.
+
+    Raises
+    ------
+    ValueError
+        If no tasks with the given type are found.
+    """
+    matching_tasks = []
+
+    # Find all tasks with matching type
+    for t in ctrl_msg.get_tasks():
+        if t.type == task:
+            matching_tasks.append(t)
+
+    if not matching_tasks:
+        err_msg = f"process_control_message: No tasks of type '{task}' found in control message."
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+
+    # Remove all matching tasks and collect their properties
+    removed_task_properties = []
+    for task_obj in matching_tasks:
+        removed_task = ctrl_msg.remove_task(task_obj.id)
+        removed_task_properties.append(removed_task.properties)
+
+    return removed_task_properties
+
+
 class IngestControlMessage:
     """
     A control message class for ingesting tasks and managing associated metadata,
@@ -65,47 +112,41 @@ class IngestControlMessage:
         """
         Initialize a new IngestControlMessage instance.
         """
-        self._tasks: Dict[str, ControlMessageTask] = {}
+        self._tasks: Dict[str, List[ControlMessageTask]] = defaultdict(list)
         self._metadata: Dict[str, Any] = {}
         self._timestamps: Dict[str, datetime] = {}
-        self._payload: pd.DataFrame = pd.DataFrame()
+        self._payload: Optional[pd.DataFrame] = None
         self._config: Dict[str, Any] = {}
 
     def add_task(self, task: ControlMessageTask):
         """
-        Add a task to the control message, keyed by the task's unique 'id'.
-
-        Raises
-        ------
-        ValueError
-            If a task with the same 'id' already exists.
+        Add a task to the control message. Multiple tasks with the same ID are supported.
         """
-        if task.id in self._tasks:
-            raise ValueError(f"Task with id '{task.id}' already exists. Tasks must be unique.")
-        self._tasks[task.id] = task
+        self._tasks[task.id].append(task)
 
     def get_tasks(self) -> Generator[ControlMessageTask, None, None]:
         """
         Return all tasks as a generator.
         """
-        yield from self._tasks.values()
+        for task_list in self._tasks.values():
+            yield from task_list
 
     def has_task(self, task_id: str) -> bool:
         """
-        Check if a task with the given ID exists.
+        Check if any tasks with the given ID exist.
         """
-        return task_id in self._tasks
+        return task_id in self._tasks and len(self._tasks[task_id]) > 0
 
     def remove_task(self, task_id: str) -> ControlMessageTask:
         """
-        Remove a task from the control message. Logs a warning if the task does not exist.
+        Remove the first task with the given ID. Warns if no task exists.
         """
-        if task_id in self._tasks:
-            _task = self._tasks[task_id]
-
-            del self._tasks[task_id]
-
-            return _task
+        if task_id in self._tasks and self._tasks[task_id]:
+            task = self._tasks[task_id].pop(0)
+            # Clean up empty lists
+            if not self._tasks[task_id]:
+                del self._tasks[task_id]
+            return task
         else:
             raise RuntimeError(f"Attempted to remove non-existent task with id: {task_id}")
 

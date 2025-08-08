@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -31,8 +32,8 @@ class ImageFilterStage(RayActorStage):
       3. Updates the message payload with the filtered DataFrame.
     """
 
-    def __init__(self, config: ImageFilterSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageFilterSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageFilterStage configuration validated successfully.")
@@ -40,9 +41,10 @@ class ImageFilterStage(RayActorStage):
             logger.exception(f"Error validating Image Filter config: {e}")
             raise
 
-    @traceable("image_filter")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=["filter"])
-    @nv_ingest_node_failure_try_except(annotation_id="image_filter", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by filtering images.

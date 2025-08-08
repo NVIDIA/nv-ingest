@@ -72,7 +72,7 @@ class RayStatsCollector:
         self._cumulative_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"processed": 0})
         self.ema_memory_per_replica: Dict[str, float] = {}  # EMA of memory per replica
 
-        logger.info(
+        logger.debug(
             f"RayStatsCollector initialized (Interval: {self._interval}s, "
             f"Actor Timeout: {self._actor_timeout}s, Queue Timeout: {self._queue_timeout}s, "
             f"EMA Alpha: {self.ema_alpha})"

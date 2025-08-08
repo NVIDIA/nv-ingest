@@ -21,6 +21,9 @@ class RayActorSinkStage(RayActorStage, ABC):
     to deliver their final processed messages.
     """
 
+    def __init__(self, config: Any, log_to_stdout=False, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=log_to_stdout, stage_name=stage_name)
+
     @ray.method(num_returns=1)
     def set_output_queue(self, queue_handle: any) -> bool:
         raise NotImplementedError("Sink stages do not support an output queue.")

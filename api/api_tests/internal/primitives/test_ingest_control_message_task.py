@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
-
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
 
@@ -40,9 +38,7 @@ def test_add_duplicate_task():
     task = ControlMessageTask(type="Test Task", id="task1", properties={"key": "value"})
     cm.add_task(task)
     duplicate_task = ControlMessageTask(type="Another Task", id="task1", properties={"key": "other"})
-    with pytest.raises(ValueError) as exc_info:
-        cm.add_task(duplicate_task)
-    assert "already exists" in str(exc_info.value)
+    cm.add_task(duplicate_task)
 
 
 def test_multiple_tasks():

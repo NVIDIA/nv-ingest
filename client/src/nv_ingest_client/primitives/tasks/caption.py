@@ -8,23 +8,12 @@
 
 import logging
 from typing import Dict
-from typing import Optional
 
-from pydantic import ConfigDict, BaseModel
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class CaptionTaskSchema(BaseModel):
-    api_key: Optional[str] = None
-    endpoint_url: Optional[str] = None
-    prompt: Optional[str] = None
-    model_name: Optional[str] = None
-
-    model_config = ConfigDict(extra="forbid")
-    model_config["protected_namespaces"] = ()
 
 
 class CaptionTask(Task):
@@ -37,10 +26,15 @@ class CaptionTask(Task):
     ) -> None:
         super().__init__()
 
-        self._api_key = api_key
-        self._endpoint_url = endpoint_url
-        self._prompt = prompt
-        self._model_name = model_name
+        # Use the API schema for validation
+        validated_data = IngestTaskCaptionSchema(
+            api_key=api_key, endpoint_url=endpoint_url, prompt=prompt, model_name=model_name
+        )
+
+        self._api_key = validated_data.api_key
+        self._endpoint_url = validated_data.endpoint_url
+        self._prompt = validated_data.prompt
+        self._model_name = validated_data.model_name
 
     def __str__(self) -> str:
         """

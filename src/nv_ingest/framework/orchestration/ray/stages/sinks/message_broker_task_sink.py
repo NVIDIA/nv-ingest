@@ -14,6 +14,8 @@ from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,8 +77,8 @@ class MessageBrokerTaskSinkConfig(BaseModel):
 
 @ray.remote
 class MessageBrokerTaskSinkStage(RayActorStage):
-    def __init__(self, config: MessageBrokerTaskSinkConfig) -> None:
-        super().__init__(config, log_to_stdout=False)
+    def __init__(self, config: MessageBrokerTaskSinkConfig, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
 
         self.config: MessageBrokerTaskSinkConfig
 
@@ -224,6 +226,7 @@ class MessageBrokerTaskSinkStage(RayActorStage):
 
     # --- Public API Methods for message broker sink ---
 
+    @udf_intercept_hook()
     def on_data(self, control_message: Any) -> Any:
         """
         Processes the control message and pushes the resulting JSON payloads to the broker.

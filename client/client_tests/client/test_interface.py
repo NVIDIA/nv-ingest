@@ -263,7 +263,7 @@ def test_split_task_no_args(ingestor):
 
 
 def test_split_task_some_args(ingestor):
-    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42)
+    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42, chunk_overlap=20)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, SplitTask)

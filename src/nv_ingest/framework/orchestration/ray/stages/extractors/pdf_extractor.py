@@ -7,16 +7,15 @@ import pandas as pd
 from typing import Any, Dict, Tuple, Optional
 import ray
 
-# Assume these imports come from your project:
-from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
-from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_try_except,
-)
+
+from nv_ingest_api.internal.primitives.tracing.tagging import set_trace_timestamps_with_parent_context, traceable
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +50,8 @@ class PDFExtractorStage(RayActorStage):
       4. Optionally, stores additional extraction info in the message metadata.
     """
 
-    def __init__(self, config: PDFExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: PDFExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             # Validate and store the PDF extractor configuration.
             self.validated_config = config
@@ -61,9 +60,10 @@ class PDFExtractorStage(RayActorStage):
             logger.exception(f"Error validating PDF extractor config: {e}")
             raise
 
-    @traceable("pdf_extraction")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "pdf"})])
-    @nv_ingest_node_failure_try_except(annotation_id="pdf_extractor", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting PDF content.
@@ -107,7 +107,8 @@ class PDFExtractorStage(RayActorStage):
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:
-            for key, ts in execution_trace_log.items():
-                control_message.set_timestamp(key, ts)
+            # Use utility function to set trace timestamps with proper parent-child context
+            parent_name = self.stage_name or "pdf_extractor"
+            set_trace_timestamps_with_parent_context(control_message, execution_trace_log, parent_name, logger)
 
         return control_message
