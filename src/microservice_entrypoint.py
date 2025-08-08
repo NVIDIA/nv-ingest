@@ -17,8 +17,8 @@ _env_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if _env_log_level.upper() == "DEFAULT":
     _env_log_level = "INFO"
 
-# Configure logging once, early
-configure_logging(_env_log_level)
+# Remove duplicate configure_logging call - only configure once in CLI function
+# configure_logging(_env_log_level)
 
 logger = logging.getLogger(__name__)
 

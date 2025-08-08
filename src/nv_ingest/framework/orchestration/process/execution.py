@@ -102,7 +102,6 @@ def launch_pipeline(
     if not ray.is_initialized():
         ray.init(
             namespace="nv_ingest_ray",
-            logging_level=logging.getLogger().getEffectiveLevel(),
             ignore_reinit_error=True,
             dashboard_host="0.0.0.0",
             dashboard_port=8265,
