@@ -1,4 +1,4 @@
-## Use Nemo Retriever Extraction with nemoretriever-parse
+# Use Nemo Retriever Extraction with nemoretriever-parse
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
