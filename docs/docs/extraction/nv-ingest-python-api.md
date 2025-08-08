@@ -1,10 +1,15 @@
-# Use the NV-Ingest Python API
+# Use the NeMo Retriever Extraction Python API
 
-The [NV-Ingest](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 !!! tip
 
     There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
 
 ## Summary of Key Methods
 
@@ -16,7 +21,7 @@ The following table describes methods of the `Ingestor` class.
 |--------------|-----------------------------------|
 | `caption`    | Extract captions from images within the document. |
 | `embed`      | Generate embeddings from extracted content. |
-| `extract`    | Add an extraction task (text, tables, charts). |
+| `extract`    | Add an extraction task (text, tables, charts, infographics). |
 | `files`      | Add document paths for processing. |
 | `ingest`     | Submit jobs and retrieve results synchronously. |
 | `load`       | Ensure files are locally accessible (downloads if needed). |
