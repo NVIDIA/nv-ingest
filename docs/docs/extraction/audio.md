@@ -1,4 +1,4 @@
-## Use NeMo Retriever Extraction with Riva
+# Use NeMo Retriever Extraction with Riva
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
