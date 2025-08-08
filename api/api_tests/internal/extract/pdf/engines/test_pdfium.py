@@ -104,14 +104,15 @@ def test_extract_page_elements_happy_path(dummy_pages):
         result = _extract_page_elements_using_image_ensemble(
             dummy_pages,
             yolox_client=mock_yolox_client,
-            execution_trace_log=["dummy_trace"],
+            yolox_model_name="yolox",
+            execution_trace_log={"dummy_trace": 0},
         )
 
         # Assert yolox_client called once
         mock_yolox_client.infer.assert_called_once_with(
             {"images": [dummy_pages[0][1], dummy_pages[1][1]]},
             max_batch_size=module_under_test.YOLOX_MAX_BATCH_SIZE,
-            trace_info=["dummy_trace"],
+            trace_info={"dummy_trace": 0},
             stage_name="pdf_content_extractor",
         )
 
@@ -465,7 +466,9 @@ def test_pdfium_extractor_happy_path(
     # Mock return values
     mock_construct_text_metadata.return_value = "text_meta"
     mock_extract_images.return_value = ["image_meta"]
-    mock_pages_to_numpy.return_value = ([MagicMock()], [MagicMock()])
+    # Create a dummy page object that can be pickled, instead of a MagicMock
+    dummy_rendered_page = (0, np.zeros((10, 10, 3), dtype=np.uint8), (0, 0))
+    mock_pages_to_numpy.return_value = ([dummy_rendered_page], [MagicMock()])
     mock_extract_elements.return_value = ["table_chart_meta"]
     mock_numpy_to_base64.return_value = "image_base64"
     mock_construct_image_metadata_from_base64.return_value = "page_image_meta"
@@ -480,7 +483,7 @@ def test_pdfium_extractor_happy_path(
         extract_charts=True,
         extract_page_as_image=True,
         extractor_config=dummy_extractor_config,
-        execution_trace_log=[],
+        execution_trace_log={},
     )
 
     # Validations

@@ -17,8 +17,13 @@
 # limitations under the License.
 
 import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import math
+import os
+import tempfile
 import logging
-from typing import List, Tuple, Optional, Any
+from typing import List, Tuple, Optional, Any, Union
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -368,6 +373,135 @@ def _extract_page_elements(
     return extracted_page_elements
 
 
+
+# ------------------------------------------------------------------ #
+#  Render a subset of pages in one process                           #
+# ------------------------------------------------------------------ #
+def _render_page_subset(
+    pdf_source: Union[str, bytes],
+    page_indices: List[int],
+    size: Tuple[int, int],
+    execution_trace_log: Optional[List] = None,
+) -> List[Tuple[int, np.ndarray, Tuple[int, int]]]:
+    """
+    Render a subset of pages specified by `page_indices`. Returns a list of
+    (page_idx, image_array, padding_offsets) keeping original page indices.
+    """
+    if not page_indices:
+        return []
+
+    # Open the original PDF once in this process
+    src_doc = libpdfium.PdfDocument(pdf_source)
+
+    # Create a new temporary PDF that contains only the required pages
+    tmp_doc = libpdfium.PdfDocument.new()
+    tmp_doc.import_pages(src_doc, page_indices)
+
+    src_doc.close()
+
+    images: List[Tuple[int, np.ndarray, Tuple[int, int]]] = []
+
+    for local_idx, orig_idx in enumerate(page_indices):
+        page = tmp_doc.get_page(local_idx)
+
+        arrays, pads = pdfium_pages_to_numpy(
+            [page],
+            scale_tuple=size,
+            padding_tuple=size,
+            trace_info=execution_trace_log,
+        )
+
+        page.close()
+        images.append((orig_idx, arrays[0], pads[0]))
+
+    tmp_doc.close()
+
+    return images
+
+
+# ------------------------------------------------------------------ #
+#  Render an entire PDF in parallel – keeps natural page order       #
+# ------------------------------------------------------------------ #
+
+# Helper to create subset PDF file path
+def _make_subset_pdf_path(src: Union[str, bytes], indices: List[int]) -> str:
+    """Return a temporary file path containing only the pages in indices."""
+    src_doc = libpdfium.PdfDocument(src)
+    subset_doc = libpdfium.PdfDocument.new()
+    subset_doc.import_pages(src_doc, indices)
+
+    tmp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    subset_doc.save(tmp_file.name)
+
+    tmp_file.close()
+    src_doc.close()
+    subset_doc.close()
+    return tmp_file.name
+
+
+def render_single_pdf_parallel(
+    pdf_source: Union[str, bytes],
+    size: Tuple[int, int],
+    max_workers: int = 8,
+    execution_trace_log: Optional[List] = None,
+) -> List[Tuple[np.ndarray, Tuple[int, int]]]:
+    """
+    Render all pages of `pdf_source` in parallel and return a list of
+    (image_array, padding_offsets) tuples in natural page order.
+    """
+    doc = libpdfium.PdfDocument(pdf_source)
+    page_count = len(doc)
+    doc.close()
+
+    max_workers = min(max_workers, page_count)
+
+    # Determine groups of pages for each worker to minimise PDF copies
+    chunk_size = math.ceil(page_count / max_workers)
+    page_groups: List[List[int]] = [list(range(i, min(i + chunk_size, page_count))) for i in range(0, page_count, chunk_size)]
+
+    images: List[Tuple[np.ndarray, Tuple[int, int]]] = [None] * page_count
+    # Create subset paths for each group
+    subset_paths: List[str] = [_make_subset_pdf_path(pdf_source, grp) for grp in page_groups]
+
+    if execution_trace_log is not None:
+        for idx in range(len(subset_paths)):
+            execution_trace_log[f"trace::entry::pdf_extraction::render_single_pdf_parallel_{idx}"] = datetime.now()
+
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers) as pool:
+            futs = [
+                pool.submit(_render_page_subset, path, group, size, execution_trace_log)
+                for path, group in zip(subset_paths, page_groups)
+            ]
+
+            for fut in as_completed(futs):
+                subset_results = fut.result()
+                for idx, img, pad in subset_results:
+                    images[idx] = (img, pad)
+                if execution_trace_log is not None:
+                    execution_trace_log[f"trace::exit::pdf_extraction::render_single_pdf_parallel_{idx}"] = datetime.now()
+    finally:
+        # Cleanup temporary subset files
+        for path in subset_paths:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+    return images
+
+
+def _get_pdf_source(pdf_stream: Any) -> Union[str, bytes]:
+    """
+    Handle pdf_stream as either a file path or a stream-like object.
+    """
+    if isinstance(pdf_stream, str):
+        return pdf_stream
+    if hasattr(pdf_stream, "read"):
+        return pdf_stream.read()
+    return pdf_stream
+
+
 def pdfium_extractor(
     pdf_stream,
     extract_text: bool,
@@ -440,7 +574,8 @@ def pdfium_extractor(
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-    doc = libpdfium.PdfDocument(pdf_stream)
+    pdf_source = _get_pdf_source(pdf_stream)
+    doc = libpdfium.PdfDocument(pdf_source)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
 
@@ -471,9 +606,21 @@ def pdfium_extractor(
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for table/chart extraction
+    # Prepare for table/chart/infographic extraction
     pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
+
+    logger.debug(f"Using {pdfium_config.workers_per_progress_engine} workers for table/chart/infographic extraction.")
+
+    # Pre-render all pages in parallel if needed
+    rendered_imgs: Optional[List[Tuple[np.ndarray, Tuple[int, int]]]] = None
+    if extract_tables or extract_charts or extract_infographics:
+        rendered_imgs = render_single_pdf_parallel(
+            pdf_source=pdf_source,
+            size=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+            max_workers=pdfium_config.workers_per_progress_engine,
+            execution_trace_log=execution_trace_log,
+        )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
@@ -534,15 +681,10 @@ def pdfium_extractor(
                 )
                 extracted_data.append(image_meta)
 
-            # If we want tables or charts, rasterize the page and store it
+            # If we want tables, charts, or infographics, use pre-rendered images
             if extract_tables or extract_charts or extract_infographics:
-                image, padding_offsets = pdfium_pages_to_numpy(
-                    [page],
-                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    trace_info=execution_trace_log,
-                )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                image, padding_offsets = rendered_imgs[page_idx]
+                pages_for_tables.append((page_idx, image, padding_offsets))
 
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
