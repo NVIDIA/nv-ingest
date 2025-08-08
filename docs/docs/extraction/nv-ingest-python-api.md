@@ -166,3 +166,41 @@ ingestor = ingestor.embed(
     api_key="nvapi-"
 )
 ```
+
+
+
+## Extract Audio
+
+Use the following code to extract mp3 audio content.
+
+```python
+from nv_ingest_client.client import Ingestor
+
+ingestor = Ingestor().files("audio_file.mp3")
+
+ingestor = ingestor.extract(
+        document_type="mp3",
+        extract_text=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images=False,
+        extract_infographics=False,
+    ).split(
+        tokenizer="meta-llama/Llama-3.2-1B",
+        chunk_size=150,
+        chunk_overlap=0,
+        params={"split_source_types": ["mp3"], "hf_access_token": "hf_***"}
+    )
+
+results = ingestor.ingest()
+```
+
+
+
+## Related Topics
+
+- [Split Documents](chunking.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Multimodal Embedding](vlm-embed.md)
