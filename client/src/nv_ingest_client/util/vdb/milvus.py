@@ -729,7 +729,7 @@ def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
     for element in records:
         writer.append_row(element)
     writer.commit()
-    print(f"Wrote data to: {writer.batch_files}")
+    logger.debug(f"Wrote data to: {writer.batch_files}")
     return writer
 
 
@@ -757,9 +757,10 @@ def bulk_insert_milvus(
 
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
+    files_to_upload = [_file for file_set in writer.batch_files for _file in file_set]
     task_id = utility.do_bulk_insert(
         collection_name=collection_name,
-        files=writer.batch_files[0],
+        files=files_to_upload,
         consistency_level=CONSISTENCY,
     )
     # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
@@ -769,11 +770,11 @@ def bulk_insert_milvus(
         state = task.state_name
         if state == "Completed":
             t_bulk_end = time.time()
-            print("Start time:", task.create_time_str)
-            print("Imported row count:", task.row_count)
-            print(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
+            logger.info("Start time:", task.create_time_str)
+            logger.info("Imported row count:", task.row_count)
+            logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
         if task.state == BulkInsertState.ImportFailed:
-            print("Failed reason:", task.failed_reason)
+            logger.error("Failed reason:", task.failed_reason)
         time.sleep(1)
 
 
