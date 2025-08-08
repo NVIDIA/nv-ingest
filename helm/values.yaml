@@ -539,7 +539,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.8.0"
+    tag: "1.9.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
