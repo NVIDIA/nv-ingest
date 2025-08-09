@@ -2,6 +2,10 @@
 
 [NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
 In addition, you can use library mode, which is intended for the following cases:
 
 - Local development
@@ -258,8 +262,8 @@ It listens for ingestion requests on port `7671` from an external client.
 
 ```python
 def main():
-config_data = {}
 
+    config_data = {}
     config_data = {key: value for key, value in config_data.items() if value is not None}
     ingest_config = PipelineCreationSchema(**config_data)
 
@@ -283,11 +287,12 @@ and immediately runs an ingestion client against it in the same parent process.
 
 ```python
 def run_ingestor():
-client = NvIngestClient(
-message_client_allocator=SimpleClient,
-message_client_port=7671,
-message_client_hostname="localhost"
-)
+
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost"
+    )
 
     ingestor = (
         Ingestor(client=client)
@@ -318,10 +323,12 @@ message_client_hostname="localhost"
     print("\nIngest done.")
     print(f"Got {len(results)} results.")
 
+
 def main():
-config_data = {}
-config_data = {key: value for key, value in config_data.items() if value is not None}
-ingest_config = PipelineCreationSchema(**config_data)
+
+    config_data = {}
+    config_data = {key: value for key, value in config_data.items() if value is not None}
+    ingest_config = PipelineCreationSchema(**config_data)
 
     try:
         pipeline = run_pipeline(
@@ -341,7 +348,7 @@ ingest_config = PipelineCreationSchema(**config_data)
         logger.info("Shutting down pipeline...")
 
 if __name__ == "__main__":
-main()
+    main()
 ```
 
 
