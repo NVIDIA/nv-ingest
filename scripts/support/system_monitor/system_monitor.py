@@ -15,21 +15,11 @@ import psutil
 # noqa
 # flake8: noqa
 
-try:
-    # Try absolute import when project root (containing src) is on PYTHONPATH
-    from util.system_tracer import get_process_tree_summary  # type: ignore
-except Exception:
-    try:
-        # Try relative import when running as package (python -m util.system_trace_grapher)
-        from .system_tracer import get_process_tree_summary  # type: ignore
-    except Exception:
-        try:
-            # Try direct import when running from same directory
-            from system_tracer import get_process_tree_summary  # type: ignore
-        except Exception:
-
-            def get_process_tree_summary(*args, **kwargs):  # type: ignore
-                return {"error": "get_process_tree_summary not available"}
+# Use absolute package import only (no relatives or fallbacks)
+from .system_tracer import (
+    get_process_tree_summary,
+    SystemTracer,
+)
 
 
 try:
@@ -65,21 +55,21 @@ except ImportError:
 def run_dashboard(datafile, port, host, interval, debug):
     """Run the system monitoring dashboard with the specified parameters."""
 
-    # Validate the data file
+    # Validate the data file (be permissive; pandas can use either pyarrow or fastparquet)
     if not os.path.exists(datafile):
         print(f"Error: Data file '{datafile}' not found.")
         print("Dashboard will start but won't display data until the file exists.")
     elif datafile.endswith(".parquet") and not PARQUET_AVAILABLE:
-        print("Error: Parquet file specified but pyarrow is not available.")
-        print("Please install pyarrow to read parquet files.")
-        sys.exit(1)
+        print("Warning: pyarrow is not installed; will attempt to read parquet via pandas (fastparquet if available).")
     elif not datafile.endswith(".parquet") and not datafile.endswith(".csv"):
         print(f"Warning: Data file '{datafile}' is not a .parquet or .csv file.")
         print("Attempting to load it anyway, but this may cause errors.")
 
-    # Initialize the Dash app and ensure assets/ is resolved relative to repo root
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
-    assets_path = os.path.join(repo_root, "assets")
+    # Initialize the Dash app and ensure assets/ resolves to the packaged assets by default
+    pkg_dir = os.path.abspath(os.path.dirname(__file__))
+    default_assets = os.path.join(pkg_dir, "assets")
+    assets_override = os.environ.get("SYSTEM_MONITOR_ASSETS")
+    assets_path = assets_override if assets_override and os.path.isdir(assets_override) else default_assets
     app = dash.Dash(__name__, assets_folder=assets_path)
 
     # Global Plotly defaults: Inter font and transparent backgrounds (Tufte-style minimalism)
@@ -123,6 +113,7 @@ def run_dashboard(datafile, port, host, interval, debug):
     app.layout = html.Div(
         [
             # Stores
+            dcc.Store(id="datafile-store", data=datafile, storage_type="local"),
             dcc.Store(id="event-store", data=[], storage_type="local"),
             dcc.Store(id="event-auto-store", data=[], storage_type="local"),
             dcc.Store(id="proctree-last-summary", data={}, storage_type="memory"),
@@ -166,6 +157,24 @@ def run_dashboard(datafile, port, host, interval, debug):
                             ),
                             html.Div(
                                 [
+                                    html.Div("Data timezone (source)", className="label"),
+                                    dcc.RadioItems(
+                                        id="data-tz",
+                                        options=[
+                                            {"label": "Local", "value": "local"},
+                                            {"label": "UTC", "value": "utc"},
+                                        ],
+                                        value="local",
+                                        persistence=True,
+                                        persisted_props=["value"],
+                                        persistence_type="local",
+                                        labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                    ),
+                                ],
+                                className="control",
+                            ),
+                            html.Div(
+                                [
                                     html.Div("Theme", className="label"),
                                     dcc.RadioItems(
                                         id="theme-toggle",
@@ -199,6 +208,106 @@ def run_dashboard(datafile, port, host, interval, debug):
                                     ),
                                 ],
                                 className="control",
+                            ),
+                            html.Div(
+                                [
+                                    html.Div("Tracing", className="section-title"),
+                                    html.Div(
+                                        [
+                                            html.Div("Output Parquet Path", className="label"),
+                                            dcc.Input(
+                                                id="tracer-output-path",
+                                                type="text",
+                                                value=datafile,
+                                                debounce=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                                style={"width": "100%"},
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Div("Sampling (s)", className="label"),
+                                            dcc.Input(
+                                                id="tracer-sample-interval",
+                                                type="number",
+                                                min=0.1,
+                                                step=0.1,
+                                                value=5.0,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Div("Write Interval (s)", className="label"),
+                                            dcc.Input(
+                                                id="tracer-write-interval",
+                                                type="number",
+                                                min=1,
+                                                step=1,
+                                                value=10.0,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            dcc.Checklist(
+                                                id="tracer-options",
+                                                options=[
+                                                    {"label": "Enable GPU", "value": "gpu"},
+                                                    {"label": "Enable Docker", "value": "docker"},
+                                                ],
+                                                value=["gpu", "docker"],
+                                                inline=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            )
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Button(
+                                                "Start", id="tracer-start-btn", n_clicks=0, className="button primary"
+                                            ),
+                                            html.Button(
+                                                "Stop",
+                                                id="tracer-stop-btn",
+                                                n_clicks=0,
+                                                className="button",
+                                                style={"marginLeft": "6px"},
+                                            ),
+                                            html.Button(
+                                                "Reset Buffer",
+                                                id="tracer-reset-btn",
+                                                n_clicks=0,
+                                                className="button",
+                                                style={"marginLeft": "6px"},
+                                            ),
+                                            html.Button(
+                                                "Snapshot Now",
+                                                id="tracer-snapshot-btn",
+                                                n_clicks=0,
+                                                className="button primary",
+                                                style={"marginLeft": "6px"},
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(id="tracer-status", className="muted", style={"marginTop": "6px"}),
+                                ]
                             ),
                             html.Hr(style={"opacity": 0.2}),
                             html.Div(
@@ -1095,31 +1204,30 @@ def run_dashboard(datafile, port, host, interval, debug):
     )
 
     # Helper function to load and filter data
-    def load_data(time_range_minutes):
+    def load_data(data_path, time_range_minutes):
         try:
-            if os.path.exists(datafile):
-                if datafile.endswith(".parquet") and PARQUET_AVAILABLE:
-                    # Read parquet file
-                    df = pd.read_parquet(datafile)
-                elif datafile.endswith(".csv"):
-                    # Read CSV file
-                    df = pd.read_csv(datafile, parse_dates=["timestamp"])
-                else:
-                    # Try to guess the format
+            if os.path.exists(data_path):
+                # Prefer parquet if extension says so; let pandas pick available engine (pyarrow/fastparquet)
+                if data_path.endswith(".parquet"):
                     try:
-                        if PARQUET_AVAILABLE:
-                            df = pd.read_parquet(datafile)
-                        else:
-                            df = pd.read_csv(datafile, parse_dates=["timestamp"])
-                    except Exception as e:
-                        print(f"Error reading data file: {e}")
-                        return pd.DataFrame()
+                        df = pd.read_parquet(data_path)
+                    except Exception as pe:
+                        print(f"Parquet read failed via pandas: {pe}. Trying CSV fallback (may fail)...")
+                        df = pd.read_csv(data_path, parse_dates=["timestamp"])  # best-effort
+                elif data_path.endswith(".csv"):
+                    df = pd.read_csv(data_path, parse_dates=["timestamp"])
+                else:
+                    # Try parquet first, then CSV
+                    try:
+                        df = pd.read_parquet(data_path)
+                    except Exception:
+                        df = pd.read_csv(data_path, parse_dates=["timestamp"])  # best-effort
 
                 # Filter by time range if specified
-                if time_range_minutes > 0 and not df.empty:
-                    latest_time = df["timestamp"].max()
+                if time_range_minutes > 0 and not df.empty and "timestamp" in df.columns:
+                    latest_time = pd.to_datetime(df["timestamp"]).max()
                     time_threshold = latest_time - pd.Timedelta(minutes=time_range_minutes)
-                    df = df[df["timestamp"] >= time_threshold]
+                    df = df[pd.to_datetime(df["timestamp"]) >= time_threshold]
 
                 return df
             else:
@@ -1717,23 +1825,42 @@ def run_dashboard(datafile, port, host, interval, debug):
         fig.update_layout(margin=dict(l=30, r=10, t=30, b=30))
         return fig
 
-    def convert_ts_for_display(ts_series, display_tz, display_tz_custom):
+    def convert_ts_for_display(ts_series, display_tz, display_tz_custom, data_tz):
         try:
             ts = pd.to_datetime(ts_series)
-            # Our data timestamps are stored UTC-naive internally.
-            if display_tz == "local" and tzlocal is not None:
+            # First, assign the correct base timezone to the stored timestamps (they are naive on disk)
+            base = None
+            if data_tz == "utc":
+                base = "UTC"
+            else:
                 try:
-                    ts = ts.dt.tz_localize("UTC").dt.tz_convert(tzlocal()).dt.tz_localize(None)
+                    base = tzlocal() if tzlocal is not None else None
                 except Exception:
-                    pass
-            elif display_tz == "custom" and display_tz_custom and gettz is not None:
+                    base = None
+
+            if base is not None:
                 try:
-                    tz = gettz(display_tz_custom)
-                    if tz is not None:
-                        ts = ts.dt.tz_localize("UTC").dt.tz_convert(tz).dt.tz_localize(None)
+                    ts = ts.dt.tz_localize(base)
                 except Exception:
-                    pass
-            # If displaying UTC, keep UTC-naive as-is.
+                    # fallback: try scalar localize if Series.dt failed
+                    try:
+                        ts = pd.DatetimeIndex(ts).tz_localize(base)
+                    except Exception:
+                        pass
+
+            # Convert to target display timezone and drop tz to keep axes naive
+            try:
+                target = None
+                if display_tz == "local" and tzlocal is not None:
+                    target = tzlocal()
+                elif display_tz == "custom" and display_tz_custom and gettz is not None:
+                    target = gettz(display_tz_custom)
+                else:
+                    target = "UTC"
+                if target is not None:
+                    ts = pd.DatetimeIndex(ts).tz_convert(target).tz_localize(None)
+            except Exception:
+                pass
             return ts
         except Exception:
             return pd.to_datetime(ts_series, errors="coerce")
@@ -1788,6 +1915,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             Input("time-range", "value"),
             Input("theme-toggle", "value"),
             Input("smoothing-window", "value"),
+            Input("datafile-store", "data"),
             Input("container-auto-top", "value"),
             Input("container-top-n", "value"),
             Input("container-select", "value"),
@@ -1796,6 +1924,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             Input("event-display-options", "value"),
             Input("display-tz", "value"),
             Input("display-tz-custom", "value"),
+            Input("data-tz", "value"),
         ],
     )
     def update_graphs(
@@ -1803,6 +1932,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         time_range,
         theme_value,
         smoothing_window,
+        data_path,
         auto_top,
         top_n,
         selected_manual,
@@ -1811,9 +1941,10 @@ def run_dashboard(datafile, port, host, interval, debug):
         event_display_options,
         display_tz,
         display_tz_custom,
+        data_tz,
     ):
         # Load data
-        df = load_data(time_range)
+        df = load_data(data_path or datafile, time_range)
         last_timestamp = "Never"
         if not df.empty and "timestamp" in df.columns:
             try:
@@ -1832,7 +1963,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             return s
 
         ts = (
-            convert_ts_for_display(df["timestamp"], display_tz, display_tz_custom)
+            convert_ts_for_display(df["timestamp"], display_tz, display_tz_custom, data_tz)
             if (not df.empty and "timestamp" in df.columns)
             else pd.Series([])
         )
@@ -2117,7 +2248,7 @@ def run_dashboard(datafile, port, host, interval, debug):
 
         return (
             page_style,
-            f"Data source: {datafile} | Data TZ: UTC-naive (stored); Displayed in:"
+            f"Data source: {data_path or datafile} | Data TZ: UTC-naive (stored); Displayed in:"
             f" {disp_label} ({disp_name}, {disp_offset})",
             f"Last updated: {last_timestamp} | Display TZ: {disp_label} ({disp_name}, {disp_offset})",
             kpi_children,
@@ -2472,11 +2603,11 @@ def run_dashboard(datafile, port, host, interval, debug):
     # Populate container dropdown options dynamically
     @app.callback(
         Output("container-select", "options"),
-        [Input("interval-component", "n_intervals"), Input("time-range", "value")],
+        [Input("interval-component", "n_intervals"), Input("time-range", "value"), Input("datafile-store", "data")],
     )
-    def update_container_options(n, time_range):
+    def update_container_options(n, time_range, data_path):
         try:
-            df = load_data(time_range)
+            df = load_data(data_path or datafile, time_range)
             if df.empty:
                 return []
             names = sorted(
@@ -2522,6 +2653,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             State("time-range", "value"),
             State("display-tz", "value"),
             State("display-tz-custom", "value"),
+            State("datafile-store", "data"),
         ],
     )
     def manage_events(
@@ -2536,6 +2668,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         time_range,
         display_tz,
         display_tz_custom,
+        data_path,
     ):
         data = data or []
         triggered = getattr(dash, "callback_context", None)
@@ -2545,7 +2678,7 @@ def run_dashboard(datafile, port, host, interval, debug):
 
         # Helper to get latest timestamp from datafile
         def latest_data_ts():
-            df = load_data(time_range)
+            df = load_data(data_path or datafile, time_range)
             if not df.empty and "timestamp" in df.columns:
                 try:
                     return df["timestamp"].max()
@@ -2681,6 +2814,109 @@ def run_dashboard(datafile, port, host, interval, debug):
         if not items:
             items = html.Div("No events", style={"opacity": 0.7})
         return data, items
+
+    # ----------------------------
+    # Tracer integration
+    # ----------------------------
+    import threading
+
+    _tracer_lock = threading.Lock()
+    _tracer_obj = {"tracer": None, "thread": None}  # type: ignore
+
+    def _is_running():
+        t = _tracer_obj.get("thread")
+        return t is not None and t.is_alive()
+
+    @app.callback(
+        [Output("tracer-status", "children"), Output("datafile-store", "data")],
+        [
+            Input("tracer-start-btn", "n_clicks"),
+            Input("tracer-stop-btn", "n_clicks"),
+            Input("tracer-reset-btn", "n_clicks"),
+            Input("tracer-snapshot-btn", "n_clicks"),
+        ],
+        [
+            State("tracer-output-path", "value"),
+            State("tracer-sample-interval", "value"),
+            State("tracer-write-interval", "value"),
+            State("tracer-options", "value"),
+            State("datafile-store", "data"),
+        ],
+        prevent_initial_call=True,
+    )
+    def manage_tracer(n_start, n_stop, n_reset, n_snap, out_path, sample_iv, write_iv, options, current_path):
+        trig = getattr(dash, "callback_context", None)
+        trig_id = ""
+        if trig and trig.triggered:
+            trig_id = trig.triggered[0]["prop_id"].split(".")[0]
+
+        out_path = (out_path or current_path or datafile).strip()
+        enable_gpu = (options or []) and ("gpu" in (options or []))
+        enable_docker = (options or []) and ("docker" in (options or []))
+
+        if trig_id == "tracer-start-btn":
+            with _tracer_lock:
+                if _is_running():
+                    return (f"Tracer already running -> {out_path}", out_path)
+                tracer = SystemTracer(
+                    sample_interval=float(sample_iv or 5.0),
+                    write_interval=float(write_iv or 10.0),
+                    output_file=out_path,
+                    enable_gpu=bool(enable_gpu),
+                    enable_docker=bool(enable_docker),
+                )
+                th = threading.Thread(target=tracer.run, kwargs={"duration": None, "verbose": False}, daemon=True)
+                _tracer_obj["tracer"] = tracer
+                _tracer_obj["thread"] = th
+                th.start()
+            return (f"Tracer started -> {out_path}", out_path)
+
+        if trig_id == "tracer-stop-btn":
+            with _tracer_lock:
+                tracer = _tracer_obj.get("tracer")
+                th = _tracer_obj.get("thread")
+                if tracer is not None:
+                    try:
+                        tracer.stop()
+                    except Exception:
+                        pass
+                if th is not None:
+                    try:
+                        th.join(timeout=2.0)
+                    except Exception:
+                        pass
+                _tracer_obj["tracer"] = None
+                _tracer_obj["thread"] = None
+            return ("Tracer stopped.", out_path)
+
+        if trig_id == "tracer-reset-btn":
+            with _tracer_lock:
+                tracer = _tracer_obj.get("tracer")
+                if tracer is not None:
+                    try:
+                        tracer.reset()
+                    except Exception:
+                        pass
+            return ("Tracer buffer reset.", out_path)
+
+        if trig_id == "tracer-snapshot-btn":
+            with _tracer_lock:
+                tracer = _tracer_obj.get("tracer")
+                if tracer is not None:
+                    try:
+                        tracer.set_output_file(out_path)
+                        path = tracer.snapshot(out_path)
+                        return (f"Snapshot saved to {path}", path)
+                    except Exception as e:
+                        return (f"Snapshot failed: {e}", out_path)
+            # If tracer not running, still write empty/new file to path
+            try:
+                pd.DataFrame([]).to_parquet(out_path)
+                return (f"Snapshot (empty) saved to {out_path}", out_path)
+            except Exception as e:
+                return (f"Snapshot failed: {e}", out_path)
+
+        return ("", out_path)
 
     # Start the server
     print(f"Starting dashboard server on http://{host}:{port}/")

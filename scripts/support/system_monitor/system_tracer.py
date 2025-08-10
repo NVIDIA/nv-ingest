@@ -2,11 +2,20 @@ import time
 import json
 import argparse
 from typing import Optional, Dict, Any, List
+import threading
+import os
 
 import pandas as pd
 import psutil
-import pynvml
-import docker
+
+try:
+    import pynvml  # type: ignore
+except Exception:  # NVML is optional
+    pynvml = None  # type: ignore
+try:
+    import docker  # type: ignore
+except Exception:  # Docker is optional
+    docker = None  # type: ignore
 import subprocess
 
 # Add these to your requirements.txt:
@@ -564,6 +573,7 @@ class SystemTracer:
         enable_docker: bool = True,
         docker_client: Optional["docker.DockerClient"] = None,
         collectors: Optional[List[BaseCollector]] = None,
+        use_utc: bool = False,
     ) -> None:
         self.sample_interval = sample_interval
         self.write_interval = write_interval
@@ -584,6 +594,7 @@ class SystemTracer:
         ]
         self.last_write_time = time.time()
         self.docker_client = docker_client
+        self.use_utc = use_utc
         if self.enable_docker and self.docker_client is None:
             try:
                 self.docker_client = docker.from_env()
@@ -611,6 +622,8 @@ class SystemTracer:
         if self.enable_docker and self.docker_client is not None:
             self.docker_collector = DockerCollector(client=self.docker_client)
             self.collectors.append(self.docker_collector)
+        # Control flags/state
+        self._stop_event = threading.Event()
 
     def _shutdown_gpu(self) -> None:
         # Back-compat: close GPU collector if present
@@ -622,7 +635,7 @@ class SystemTracer:
 
     def collect_once(self) -> Dict[str, Any]:
         """Collect a single snapshot of system metrics, computing deltas if possible."""
-        timestamp = pd.Timestamp.now()
+        timestamp = pd.Timestamp.utcnow() if self.use_utc else pd.Timestamp.now()
         row: Dict[str, Any] = {"timestamp": timestamp}
         # Aggregate from all collectors
         for collector in self.collectors:
@@ -655,13 +668,42 @@ class SystemTracer:
         return row
 
     def write_parquet(self, df: pd.DataFrame) -> None:
+        """Atomically write the current dataframe to the parquet output path.
+
+        Prefers pyarrow; falls back to fastparquet if available. Writes to a temp
+        file and atomically replaces the target so readers never see partial data.
+        """
+        tmp_path = f"{self.output_file}.tmp"
+        # Try pyarrow first
         try:
-            import pyarrow as pa
-            import pyarrow.parquet as pq
+            import pyarrow as pa  # type: ignore
+            import pyarrow.parquet as pq  # type: ignore
+
+            table = pa.Table.from_pandas(df)
+            pq.write_table(table, tmp_path)
+            os.replace(tmp_path, self.output_file)
+            return
         except ImportError:
-            raise ImportError("pyarrow is required for parquet output.")
-        table = pa.Table.from_pandas(df)
-        pq.write_table(table, self.output_file)
+            pass
+        except Exception:
+            # If pyarrow present but write failed, clean up and re-raise to try fallback
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+            raise
+
+        # Fallback: fastparquet via pandas
+        try:
+            df.to_parquet(tmp_path, engine="fastparquet")
+            os.replace(tmp_path, self.output_file)
+        finally:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
 
     def run(self, duration: Optional[float] = None, verbose: bool = True) -> None:
         """Run monitoring loop. If duration is set (seconds), stop after duration; else run until Ctrl+C."""
@@ -673,7 +715,7 @@ class SystemTracer:
             )
             print("Press Ctrl+C to stop monitoring." if duration is None else f"Stopping after {duration} seconds...")
         try:
-            while True:
+            while not self._stop_event.is_set():
                 row = self.collect_once()
                 self.data_buffer.append(row)
 
@@ -702,13 +744,16 @@ class SystemTracer:
                 now = time.time()
                 if now - self.last_write_time >= self.write_interval:
                     df = pd.DataFrame(self.data_buffer)
-                    self.write_parquet(df)
-                    if verbose:
-                        print(
-                            f"Total accumulated data ({len(self.data_buffer)} rows) "
-                            f"written to {self.output_file} at {row['timestamp']}"
-                        )
-                    self.last_write_time = now
+                    try:
+                        self.write_parquet(df)
+                        if verbose:
+                            print(
+                                f"Total accumulated data ({len(self.data_buffer)} rows) "
+                                f"written to {self.output_file} at {row['timestamp']}"
+                            )
+                        self.last_write_time = now
+                    except Exception as e:
+                        print(f"Error writing periodic data: {e}")
 
                 # Stop conditions
                 if duration is not None and (now - start_time) >= duration:
@@ -733,7 +778,37 @@ class SystemTracer:
                 self._shutdown_gpu()
             except Exception:
                 pass
-            self._shutdown_gpu()
+
+    def stop(self) -> None:
+        """Signal the run loop to stop."""
+        self._stop_event.set()
+
+    def reset(self) -> None:
+        """Clear accumulated data and deltas. Does not change output file."""
+        self.data_buffer = []
+        self.previous_row = None
+        self.last_write_time = time.time()
+        # Do not clear stop flag to allow caller to decide lifecycle
+
+    def set_output_file(self, output_file: str) -> None:
+        """Update the output parquet path used by periodic writes."""
+        self.output_file = output_file
+
+    def snapshot(self, output_file: Optional[str] = None) -> str:
+        """Write the current buffered dataframe to the specified parquet path (or self.output_file).
+
+        Returns the path written.
+        """
+        path = output_file or self.output_file
+        if not path:
+            raise ValueError("No output_file specified for snapshot.")
+        df = pd.DataFrame(self.data_buffer)
+        if not df.empty:
+            self.write_parquet(df)
+        else:
+            # Still write an empty table with schema if desired; for now, create empty file via pandas/pyarrow
+            self.write_parquet(pd.DataFrame([]))
+        return path
 
 
 # -------- Functional API --------
@@ -745,6 +820,7 @@ def collect_system_snapshot(enable_gpu: bool = True, enable_docker: bool = True,
         enable_gpu=enable_gpu,
         enable_docker=enable_docker,
         docker_client=docker_client,
+        use_utc=False,
     )
     return tracer.collect_once()
 
@@ -758,6 +834,7 @@ def monitor_to_parquet(
     enable_docker: bool = True,
     docker_client=None,
     verbose: bool = True,
+    use_utc: bool = False,
 ) -> None:
     tracer = SystemTracer(
         sample_interval=sample_interval,
@@ -766,6 +843,7 @@ def monitor_to_parquet(
         enable_gpu=enable_gpu,
         enable_docker=enable_docker,
         docker_client=docker_client,
+        use_utc=use_utc,
     )
     tracer.run(duration=duration, verbose=verbose)
 
@@ -784,11 +862,13 @@ def main():
     p_run.add_argument("--no-gpu", action="store_true", help="Disable GPU collection")
     p_run.add_argument("--no-docker", action="store_true", help="Disable Docker collection")
     p_run.add_argument("--quiet", action="store_true", help="Reduce console output")
+    p_run.add_argument("--utc", action="store_true", help="Record timestamps in UTC (default is local time)")
 
     # snapshot
     p_snap = sub.add_parser("snapshot", help="Collect a single snapshot and print JSON")
     p_snap.add_argument("--no-gpu", action="store_true", help="Disable GPU collection")
     p_snap.add_argument("--no-docker", action="store_true", help="Disable Docker collection")
+    p_snap.add_argument("--utc", action="store_true", help="Use UTC timestamp for the snapshot")
 
     # proctree (process/thread inspection)
     p_tree = sub.add_parser("proctree", help="Inspect a process tree and summarize threads")
@@ -802,7 +882,17 @@ def main():
     cmd = args.command
 
     if cmd == "snapshot":
-        snap = collect_system_snapshot(enable_gpu=not args.no_gpu, enable_docker=not args.no_docker)
+        # One-off snapshot; use_utc affects only the timestamp on this row
+        tracer = SystemTracer(
+            sample_interval=0.0,
+            write_interval=0.0,
+            output_file="",
+            enable_gpu=not args.no_gpu,
+            enable_docker=not args.no_docker,
+            docker_client=None,
+            use_utc=bool(getattr(args, "utc", False)),
+        )
+        snap = tracer.collect_once()
         print(json.dumps(snap, default=str))
         return
 
@@ -820,6 +910,7 @@ def main():
         enable_gpu=not args.no_gpu,
         enable_docker=not args.no_docker,
         verbose=not args.quiet,
+        use_utc=bool(getattr(args, "utc", False)),
     )
 
 
