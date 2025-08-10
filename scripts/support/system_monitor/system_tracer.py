@@ -574,6 +574,7 @@ class SystemTracer:
         docker_client: Optional["docker.DockerClient"] = None,
         collectors: Optional[List[BaseCollector]] = None,
         use_utc: bool = False,
+        write_final: bool = True,
     ) -> None:
         self.sample_interval = sample_interval
         self.write_interval = write_interval
@@ -595,6 +596,7 @@ class SystemTracer:
         self.last_write_time = time.time()
         self.docker_client = docker_client
         self.use_utc = use_utc
+        self.write_final = write_final
         if self.enable_docker and self.docker_client is None:
             try:
                 self.docker_client = docker.from_env()
@@ -630,6 +632,42 @@ class SystemTracer:
         if self.gpu_collector is not None:
             try:
                 self.gpu_collector.close()
+            except Exception:
+                pass
+
+    def write_parquet_to(self, df: pd.DataFrame, destination_path: str) -> None:
+        """Atomically write the dataframe to a specific parquet destination path.
+
+        Mirrors write_parquet but targets the provided destination rather than self.output_file.
+        """
+        tmp_path = f"{destination_path}.tmp"
+        # Try pyarrow first
+        try:
+            import pyarrow as pa  # type: ignore
+            import pyarrow.parquet as pq  # type: ignore
+
+            table = pa.Table.from_pandas(df)
+            pq.write_table(table, tmp_path)
+            os.replace(tmp_path, destination_path)
+            return
+        except ImportError:
+            pass
+        except Exception:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+            raise
+
+        # Fallback: fastparquet via pandas
+        try:
+            df.to_parquet(tmp_path, engine="fastparquet")
+            os.replace(tmp_path, destination_path)
+        finally:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
             except Exception:
                 pass
 
@@ -740,9 +778,13 @@ class SystemTracer:
                             f"{row['net_bytes_sent_per_sec']/1024**2:.2f} MB/s up"
                         )
 
-                # Periodic write (overwrite full buffered data)
+                # Periodic write (overwrite full buffered data) if enabled
                 now = time.time()
-                if now - self.last_write_time >= self.write_interval:
+                if (
+                    self.write_interval
+                    and self.write_interval > 0
+                    and (now - self.last_write_time) >= self.write_interval
+                ):
                     df = pd.DataFrame(self.data_buffer)
                     try:
                         self.write_parquet(df)
@@ -764,8 +806,8 @@ class SystemTracer:
             if verbose:
                 print("\nStopping monitoring. Writing final data batch...")
         finally:
-            # Final write
-            if self.data_buffer:
+            # Final write if enabled
+            if self.write_final and self.data_buffer:
                 df = pd.DataFrame(self.data_buffer)
                 try:
                     self.write_parquet(df)
@@ -799,15 +841,31 @@ class SystemTracer:
 
         Returns the path written.
         """
-        path = output_file or self.output_file
-        if not path:
+        base_path = output_file or self.output_file
+        if not base_path:
             raise ValueError("No output_file specified for snapshot.")
+        # If destination exists, create a unique suffixed name: file.parquet -> file_0.parquet, ...
+        root, ext = os.path.splitext(base_path)
+        if not ext:
+            ext = ".parquet"
+            root = base_path  # original base without extension
+            base_path = base_path + ext
+
+        path = base_path
+        if os.path.exists(path):
+            idx = 0
+            while True:
+                candidate = f"{root}_{idx}{ext}"
+                if not os.path.exists(candidate):
+                    path = candidate
+                    break
+                idx += 1
         df = pd.DataFrame(self.data_buffer)
         if not df.empty:
-            self.write_parquet(df)
+            self.write_parquet_to(df, path)
         else:
-            # Still write an empty table with schema if desired; for now, create empty file via pandas/pyarrow
-            self.write_parquet(pd.DataFrame([]))
+            # Still write an empty table with schema
+            self.write_parquet_to(pd.DataFrame([]), path)
         return path
 
 

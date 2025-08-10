@@ -1,15 +1,15 @@
 import dash
 from dash import dcc, html
-from dash.dependencies import Output, Input, State
+from dash.dependencies import Output, Input, State, ALL
 import pandas as pd
 import plotly.graph_objects as go
 import os
-import sys
 import click
 import base64
 import io
 import csv
 from datetime import datetime
+import json
 import psutil
 
 # noqa
@@ -116,6 +116,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             dcc.Store(id="datafile-store", data=datafile, storage_type="local"),
             dcc.Store(id="event-store", data=[], storage_type="local"),
             dcc.Store(id="event-auto-store", data=[], storage_type="local"),
+            dcc.Store(id="watch-state-store", data={}, storage_type="session"),
             dcc.Store(id="proctree-last-summary", data={}, storage_type="memory"),
             dcc.Store(id="proctree-snapshot", data=None, storage_type="local"),
             dcc.Store(id="theme-sink", data=None, storage_type="memory"),
@@ -134,84 +135,117 @@ def run_dashboard(datafile, port, host, interval, debug):
                                 ],
                                 style={"marginBottom": "6px"},
                             ),
-                            html.Div(
+                            html.Details(
                                 [
-                                    html.Div("Time range", className="label"),
-                                    dcc.RadioItems(
-                                        id="time-range",
-                                        options=[
-                                            {"label": "10m", "value": 10},
-                                            {"label": "30m", "value": 30},
-                                            {"label": "1h", "value": 60},
-                                            {"label": "3h", "value": 180},
-                                            {"label": "All", "value": 0},
+                                    html.Summary("Time & Display", className="section-title"),
+                                    html.Div(
+                                        [
+                                            html.Div("Time range", className="label"),
+                                            dcc.RadioItems(
+                                                id="time-range",
+                                                options=[
+                                                    {"label": "10m", "value": 10},
+                                                    {"label": "30m", "value": 30},
+                                                    {"label": "1h", "value": 60},
+                                                    {"label": "3h", "value": 180},
+                                                    {"label": "All", "value": 0},
+                                                ],
+                                                value=30,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                                labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                            ),
                                         ],
-                                        value=30,
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
-                                        labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                        className="control",
                                     ),
-                                ],
-                                className="control",
-                            ),
-                            html.Div(
-                                [
-                                    html.Div("Data timezone (source)", className="label"),
-                                    dcc.RadioItems(
-                                        id="data-tz",
-                                        options=[
-                                            {"label": "Local", "value": "local"},
-                                            {"label": "UTC", "value": "utc"},
+                                    html.Div(
+                                        [
+                                            html.Div("Display timezone", className="label"),
+                                            dcc.Dropdown(
+                                                id="display-tz",
+                                                options=[
+                                                    {"label": "Local", "value": "local"},
+                                                    {"label": "UTC", "value": "utc"},
+                                                    {"label": "Custom…", "value": "custom"},
+                                                ],
+                                                value="local",
+                                                clearable=False,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            ),
                                         ],
-                                        value="local",
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
-                                        labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                        className="control",
                                     ),
-                                ],
-                                className="control",
-                            ),
-                            html.Div(
-                                [
-                                    html.Div("Theme", className="label"),
-                                    dcc.RadioItems(
-                                        id="theme-toggle",
-                                        options=[
-                                            {"label": "Light", "value": "light"},
-                                            {"label": "Dark", "value": "dark"},
+                                    html.Div(
+                                        [
+                                            dcc.Input(
+                                                id="display-tz-custom",
+                                                type="text",
+                                                placeholder="e.g., America/Denver",
+                                                debounce=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            )
                                         ],
-                                        value="dark",
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
-                                        labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                        id="display-tz-custom-wrap",
+                                        className="control",
+                                        style={"display": "none"},
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Div("Data timezone (source)", className="label"),
+                                            dcc.RadioItems(
+                                                id="data-tz",
+                                                options=[
+                                                    {"label": "Local", "value": "local"},
+                                                    {"label": "UTC", "value": "utc"},
+                                                ],
+                                                value="local",
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                                labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                            ),
+                                            html.Div(
+                                                "Tip: Set to UTC if you started the tracer with --utc.",
+                                                className="muted",
+                                                style={"marginTop": "4px"},
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Div("Smoothing (samples)", className="label"),
+                                            dcc.Slider(
+                                                id="smoothing-window",
+                                                min=1,
+                                                max=10,
+                                                step=1,
+                                                value=3,
+                                                marks={1: "1", 5: "5", 10: "10"},
+                                                tooltip={"placement": "bottom", "always_visible": False},
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            ),
+                                        ],
+                                        className="control",
                                     ),
                                 ],
-                                className="control",
+                                open=True,
                             ),
-                            html.Div(
+                            html.Details(
                                 [
-                                    html.Div("Smoothing (samples)", className="label"),
-                                    dcc.Slider(
-                                        id="smoothing-window",
-                                        min=1,
-                                        max=10,
-                                        step=1,
-                                        value=3,
-                                        marks={1: "1", 5: "5", 10: "10"},
-                                        tooltip={"placement": "bottom", "always_visible": False},
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
+                                    html.Summary("Live Tracing", className="section-title"),
+                                    html.Div(
+                                        "Configure and control in-process tracing. For offline files, leave tracing stopped.",
+                                        className="muted",
+                                        style={"marginTop": "-6px", "marginBottom": "6px"},
                                     ),
-                                ],
-                                className="control",
-                            ),
-                            html.Div(
-                                [
-                                    html.Div("Tracing", className="section-title"),
                                     html.Div(
                                         [
                                             html.Div("Output Parquet Path", className="label"),
@@ -267,6 +301,7 @@ def run_dashboard(datafile, port, host, interval, debug):
                                                 options=[
                                                     {"label": "Enable GPU", "value": "gpu"},
                                                     {"label": "Enable Docker", "value": "docker"},
+                                                    {"label": "UTC timestamps", "value": "utc"},
                                                 ],
                                                 value=["gpu", "docker"],
                                                 inline=True,
@@ -307,46 +342,18 @@ def run_dashboard(datafile, port, host, interval, debug):
                                         className="control",
                                     ),
                                     html.Div(id="tracer-status", className="muted", style={"marginTop": "6px"}),
-                                ]
+                                ],
+                                open=False,
                             ),
                             html.Hr(style={"opacity": 0.2}),
-                            html.Div(
+                            html.Details(
                                 [
-                                    html.Div("Display timezone", className="label"),
-                                    dcc.Dropdown(
-                                        id="display-tz",
-                                        options=[
-                                            {"label": "Local", "value": "local"},
-                                            {"label": "UTC", "value": "utc"},
-                                            {"label": "Custom…", "value": "custom"},
-                                        ],
-                                        value="local",
-                                        clearable=False,
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
+                                    html.Summary("Events & Annotations", className="section-title"),
+                                    html.Div(
+                                        "Add named events to appear as vertical markers on all charts.",
+                                        className="muted",
+                                        style={"marginTop": "-6px", "marginBottom": "6px"},
                                     ),
-                                ],
-                                className="control",
-                            ),
-                            html.Div(
-                                [
-                                    dcc.Input(
-                                        id="display-tz-custom",
-                                        type="text",
-                                        placeholder="e.g., America/Denver",
-                                        debounce=True,
-                                        persistence=True,
-                                        persisted_props=["value"],
-                                        persistence_type="local",
-                                    )
-                                ],
-                                className="control",
-                            ),
-                            html.Hr(style={"opacity": 0.2}),
-                            html.Div([html.Div("Events", className="section-title")]),
-                            html.Div(
-                                [
                                     html.Div(
                                         [
                                             dcc.Input(
@@ -363,15 +370,32 @@ def run_dashboard(datafile, port, host, interval, debug):
                                     ),
                                     html.Div(
                                         [
-                                            dcc.Input(
-                                                id="event-datetime-text",
-                                                type="text",
-                                                placeholder="YYYY-MM-DD HH:MM[:SS]",
-                                                persistence=True,
-                                                persisted_props=["value"],
-                                                persistence_type="local",
-                                                style={"width": "100%"},
-                                            )
+                                            html.Div("Event time", className="label"),
+                                            html.Div(
+                                                [
+                                                    dcc.DatePickerSingle(
+                                                        id="event-date",
+                                                        display_format="YYYY-MM-DD",
+                                                        persistence=True,
+                                                        persistence_type="local",
+                                                    ),
+                                                    dcc.Input(
+                                                        id="event-time",
+                                                        type="text",
+                                                        placeholder="HH:MM[:SS]",
+                                                        persistence=True,
+                                                        persisted_props=["value"],
+                                                        persistence_type="local",
+                                                        style={"width": "120px", "marginLeft": "8px"},
+                                                    ),
+                                                ],
+                                                style={"display": "flex", "alignItems": "center"},
+                                            ),
+                                            html.Div(
+                                                "Date/time interpreted in selected Display Timezone; stored as UTC.",
+                                                className="muted",
+                                                style={"marginTop": "4px"},
+                                            ),
                                         ],
                                         className="control",
                                     ),
@@ -410,7 +434,122 @@ def run_dashboard(datafile, port, host, interval, debug):
                                         className="control",
                                     ),
                                     html.Div(id="event-list", className="control"),
-                                ]
+                                ],
+                                open=False,
+                            ),
+                            html.Details(
+                                [
+                                    html.Summary(
+                                        "Watch Points (auto-create events when thresholds are exceeded)",
+                                        className="section-title",
+                                    ),
+                                    html.Div(
+                                        [
+                                            dcc.Checklist(
+                                                id="watch-enable",
+                                                options=[
+                                                    {"label": "CPU %", "value": "cpu"},
+                                                    {"label": "Memory %", "value": "mem"},
+                                                    {"label": "Threads", "value": "threads"},
+                                                    {"label": "Processes", "value": "procs"},
+                                                ],
+                                                value=[],
+                                                inline=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Span("CPU % >"),
+                                                    dcc.Input(
+                                                        id="watch-cpu",
+                                                        type="number",
+                                                        min=0,
+                                                        max=100,
+                                                        step=1,
+                                                        style={"width": "70px", "marginRight": "12px"},
+                                                        persistence=True,
+                                                        persisted_props=["value"],
+                                                        persistence_type="local",
+                                                    ),
+                                                    html.Span("Mem % >"),
+                                                    dcc.Input(
+                                                        id="watch-mem",
+                                                        type="number",
+                                                        min=0,
+                                                        max=100,
+                                                        step=1,
+                                                        style={"width": "70px", "marginRight": "12px"},
+                                                        persistence=True,
+                                                        persisted_props=["value"],
+                                                        persistence_type="local",
+                                                    ),
+                                                    html.Span("Threads >"),
+                                                    dcc.Input(
+                                                        id="watch-threads",
+                                                        type="number",
+                                                        min=0,
+                                                        step=1,
+                                                        style={"width": "90px", "marginRight": "12px"},
+                                                        persistence=True,
+                                                        persisted_props=["value"],
+                                                        persistence_type="local",
+                                                    ),
+                                                    html.Span("Processes >"),
+                                                    dcc.Input(
+                                                        id="watch-procs",
+                                                        type="number",
+                                                        min=0,
+                                                        step=1,
+                                                        style={"width": "90px", "marginRight": "12px"},
+                                                        persistence=True,
+                                                        persisted_props=["value"],
+                                                        persistence_type="local",
+                                                    ),
+                                                ],
+                                                style={"marginTop": "6px"},
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Button(
+                                                        "Clear Auto Events",
+                                                        id="clear-auto-events-btn",
+                                                        n_clicks=0,
+                                                        className="inline",
+                                                    )
+                                                ],
+                                                className="control",
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                open=False,
+                            ),
+                            html.Hr(style={"opacity": 0.2}),
+                            html.Details(
+                                [
+                                    html.Summary("Appearance", className="section-title"),
+                                    html.Div(
+                                        [
+                                            html.Div("Theme", className="label"),
+                                            dcc.RadioItems(
+                                                id="theme-toggle",
+                                                options=[
+                                                    {"label": "Light", "value": "light"},
+                                                    {"label": "Dark", "value": "dark"},
+                                                ],
+                                                value="dark",
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                                labelStyle={"display": "inline-block", "marginRight": "8px"},
+                                            ),
+                                        ],
+                                        className="control",
+                                    ),
+                                ],
+                                open=False,
                             ),
                         ],
                         className="sidebar",
@@ -444,96 +583,6 @@ def run_dashboard(datafile, port, host, interval, debug):
                                                                 style={"height": "340px"},
                                                             ),
                                                         ]
-                                                    ),
-                                                    html.Details(
-                                                        open=False,
-                                                        children=[
-                                                            html.Summary(
-                                                                "Watch Points (auto-create events when "
-                                                                "thresholds are exceeded)"
-                                                            ),
-                                                            html.Div(
-                                                                [
-                                                                    dcc.Checklist(
-                                                                        id="watch-enable",
-                                                                        options=[
-                                                                            {"label": "CPU %", "value": "cpu"},
-                                                                            {"label": "Memory %", "value": "mem"},
-                                                                            {"label": "Threads", "value": "threads"},
-                                                                            {"label": "Processes", "value": "procs"},
-                                                                        ],
-                                                                        value=[],
-                                                                        inline=True,
-                                                                        persistence=True,
-                                                                        persisted_props=["value"],
-                                                                        persistence_type="local",
-                                                                    ),
-                                                                    html.Div(
-                                                                        [
-                                                                            html.Span("CPU % >"),
-                                                                            dcc.Input(
-                                                                                id="watch-cpu",
-                                                                                type="number",
-                                                                                min=0,
-                                                                                max=100,
-                                                                                step=1,
-                                                                                style={
-                                                                                    "width": "70px",
-                                                                                    "marginRight": "12px",
-                                                                                },
-                                                                                persistence=True,
-                                                                                persisted_props=["value"],
-                                                                                persistence_type="local",
-                                                                            ),
-                                                                            html.Span("Mem % >"),
-                                                                            dcc.Input(
-                                                                                id="watch-mem",
-                                                                                type="number",
-                                                                                min=0,
-                                                                                max=100,
-                                                                                step=1,
-                                                                                style={
-                                                                                    "width": "70px",
-                                                                                    "marginRight": "12px",
-                                                                                },
-                                                                                persistence=True,
-                                                                                persisted_props=["value"],
-                                                                                persistence_type="local",
-                                                                            ),
-                                                                            html.Span("Threads >"),
-                                                                            dcc.Input(
-                                                                                id="watch-threads",
-                                                                                type="number",
-                                                                                min=0,
-                                                                                step=1,
-                                                                                style={
-                                                                                    "width": "90px",
-                                                                                    "marginRight": "12px",
-                                                                                },
-                                                                                persistence=True,
-                                                                                persisted_props=["value"],
-                                                                                persistence_type="local",
-                                                                            ),
-                                                                            html.Span("Processes >"),
-                                                                            dcc.Input(
-                                                                                id="watch-procs",
-                                                                                type="number",
-                                                                                min=0,
-                                                                                step=1,
-                                                                                style={
-                                                                                    "width": "90px",
-                                                                                    "marginRight": "12px",
-                                                                                },
-                                                                                persistence=True,
-                                                                                persisted_props=["value"],
-                                                                                persistence_type="local",
-                                                                            ),
-                                                                        ],
-                                                                        style={"marginTop": "6px"},
-                                                                    ),
-                                                                ]
-                                                            ),
-                                                        ],
                                                     ),
                                                 ],
                                                 style={"marginTop": "4px"},
@@ -1206,6 +1255,21 @@ def run_dashboard(datafile, port, host, interval, debug):
     # Helper function to load and filter data
     def load_data(data_path, time_range_minutes):
         try:
+            # If live tracer is running, read directly from in-memory buffer
+            try:
+                if _is_running():
+                    with _tracer_lock:
+                        tracer = _tracer_obj.get("tracer")
+                        if tracer is not None and getattr(tracer, "data_buffer", None) is not None:
+                            df = pd.DataFrame(list(tracer.data_buffer))
+                            if time_range_minutes > 0 and not df.empty and "timestamp" in df.columns:
+                                latest_time = pd.to_datetime(df["timestamp"]).max()
+                                time_threshold = latest_time - pd.Timedelta(minutes=time_range_minutes)
+                                df = df[pd.to_datetime(df["timestamp"]) >= time_threshold]
+                            return df
+            except Exception as le:
+                print(f"Error reading live buffer: {le}")
+
             if os.path.exists(data_path):
                 # Prefer parquet if extension says so; let pandas pick available engine (pyarrow/fastparquet)
                 if data_path.endswith(".parquet"):
@@ -1814,7 +1878,27 @@ def run_dashboard(datafile, port, host, interval, debug):
         return fig
 
     def render_event_list(events_list):
-        items = [html.Div(f"{e.get('timestamp', '')} — {e.get('name', 'event')}") for e in (events_list or [])]
+        events_list = events_list or []
+        items = []
+        for idx, e in enumerate(events_list):
+            ts_txt = e.get("timestamp", "")
+            name_txt = e.get("name", "event")
+            items.append(
+                html.Div(
+                    [
+                        html.Span(f"{ts_txt} — {name_txt}", className="event-text"),
+                        html.Button(
+                            "Delete",
+                            id={"type": "event-delete", "index": idx},
+                            n_clicks=0,
+                            className="inline button tiny",
+                            style={"marginLeft": "8px"},
+                        ),
+                    ],
+                    className="event-item",
+                    style={"display": "flex", "alignItems": "center", "justifyContent": "space-between"},
+                )
+            )
         if not items:
             return html.Div("No events", style={"opacity": 0.7})
         return items
@@ -1884,6 +1968,15 @@ def run_dashboard(datafile, port, host, interval, debug):
             return pd.Series([], dtype="datetime64[ns]")
 
     # Callback to update all graphs periodically
+    @app.callback(
+        Output("display-tz-custom-wrap", "style"),
+        [Input("display-tz", "value")],
+    )
+    def _toggle_custom_tz(display_value):
+        if display_value == "custom":
+            return {"display": "block"}
+        return {"display": "none"}
+
     @app.callback(
         [
             Output("page-container", "style"),
@@ -2644,10 +2737,12 @@ def run_dashboard(datafile, port, host, interval, debug):
             Input("add-event-now-btn", "n_clicks"),
             Input("clear-events-btn", "n_clicks"),
             Input("event-upload", "contents"),
+            Input({"type": "event-delete", "index": ALL}, "n_clicks"),
         ],
         [
             State("event-name", "value"),
-            State("event-datetime-text", "value"),
+            State("event-date", "date"),
+            State("event-time", "value"),
             State("event-store", "data"),
             State("event-auto-store", "data"),
             State("time-range", "value"),
@@ -2661,8 +2756,10 @@ def run_dashboard(datafile, port, host, interval, debug):
         n_now,
         n_clear,
         upload_contents,
+        delete_clicks,
         name,
-        dt_text,
+        date_val,
+        time_val,
         data,
         auto_data,
         time_range,
@@ -2739,6 +2836,17 @@ def run_dashboard(datafile, port, host, interval, debug):
                     pass
             return base
 
+        # Handle per-item delete via pattern-matching id
+        if trig_id.startswith("{") and "event-delete" in trig_id:
+            try:
+                obj = json.loads(trig_id)
+                idx = int(obj.get("index", -1))
+            except Exception:
+                idx = -1
+            if 0 <= idx < len(data):
+                data.pop(idx)
+            return data, render_event_list(data)
+
         if trig_id == "clear-events-btn":
             return [], html.Div("No events", style={"opacity": 0.7})
 
@@ -2755,10 +2863,17 @@ def run_dashboard(datafile, port, host, interval, debug):
                         pass
                 ts = now_dt
             else:
-                # Use date/time picker if provided, else latest data timestamp
-                if dt_text:
+                # Combine date + time into a single wall time in selected display tz
+                if date_val:
+                    t_str = (time_val or "00:00:00").strip()
+                    # normalize time format HH:MM[:SS]
+                    parts = t_str.split(":")
+                    if len(parts) == 1:
+                        t_str = f"{parts[0]}:00:00"
+                    elif len(parts) == 2:
+                        t_str = f"{parts[0]}:{parts[1]}:00"
                     try:
-                        ts = from_text_to_utc_naive(dt_text)
+                        ts = from_text_to_utc_naive(f"{date_val} {t_str}")
                     except Exception:
                         ts = latest_data_ts()
                 else:
@@ -2770,8 +2885,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             except Exception:
                 ts_str = str(ts)
             new_data = data + [{"name": evt_name, "timestamp": ts_str}]
-            items = [html.Div(f"{d['timestamp']} — {d['name']}") for d in new_data]
-            return new_data, items
+            return new_data, render_event_list(new_data)
 
         if trig_id == "event-upload":
             try:
@@ -2801,19 +2915,172 @@ def run_dashboard(datafile, port, host, interval, debug):
                         ts_str = str(ts_text)
                     imported.append({"name": evt_name, "timestamp": ts_str})
                 new_data = (data or []) + imported
-                items = [html.Div(f"{d['timestamp']} — {d['name']}") for d in new_data]
-                return new_data, items
+                return new_data, render_event_list(new_data)
             except Exception:
-                items = [html.Div(f"{d['timestamp']} — {d['name']}") for d in data]
-                if not items:
-                    items = html.Div("No events", style={"opacity": 0.7})
-                return data, items
+                return data, render_event_list(data)
 
         # default: just render existing
-        items = [html.Div(f"{d['timestamp']} — {d['name']}") for d in data]
-        if not items:
-            items = html.Div("No events", style={"opacity": 0.7})
-        return data, items
+        return data, render_event_list(data)
+
+    # Auto event triggers (watch points)
+    @app.callback(
+        [Output("event-auto-store", "data"), Output("watch-state-store", "data")],
+        [Input("interval-component", "n_intervals"), Input("clear-auto-events-btn", "n_clicks")],
+        [
+            State("watch-enable", "value"),
+            State("watch-cpu", "value"),
+            State("watch-mem", "value"),
+            State("watch-threads", "value"),
+            State("watch-procs", "value"),
+            State("event-auto-store", "data"),
+            State("watch-state-store", "data"),
+            State("datafile-store", "data"),
+            State("time-range", "value"),
+        ],
+    )
+    def apply_watch_points(
+        n,
+        n_clear_auto,
+        enable_vals,
+        thr_cpu,
+        thr_mem,
+        thr_thr,
+        thr_prc,
+        auto_events,
+        watch_state,
+        data_path,
+        time_range,
+    ):
+        auto_events = auto_events or []
+        watch_state = watch_state or {"cpu": False, "mem": False, "threads": False, "procs": False}
+        enabled = set(enable_vals or [])
+        # If clear button triggered, reset auto events and watch state immediately
+        triggered = getattr(dash, "callback_context", None)
+        trig_id = ""
+        if triggered and triggered.triggered:
+            trig_id = triggered.triggered[0]["prop_id"].split(".")[0]
+        if trig_id == "clear-auto-events-btn":
+            # Clear auto events and set watch_state according to current readings
+            try:
+                df_now = load_data(data_path or datafile, time_range)
+            except Exception:
+                return [], watch_state
+            if df_now.empty or "timestamp" not in df_now.columns:
+                return [], watch_state
+            latest_now = df_now.iloc[-1]
+            # Compute over-threshold flags to avoid immediate re-trigger if still over
+            new_state = {"cpu": False, "mem": False, "threads": False, "procs": False}
+            try:
+                if "cpu" in enabled and thr_cpu is not None:
+                    cpu_cols = [c for c in df_now.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+                    cpu_avg = float(latest_now[cpu_cols].mean()) if cpu_cols else None
+                    new_state["cpu"] = cpu_avg is not None and cpu_avg >= float(thr_cpu)
+            except Exception:
+                pass
+            try:
+                if "mem" in enabled and thr_mem is not None:
+                    used = float(latest_now.get("sys_used", 0.0))
+                    total = float(latest_now.get("sys_total", 0.0))
+                    mem_pct = (used / total * 100.0) if total > 0 else None
+                    new_state["mem"] = mem_pct is not None and mem_pct >= float(thr_mem)
+            except Exception:
+                pass
+            try:
+                if "threads" in enabled and thr_thr is not None:
+                    thr_count = float(latest_now.get("system_thread_count", 0))
+                    new_state["threads"] = thr_count >= float(thr_thr)
+            except Exception:
+                pass
+            try:
+                if "procs" in enabled and thr_prc is not None:
+                    prc_count = float(latest_now.get("system_process_count", 0))
+                    new_state["procs"] = prc_count >= float(thr_prc)
+            except Exception:
+                pass
+            return [], new_state
+        try:
+            df = load_data(data_path or datafile, time_range)
+        except Exception:
+            return auto_events, watch_state
+        if df.empty or "timestamp" not in df.columns:
+            return auto_events, watch_state
+        latest = df.iloc[-1]
+        ts = latest.get("timestamp")
+        try:
+            ts_norm = pd.to_datetime(normalize_ts(ts)).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            ts_norm = str(ts)
+
+        new_events = []
+        # CPU avg threshold
+        if "cpu" in enabled and thr_cpu is not None:
+            try:
+                cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+                cpu_avg = float(latest[cpu_cols].mean()) if cpu_cols else None
+                if cpu_avg is not None:
+                    over = cpu_avg >= float(thr_cpu)
+                    if over and not watch_state.get("cpu", False):
+                        new_events.append(
+                            {
+                                "name": f"CPU% > {float(thr_cpu):.0f} (now {cpu_avg:.1f})",
+                                "timestamp": ts_norm,
+                            }
+                        )
+                    watch_state["cpu"] = over
+            except Exception:
+                pass
+        # Memory percent threshold
+        if "mem" in enabled and thr_mem is not None:
+            try:
+                used = float(latest.get("sys_used", 0.0))
+                total = float(latest.get("sys_total", 0.0))
+                mem_pct = (used / total * 100.0) if total > 0 else None
+                if mem_pct is not None:
+                    over = mem_pct >= float(thr_mem)
+                    if over and not watch_state.get("mem", False):
+                        new_events.append(
+                            {
+                                "name": f"Mem% > {float(thr_mem):.0f} (now {mem_pct:.1f})",
+                                "timestamp": ts_norm,
+                            }
+                        )
+                    watch_state["mem"] = over
+            except Exception:
+                pass
+        # Threads threshold
+        if "threads" in enabled and thr_thr is not None:
+            try:
+                thr_count = float(latest.get("system_thread_count", 0))
+                over = thr_count >= float(thr_thr)
+                if over and not watch_state.get("threads", False):
+                    new_events.append(
+                        {
+                            "name": f"Threads > {float(thr_thr):.0f} (now {thr_count:.0f})",
+                            "timestamp": ts_norm,
+                        }
+                    )
+                watch_state["threads"] = over
+            except Exception:
+                pass
+        # Processes threshold
+        if "procs" in enabled and thr_prc is not None:
+            try:
+                prc_count = float(latest.get("system_process_count", 0))
+                over = prc_count >= float(thr_prc)
+                if over and not watch_state.get("procs", False):
+                    new_events.append(
+                        {
+                            "name": f"Processes > {float(thr_prc):.0f} (now {prc_count:.0f})",
+                            "timestamp": ts_norm,
+                        }
+                    )
+                watch_state["procs"] = over
+            except Exception:
+                pass
+
+        if new_events:
+            return (auto_events + new_events), watch_state
+        return auto_events, watch_state
 
     # ----------------------------
     # Tracer integration
@@ -2853,6 +3120,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         out_path = (out_path or current_path or datafile).strip()
         enable_gpu = (options or []) and ("gpu" in (options or []))
         enable_docker = (options or []) and ("docker" in (options or []))
+        use_utc = (options or []) and ("utc" in (options or []))
 
         if trig_id == "tracer-start-btn":
             with _tracer_lock:
@@ -2860,10 +3128,13 @@ def run_dashboard(datafile, port, host, interval, debug):
                     return (f"Tracer already running -> {out_path}", out_path)
                 tracer = SystemTracer(
                     sample_interval=float(sample_iv or 5.0),
-                    write_interval=float(write_iv or 10.0),
+                    # Keep data in memory when running from dashboard; only snapshot persists
+                    write_interval=0.0,
                     output_file=out_path,
                     enable_gpu=bool(enable_gpu),
                     enable_docker=bool(enable_docker),
+                    use_utc=bool(use_utc),
+                    write_final=False,
                 )
                 th = threading.Thread(target=tracer.run, kwargs={"duration": None, "verbose": False}, daemon=True)
                 _tracer_obj["tracer"] = tracer
@@ -2911,8 +3182,24 @@ def run_dashboard(datafile, port, host, interval, debug):
                         return (f"Snapshot failed: {e}", out_path)
             # If tracer not running, still write empty/new file to path
             try:
-                pd.DataFrame([]).to_parquet(out_path)
-                return (f"Snapshot (empty) saved to {out_path}", out_path)
+                # Create a unique suffixed filename if destination exists
+                base_path = (out_path or "system_monitor.parquet").strip()
+                root, ext = os.path.splitext(base_path)
+                if not ext:
+                    ext = ".parquet"
+                    root = base_path  # original base without extension
+                    base_path = base_path + ext
+                path = base_path
+                if os.path.exists(path):
+                    idx = 0
+                    while True:
+                        candidate = f"{root}_{idx}{ext}"
+                        if not os.path.exists(candidate):
+                            path = candidate
+                            break
+                        idx += 1
+                pd.DataFrame([]).to_parquet(path)
+                return (f"Snapshot (empty) saved to {path}", path)
             except Exception as e:
                 return (f"Snapshot failed: {e}", out_path)
 
