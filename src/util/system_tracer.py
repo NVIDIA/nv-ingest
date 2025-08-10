@@ -200,6 +200,133 @@ class OpenFilesCollector(BaseCollector):
             }
 
 
+# -------- Process tree/thread inspector (Python equivalent of thread_checker.sh) --------
+def get_process_tree_summary(root_pid: int, verbose: bool = False) -> Dict[str, Any]:
+    """Return a summary of a process tree rooted at root_pid.
+
+    Provides per-process thread counts and command names, totals, and aggregation by command.
+    This mirrors the functionality of thread_checker.sh using psutil.
+    """
+    result: Dict[str, Any] = {
+        "root_pid": root_pid,
+        "processes": [],  # list of {pid, ppid, name, threads}
+        "totals": {"total_processes": 0, "total_threads": 0},
+        "aggregated_by_command": [],  # list of {command, processes, total_threads}
+        "verbose": verbose,
+    }
+    try:
+        if root_pid <= 0:
+            return result
+        try:
+            root = psutil.Process(root_pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Fallback: scan process table, locate root by pid and build tree using PPID relationships
+            all_infos: Dict[int, Dict[str, Any]] = {}
+            try:
+                for p in psutil.process_iter(attrs=["pid", "ppid", "name", "num_threads"]):
+                    info = p.info
+                    all_infos[info.get("pid")] = {
+                        "pid": info.get("pid"),
+                        "ppid": info.get("ppid"),
+                        "name": info.get("name") or "(unknown)",
+                        "threads": int(info.get("num_threads") or 0),
+                    }
+            except Exception:
+                pass
+            if root_pid not in all_infos:
+                return result
+            # Build children map
+            by_ppid: Dict[Optional[int], list] = {}
+            for it in all_infos.values():
+                by_ppid.setdefault(it.get("ppid"), []).append(it)
+            # DFS from root_pid to collect subtree
+            stack = [root_pid]
+            per_pid = []
+            total_threads = 0
+            seen = set()
+            while stack:
+                cur = stack.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                ent = all_infos.get(cur)
+                if not ent:
+                    continue
+                per_pid.append(ent)
+                total_threads += ent.get("threads", 0)
+                for child in by_ppid.get(cur, []):
+                    cid = child.get("pid")
+                    if cid is not None:
+                        stack.append(cid)
+            result["processes"] = sorted(per_pid, key=lambda x: (x.get("ppid") or -1, x.get("pid") or -1))
+            result["totals"] = {"total_processes": len(per_pid), "total_threads": total_threads}
+            # Aggregate by command
+            agg: Dict[str, Dict[str, int]] = {}
+            for it in per_pid:
+                cmd = it.get("name") or "(unknown)"
+                ent = agg.setdefault(cmd, {"processes": 0, "total_threads": 0})
+                ent["processes"] += 1
+                ent["total_threads"] += int(it.get("threads") or 0)
+            result["aggregated_by_command"] = [
+                {"command": k, **v} for k, v in sorted(agg.items(), key=lambda kv: kv[1]["total_threads"], reverse=True)
+            ]
+            return result
+
+        # Gather all processes in the tree (root + recursive children)
+        procs = [root]
+        try:
+            procs.extend(root.children(recursive=True))
+        except Exception:
+            pass
+
+        per_pid = []
+        total_threads = 0
+        for p in procs:
+            if p is None:
+                continue
+            pid = None
+            ppid = None
+            name = None
+            threads = 0
+            try:
+                pid = p.pid
+            except Exception:
+                continue
+            try:
+                ppid = p.ppid()
+            except Exception:
+                ppid = None
+            try:
+                name = p.name()
+            except Exception:
+                name = "(access-denied)"
+            try:
+                threads = int(p.num_threads())
+            except Exception:
+                # If threads cannot be read due to permissions, treat as 0 but still include the process
+                threads = 0
+            info = {"pid": pid, "ppid": ppid, "name": name, "threads": threads}
+            per_pid.append(info)
+            total_threads += threads
+
+        result["processes"] = sorted(per_pid, key=lambda x: x["pid"])
+        result["totals"] = {"total_processes": len(per_pid), "total_threads": total_threads}
+
+        # Aggregate by command
+        agg: Dict[str, Dict[str, int]] = {}
+        for it in per_pid:
+            cmd = it["name"] or "(unknown)"
+            ent = agg.setdefault(cmd, {"processes": 0, "total_threads": 0})
+            ent["processes"] += 1
+            ent["total_threads"] += it["threads"]
+        result["aggregated_by_command"] = [
+            {"command": k, **v} for k, v in sorted(agg.items(), key=lambda kv: kv[1]["total_threads"], reverse=True)
+        ]
+    except Exception as e:
+        result["error"] = str(e)
+    return result
+
+
 class DiskIOCollector(BaseCollector):
     def collect(self) -> Dict[str, Any]:
         try:
@@ -663,6 +790,11 @@ def main():
     p_snap.add_argument("--no-gpu", action="store_true", help="Disable GPU collection")
     p_snap.add_argument("--no-docker", action="store_true", help="Disable Docker collection")
 
+    # proctree (process/thread inspection)
+    p_tree = sub.add_parser("proctree", help="Inspect a process tree and summarize threads")
+    p_tree.add_argument("pid", type=int, help="Root PID to inspect")
+    p_tree.add_argument("--verbose", action="store_true", help="Verbose per-PID output in JSON")
+
     args = parser.parse_args()
     if not getattr(args, "command", None):
         # No subcommand provided; default to 'run' so that subparser defaults are applied
@@ -672,6 +804,11 @@ def main():
     if cmd == "snapshot":
         snap = collect_system_snapshot(enable_gpu=not args.no_gpu, enable_docker=not args.no_docker)
         print(json.dumps(snap, default=str))
+        return
+
+    if cmd == "proctree":
+        summary = get_process_tree_summary(args.pid, verbose=args.verbose)
+        print(json.dumps(summary, default=str))
         return
 
     # default: run
