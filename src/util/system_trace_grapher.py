@@ -105,7 +105,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             # Stores
             dcc.Store(id="event-store", data=[], storage_type="local"),
             dcc.Store(id="event-auto-store", data=[], storage_type="local"),
-            dcc.Store(id="body-bg-sync"),
+            # body-bg-sync is provided as a hidden Div below for clientside callback output
             html.Div(
                 [
                     # Sidebar controls
@@ -260,6 +260,20 @@ def run_dashboard(datafile, port, host, interval, debug):
                                                     "marginLeft": "8px",
                                                 },
                                             ),
+                                        ],
+                                        className="control",
+                                    ),
+                                    html.Div(
+                                        [
+                                            dcc.Checklist(
+                                                id="event-display-options",
+                                                options=[{"label": "Show event markers", "value": "markers"}],
+                                                value=["markers"],
+                                                inline=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            )
                                         ],
                                         className="control",
                                     ),
@@ -850,6 +864,447 @@ def run_dashboard(datafile, port, host, interval, debug):
             pass
         return fig
 
+    def style_minimal_figure(fig, theme_value):
+        """Apply a Tufte-inspired minimal style to reduce chartjunk and emphasize data.
+
+        - Remove heavy titles, rely on surrounding headings
+        - Thin margins and light gridlines
+        - Hide zero lines and reduce axis clutter
+        - Use unified hover for easier comparison across series
+        - Do not override legend visibility here; caller decides.
+        """
+        try:
+            # Remove figure title; surrounding layout already provides section headers
+            fig.update_layout(title=None)
+
+            # Compact margins and legend
+            fig.update_layout(
+                margin=dict(l=40, r=10, t=10, b=28),
+                hovermode="x unified",
+            )
+
+            # Light, subtle grids; no axis zero lines
+            grid_color = "rgba(127,127,127,0.15)" if theme_value == "dark" else "rgba(0,0,0,0.08)"
+            axis_color = "rgba(127,127,127,0.4)" if theme_value == "dark" else "rgba(0,0,0,0.35)"
+            fig.update_xaxes(
+                showgrid=True,
+                gridcolor=grid_color,
+                zeroline=False,
+                linecolor=axis_color,
+                ticks="outside",
+                tickcolor=axis_color,
+                ticklen=4,
+            )
+            fig.update_yaxes(
+                showgrid=True,
+                gridcolor=grid_color,
+                zeroline=False,
+                linecolor=axis_color,
+                ticks="outside",
+                tickcolor=axis_color,
+                ticklen=4,
+            )
+
+            # Thin lines for traces to keep focus on shape; avoid overly thick strokes
+            try:
+                for tr in fig.data:
+                    if hasattr(tr, "line") and getattr(tr, "line", None) is not None:
+                        # keep bar width as-is; only adjust scatter-like traces
+                        if getattr(tr, "type", "").lower() in ("scatter", "scattergl", "lines"):
+                            lw = getattr(tr.line, "width", None)
+                            new_w = 1.25 if lw is None else min(lw, 1.5)
+                            tr.line.width = new_w
+            except Exception:
+                pass
+
+        except Exception:
+            # Never let styling break figure rendering
+            pass
+        return fig
+
+    def make_sparkline(ts, series, theme_value):
+        """Create a tiny sparkline figure for KPI cards.
+
+        Expects ts (Datetime-like Series) and series (numeric Series) of same length.
+        """
+        fig = go.Figure()
+        try:
+            fig.add_trace(go.Scatter(x=ts, y=series, mode="lines", name="", hoverinfo="skip"))
+        except Exception:
+            # fallback empty
+            pass
+        # Minimal styling
+        apply_theme(fig, theme_value)
+        style_minimal_figure(fig, theme_value)
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+
+    # ----------------------------
+    # Strategy pattern: Graph components and registry
+    # ----------------------------
+    class GraphContext:
+        def __init__(self, smoothing_window, apply_theme_fn, smooth_series_fn):
+            self.smoothing_window = smoothing_window
+            self.apply_theme = apply_theme_fn
+            self.smooth_series = smooth_series_fn
+
+    class GraphComponent:
+        component_id = ""
+        title = None
+        is_time_series = True  # whether event markers should be applied
+
+        def build(self, df: pd.DataFrame, ts: pd.Series, ctx: GraphContext, params: dict) -> go.Figure:
+            raise NotImplementedError
+
+    class CPUIndividualGraph(GraphComponent):
+        component_id = "cpu-individual-utilization-graph"
+        title = "CPU Utilization (per core)"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+            for c in sorted(cpu_cols):
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[c]), mode="lines", name=c.replace("_utilization", ""))
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class CPUAggregateGraph(GraphComponent):
+        component_id = "cpu-aggregated-utilization-graph"
+        title = "CPU Utilization (aggregate)"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+            if cpu_cols:
+                cpu_mean = ctx.smooth_series(df[cpu_cols].mean(axis=1))
+                fig.add_trace(go.Scatter(x=ts, y=cpu_mean, mode="lines", name="CPU %"))
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class MemoryGraph(GraphComponent):
+        component_id = "memory-graph"
+        title = "Memory Utilization"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            if {"sys_used", "sys_total"}.issubset(df.columns):
+                mem_pct = (df["sys_used"] / df["sys_total"] * 100.0).clip(lower=0, upper=100)
+                fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(mem_pct), mode="lines", name="Mem %"))
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class FileCountGraph(GraphComponent):
+        component_id = "file-count-graph"
+        title = "Total Open Files"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            if "total_open_files" in df.columns:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df["total_open_files"]), mode="lines", name="Open Files")
+                )
+                fig.update_layout(title=self.title)
+            return fig
+
+    class FDUsageGraph(GraphComponent):
+        component_id = "fd-usage-graph"
+        title = "FD Usage %"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            if "fd_usage_percent" in df.columns:
+                fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(df["fd_usage_percent"]), mode="lines", name="FD %"))
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class NetworkGraph(GraphComponent):
+        component_id = "network-graph"
+        title = "Network Throughput"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            recv_col = "net_bytes_recv_per_sec" if "net_bytes_recv_per_sec" in df.columns else None
+            sent_col = "net_bytes_sent_per_sec" if "net_bytes_sent_per_sec" in df.columns else None
+            if recv_col:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[recv_col]) / (1024**2), mode="lines", name="Down MB/s")
+                )
+            if sent_col:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[sent_col]) / (1024**2), mode="lines", name="Up MB/s")
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="MB/s")
+            return fig
+
+    class DiskIOGraph(GraphComponent):
+        component_id = "disk-io-graph"
+        title = "Disk I/O"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            r_col = "disk_read_bytes_per_sec" if "disk_read_bytes_per_sec" in df.columns else None
+            w_col = "disk_write_bytes_per_sec" if "disk_write_bytes_per_sec" in df.columns else None
+            if r_col:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[r_col]) / (1024**2), mode="lines", name="Read MB/s")
+                )
+            if w_col:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[w_col]) / (1024**2), mode="lines", name="Write MB/s")
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="MB/s")
+            return fig
+
+    class GPUUtilGraph(GraphComponent):
+        component_id = "gpu-utilization-graph"
+        title = "GPU Utilization %"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            util_cols = [c for c in df.columns if c.endswith("_utilization") and c.startswith("gpu_")]
+            for c in sorted(util_cols):
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df[c]), mode="lines", name=c.replace("_utilization", " util"))
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class GPUMemoryGraph(GraphComponent):
+        component_id = "gpu-memory-graph"
+        title = "GPU Memory %"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            gpu_mem_used = [c for c in df.columns if c.startswith("gpu_") and c.endswith("_used")]
+            for c in sorted(gpu_mem_used):
+                idx = c.split("_")[1]
+                tot_col = f"gpu_{idx}_total"
+                if tot_col in df.columns:
+                    pct = (df[c] / df[tot_col] * 100.0).clip(lower=0, upper=100)
+                    fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(pct), mode="lines", name=f"GPU {idx} Mem %"))
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    # Helpers for Docker naming (support old and new) — module scope so callbacks can access
+    def docker_container_names(df):
+        try:
+            names = set()
+            for col in df.columns:
+                if col.endswith("_container_cpu_percent"):
+                    names.add(col[: -len("_container_cpu_percent")])
+                elif col.startswith("docker_") and col.endswith("_cpu_percent"):
+                    names.add(col[len("docker_") : -len("_cpu_percent")])
+            return sorted(names)
+        except Exception:
+            return []
+
+    def docker_pick_col(df, name, new_suffix, old_suffix):
+        for cand in (f"docker_{name}_{new_suffix}", f"{name}_{old_suffix}"):
+            if cand in df.columns:
+                return cand
+        return None
+
+    class ContainerCPUGraph(GraphComponent):
+        component_id = "container-cpu-utilization-graph"
+        title = "Container CPU %"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            for name in params.get("selected_containers", []):
+                col = docker_pick_col(df, name, "cpu_percent", "container_cpu_percent")
+                if col:
+                    fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(df[col]), mode="lines", name=f"{name} CPU%"))
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class ContainerMemGraph(GraphComponent):
+        component_id = "container-memory-utilization-graph"
+        title = "Container Memory %"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            for name in params.get("selected_containers", []):
+                col = docker_pick_col(df, name, "mem_percent", "container_mem_percent")
+                if col:
+                    fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(df[col]), mode="lines", name=f"{name} Mem%"))
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
+    class ContainerFilesGraph(GraphComponent):
+        component_id = "container-files-graph"
+        title = "Container Open Files"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            for name in params.get("selected_containers", []):
+                col = docker_pick_col(df, name, "open_files", "container_open_files")
+                if col:
+                    fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(df[col]), mode="lines", name=f"{name} Files"))
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title)
+            return fig
+
+    class ContainerNetGraph(GraphComponent):
+        component_id = "container-net-graph"
+        title = "Container Network (selected sum)"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            rx_cols = []
+            tx_cols = []
+            for n in params.get("selected_containers", []):
+                col_rx = docker_pick_col(df, n, "net_rx_bytes_per_sec", "container_net_rx_bytes_per_sec")
+                col_tx = docker_pick_col(df, n, "net_tx_bytes_per_sec", "container_net_tx_bytes_per_sec")
+                if col_rx:
+                    rx_cols.append(col_rx)
+                if col_tx:
+                    tx_cols.append(col_tx)
+            if rx_cols:
+                fig.add_trace(
+                    go.Scatter(
+                        x=ts, y=ctx.smooth_series(df[rx_cols].sum(axis=1)) / (1024**2), mode="lines", name="RX MB/s"
+                    )
+                )
+            if tx_cols:
+                fig.add_trace(
+                    go.Scatter(
+                        x=ts, y=ctx.smooth_series(df[tx_cols].sum(axis=1)) / (1024**2), mode="lines", name="TX MB/s"
+                    )
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="MB/s")
+            return fig
+
+    class ContainerIOGraph(GraphComponent):
+        component_id = "container-io-graph"
+        title = "Container Disk I/O (selected sum)"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            r_cols = []
+            w_cols = []
+            for n in params.get("selected_containers", []):
+                col_r = docker_pick_col(df, n, "blkio_read_bytes_per_sec", "container_blkio_read_bytes_per_sec")
+                col_w = docker_pick_col(df, n, "blkio_write_bytes_per_sec", "container_blkio_write_bytes_per_sec")
+                if col_r:
+                    r_cols.append(col_r)
+                if col_w:
+                    w_cols.append(col_w)
+            if r_cols:
+                fig.add_trace(
+                    go.Scatter(
+                        x=ts, y=ctx.smooth_series(df[r_cols].sum(axis=1)) / (1024**2), mode="lines", name="Read MB/s"
+                    )
+                )
+            if w_cols:
+                fig.add_trace(
+                    go.Scatter(
+                        x=ts, y=ctx.smooth_series(df[w_cols].sum(axis=1)) / (1024**2), mode="lines", name="Write MB/s"
+                    )
+                )
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="MB/s")
+            return fig
+
+    class TopContainersCPUBar(GraphComponent):
+        component_id = "container-top-cpu-graph"
+        title = "Top Containers by CPU (latest)"
+        is_time_series = False
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            all_containers = docker_container_names(df)
+            if not all_containers or df.empty:
+                return fig
+            latest = df.iloc[-1]
+            pairs = []
+            for name in all_containers:
+                col = docker_pick_col(df, name, "cpu_percent", "container_cpu_percent")
+                if col:
+                    pairs.append((name, latest[col]))
+            pairs = sorted(pairs, key=lambda x: x[1], reverse=True)[:10]
+            if pairs:
+                fig.add_trace(go.Bar(x=[n for n, _ in pairs], y=[v for _, v in pairs], name="CPU %"))
+                fig.update_layout(title=self.title)
+            return fig
+
+    class TopContainersMemBar(GraphComponent):
+        component_id = "container-top-mem-graph"
+        title = "Top Containers by Mem (latest)"
+        is_time_series = False
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            all_containers = docker_container_names(df)
+            if not all_containers or df.empty:
+                return fig
+            latest = df.iloc[-1]
+            pairs = []
+            for name in all_containers:
+                col = docker_pick_col(df, name, "mem_percent", "container_mem_percent")
+                if col:
+                    pairs.append((name, latest[col]))
+            pairs = sorted(pairs, key=lambda x: x[1], reverse=True)[:10]
+            if pairs:
+                fig.add_trace(go.Bar(x=[n for n, _ in pairs], y=[v for _, v in pairs], name="Mem %"))
+                fig.update_layout(title=self.title)
+            return fig
+
+    class ProcessCountGraph(GraphComponent):
+        component_id = "process-count-graph"
+        title = "System Process Count"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            if "system_process_count" in df.columns:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df["system_process_count"]), mode="lines", name="Processes")
+                )
+                fig.update_layout(title=self.title)
+            return fig
+
+    class ThreadCountGraph(GraphComponent):
+        component_id = "thread-count-graph"
+        title = "System Thread Count"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            if "system_thread_count" in df.columns:
+                fig.add_trace(
+                    go.Scatter(x=ts, y=ctx.smooth_series(df["system_thread_count"]), mode="lines", name="Threads")
+                )
+                fig.update_layout(title=self.title)
+            return fig
+
+    class OverviewGraph(GraphComponent):
+        component_id = "system-overview-graph"
+        title = "System Overview"
+
+        def build(self, df, ts, ctx, params):
+            fig = go.Figure()
+            # include CPU aggregate and Memory % if available
+            cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+            if cpu_cols:
+                cpu_mean = ctx.smooth_series(df[cpu_cols].mean(axis=1))
+                fig.add_trace(go.Scatter(x=ts, y=cpu_mean, mode="lines", name="CPU %"))
+            if {"sys_used", "sys_total"}.issubset(df.columns):
+                mem_pct = (df["sys_used"] / df["sys_total"] * 100.0).clip(lower=0, upper=100)
+                fig.add_trace(go.Scatter(x=ts, y=ctx.smooth_series(mem_pct), mode="lines", name="Mem %"))
+            if len(fig.data) > 0:
+                fig.update_layout(title=self.title, yaxis_title="%")
+            return fig
+
     def add_event_markers(fig, events_list, display_tz, display_tz_custom):
         try:
             events_list = events_list or []
@@ -991,6 +1446,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             Input("container-select", "value"),
             Input("event-store", "data"),
             Input("event-auto-store", "data"),
+            Input("event-display-options", "value"),
             Input("display-tz", "value"),
             Input("display-tz-custom", "value"),
         ],
@@ -1005,6 +1461,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         selected_manual,
         events_data,
         auto_events,
+        event_display_options,
         display_tz,
         display_tz_custom,
     ):
@@ -1064,270 +1521,157 @@ def run_dashboard(datafile, port, host, interval, debug):
 
         disp_label, disp_name, disp_offset = display_tz_info()
 
-        # KPI row (basic)
-        kpi_children = [
-            html.Div(
+        # KPI row (compact, minimal)
+        def kpi_card(label, value, spark_fig=None):
+            return html.Div(
                 [
-                    html.Div("Samples", style={"fontSize": "12px", "opacity": 0.7}),
-                    html.Div(f"{len(df)}", style={"fontSize": "18px", "fontWeight": "600"}),
+                    html.Div(label, style={"fontSize": "12px", "opacity": 0.7}),
+                    html.Div(value, style={"fontSize": "18px", "fontWeight": "600"}),
+                    (dcc.Graph(figure=spark_fig, style={"height": "36px"}) if spark_fig is not None else None),
                 ],
                 style={"border": "1px solid #333", "borderRadius": "6px", "padding": "8px", "marginRight": "8px"},
-            ),
+            )
+
+        kpi_children = [kpi_card("Samples", f"{len(df)}")]
+
+        # Add key latest metrics if present (Tufte-inspired: high information density, no chartjunk)
+        try:
+            if not df.empty:
+                latest_row = df.iloc[-1]
+                # CPU % (aggregate)
+                cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
+                if cpu_cols:
+                    cpu_latest = float(pd.to_numeric(latest_row[cpu_cols], errors="coerce").mean())
+                    # sparkline for CPU mean
+                    try:
+                        cpu_mean_series = pd.to_numeric(df[cpu_cols], errors="coerce").mean(axis=1)
+                        cpu_spark = make_sparkline(ts, cpu_mean_series, theme_value)
+                    except Exception:
+                        cpu_spark = None
+                    kpi_children.append(kpi_card("CPU %", f"{cpu_latest:0.1f}", cpu_spark))
+                # Mem %
+                if {"sys_used", "sys_total"}.issubset(df.columns):
+                    try:
+                        mem_latest = float(latest_row["sys_used"]) / float(latest_row["sys_total"]) * 100.0
+                        mem_latest = max(0.0, min(100.0, mem_latest))
+                        try:
+                            mem_pct_series = (df["sys_used"] / df["sys_total"] * 100.0).clip(lower=0, upper=100)
+                            mem_spark = make_sparkline(ts, mem_pct_series, theme_value)
+                        except Exception:
+                            mem_spark = None
+                        kpi_children.append(kpi_card("Mem %", f"{mem_latest:0.1f}", mem_spark))
+                    except Exception:
+                        pass
+                # Processes / Threads
+                if "system_process_count" in df.columns:
+                    try:
+                        kpi_children.append(kpi_card("Procs", f"{int(latest_row['system_process_count'])}"))
+                    except Exception:
+                        pass
+                if "system_thread_count" in df.columns:
+                    try:
+                        kpi_children.append(kpi_card("Threads", f"{int(latest_row['system_thread_count'])}"))
+                    except Exception:
+                        pass
+                # Net MB/s (sum up/down)
+                rx_col = "net_bytes_recv_per_sec" if "net_bytes_recv_per_sec" in df.columns else None
+                tx_col = "net_bytes_sent_per_sec" if "net_bytes_sent_per_sec" in df.columns else None
+                if rx_col or tx_col:
+                    try:
+                        rx = float(latest_row.get(rx_col, 0.0) or 0.0)
+                        tx = float(latest_row.get(tx_col, 0.0) or 0.0)
+                        mbps = (rx + tx) / (1024**2)
+                        try:
+                            rx_series = df[rx_col] if rx_col in df.columns else 0.0
+                            tx_series = df[tx_col] if tx_col in df.columns else 0.0
+                            net_series = (
+                                pd.to_numeric(rx_series, errors="coerce").fillna(0)
+                                + pd.to_numeric(tx_series, errors="coerce").fillna(0)
+                            ) / (1024**2)
+                            net_spark = make_sparkline(ts, net_series, theme_value)
+                        except Exception:
+                            net_spark = None
+                        kpi_children.append(kpi_card("Net MB/s", f"{mbps:0.2f}", net_spark))
+                    except Exception:
+                        pass
+                # Disk MB/s (sum r+w)
+                r_col = "disk_read_bytes_per_sec" if "disk_read_bytes_per_sec" in df.columns else None
+                w_col = "disk_write_bytes_per_sec" if "disk_write_bytes_per_sec" in df.columns else None
+                if r_col or w_col:
+                    try:
+                        r = float(latest_row.get(r_col, 0.0) or 0.0)
+                        w = float(latest_row.get(w_col, 0.0) or 0.0)
+                        mbps = (r + w) / (1024**2)
+                        try:
+                            r_series = df[r_col] if r_col in df.columns else 0.0
+                            w_series = df[w_col] if w_col in df.columns else 0.0
+                            io_series = (
+                                pd.to_numeric(r_series, errors="coerce").fillna(0)
+                                + pd.to_numeric(w_series, errors="coerce").fillna(0)
+                            ) / (1024**2)
+                            io_spark = make_sparkline(ts, io_series, theme_value)
+                        except Exception:
+                            io_spark = None
+                        kpi_children.append(kpi_card("Disk MB/s", f"{mbps:0.2f}", io_spark))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Build component registry and figures using strategy pattern
+        # Determine selected containers first (support old and new docker column names)
+        all_containers = docker_container_names(df) if (not df.empty) else []
+        if all_containers:
+            if auto_top and "auto" in (auto_top or []):
+                latest = df.iloc[-1]
+                scored = []
+                for name in all_containers:
+                    col = docker_pick_col(df, name, "cpu_percent", "container_cpu_percent")
+                    if col:
+                        scored.append((name, latest[col]))
+                selected_containers = [
+                    n for n, _ in sorted(scored, key=lambda x: x[1], reverse=True)[: int(top_n or 5)]
+                ]
+            else:
+                selected_containers = selected_manual or []
+            if not selected_containers:
+                selected_containers = all_containers[: min(5, len(all_containers))]
+        else:
+            selected_containers = []
+
+        ctx_obj = GraphContext(smoothing_window, apply_theme, smooth_series)
+        params = {"selected_containers": selected_containers}
+
+        components = [
+            OverviewGraph(),
+            CPUIndividualGraph(),
+            CPUAggregateGraph(),
+            MemoryGraph(),
+            FileCountGraph(),
+            FDUsageGraph(),
+            NetworkGraph(),
+            DiskIOGraph(),
+            GPUUtilGraph(),
+            GPUMemoryGraph(),
+            ContainerCPUGraph(),
+            ContainerMemGraph(),
+            ContainerFilesGraph(),
+            ContainerNetGraph(),
+            ContainerIOGraph(),
+            TopContainersCPUBar(),
+            TopContainersMemBar(),
+            ProcessCountGraph(),
+            ThreadCountGraph(),
         ]
 
-        # Initialize figures
-        fig_overview = go.Figure()
-        fig_cpu_ind = go.Figure()
-        fig_cpu_agg = go.Figure()
-        fig_memory = go.Figure()
-        fig_files = go.Figure()
-        fig_fd = go.Figure()
-        fig_network = go.Figure()
-        fig_disk = go.Figure()
-        fig_gpu_util = go.Figure()
-        fig_gpu_mem = go.Figure()
-        fig_container_cpu = go.Figure()
-        fig_container_mem = go.Figure()
-        fig_container_files = go.Figure()
-        fig_container_net = go.Figure()
-        fig_container_io = go.Figure()
-        fig_top_cpu = go.Figure()
-        fig_top_mem = go.Figure()
-        fig_process = go.Figure()
-        fig_thread = go.Figure()
-
+        # Build figures map by id
+        figures_by_id = {c.component_id: go.Figure() for c in components}
         if not df.empty and "timestamp" in df.columns:
-            # CPU
-            cpu_cols = [c for c in df.columns if c.startswith("cpu_") and c.endswith("_utilization")]
-            if cpu_cols:
-                # individual
-                for c in sorted(cpu_cols):
-                    fig_cpu_ind.add_trace(
-                        go.Scatter(x=ts, y=smooth_series(df[c]), mode="lines", name=c.replace("_utilization", ""))
-                    )
-                fig_cpu_ind.update_layout(title="CPU Utilization (per core)", yaxis_title="%")
-                # aggregate mean
-                cpu_mean = smooth_series(df[cpu_cols].mean(axis=1))
-                fig_cpu_agg.add_trace(go.Scatter(x=ts, y=cpu_mean, mode="lines", name="CPU %"))
-                fig_cpu_agg.update_layout(title="CPU Utilization (aggregate)", yaxis_title="%")
-
-            # Memory
-            if {"sys_used", "sys_total"}.issubset(df.columns):
-                mem_pct = (df["sys_used"] / df["sys_total"] * 100.0).clip(lower=0, upper=100)
-                fig_memory.add_trace(go.Scatter(x=ts, y=smooth_series(mem_pct), mode="lines", name="Mem %"))
-                fig_memory.update_layout(title="Memory Utilization", yaxis_title="%")
-
-            # Files and FD
-            if "total_open_files" in df.columns:
-                fig_files.add_trace(
-                    go.Scatter(x=ts, y=smooth_series(df["total_open_files"]), mode="lines", name="Open Files")
-                )
-                fig_files.update_layout(title="Total Open Files")
-            if "fd_usage_percent" in df.columns:
-                fig_fd.add_trace(go.Scatter(x=ts, y=smooth_series(df["fd_usage_percent"]), mode="lines", name="FD %"))
-                fig_fd.update_layout(title="FD Usage %", yaxis_title="%")
-
-            # Processes/Threads
-            if "system_process_count" in df.columns:
-                fig_process.add_trace(
-                    go.Scatter(x=ts, y=smooth_series(df["system_process_count"]), mode="lines", name="Processes")
-                )
-                fig_process.update_layout(title="System Process Count")
-            if "system_thread_count" in df.columns:
-                fig_thread.add_trace(
-                    go.Scatter(x=ts, y=smooth_series(df["system_thread_count"]), mode="lines", name="Threads")
-                )
-                fig_thread.update_layout(title="System Thread Count")
-
-            # Network
-            recv_col = "net_bytes_recv_per_sec" if "net_bytes_recv_per_sec" in df.columns else None
-            sent_col = "net_bytes_sent_per_sec" if "net_bytes_sent_per_sec" in df.columns else None
-            if recv_col or sent_col:
-                if recv_col:
-                    fig_network.add_trace(
-                        go.Scatter(x=ts, y=smooth_series(df[recv_col]) / (1024**2), mode="lines", name="Down MB/s")
-                    )
-                if sent_col:
-                    fig_network.add_trace(
-                        go.Scatter(x=ts, y=smooth_series(df[sent_col]) / (1024**2), mode="lines", name="Up MB/s")
-                    )
-                fig_network.update_layout(title="Network Throughput", yaxis_title="MB/s")
-
-            # Disk I/O
-            r_col = "disk_read_bytes_per_sec" if "disk_read_bytes_per_sec" in df.columns else None
-            w_col = "disk_write_bytes_per_sec" if "disk_write_bytes_per_sec" in df.columns else None
-            if r_col or w_col:
-                if r_col:
-                    fig_disk.add_trace(
-                        go.Scatter(x=ts, y=smooth_series(df[r_col]) / (1024**2), mode="lines", name="Read MB/s")
-                    )
-                if w_col:
-                    fig_disk.add_trace(
-                        go.Scatter(x=ts, y=smooth_series(df[w_col]) / (1024**2), mode="lines", name="Write MB/s")
-                    )
-                fig_disk.update_layout(title="Disk I/O", yaxis_title="MB/s")
-
-            # GPU
-            gpu_util_cols = [c for c in df.columns if c.endswith("_utilization") and c.startswith("gpu_")]
-            for c in sorted(gpu_util_cols):
-                fig_gpu_util.add_trace(
-                    go.Scatter(x=ts, y=smooth_series(df[c]), mode="lines", name=c.replace("_utilization", " util"))
-                )
-            if gpu_util_cols:
-                fig_gpu_util.update_layout(title="GPU Utilization %", yaxis_title="%")
-            # GPU memory percent if available
-            gpu_mem_used = [c for c in df.columns if c.startswith("gpu_") and c.endswith("_used")]
-            for c in sorted(gpu_mem_used):
-                idx = c.split("_")[1]
-                tot_col = f"gpu_{idx}_total"
-                if tot_col in df.columns:
-                    pct = (df[c] / df[tot_col] * 100.0).clip(lower=0, upper=100)
-                    fig_gpu_mem.add_trace(go.Scatter(x=ts, y=smooth_series(pct), mode="lines", name=f"GPU {idx} Mem %"))
-            if len(fig_gpu_mem.data) > 0:
-                fig_gpu_mem.update_layout(title="GPU Memory %", yaxis_title="%")
-
-            # Containers
-            # Determine container set
-            all_containers = sorted(
-                {col.split("_container_cpu_percent")[0] for col in df.columns if col.endswith("_container_cpu_percent")}
-            )
-            selected = []
-            if all_containers:
-                if auto_top and "auto" in (auto_top or []):
-                    # pick top N by latest cpu
-                    latest = df.iloc[-1]
-                    scored = []
-                    for name in all_containers:
-                        col = f"{name}_container_cpu_percent"
-                        if col in df.columns:
-                            scored.append((name, latest[col]))
-                    selected = [n for n, _ in sorted(scored, key=lambda x: x[1], reverse=True)[: int(top_n or 5)]]
-                else:
-                    selected = selected_manual or []
-                # Fallback if none selected
-                if not selected:
-                    selected = all_containers[: min(5, len(all_containers))]
-
-                # CPU and Memory
-                for name in selected:
-                    cpu_col = f"{name}_container_cpu_percent"
-                    mem_col = f"{name}_container_mem_percent"
-                    files_col = f"{name}_container_open_files"
-                    if cpu_col in df.columns:
-                        fig_container_cpu.add_trace(
-                            go.Scatter(x=ts, y=smooth_series(df[cpu_col]), mode="lines", name=f"{name} CPU%")
-                        )
-                    if mem_col in df.columns:
-                        fig_container_mem.add_trace(
-                            go.Scatter(x=ts, y=smooth_series(df[mem_col]), mode="lines", name=f"{name} Mem%")
-                        )
-                    if files_col in df.columns:
-                        fig_container_files.add_trace(
-                            go.Scatter(x=ts, y=smooth_series(df[files_col]), mode="lines", name=f"{name} Files")
-                        )
-                if len(fig_container_cpu.data) > 0:
-                    fig_container_cpu.update_layout(title="Container CPU %", yaxis_title="%")
-                if len(fig_container_mem.data) > 0:
-                    fig_container_mem.update_layout(title="Container Memory %", yaxis_title="%")
-                if len(fig_container_files.data) > 0:
-                    fig_container_files.update_layout(title="Container Open Files")
-
-                # Container net/disk per-sec
-                net_rx_cols = [
-                    f"{name}_container_net_rx_bytes_per_sec"
-                    for name in selected
-                    if f"{name}_container_net_rx_bytes_per_sec" in df.columns
-                ]
-                net_tx_cols = [
-                    f"{name}_container_net_tx_bytes_per_sec"
-                    for name in selected
-                    if f"{name}_container_net_tx_bytes_per_sec" in df.columns
-                ]
-                if net_rx_cols or net_tx_cols:
-                    if net_rx_cols:
-                        fig_container_net.add_trace(
-                            go.Scatter(
-                                x=ts,
-                                y=smooth_series(df[net_rx_cols].sum(axis=1)) / (1024**2),
-                                mode="lines",
-                                name="RX MB/s",
-                            )
-                        )
-                    if net_tx_cols:
-                        fig_container_net.add_trace(
-                            go.Scatter(
-                                x=ts,
-                                y=smooth_series(df[net_tx_cols].sum(axis=1)) / (1024**2),
-                                mode="lines",
-                                name="TX MB/s",
-                            )
-                        )
-                    fig_container_net.update_layout(title="Container Network (selected sum)", yaxis_title="MB/s")
-
-                blk_read_cols = [
-                    f"{name}_container_blkio_read_bytes_per_sec"
-                    for name in selected
-                    if f"{name}_container_blkio_read_bytes_per_sec" in df.columns
-                ]
-                blk_write_cols = [
-                    f"{name}_container_blkio_write_bytes_per_sec"
-                    for name in selected
-                    if f"{name}_container_blkio_write_bytes_per_sec" in df.columns
-                ]
-                if blk_read_cols or blk_write_cols:
-                    if blk_read_cols:
-                        fig_container_io.add_trace(
-                            go.Scatter(
-                                x=ts,
-                                y=smooth_series(df[blk_read_cols].sum(axis=1)) / (1024**2),
-                                mode="lines",
-                                name="Read MB/s",
-                            )
-                        )
-                    if blk_write_cols:
-                        fig_container_io.add_trace(
-                            go.Scatter(
-                                x=ts,
-                                y=smooth_series(df[blk_write_cols].sum(axis=1)) / (1024**2),
-                                mode="lines",
-                                name="Write MB/s",
-                            )
-                        )
-                    fig_container_io.update_layout(title="Container Disk I/O (selected sum)", yaxis_title="MB/s")
-
-                # Top containers (latest sample)
-                latest = df.iloc[-1]
-                cpu_pairs = []
-                mem_pairs = []
-                for name in all_containers:
-                    c_cpu = f"{name}_container_cpu_percent"
-                    c_mem = f"{name}_container_mem_percent"
-                    if c_cpu in df.columns:
-                        cpu_pairs.append((name, latest[c_cpu]))
-                    if c_mem in df.columns:
-                        mem_pairs.append((name, latest[c_mem]))
-                cpu_pairs = sorted(cpu_pairs, key=lambda x: x[1], reverse=True)[:10]
-                mem_pairs = sorted(mem_pairs, key=lambda x: x[1], reverse=True)[:10]
-                if cpu_pairs:
-                    fig_top_cpu.add_trace(
-                        go.Bar(x=[n for n, _ in cpu_pairs], y=[v for _, v in cpu_pairs], name="CPU %")
-                    )
-                    fig_top_cpu.update_layout(title="Top Containers by CPU (latest)")
-                if mem_pairs:
-                    fig_top_mem.add_trace(
-                        go.Bar(x=[n for n, _ in mem_pairs], y=[v for _, v in mem_pairs], name="Mem %")
-                    )
-                    fig_top_mem.update_layout(title="Top Containers by Mem (latest)")
-
-            # Overview: combine CPU agg and Mem % if available
-            if len(fig_cpu_agg.data) > 0 or ("sys_used" in df.columns and "sys_total" in df.columns):
-                if len(fig_cpu_agg.data) > 0:
-                    for tr in fig_cpu_agg.data:
-                        fig_overview.add_trace(tr)
-                if {"sys_used", "sys_total"}.issubset(df.columns):
-                    mem_pct = (df["sys_used"] / df["sys_total"] * 100.0).clip(lower=0, upper=100)
-                    fig_overview.add_trace(go.Scatter(x=ts, y=smooth_series(mem_pct), mode="lines", name="Mem %"))
-                fig_overview.update_layout(title="System Overview", yaxis_title="%")
+            for comp in components:
+                try:
+                    figures_by_id[comp.component_id] = comp.build(df, ts, ctx_obj, params)
+                except Exception:
+                    figures_by_id[comp.component_id] = go.Figure()
 
         # Merge events and theme
         merged_events = (events_data or []) + (auto_events or [])
@@ -1349,26 +1693,34 @@ def run_dashboard(datafile, port, host, interval, debug):
         evt_ts = event_times_for_display(merged_events, display_tz, display_tz_custom)
         # Removed unused figs_all variable (was redundant with time_series_figs and not referenced)
         # Time-series figs exclude categorical bar charts (top_*). Bar charts won't get event lines.
-        time_series_figs = [
-            fig_overview,
-            fig_cpu_ind,
-            fig_cpu_agg,
-            fig_memory,
-            fig_files,
-            fig_fd,
-            fig_network,
-            fig_disk,
-            fig_gpu_util,
-            fig_gpu_mem,
-            fig_container_cpu,
-            fig_container_mem,
-            fig_container_files,
-            fig_container_net,
-            fig_container_io,
-            fig_process,
-            fig_thread,
+        # Post-process: apply x-axis type, include events and theme to time-series figs
+        time_series_ids = [
+            "system-overview-graph",
+            "cpu-individual-utilization-graph",
+            "cpu-aggregated-utilization-graph",
+            "memory-graph",
+            "file-count-graph",
+            "fd-usage-graph",
+            "network-graph",
+            "disk-io-graph",
+            "gpu-utilization-graph",
+            "gpu-memory-graph",
+            "container-cpu-utilization-graph",
+            "container-memory-utilization-graph",
+            "container-files-graph",
+            "container-net-graph",
+            "container-io-graph",
+            "process-count-graph",
+            "thread-count-graph",
         ]
-        for f in time_series_figs:
+        markers_enabled = True
+        try:
+            markers_enabled = (event_display_options is None) or ("markers" in (event_display_options or []))
+        except Exception:
+            markers_enabled = True
+
+        for fig_id in time_series_ids:
+            f = figures_by_id.get(fig_id, go.Figure())
             # Ensure date x-axis for proper placement of vertical lines
             f.update_xaxes(type="date")
             # If we have both data ts and event ts, expand range to include both
@@ -1389,12 +1741,23 @@ def run_dashboard(datafile, port, host, interval, debug):
                     f.update_xaxes(range=[xmin - pad, xmax + pad])
             except Exception:
                 pass
-            add_event_markers(f, merged_events, display_tz, display_tz_custom)
+            if markers_enabled:
+                add_event_markers(f, merged_events, display_tz, display_tz_custom)
             apply_theme(f, theme_value)
+            style_minimal_figure(f, theme_value)
+            # Always show legends for clarity (after styling which doesn't override legend)
+            f.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", x=0.0, y=1.0, yanchor="top"),
+                margin=dict(l=40, r=10, t=40, b=28),
+            )
 
         # Apply theme to bar charts as well
-        for f in [fig_top_cpu, fig_top_mem]:
+        for fig_id in ["container-top-cpu-graph", "container-top-mem-graph"]:
+            f = figures_by_id.get(fig_id, go.Figure())
             apply_theme(f, theme_value)
+            style_minimal_figure(f, theme_value)
+            f.update_layout(showlegend=True)
 
         # Page style per theme
         page_style = {
@@ -1409,25 +1772,25 @@ def run_dashboard(datafile, port, host, interval, debug):
             f" {disp_label} ({disp_name}, {disp_offset})",
             f"Last updated: {last_timestamp} | Display TZ: {disp_label} ({disp_name}, {disp_offset})",
             kpi_children,
-            fig_overview,
-            fig_cpu_ind,
-            fig_cpu_agg,
-            fig_memory,
-            fig_files,
-            fig_fd,
-            fig_network,
-            fig_disk,
-            fig_gpu_util,
-            fig_gpu_mem,
-            fig_container_cpu,
-            fig_container_mem,
-            fig_container_files,
-            fig_container_net,
-            fig_container_io,
-            fig_top_cpu,
-            fig_top_mem,
-            fig_process,
-            fig_thread,
+            figures_by_id["system-overview-graph"],
+            figures_by_id["cpu-individual-utilization-graph"],
+            figures_by_id["cpu-aggregated-utilization-graph"],
+            figures_by_id["memory-graph"],
+            figures_by_id["file-count-graph"],
+            figures_by_id["fd-usage-graph"],
+            figures_by_id["network-graph"],
+            figures_by_id["disk-io-graph"],
+            figures_by_id["gpu-utilization-graph"],
+            figures_by_id["gpu-memory-graph"],
+            figures_by_id["container-cpu-utilization-graph"],
+            figures_by_id["container-memory-utilization-graph"],
+            figures_by_id["container-files-graph"],
+            figures_by_id["container-net-graph"],
+            figures_by_id["container-io-graph"],
+            figures_by_id["container-top-cpu-graph"],
+            figures_by_id["container-top-mem-graph"],
+            figures_by_id["process-count-graph"],
+            figures_by_id["thread-count-graph"],
         )
 
     # Populate container dropdown options dynamically
