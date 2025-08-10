@@ -757,25 +757,31 @@ def bulk_insert_milvus(
 
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
-    files_to_upload = [_file for file_set in writer.batch_files for _file in file_set]
-    task_id = utility.do_bulk_insert(
-        collection_name=collection_name,
-        files=files_to_upload,
-        consistency_level=CONSISTENCY,
-    )
+    task_ids = []
+    for files in writer.batch_files:
+        task_id = utility.do_bulk_insert(
+            collection_name=collection_name,
+            files=files,
+            consistency_level=CONSISTENCY,
+        )
+        task_ids.append(task_id)
     # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
-    state = "Pending"
-    while state != "Completed":
-        task = utility.get_bulk_insert_state(task_id=task_id)
-        state = task.state_name
-        if state == "Completed":
-            t_bulk_end = time.time()
-            logger.info("Start time:", task.create_time_str)
-            logger.info("Imported row count:", task.row_count)
-            logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
-        if task.state == BulkInsertState.ImportFailed:
-            logger.error("Failed reason:", task.failed_reason)
+    while len(task_ids) > 0:
         time.sleep(1)
+        for task_id in task_ids:
+            task = utility.get_bulk_insert_state(task_id=task_id)
+            state = task.state_name
+            if state == "Completed":
+                logger.info(f"Task: {task_id}")
+                logger.info(f"Start time: {task.create_time_str}")
+                logger.info(f"Imported row count: {task.row_count}")
+                task_ids.remove(task_id)
+            if task.state == BulkInsertState.ImportFailed:
+                logger.error(f"Task: {task_id}")
+                logger.error("Failed reason:", task.failed_reason)
+                task_ids.remove(task_id)
+    t_bulk_end = time.time()
+    logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
 
 
 def create_bm25_model(
