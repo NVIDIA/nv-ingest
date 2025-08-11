@@ -770,8 +770,8 @@ def bulk_insert_milvus(
         state = task.state_name
         if state == "Completed":
             t_bulk_end = time.time()
-            logger.info("Start time:", task.create_time_str)
-            logger.info("Imported row count:", task.row_count)
+            logger.info(f"Start time: {task.create_time_str}")
+            logger.info(f"Imported row count: {task.row_count}")
             logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
         if task.state == BulkInsertState.ImportFailed:
             logger.error("Failed reason:", task.failed_reason)
