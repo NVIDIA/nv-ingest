@@ -6,6 +6,7 @@
 
 import collections
 import glob
+import gzip
 import json
 import logging
 import os
@@ -90,17 +91,21 @@ def ensure_job_specs(func):
 
 
 class LazyLoadedList(collections.abc.Sequence):
-    def __init__(self, filepath: str, expected_len: Optional[int] = None):
+    def __init__(self, filepath: str, expected_len: Optional[int] = None, compression: Optional[str] = None):
         self.filepath = filepath
         self._len: Optional[int] = expected_len  # Store pre-calculated length
         self._offsets: Optional[List[int]] = None
+        self.compression = compression
 
         if self._len == 0:
             self._offsets = []
 
+        self._open = gzip.open if self.compression == "gzip" else open
+        self._read_mode = "rt"
+
     def __iter__(self) -> Iterator[Any]:
         try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
+            with self._open(self.filepath, self._read_mode, encoding="utf-8") as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -141,13 +146,20 @@ class LazyLoadedList(collections.abc.Sequence):
     def __len__(self) -> int:
         if self._len is not None:
             return self._len
-        if self._offsets is not None:
-            self._len = len(self._offsets)
-            return self._len
-        self._build_index()
+
+        count = 0
+        for _ in self:
+            count += 1
+        self._len = count
+
         return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
+        if self.compression:
+            for i, item in enumerate(self):
+                if i == idx:
+                    return item
+
         if not isinstance(idx, int):
             raise TypeError(f"List indices must be integers or slices, not {type(idx).__name__}")
 
@@ -236,6 +248,10 @@ class Ingestor:
 
         self._output_config = None
         self._created_temp_output_dir = None
+
+        # --- variables for tracking disk usage ---
+        self._total_disk_usage = 0
+        self._disk_usage_lock = threading.Lock()
 
     def __enter__(self):
         return self
@@ -451,18 +467,32 @@ class Ingestor:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
-                file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+                file_suffix = f".{file_ext.strip('.')}.results.jsonl.gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
+                # --- CHANGE: Pass compression argument to the save utility ---
                 num_items_saved = save_document_results_to_jsonl(
                     doc_data,
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
+                    compression="gzip",
                 )
 
                 if num_items_saved > 0:
-                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    # --- CHANGE: Get file size and log it ---
+                    file_size = os.path.getsize(jsonl_filepath)
+                    with self._disk_usage_lock:
+                        self._total_disk_usage += file_size
+
+                    print(
+                        f"Saved {os.path.basename(jsonl_filepath)} "
+                        f"(Size: {file_size / 1024:.2f} KB). "
+                        f"Total disk usage so far: {self._total_disk_usage / (1024*1024):.2f} MB"
+                    )
+
+                    # --- CHANGE: Tell LazyLoadedList it's compressed ---
+                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved, compression="gzip")
                     if results_lock:
                         with results_lock:
                             final_results_payload_list.append(results)
@@ -559,6 +589,7 @@ class Ingestor:
             io_executor.shutdown(wait=True)
 
         if self._output_config:
+            print(f"BENCHMARK: Final total disk space used: {self._total_disk_usage / (1024*1024):.2f} MB")
             results = final_results_payload_list
 
         if self._vdb_bulk_upload:
