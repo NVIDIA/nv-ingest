@@ -1008,6 +1008,10 @@ def write_to_nvingest_collection(
             collection_name,
         )
     else:
+        minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+
         # Connections parameters to access the remote bucket
         conn = RemoteBulkWriter.S3ConnectParam(
             endpoint=minio_endpoint,  # the default MinIO service started along with Milvus
