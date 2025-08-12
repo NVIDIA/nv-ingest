@@ -21,6 +21,25 @@ It does not store the embeddings for images.
 NeMo Retriever extraction supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md). 
 Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
  
+### Partial Failures and Upload Semantics
+
+When chaining `.vdb_upload(...)` on an `Ingestor`, upload behavior depends on the `return_failures` flag passed to `ingest()`:
+
+- `return_failures=False` (default): If any ingestion jobs fail, `ingest()` raises a `RuntimeError` and no upload occurs (all-or-nothing).
+- `return_failures=True`: `ingest()` returns `(results, failures)` and uploads only the successful results; it does not raise. Inspect `failures` and retry as needed.
+
+Example:
+
+```python
+results, failures = (
+    Ingestor(client=client)
+    .files(["doc1.pdf", "doc2.pdf"]).extract().embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+    .ingest(return_failures=True)
+)
+print(f"Uploaded {len(results)} successes; {len(failures)} failures")
+```
+
 
 
 ## Upload to Milvus
