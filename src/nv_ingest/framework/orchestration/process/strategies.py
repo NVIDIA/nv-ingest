@@ -154,7 +154,9 @@ class SubprocessStrategy(ProcessExecutionStrategy):
         else:
             # Return interface for non-blocking execution
             logger.info(f"Pipeline subprocess started (PID={process.pid})")
-            atexit.register(lambda: kill_pipeline_process_group(process.pid))
+            # Ensure we pass the Process object, not just the PID, to avoid AttributeError
+            # kill_pipeline_process_group expects a multiprocessing.Process instance
+            atexit.register(lambda: kill_pipeline_process_group(process))
             return ExecutionResult(interface=interface, elapsed_time=None)
 
 
