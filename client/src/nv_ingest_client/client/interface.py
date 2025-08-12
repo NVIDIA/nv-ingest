@@ -599,6 +599,72 @@ class Ingestor:
 
         return (results, failures) if return_failures else results
 
+    def ingest_in_chunks(
+        self,
+        chunk_size: int = 100,
+        show_progress: bool = False,
+        return_failures: bool = False,
+        **kwargs: Any,
+    ) -> Tuple[List[Any], List[Tuple[str, str]]]:
+        """
+        Ingests documents in smaller chunks to limit peak disk space usage.
+
+        This method processes the full list of documents in batches of `chunk_size`,
+        performing a full ingest, VDB upload, and cleanup for each chunk.
+
+        Parameters
+        ----------
+        chunk_size : int, optional
+            The number of documents to process in each chunk. Default is 100.
+        show_progress : bool, optional
+            Whether to display a progress bar for the chunks. Default is False.
+        **kwargs : Any
+            Additional keyword arguments passed to the underlying `ingest` method.
+
+        Returns
+        -------
+        Tuple containing aggregated successful results and failure information.
+        """
+        if not self._vdb_bulk_upload:
+            raise ValueError("`vdb_upload()` must be configured to use `ingest_in_chunks`.")
+
+        job_spec_chunks = {}
+        total_count = 0
+        for file_type, job_specs in self._job_specs.job_specs.items():
+            job_spec_chunks[file_type] = []
+            for i in range(0, len(job_specs), chunk_size):
+                chunk = job_specs[i : i + chunk_size]
+                job_spec_chunks[file_type].append(chunk)
+                total_count += len(chunk)
+
+        aggregated_results = []
+        aggregated_failures = []
+
+        pbar = tqdm(total=total_count, desc="Processing", unit="doc") if show_progress else None
+
+        original_job_specs = self._job_specs
+        for file_type, chunks in job_spec_chunks.items():
+            for chunk in chunks:
+                # Temporarily replace the main job_specs
+                chunk_job_spec = BatchJobSpec(chunk)
+                self._job_specs = chunk_job_spec
+
+                results, failures = self.ingest(return_failures=True, show_progress=False, **kwargs)
+
+                aggregated_results.extend(results)
+                aggregated_failures.extend(failures)
+
+                if pbar:
+                    pbar.update(len(chunk))
+
+        # Restore original job_specs
+        self._job_specs = original_job_specs
+
+        if pbar:
+            pbar.close()
+
+        return (aggregated_results, aggregated_failures) if return_failures else aggregated_results
+
     def ingest_async(self, **kwargs: Any) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
@@ -713,7 +779,6 @@ class Ingestor:
         ----------
         kwargs : dict
             Parameters specific to the EmbedTask.
-
         Returns
         -------
         Ingestor

@@ -836,7 +836,10 @@ def test_vdb_upload_with_failures_return_failures_true(workspace, monkeypatch, c
     os.makedirs(results_dir)
 
     # Mock successful results for 2 jobs and failures for 1 job
-    successful_results = [[{"data": "embedding1", "source": "doc1"}], [{"data": "embedding2", "source": "doc2"}]]
+    successful_results = [
+        [{"data": "embedding1", "source": "doc1"}],
+        [{"data": "embedding2", "source": "doc2"}],
+    ]
     failures = [("job_3", "Processing failed")]
 
     def fake_processor(completion_callback=None, **kwargs):
@@ -849,7 +852,10 @@ def test_vdb_upload_with_failures_return_failures_true(workspace, monkeypatch, c
         return (successful_results, failures)
 
     mock_client.process_jobs_concurrently.side_effect = fake_processor
-    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
+    mock_client._job_index_to_job_spec = {
+        "0": MagicMock(source_name=doc1_path),
+        "1": MagicMock(source_name="doc2.txt"),
+    }
 
     with Ingestor(documents=[doc1_path]) as ingestor:
         ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
@@ -952,7 +958,10 @@ def test_vdb_upload_with_no_failures(workspace, monkeypatch):
         return (successful_results, failures)
 
     mock_client.process_jobs_concurrently.side_effect = fake_processor
-    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
+    mock_client._job_index_to_job_spec = {
+        "0": MagicMock(source_name=doc1_path),
+        "1": MagicMock(source_name="doc2.txt"),
+    }
 
     with Ingestor(documents=[doc1_path]) as ingestor:
         ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
@@ -993,7 +1002,11 @@ def test_vdb_upload_with_all_failures_return_failures_true(workspace, monkeypatc
 
     # Mock no successful results, only failures
     successful_results = []
-    failures = [("job_1", "Processing failed"), ("job_2", "Processing failed"), ("job_3", "Processing failed")]
+    failures = [
+        ("job_1", "Processing failed"),
+        ("job_2", "Processing failed"),
+        ("job_3", "Processing failed"),
+    ]
 
     def fake_processor(completion_callback=None, **kwargs):
         return (successful_results, failures)
