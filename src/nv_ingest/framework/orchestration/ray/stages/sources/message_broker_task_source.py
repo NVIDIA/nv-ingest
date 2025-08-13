@@ -11,6 +11,7 @@ import json
 import copy
 import threading
 import time
+import random
 from datetime import datetime
 
 import pandas as pd
@@ -123,6 +124,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         # Threading event remains the same
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
+
+        # Backoff state for graceful retries when broker is unavailable
+        self._fetch_failure_count: int = 0
+        self._current_backoff_sleep: float = 0.0
+        self._last_backoff_log_time: float = 0.0
 
         self._logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
@@ -263,6 +269,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             job = self.client.fetch_message(self.task_queue, timeout)
             if job is None:
                 self._logger.debug("No message received from '%s'", self.task_queue)
+                # Do not treat normal empty polls as failures
+                self._fetch_failure_count = 0
+                self._current_backoff_sleep = 0.0
                 return None
             self._logger.debug("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
@@ -275,12 +284,46 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     return None
                 job = json.loads(job.response)
             self._logger.debug("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
+            # Success: reset backoff state
+            self._fetch_failure_count = 0
+            self._current_backoff_sleep = 0.0
             return job
         except TimeoutError:
             self._logger.debug("Timeout waiting for message")
+            # Timeout is not a connectivity failure; do not escalate backoff
             return None
         except Exception as err:
-            self._logger.exception("Error during message fetching: %s", err)
+            # Connectivity or other fetch issue: apply graceful backoff and avoid stacktrace spam
+            self._fetch_failure_count += 1
+
+            # Compute exponential backoff with jitter, capped by configured max_backoff
+            try:
+                max_backoff = getattr(self.config.broker_client, "max_backoff", 5.0)
+            except Exception:
+                max_backoff = 5.0
+            # Start from 0.5s, double each failure
+            base = 0.5
+            backoff_no_jitter = min(max_backoff, base * (2 ** (self._fetch_failure_count - 1)))
+            jitter = random.uniform(0, backoff_no_jitter * 0.2)
+            self._current_backoff_sleep = backoff_no_jitter + jitter
+
+            now = time.time()
+            # Throttle warning logs to at most once per 5 seconds to avoid spam
+            if now - self._last_backoff_log_time >= 5.0:
+                self._logger.warning(
+                    "Broker fetch failed (%d consecutive failures). Backing off for %.2fs. Error: %s",
+                    self._fetch_failure_count,
+                    self._current_backoff_sleep,
+                    err,
+                )
+                self._last_backoff_log_time = now
+            else:
+                self._logger.debug(
+                    "Broker fetch failed (%d). Backoff %.2fs. Error: %s",
+                    self._fetch_failure_count,
+                    self._current_backoff_sleep,
+                    err,
+                )
             return None
 
     def _read_input(self) -> any:
@@ -291,8 +334,17 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._logger.debug("read_input: calling _fetch_message()")
         job = self._fetch_message(timeout=100)
         if job is None:
-            self._logger.debug("read_input: No job received, sleeping for poll_interval: %s", self.config.poll_interval)
-            time.sleep(self.config.poll_interval)
+            # Sleep for either the configured poll interval or the current backoff, whichever is larger
+            sleep_time = max(self.config.poll_interval, getattr(self, "_current_backoff_sleep", 0.0))
+            self._logger.debug(
+                "read_input: No job received; sleeping %.2fs (poll_interval=%.2fs, backoff=%.2fs)",
+                sleep_time,
+                self.config.poll_interval,
+                getattr(self, "_current_backoff_sleep", 0.0),
+            )
+            time.sleep(sleep_time)
+            # Reset one-shot backoff so that repeated failures recompute progressively
+            self._current_backoff_sleep = 0.0
 
             return None
 
