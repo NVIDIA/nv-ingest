@@ -45,7 +45,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr and then set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
 
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
@@ -179,16 +179,23 @@ ingestor = (
 )
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+results, failures = ingestor.ingest(return_failures=True)
 t1 = time.time()
 print(f"Time taken: {t1-t0} seconds")
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 !!! note
 
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+
+!!! important "About return_failures and vdb_upload"
+
+    - `ingestor.ingest(..., return_failures=False)` (default): returns only successful results. If `.vdb_upload(...)` is configured and any jobs fail, `ingest()` raises `RuntimeError` and does not upload (all-or-nothing).
+    - `ingestor.ingest(..., return_failures=True)`: returns `(results, failures)`. If `.vdb_upload(...)` is configured and some jobs fail, `ingest()` uploads only the successful results and does not raise; inspect `failures` for remediation.
 
 
 ```

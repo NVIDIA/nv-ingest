@@ -26,7 +26,7 @@ def infer_microservice(
         client = NimClient(
             model_interface=EmbeddingModelInterface(),
             protocol="grpc",
-            endpoints=(embedding_endpoint, embedding_endpoint),
+            endpoints=(embedding_endpoint, None),
             auth_token=nvidia_api_key,
         )
         return client.infer(
@@ -43,7 +43,7 @@ def infer_microservice(
         client = NimClient(
             model_interface=EmbeddingModelInterface(),
             protocol="http",
-            endpoints=(embedding_endpoint, embedding_endpoint),
+            endpoints=(None, embedding_endpoint),
             auth_token=nvidia_api_key,
         )
         return client.infer(data, model_name, input_type=input_type, truncate=truncate, batch_size=batch_size)
