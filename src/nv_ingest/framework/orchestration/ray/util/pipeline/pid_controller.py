@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Constants ---

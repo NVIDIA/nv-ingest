@@ -45,7 +45,14 @@ def pipeline_process():
     - Waits briefly to allow pipeline warm-up.
     - Ensures clean shutdown at session teardown.
     """
-    # Load pipeline configuration from the default pipeline YAML
+    # Configure the pipeline to use the in-process Simple broker so tests can connect on localhost:7671
+    # These must be set BEFORE loading the YAML so substitution applies.
+    os.environ["MESSAGE_CLIENT_TYPE"] = "simple"
+    os.environ["MESSAGE_CLIENT_HOST"] = "0.0.0.0"  # bind all interfaces; clients use localhost
+    os.environ["MESSAGE_CLIENT_PORT"] = "7671"
+    os.environ["INGEST_LAUNCH_SIMPLE_BROKER"] = "true"
+
+    # Load pipeline configuration from the default pipeline YAML (with env var substitution)
     pipeline_config_path = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH", "config/default_pipeline.yaml")
     config = load_pipeline_config(pipeline_config_path)
 
