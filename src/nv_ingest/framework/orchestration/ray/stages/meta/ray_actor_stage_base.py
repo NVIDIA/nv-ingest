@@ -588,7 +588,7 @@ class RayActorStage(ABC):
             self._logger.warning(f"{self._actor_id_str}: Start called but actor is already running.")
             return False
 
-        self._logger.info(f"{self._actor_id_str}: Starting actor...")
+        self._logger.debug(f"{self._actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
         self._running = True
         self._shutting_down = False  # Reset shutdown flag on start
@@ -607,14 +607,14 @@ class RayActorStage(ABC):
         )
         self._processing_thread.start()
 
-        self._logger.info(f"{self._actor_id_str}: Actor started successfully.")
+        self._logger.debug(f"{self._actor_id_str}: Actor started successfully.")
 
         return True
 
     @ray.method(num_returns=0)
     def stop(self) -> None:
         """Stops the actor's processing loop by setting the running flag to False."""
-        self._logger.info(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
+        self._logger.debug(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
         self._running = False
 
     def is_shutdown_complete(self) -> bool:

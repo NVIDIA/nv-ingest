@@ -136,7 +136,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def _create_client(self):
         # Access broker config via self.config.broker_client
         broker_config = self.config.broker_client
-        self._logger.info("Creating client of type: %s", broker_config.client_type)
+        self._logger.debug("Creating client of type: %s", broker_config.client_type)
 
         if broker_config.client_type == "redis":
             client = RedisClient(
@@ -364,7 +364,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This loop fetches messages from the broker and writes them to the output queue,
         but blocks on the pause event when the stage is paused.
         """
-        self._logger.info("Processing loop started")
+        self._logger.debug("Processing loop started")
         iteration = 0
         while self._running:
             iteration += 1
@@ -431,25 +431,25 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self._active_processing = False
                 self._shutdown_signal_complete = True
 
-        self._logger.info("Processing loop ending")
+        self._logger.debug("Processing loop ending")
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
         if self._running:
-            self._logger.info("Start called but stage is already running.")
+            self._logger.warning("Start called but stage is already running.")
             return False
         self._running = True
         self.start_time = time.time()
         self._message_count = 0
-        self._logger.info("Starting processing loop thread.")
+        self._logger.debug("Starting processing loop thread.")
         threading.Thread(target=self._processing_loop, daemon=True).start()
-        self._logger.info("MessageBrokerTaskSourceStage started.")
+        self._logger.debug("MessageBrokerTaskSourceStage started.")
         return True
 
     @ray.method(num_returns=1)
     def stop(self) -> bool:
         self._running = False
-        self._logger.info("Stop called on MessageBrokerTaskSourceStage")
+        self._logger.debug("Stop called on MessageBrokerTaskSourceStage")
         return True
 
     @ray.method(num_returns=1)
@@ -475,7 +475,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     @ray.method(num_returns=1)
     def set_output_queue(self, queue_handle: any) -> bool:
         self.output_queue = queue_handle
-        self._logger.info("Output queue set: %s", queue_handle)
+        self._logger.debug("Output queue set: %s", queue_handle)
         return True
 
     @ray.method(num_returns=1)
@@ -490,7 +490,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is paused.
         """
         self._pause_event.clear()
-        self._logger.info("Stage paused.")
+        self._logger.debug("Stage paused.")
 
         return True
 
@@ -506,7 +506,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is resumed.
         """
         self._pause_event.set()
-        self._logger.info("Stage resumed.")
+        self._logger.debug("Stage resumed.")
         return True
 
     @ray.method(num_returns=1)
@@ -516,9 +516,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This method pauses the stage, waits for any current processing to finish,
         replaces the output queue, and then resumes the stage.
         """
-        self._logger.info("Swapping output queue: pausing stage first.")
+        self._logger.debug("Swapping output queue: pausing stage first.")
         self.pause()
         self.set_output_queue(new_queue)
-        self._logger.info("Output queue swapped. Resuming stage.")
+        self._logger.debug("Output queue swapped. Resuming stage.")
         self.resume()
         return True
