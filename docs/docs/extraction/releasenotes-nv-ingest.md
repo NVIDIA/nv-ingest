@@ -29,7 +29,7 @@ The NeMo Retriever extraction 25.8.0 release adds new hardware and software supp
 
 The following are the know issues for this release:
 
-- A10G is not supported. For details, refer to [Support Matrix](support-matrix.md).
+- A10G and L40S are not supported. For details, refer to [Support Matrix](support-matrix.md).
 - `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
 
 
