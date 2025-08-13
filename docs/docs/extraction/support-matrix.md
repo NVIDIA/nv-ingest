@@ -55,10 +55,16 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 | VLM Additional Disk Space                     | ~16GB         | ~16GB         | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
 
 
+!!! note
+
+    Release 25.08 does not support A10G and L40S hardware. For details, refer to [Release Notes](releasenotes-nv-ingest.md).
+
+
 
 ## Related Topics
 
 - [Prerequisites](prerequisites.md)
+- [Release Notes](releasenotes-nv-ingest.md)
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
 - [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
 - [Deploy With Helm](helm.md)

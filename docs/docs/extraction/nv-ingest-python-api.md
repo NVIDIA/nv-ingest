@@ -115,7 +115,30 @@ For large document batches, you can enable a progress bar by setting `show_progr
 Use the following code.
 
 ```python
-result = ingestor.extract().ingest(show_progress=True)
+results, failures = ingestor.extract().ingest(show_progress=True, return_failures=True)
+print(len(results), "successful documents")
+if failures:
+    print("Failures:", failures[:1])
+```
+
+## Ingest Semantics with vdb_upload
+
+If you chain `.vdb_upload(...)` on the `Ingestor`, uploads are performed after ingestion completes. Behavior depends on `return_failures`:
+
+- `return_failures=False` (default): If any jobs fail, `ingest()` raises a `RuntimeError` and does not upload (all-or-nothing).
+- `return_failures=True`: `ingest()` returns `(results, failures)` and uploads only the successful results; it does not raise. You can inspect `failures` and retry selectively.
+
+Example:
+
+```python
+ingestor = (
+    Ingestor(client=client)
+    .files(["/path/doc1.pdf", "/path/doc2.pdf"]).extract().embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+)
+
+results, failures = ingestor.ingest(return_failures=True)
+print(f"Uploaded {len(results)} successful docs; {len(failures)} failures")
 ```
 
 

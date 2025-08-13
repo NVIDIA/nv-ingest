@@ -2,19 +2,34 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import base64
 import json
 import time
-import requests
 import csv
 import click
 import signal
 import os
+import sys
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
+from typing import Callable
+
+# Make shared benchmarking helpers importable when running this script directly
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+UTIL_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+if UTIL_DIR not in sys.path:
+    sys.path.insert(0, UTIL_DIR)
+
+from benchmarking.common_components import (  # noqa: E402
+    essential_headers,
+    encode_image_file_to_data_url,
+    load_image_numpy,
+    build_http_payload_from_data_url,
+    http_post_with_timing,
+    yolox_grpc_infer_with_timing,
+)
 
 # Global variable to track if the test is running
 running = True
@@ -35,7 +50,17 @@ signal.signal(signal.SIGINT, signal_handler)
 @click.option(
     "--image-path", required=False, type=click.Path(exists=True), help="Path to the image file to be encoded and sent."
 )
-@click.option("--url", default="http://localhost:8000/v1/infer", help="Endpoint URL to send the POST request.")
+@click.option(
+    "--url",
+    default="http://localhost:8000/v1/infer",
+    help="Endpoint URL for HTTP (e.g., http://host:8000/v1/infer) or gRPC address for Triton (e.g., 127.0.0.1:8001).",
+)
+@click.option(
+    "--protocol",
+    type=click.Choice(["http", "grpc"], case_sensitive=False),
+    default="http",
+    help="Protocol to use for requests.",
+)
 @click.option("--min-concurrency", default=1, help="Minimum number of concurrent connections to test.", type=int)
 @click.option("--max-concurrency", default=64, help="Maximum number of concurrent connections to test.", type=int)
 @click.option("--concurrency-step", default=2, help="Step size for concurrency values (multiplier).", type=float)
@@ -58,6 +83,7 @@ signal.signal(signal.SIGINT, signal_handler)
 def optimize_throughput(
     image_path,
     url,
+    protocol,
     min_concurrency,
     max_concurrency,
     concurrency_step,
@@ -102,21 +128,28 @@ def optimize_throughput(
         click.echo("Error: --image-path is required when running tests.")
         return
 
-    # Read and encode the image file once (store the raw base64 string)
-    with open(image_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
-
-    # Set up default headers and update with auth token or custom headers if provided
-    headers = {"accept": "application/json", "content-type": "application/json"}
-    if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
-    if custom_headers:
-        try:
-            extra_headers = json.loads(custom_headers)
-            headers.update(extra_headers)
-        except Exception as e:
-            click.echo(f"Error parsing custom headers: {e}. Please provide a valid JSON string.")
-            return
+    # Prepare per-protocol inputs and headers
+    protocol = (protocol or "http").lower()
+    if protocol == "http":
+        # Prepare a data URL once for reuse across requests
+        data_url = encode_image_file_to_data_url(image_path)
+        headers = dict(essential_headers)
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+        if custom_headers:
+            try:
+                extra_headers = json.loads(custom_headers)
+                headers.update(extra_headers)
+            except Exception as e:
+                click.echo(f"Error parsing custom headers: {e}. Please provide a valid JSON string.")
+                return
+    elif protocol == "grpc":
+        # Load numpy image once for reuse; headers unused
+        image_np = load_image_numpy(image_path)
+        headers = {}
+    else:
+        click.echo("Invalid protocol specified. Use http or grpc.")
+        return
 
     # Prepare results array for CSV output
     results_data = []
@@ -165,8 +198,13 @@ def optimize_throughput(
             click.echo(f"  Testing batch size: {current_batch}")
 
             # Test this configuration for stability
+            # Build the appropriate request function for this protocol
+            request_fn = make_request_fn(
+                protocol, url, headers, timeout, auth_token, data_url if protocol == "http" else image_np
+            )
+
             stability_result = test_configuration_stability(
-                url, encoded_image, current_concurrency, current_batch, timeout, stability_duration, headers
+                request_fn, current_concurrency, current_batch, timeout, stability_duration
             )
 
             # Extract results
@@ -271,7 +309,13 @@ def optimize_throughput(
         generate_visualizations(output_file)
 
 
-def test_configuration_stability(url, encoded_image, concurrency, batch_size, timeout, stability_duration, headers):
+def test_configuration_stability(
+    request_fn: Callable[[int], tuple],
+    concurrency: int,
+    batch_size: int,
+    timeout: int,
+    stability_duration: int,
+):
     """
     Tests a specific concurrency/batch size configuration for stability.
 
@@ -297,10 +341,7 @@ def test_configuration_stability(url, encoded_image, concurrency, batch_size, ti
 
         # Launch concurrent requests using a thread pool
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            futures = [
-                executor.submit(send_yolox_request_with_timing, url, encoded_image, batch_size, timeout, headers)
-                for _ in range(concurrency)
-            ]
+            futures = [executor.submit(request_fn, batch_size) for _ in range(concurrency)]
             for future in as_completed(futures):
                 status, response_time = future.result()
                 batch_results.append((status, response_time))
@@ -329,36 +370,37 @@ def test_configuration_stability(url, encoded_image, concurrency, batch_size, ti
     return results
 
 
-def send_yolox_request_with_timing(url, encoded_image, batch_size, timeout, headers):
+def make_request_fn(
+    protocol: str,
+    url: str,
+    headers: dict,
+    timeout: int,
+    auth_token: str,
+    prepped_input,
+) -> Callable[[int], tuple]:
+    """Return a callable that sends a single request for the given protocol.
+
+    The callable signature is (batch_size) -> (status, response_time_seconds).
     """
-    Sends a request to the YOLOX service and measures response time.
+    protocol = protocol.lower()
 
-    Returns:
-        - A tuple of (status_code, response_time) where:
-          - status_code is the HTTP status code, "timeout", or "error"
-          - response_time is the time taken for the request in seconds
-    """
-    # Build the input list with the specified batch size
-    input_list = []
-    for _ in range(batch_size):
-        image_url = f"data:image/png;base64,{encoded_image}"
-        image_obj = {"type": "image_url", "url": image_url}
-        input_list.append(image_obj)
+    if protocol == "http":
 
-    # Construct the payload
-    payload = {"input": input_list}
+        def _fn(batch_size: int):
+            payload = build_http_payload_from_data_url(prepped_input, batch_size)
+            return http_post_with_timing(url, payload, timeout, headers)
 
-    start_time = time.time()
-    try:
-        response = requests.post(url, json=payload, timeout=timeout, headers=headers)
-        response_time = time.time() - start_time
-        return response.status_code, response_time
-    except requests.exceptions.Timeout:
-        response_time = time.time() - start_time
-        return "timeout", response_time
-    except Exception:
-        response_time = time.time() - start_time
-        return "error", response_time
+        return _fn
+
+    elif protocol == "grpc":
+
+        def _fn(batch_size: int):
+            return yolox_grpc_infer_with_timing(url, auth_token, prepped_input, batch_size, timeout)
+
+        return _fn
+
+    else:
+        raise ValueError("Unsupported protocol")
 
 
 def generate_visualizations(csv_file):
