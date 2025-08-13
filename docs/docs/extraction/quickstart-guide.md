@@ -89,7 +89,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
-    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  3 minutes ago   Up 3 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
+    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  3 minutes ago   Up 3 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-rest-api-1
     62c6b999c413  zilliz/attu:...                                  "docker-entrypoint.s…"  13 minutes ago  Up 3 minutes            0.0.0.0:3001...  milvus-attu
     14ef31ed7f49  milvusdb/milvus:...                              "/tini -- milvus run…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
     dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  13 minutes ago  Up 3 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
@@ -126,7 +126,7 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-rest-api-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
 
 
 ## Step 3: Ingesting Documents

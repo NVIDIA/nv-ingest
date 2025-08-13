@@ -241,24 +241,19 @@ services:
     profiles:
       - audio
 
-  nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
-    shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
+  nv-ingest-rest-api:
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest-rest-api:latest
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
-      target: runtime
+      target: rest-api
       args:
         DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
         HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
         MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
-    volumes:
-      - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
       # HTTP API
       - "7670:7670"
-      # Simple Broker -- Uncomment if running SimpleBroker in the container
-      #- "7671:7671"
       # Ray Dashboards
       - "8265:8265"
     cap_add:
@@ -339,7 +334,7 @@ services:
       #    comma separated list of HTTP environment variables for specific services to check for ready
       - COMPONENTS_TO_READY_CHECK=ALL
     healthcheck:
-      test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
+      test: curl --fail http://nv-ingest-rest-api:7670/v1/health/ready || exit 1
       interval: 10s
       timeout: 5s
       retries: 20
@@ -350,6 +345,91 @@ services:
             - driver: nvidia
               device_ids: ["0"]
               capabilities: [gpu]
+
+
+  nv-ingest-worker:
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest-worker:latest
+    shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
+    build:
+      context: ${NV_INGEST_ROOT:-.}
+      dockerfile: "./Dockerfile"
+      target: worker
+      args:
+        DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
+        HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
+        MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
+    volumes:
+      - ${DATASET_ROOT:-./data}:/workspace/data
+    cap_add:
+      - sys_nice
+    environment:
+      - ARROW_DEFAULT_MEMORY_POOL=system
+      - OMP_NUM_THREADS=1
+      - AUDIO_GRPC_ENDPOINT=audio:50051
+      - AUDIO_INFER_PROTOCOL=grpc
+      - CUDA_VISIBLE_DEVICES=-1
+      - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
+      - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
+      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
+      - INGEST_LOG_LEVEL=DEFAULT
+      - INGEST_EDGE_BUFFER_SIZE=64
+      - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
+      - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
+      - RAY_num_grpc_threads=1
+      # Dynamic Memory Scaling Configuration
+      # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
+      # - INGEST_DYNAMIC_MEMORY_KP=0.2
+      # - INGEST_DYNAMIC_MEMORY_KI=0.01
+      # - INGEST_DYNAMIC_MEMORY_EMA_ALPHA=0.1
+      # - INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH=0
+      # - INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR=0.1
+      # - INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR=1.5
+      # - INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION=0.15
+      # - INSTALL_AUDIO_EXTRACTION_DEPS=true
+      # Message client for development
+      #- MESSAGE_CLIENT_HOST=0.0.0.0
+      #- MESSAGE_CLIENT_PORT=7671
+      #- MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
+      # Message client for production
+      - MESSAGE_CLIENT_HOST=redis
+      - MESSAGE_CLIENT_PORT=6379
+      - MESSAGE_CLIENT_TYPE=redis
+      - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
+      # build.nvidia.com hosted nemoretriever-parse
+      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
+      - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
+      #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
+      - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      # Self-hosted ocr endpoints.
+      - OCR_GRPC_ENDPOINT=ocr:8001
+      - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
+      - OCR_INFER_PROTOCOL=grpc
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
+      # build.nvidia.com hosted ocr endpoints.
+      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
+      #- OCR_INFER_PROTOCOL=http
+      - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
+      # Self-hosted redis endpoints.
+      - YOLOX_PAGE_IMAGE_FORMAT=JPEG # JPG is faster than PNG
+      - YOLOX_GRPC_ENDPOINT=page-elements:8001
+      - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
+      - YOLOX_INFER_PROTOCOL=grpc
+      # build.nvidia.com hosted endpoints.
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_INFER_PROTOCOL=http
+      - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
+      - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
+      - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
+      - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
+      - VLM_CAPTION_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+      - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0

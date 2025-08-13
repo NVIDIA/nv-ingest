@@ -82,20 +82,7 @@ else
         _gunicorn_access_logformat=''
     fi
 
-    # --- Launch Services ---
-
-    if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
-        # Start gunicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
-        gunicorn nv_ingest.api.main:app \
-            -w 32 \
-            -k uvicorn.workers.UvicornWorker \
-            --bind 0.0.0.0:7670 \
-            --timeout 300 \
-            --log-level "${_log_level}" \
-            --access-logfile "${_gunicorn_access_logfile}" \
-            --access-logformat "${_gunicorn_access_logformat}" \
-            --error-logfile - &
-    fi
+    # --- Launch nv-ingest-worker ---
 
     if [ "${MEM_TRACE}" = true ]; then
         # Run the entrypoint wrapped in memray
