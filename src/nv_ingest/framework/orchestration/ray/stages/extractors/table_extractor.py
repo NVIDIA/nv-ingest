@@ -35,7 +35,7 @@ class TableExtractorStage(RayActorStage):
         super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
-            logger.info("TableExtractorStage configuration validated successfully.")
+            logger.debug("TableExtractorStage configuration validated successfully.")
         except Exception as e:
             logger.exception("Error validating table extractor config")
             raise e
@@ -58,7 +58,7 @@ class TableExtractorStage(RayActorStage):
         IngestControlMessage
             The updated message with the extracted table data and extraction info in metadata.
         """
-        logger.info("TableExtractorStage.on_data: Starting table extraction.")
+        logger.debug("TableExtractorStage.on_data: Starting table extraction.")
         # Extract the DataFrame payload.
         df_payload = control_message.payload()
         logger.debug("Extracted payload with %d rows.", len(df_payload))
@@ -75,13 +75,13 @@ class TableExtractorStage(RayActorStage):
             extraction_config=self.validated_config,
             execution_trace_log=execution_trace_log,
         )
-        logger.info("Table extraction completed. Extracted %d rows.", len(new_df))
+        logger.debug("Table extraction completed. Extracted %d rows.", len(new_df))
 
         # Update the control message with the new DataFrame.
         control_message.payload(new_df)
         # Annotate the message with extraction info.
         control_message.set_metadata("table_extraction_info", extraction_info)
-        logger.info("Table extraction metadata injected successfully.")
+        logger.debug("Table extraction metadata injected successfully.")
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:

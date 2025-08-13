@@ -55,7 +55,7 @@ class PDFExtractorStage(RayActorStage):
         try:
             # Validate and store the PDF extractor configuration.
             self.validated_config = config
-            logger.info("PDFExtractorStage configuration validated successfully.")
+            logger.debug("PDFExtractorStage configuration validated successfully.")
         except Exception as e:
             logger.exception(f"Error validating PDF extractor config: {e}")
             raise
@@ -79,7 +79,7 @@ class PDFExtractorStage(RayActorStage):
             The updated message with the extracted DataFrame and extraction info in metadata.
         """
 
-        logger.info("PDFExtractorStage.on_data: Starting PDF extraction process.")
+        logger.debug("PDFExtractorStage.on_data: Starting PDF extraction process.")
 
         # Extract the DataFrame payload.
         df_extraction_ledger = control_message.payload()
@@ -97,13 +97,13 @@ class PDFExtractorStage(RayActorStage):
             execution_trace_log=execution_trace_log,
             validated_config=self.validated_config,
         )
-        logger.info("PDF extraction completed. Extracted %d rows.", len(new_df))
+        logger.debug("PDF extraction completed. Extracted %d rows.", len(new_df))
 
         # Update the message payload with the extracted DataFrame.
         control_message.payload(new_df)
         # Optionally, annotate the message with extraction info.
         control_message.set_metadata("pdf_extraction_info", extraction_info)
-        logger.info("PDF extraction metadata injected successfully.")
+        logger.debug("PDF extraction metadata injected successfully.")
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:

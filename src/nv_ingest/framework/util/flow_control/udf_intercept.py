@@ -322,28 +322,23 @@ def udf_intercept_hook(stage_name: Optional[str] = None, enable_run_before: bool
                 args_list = list(args)
 
             if control_message:
-                try:
-                    # Execute UDFs that should run before this stage (if enabled)
-                    if enable_run_before:
-                        control_message = execute_targeted_udfs(control_message, resolved_stage_name, "run_before")
-                        # Update args with modified control_message
-                        if len(args) >= 2 and hasattr(args[1], "get_tasks"):
-                            args_list[1] = control_message
-                        else:
-                            args_list[0] = control_message
+                # Execute UDFs that should run before this stage (if enabled)
+                if enable_run_before:
+                    control_message = execute_targeted_udfs(control_message, resolved_stage_name, "run_before")
+                    # Update args with modified control_message
+                    if len(args) >= 2 and hasattr(args[1], "get_tasks"):
+                        args_list[1] = control_message
+                    else:
+                        args_list[0] = control_message
 
-                    # Execute the original stage logic
-                    result = func(*tuple(args_list), **kwargs)
+                # Execute the original stage logic
+                result = func(*tuple(args_list), **kwargs)
 
-                    # Execute UDFs that should run after this stage (if enabled)
-                    if enable_run_after and hasattr(result, "get_tasks"):  # Result is control_message
-                        result = execute_targeted_udfs(result, resolved_stage_name, "run_after")
+                # Execute UDFs that should run after this stage (if enabled)
+                if enable_run_after and hasattr(result, "get_tasks"):  # Result is control_message
+                    result = execute_targeted_udfs(result, resolved_stage_name, "run_after")
 
-                    return result
-                except Exception as e:
-                    logger.error(f"Error in udf_intercept_hook decorator for stage '{resolved_stage_name}': {e}")
-                    # Continue with original function execution
-                    return func(*args, **kwargs)
+                return result
             else:
                 return func(*args, **kwargs)
 

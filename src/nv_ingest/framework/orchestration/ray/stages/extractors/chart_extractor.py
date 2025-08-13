@@ -59,7 +59,7 @@ class ChartExtractorStage(RayActorStage):
         IngestControlMessage
             The updated message with the extracted chart data and extraction info in metadata.
         """
-        logger.info("ChartExtractorStage.on_data: Starting chart extraction.")
+        logger.debug("ChartExtractorStage.on_data: Starting chart extraction.")
         # Extract the DataFrame payload.
         df_payload = control_message.payload()
         logger.debug("ChartExtractorStage: Extracted payload with %d rows.", len(df_payload))
@@ -76,13 +76,13 @@ class ChartExtractorStage(RayActorStage):
             extraction_config=self.validated_config,
             execution_trace_log=execution_trace_log,
         )
-        logger.info("ChartExtractorStage: Chart extraction completed. New payload has %d rows.", len(new_df))
+        logger.debug("ChartExtractorStage: Chart extraction completed. New payload has %d rows.", len(new_df))
 
         # Update the control message with the new DataFrame.
         control_message.payload(new_df)
         # Annotate the message with extraction info.
         control_message.set_metadata("chart_extraction_info", extraction_info)
-        logger.info("ChartExtractorStage: Metadata injection complete. Returning updated control message.")
+        logger.debug("ChartExtractorStage: Metadata injection complete. Returning updated control message.")
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:

@@ -349,11 +349,11 @@ class RayPipeline(PipelineInterface):
         # Update constraint manager
         self.constraint_manager.max_replicas = total_max_replicas
 
-        logger.info(f"[Build-Configure] Autoscalers configured. Total Max Replicas: {total_max_replicas}")
+        logger.debug(f"[Build-Configure] Autoscalers configured. Total Max Replicas: {total_max_replicas}")
 
     def _instantiate_initial_actors(self) -> None:
         """Instantiates initial actors and updates topology."""
-        logger.info("[Build-Actors] Instantiating initial stage actors (min_replicas)...")
+        logger.debug("[Build-Actors] Instantiating initial stage actors (min_replicas)...")
         # Use topology accessor
         current_stages = self.topology.get_stages_info()
 
@@ -388,7 +388,7 @@ class RayPipeline(PipelineInterface):
             self.topology.set_actors_for_stage(stage.name, replicas)
             logger.debug(f"[Build-Actors] Stage '{stage.name}' initial actors set in topology: count={len(replicas)}")
 
-        logger.info("[Build-Actors] Initial actor instantiation complete.")
+        logger.debug("[Build-Actors] Initial actor instantiation complete.")
 
     def _create_and_wire_edges(self) -> List[ray.ObjectRef]:
         """
@@ -399,7 +399,7 @@ class RayPipeline(PipelineInterface):
         List[ray.ObjectRef]
             A list of object references for the remote wiring calls.
         """
-        logger.info("[Build-Wiring] Creating and wiring edges...")
+        logger.debug("[Build-Wiring] Creating and wiring edges...")
         wiring_refs = []
         new_edge_queues: Dict[str, Tuple[Any, int]] = {}
 
@@ -628,7 +628,7 @@ class RayPipeline(PipelineInterface):
         Dict[str, List[Any]]
             A dictionary mapping stage names to lists of actor handles.
         """
-        logger.info("--- Starting Pipeline Build Process ---")
+        logger.debug("--- Starting Pipeline Build Process ---")
         try:
             if not self.topology.get_stages_info():
                 logger.error("Build failed: No stages defined in topology.")
@@ -640,7 +640,7 @@ class RayPipeline(PipelineInterface):
             wiring_futures = self._create_and_wire_edges()
             self._wait_for_wiring(wiring_futures)
 
-            logger.info("--- Pipeline Build Completed Successfully ---")
+            logger.debug("--- Pipeline Build Completed Successfully ---")
             return self.topology.get_stage_actors()  # Return actors from topology
 
         except RuntimeError as e:
@@ -861,7 +861,7 @@ class RayPipeline(PipelineInterface):
         # Select actors to remove (e.g., the most recently added)
         actors_to_remove = current_replicas[-num_to_remove:]
 
-        logger.info(f"[ScaleDown-{stage_name}] Selected {len(actors_to_remove)} actors for removal.")
+        logger.debug(f"[ScaleDown-{stage_name}] Selected {len(actors_to_remove)} actors for removal.")
 
         # Signal each actor to stop and mark it for removal by the topology.
         # The topology's cleanup thread will handle polling and final removal.
@@ -966,7 +966,7 @@ class RayPipeline(PipelineInterface):
             True if the pipeline drained successfully, False otherwise.
         """
         start_time = time.time()
-        logger.info(f"Waiting for pipeline drain (Timeout: {timeout_seconds}s)...")
+        logger.debug(f"Waiting for pipeline drain (Timeout: {timeout_seconds}s)...")
         last_in_flight = -1
         drain_check_interval = 1.0  # Check every second
 
@@ -1172,7 +1172,7 @@ class RayPipeline(PipelineInterface):
         force : bool, optional
             Whether to force the flush, by default False.
         """
-        logger.info(f"Manual queue flush requested (force={force}).")
+        logger.debug(f"Manual queue flush requested (force={force}).")
 
         if self.topology.get_is_flushing() or self._stopping:  # Check topology
             logger.warning("Flush already in progress or pipeline is stopping.")
@@ -1183,7 +1183,7 @@ class RayPipeline(PipelineInterface):
             # For now, run synchronously:
             self._execute_queue_flush()
         else:
-            logger.info("Manual flush denied: pipeline not quiet or interval not met.")
+            logger.debug("Manual flush denied: pipeline not quiet or interval not met.")
 
     def _gather_controller_metrics(
         self, current_stage_stats: Dict[str, Dict[str, int]], global_in_flight: int
@@ -1409,7 +1409,7 @@ class RayPipeline(PipelineInterface):
                 self._consecutive_quiet_cycles += 1
                 logger.debug(f"Pipeline is quiet. Consecutive quiet cycles: {self._consecutive_quiet_cycles}")
                 if self._consecutive_quiet_cycles >= self.consecutive_quiet_cycles_for_flush:
-                    logger.info(
+                    logger.debug(
                         f"Pipeline has been quiet for {self._consecutive_quiet_cycles} cycles. "
                         "Initiating queue flush."
                     )
@@ -1423,7 +1423,7 @@ class RayPipeline(PipelineInterface):
                     )
             else:
                 if self._consecutive_quiet_cycles > 0:
-                    logger.info(
+                    logger.debug(
                         f"Pipeline is no longer quiet. Resetting consecutive quiet cycle count "
                         f"from {self._consecutive_quiet_cycles} to 0."
                     )
@@ -1479,7 +1479,7 @@ class RayPipeline(PipelineInterface):
         interval : float
             The interval in seconds.
         """
-        logger.info(f"Scaling loop started. Interval: {interval}s")
+        logger.debug(f"Scaling loop started. Interval: {interval}s")
         while self._scaling_monitoring:
             try:
                 self._perform_scaling_and_maintenance()
@@ -1490,7 +1490,7 @@ class RayPipeline(PipelineInterface):
             if not self._scaling_monitoring:
                 break
             time.sleep(sleep_time)
-        logger.info("Scaling loop finished.")
+        logger.debug("Scaling loop finished.")
 
     def _start_scaling(self, poll_interval: float = 10.0) -> None:
         """
@@ -1505,7 +1505,7 @@ class RayPipeline(PipelineInterface):
             self._scaling_monitoring = True
             self._scaling_thread = threading.Thread(target=self._scaling_loop, args=(poll_interval,), daemon=True)
             self._scaling_thread.start()
-            logger.info(f"Scaling/Maintenance thread launched (Interval: {poll_interval}s).")
+            logger.debug(f"Scaling/Maintenance thread launched (Interval: {poll_interval}s).")
 
     def _stop_scaling(self) -> None:
         """
@@ -1519,7 +1519,7 @@ class RayPipeline(PipelineInterface):
                 if self._scaling_thread.is_alive():
                     logger.warning("Scaling thread did not exit cleanly.")
             self._scaling_thread = None
-            logger.info("Scaling/Maintenance stopped.")
+            logger.debug("Scaling/Maintenance stopped.")
 
     # --- Pipeline Start/Stop ---
     def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
@@ -1548,7 +1548,7 @@ class RayPipeline(PipelineInterface):
             logger.debug(f"Waiting for {len(start_futures)} actors to start...")
             try:
                 ray.get(start_futures, timeout=60.0)
-                logger.info(f"{len(start_futures)} actors started.")
+                logger.debug(f"{len(start_futures)} actors started.")
             except Exception as e:
                 logger.error(f"Error/Timeout starting actors: {e}", exc_info=True)
                 self.stop()  # Attempt cleanup
@@ -1593,7 +1593,7 @@ class RayPipeline(PipelineInterface):
                     logger.warning(
                         f"Timeout waiting for {len(not_ready)} actors to stop. " f"Proceeding with shutdown."
                     )
-                logger.info(f"{len(ready)} actors confirmed stop.")
+                logger.debug(f"{len(ready)} actors confirmed stop.")
             except Exception as e:
                 logger.error(f"An unexpected error occurred during actor shutdown: {e}", exc_info=True)
 

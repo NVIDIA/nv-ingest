@@ -36,7 +36,7 @@ class TextSplitterStage(RayActorStage):
         super().__init__(config, stage_name=stage_name)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
-        logger.info("TextSplitterStage initialized with config: %s", config)
+        logger.debug("TextSplitterStage initialized with config: %s", config)
 
     @nv_ingest_node_failure_try_except()
     @traceable()
@@ -72,11 +72,13 @@ class TextSplitterStage(RayActorStage):
             transform_config=self.validated_config,
             execution_trace_log=None,
         )
-        logger.info("TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated))
+        logger.debug(
+            "TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated)
+        )
 
         # Update the message payload.
         message.payload(df_updated)
-        logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
+        logger.debug("TextSplitterStage.on_data: Finished processing, returning updated message.")
 
         return message
 
@@ -114,10 +116,10 @@ def text_splitter_fn(control_message: IngestControlMessage, stage_config: TextSp
         transform_config=stage_config,
         execution_trace_log=None,
     )
-    logger.info("TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated))
+    logger.debug("TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated))
 
     # Update the message payload.
     control_message.payload(df_updated)
-    logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
+    logger.debug("TextSplitterStage.on_data: Finished processing, returning updated message.")
 
     return control_message

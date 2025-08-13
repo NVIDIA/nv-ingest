@@ -42,7 +42,7 @@ class MetadataInjectionStage(RayActorStage):
         # Call the base initializer to set attributes like self._running.
         super().__init__(config, stage_name=stage_name)
         # Additional initialization can be added here if necessary.
-        self._logger.info("MetadataInjectionStage initialized with config: %s", config)
+        self._logger.debug("MetadataInjectionStage initialized with config: %s", config)
 
     @nv_ingest_node_failure_try_except()
     @traceable()
@@ -64,7 +64,7 @@ class MetadataInjectionStage(RayActorStage):
         df = message.payload()
         update_required = False
         rows = []
-        logger.info("Starting metadata injection on DataFrame with %d rows", len(df))
+        logger.debug("Starting metadata injection on DataFrame with %d rows", len(df))
 
         for _, row in df.iterrows():
             try:
@@ -143,7 +143,7 @@ class MetadataInjectionStage(RayActorStage):
                         "source_metadata": default_source_metadata,
                         "text_metadata": default_text_metadata,
                     }
-                    logger.info(
+                    logger.debug(
                         f"METADATA_INJECTOR_DEBUG: Rebuilt metadata for source_id='{row.get('source_id', 'N/A')}'. "
                         f"Metadata keys: {list(row['metadata'].keys())}."
                         f"'content' present: {'content' in row['metadata']}"
@@ -156,8 +156,8 @@ class MetadataInjectionStage(RayActorStage):
         if update_required:
             docs = pd.DataFrame(rows)
             message.payload(docs)
-            logger.info("Metadata injection updated payload with %d rows", len(docs))
+            logger.debug("Metadata injection updated payload with %d rows", len(docs))
         else:
-            logger.info("No metadata update was necessary during metadata injection")
+            logger.debug("No metadata update was necessary during metadata injection")
 
         return message

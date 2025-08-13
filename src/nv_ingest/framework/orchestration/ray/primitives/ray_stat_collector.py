@@ -111,7 +111,7 @@ class RayStatsCollector:
             self._running = False  # Correct inconsistent state
 
         if not self._running:
-            logger.info("Starting stats collector thread...")
+            logger.debug("Starting stats collector thread...")
             self._running = True
             with self._lock:
                 self._last_update_successful = False  # Mark as stale until first collection
@@ -129,7 +129,7 @@ class RayStatsCollector:
     def stop(self) -> None:
         """Signals the background stats collection thread to stop and waits for it."""
         if self._running:
-            logger.info("Stopping stats collector thread...")
+            logger.debug("Stopping stats collector thread...")
             self._running = False  # Signal loop to stop
 
             if self._thread is not None:
@@ -150,7 +150,7 @@ class RayStatsCollector:
             with self._lock:
                 self._last_update_successful = False
                 self._collected_stats = {}  # Clear last collected stats
-            logger.info("Stats collector thread stopped.")
+            logger.debug("Stats collector thread stopped.")
         else:
             logger.debug("Stats collector thread already stopped or never started.")
 
@@ -230,7 +230,7 @@ class RayStatsCollector:
             # but time.sleep is simpler for now.
             time.sleep(sleep_time)
 
-        logger.info("Stats collector loop finished.")
+        logger.debug("Stats collector loop finished.")
 
     def collect_stats_now(self) -> Tuple[Dict[str, Dict[str, int]], int, bool]:
         """

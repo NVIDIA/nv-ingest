@@ -36,7 +36,7 @@ class ImageFilterStage(RayActorStage):
         super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
-            logger.info("ImageFilterStage configuration validated successfully.")
+            logger.debug("ImageFilterStage configuration validated successfully.")
         except Exception as e:
             logger.exception(f"Error validating Image Filter config: {e}")
             raise
@@ -59,7 +59,7 @@ class ImageFilterStage(RayActorStage):
         IngestControlMessage
             The updated message with filtered images in the payload.
         """
-        logger.info("ImageFilterStage.on_data: Starting image filtering process.")
+        logger.debug("ImageFilterStage.on_data: Starting image filtering process.")
 
         # Extract the DataFrame payload.
         df_ledger = control_message.payload()
@@ -78,7 +78,7 @@ class ImageFilterStage(RayActorStage):
             mutate_config=self.validated_config,
             execution_trace_log=None,
         )
-        logger.info("Image filtering completed. Resulting DataFrame has %d rows.", len(new_df))
+        logger.debug("Image filtering completed. Resulting DataFrame has %d rows.", len(new_df))
 
         # Update the message payload with the filtered DataFrame.
         control_message.payload(new_df)

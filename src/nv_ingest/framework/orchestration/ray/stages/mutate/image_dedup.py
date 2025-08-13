@@ -37,7 +37,7 @@ class ImageDedupStage(RayActorStage):
         super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
-            logger.info("ImageDedupStage configuration validated successfully.")
+            logger.debug("ImageDedupStage configuration validated successfully.")
         except Exception as e:
             logger.exception(f"Error validating Image Deduplication config: {e}")
             raise
@@ -60,7 +60,7 @@ class ImageDedupStage(RayActorStage):
         IngestControlMessage
             The updated message with deduplicated images in the payload.
         """
-        logger.info("ImageDedupStage.on_data: Starting image deduplication process.")
+        logger.debug("ImageDedupStage.on_data: Starting image deduplication process.")
         try:
             # Extract the DataFrame payload.
             df_ledger = control_message.payload()
@@ -77,7 +77,7 @@ class ImageDedupStage(RayActorStage):
                 mutate_config=self.validated_config,
                 execution_trace_log=None,
             )
-            logger.info("Image deduplication completed. Resulting DataFrame has %d rows.", len(new_df))
+            logger.debug("Image deduplication completed. Resulting DataFrame has %d rows.", len(new_df))
 
             # Update the message payload with the deduplicated DataFrame.
             control_message.payload(new_df)
