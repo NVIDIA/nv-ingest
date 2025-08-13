@@ -156,7 +156,9 @@ class SubprocessStrategy(ProcessExecutionStrategy):
             logger.info(f"Pipeline subprocess started (PID={process.pid})")
             # Ensure we pass the Process object, not just the PID, to avoid AttributeError
             # kill_pipeline_process_group expects a multiprocessing.Process instance
-            atexit.register(lambda: kill_pipeline_process_group(process))
+            # Capture raw PID to avoid using multiprocessing APIs during interpreter shutdown
+            pid = int(process.pid)
+            atexit.register(kill_pipeline_process_group, pid)
             return ExecutionResult(interface=interface, elapsed_time=None)
 
 

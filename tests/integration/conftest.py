@@ -4,11 +4,29 @@
 
 import os
 import time
+import socket
 
 import pytest
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest.pipeline.config.loaders import load_pipeline_config
+
+
+def _wait_for_port(host: str, port: int, timeout: float = 120.0, interval: float = 0.5) -> None:
+    """
+    Wait until a TCP port on a host is accepting connections or raise TimeoutError.
+    This makes the tests robust against pipeline warm-up variability.
+    """
+    deadline = time.time() + timeout
+    last_err: Exception | None = None
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1.0):
+                return
+        except Exception as e:
+            last_err = e
+            time.sleep(interval)
+    raise TimeoutError(f"Port {host}:{port} not ready after {timeout}s: {last_err}")
 
 
 @pytest.fixture(scope="session")
@@ -37,7 +55,8 @@ def pipeline_process():
     pipeline = None
     try:
         pipeline = run_pipeline(config, block=False, run_in_subprocess=True, disable_dynamic_scaling=True)
-        time.sleep(5)  # Allow some warm-up time
+        # Wait for message broker readiness using explicit IPv4 loopback to avoid IPv6 localhost mismatch
+        _wait_for_port("127.0.0.1", 7671, timeout=120.0, interval=0.5)
         yield pipeline
     except KeyboardInterrupt:
         print("Keyboard interrupt received. Shutting down pipeline...")

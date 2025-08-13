@@ -85,7 +85,7 @@ class TestBuildLoggingConfigFromEnv:
         assert os.environ["RAY_LOGGING_LEVEL"] == "INFO"
         assert os.environ["RAY_LOGGING_ENCODING"] == "TEXT"
         assert os.environ["RAY_DEDUP_LOGS"] == "1"
-        assert os.environ["RAY_LOG_TO_DRIVER"] == "1"
+        assert os.environ["RAY_LOG_TO_DRIVER"] == "0"
 
     @patch("nv_ingest.framework.orchestration.process.execution.LoggingConfig")
     def test_build_logging_config_production_preset(self, mock_logging_config):

@@ -34,6 +34,28 @@ from nv_ingest_api.util.string_processing.configuration import pretty_print_pipe
 logger = logging.getLogger(__name__)
 
 
+def _safe_log(level: int, msg: str) -> None:
+    """Best-effort logging that won't crash during interpreter shutdown.
+
+    Attempts to emit via the module logger, but if logging handlers/streams
+    have already been closed (common in atexit during CI/pytest teardown),
+    falls back to writing to sys.__stderr__ and never raises.
+    """
+    try:
+        logger.log(level, msg)
+        return
+    except Exception:
+        pass
+    try:
+        # Use the original un-captured stderr if available
+        if hasattr(sys, "__stderr__") and sys.__stderr__:
+            sys.__stderr__.write(msg + "\n")
+            sys.__stderr__.flush()
+    except Exception:
+        # Last resort: swallow any error to avoid noisy shutdowns
+        pass
+
+
 def str_to_bool(value: str) -> bool:
     """Convert string to boolean value."""
     return value.strip().lower() in {"1", "true", "yes", "on"}
@@ -370,6 +392,12 @@ def run_pipeline_process(
     if stderr:
         sys.stderr = stderr
 
+    # Create a new process group so we can terminate the entire subtree cleanly
+    try:
+        os.setpgrp()
+    except Exception as e:
+        logger.debug(f"os.setpgrp() not available or failed: {e}")
+
     # Test output redirection
     print("DEBUG: Direct print to stdout - should appear in parent process")
     sys.stderr.write("DEBUG: Direct write to stderr - should appear in parent process\n")
@@ -390,27 +418,80 @@ def kill_pipeline_process_group(process: multiprocessing.Process) -> None:
     """
     Kill a pipeline process and its entire process group.
 
-    This function sends SIGTERM to the process group to ensure all
-    child processes are properly terminated.
+    Note: Although the type annotation specifies a multiprocessing.Process for
+    compatibility with existing tests and public API, this function is robust
+    to also being passed a raw PID (int) at runtime.
+
+    Behavior:
+    - Send SIGTERM to the process group; if still alive after grace period, escalate to SIGKILL.
+    - If a Process object is provided, attempt to join() with timeouts.
+    - If only a PID is provided, skip joins and just signal the process group with grace/force.
 
     Parameters
     ----------
     process : multiprocessing.Process
-        The process to terminate.
+        Process handle (or a raw PID int) for the process whose process group should be terminated.
     """
-    if process.is_alive():
-        logger.info(f"Terminating pipeline process group (PID: {process.pid})")
+    # Resolve PID and optional Process handle
+    proc: Optional[object] = None
+    pid: Optional[int] = None
+
+    if isinstance(process, int):
+        pid = process
+    elif hasattr(process, "pid"):
+        # Duck-type any object that exposes a pid (e.g., multiprocessing.Process or Mock)
+        proc = process
         try:
-            # Kill the entire process group
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-            process.join(timeout=5.0)
-
-            if process.is_alive():
-                logger.warning("Process did not terminate gracefully, using SIGKILL")
-                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                process.join()
-
-        except (ProcessLookupError, OSError) as e:
-            logger.debug(f"Process already terminated: {e}")
+            pid = int(getattr(proc, "pid"))
+        except Exception as e:
+            raise AttributeError(f"Invalid process-like object without usable pid: {e}")
     else:
-        logger.debug("Process already terminated")
+        raise AttributeError(
+            "kill_pipeline_process_group expects a multiprocessing.Process or a PID int (process-like object with .pid)"
+        )
+
+    # If we have a Process handle and it's already dead, nothing to do
+    if proc is not None and hasattr(proc, "is_alive") and not proc.is_alive():
+        _safe_log(logging.DEBUG, "Process already terminated")
+        return
+
+    if pid is None:
+        # Defensive guard; should not happen
+        raise AttributeError("Unable to determine PID for process group termination")
+
+    _safe_log(logging.INFO, f"Terminating pipeline process group (PID: {pid})")
+    try:
+        # Send graceful termination to the entire process group
+        os.killpg(os.getpgid(pid), signal.SIGTERM)
+
+        # If we have a Process handle, give it a chance to exit cleanly
+        if proc is not None and hasattr(proc, "join"):
+            try:
+                proc.join(timeout=5.0)
+            except Exception:
+                pass
+            still_alive = getattr(proc, "is_alive", lambda: True)()
+        else:
+            # Without a handle, provide a small grace period
+            time.sleep(2.0)
+            # Best-effort check: if getpgid fails, it's gone
+            try:
+                _ = os.getpgid(pid)
+                still_alive = True
+            except Exception:
+                still_alive = False
+
+        if still_alive:
+            _safe_log(logging.WARNING, "Process group did not terminate gracefully, using SIGKILL")
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            finally:
+                if proc is not None and hasattr(proc, "join"):
+                    try:
+                        proc.join(timeout=3.0)
+                    except Exception:
+                        pass
+
+    except (ProcessLookupError, OSError) as e:
+        # Process or group may already be gone
+        _safe_log(logging.DEBUG, f"Process group already terminated or not found: {e}")
