@@ -11,13 +11,14 @@ import os
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import ANY
+from unittest.mock import call
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import nv_ingest_client.client.interface as module_under_test
 import pytest
 
-from client.client_tests.utilities_for_test import (
+from ..utilities_for_test import (
     cleanup_test_workspace,
     create_test_workspace,
     get_git_root,
@@ -1074,3 +1075,111 @@ def test_vdb_upload_return_failures_true_with_tuple_return(workspace, monkeypatc
         mock_vdb_op.run.assert_called_once()
         called_args = mock_vdb_op.run.call_args[0][0]
         assert called_args == successful_results  # Should be raw data when save_to_disk() is not used
+
+
+@pytest.fixture
+def mock_files_in_workspace(tmp_path):
+    """
+    A factory fixture that creates a specified number of dummy files
+    in a temporary directory and returns their paths.
+    """
+
+    def _create_files(num_files: int):
+        file_paths = []
+        for i in range(num_files):
+            file_path = tmp_path / f"doc{i+1}.txt"
+            file_path.write_text(f"content of doc {i+1}")
+            file_paths.append(str(file_path))
+        return file_paths
+
+    return _create_files
+
+
+def test_ingest_in_chunks_raises_error_if_vdb_not_configured(ingestor_without_doc, mock_files_in_workspace):
+    """
+    Verifies that ingest_in_chunks raises a ValueError if vdb_upload has not been called.
+    """
+    doc_files = mock_files_in_workspace(num_files=2)
+    ingestor = ingestor_without_doc.files(doc_files)
+
+    with pytest.raises(ValueError, match=r"`vdb_upload\(\)` must be configured to use `ingest_in_chunks`."):
+        ingestor.ingest_in_chunks(chunk_size=1)
+
+
+def test_ingest_in_chunks_splits_correctly_and_aggregates_results(ingestor_without_doc, mock_files_in_workspace):
+    """
+    Tests the happy path for ingest_in_chunks.
+    Verifies that it splits documents into correct chunks, calls ingest for each,
+    and aggregates the results and failures.
+    """
+    five_docs = mock_files_in_workspace(num_files=5)
+    ingestor = ingestor_without_doc.files(five_docs)
+
+    ingestor._vdb_bulk_upload = MagicMock()
+
+    mock_results_per_chunk = [
+        (["result1"], [("failure1", "error")]),
+        (["result2", "result3"], []),
+        (["result4"], [("failure2", "error")]),
+    ]
+
+    with patch.object(ingestor, "ingest", side_effect=mock_results_per_chunk) as mock_ingest:
+        final_results, final_failures = ingestor.ingest_in_chunks(chunk_size=2, return_failures=True)
+
+        assert mock_ingest.call_count == 3
+
+        expected_calls = [
+            call(return_failures=True, show_progress=False),
+            call(return_failures=True, show_progress=False),
+            call(return_failures=True, show_progress=False),
+        ]
+        mock_ingest.assert_has_calls(expected_calls, any_order=False)
+
+        expected_final_results = ["result1", "result2", "result3", "result4"]
+        expected_final_failures = [("failure1", "error"), ("failure2", "error")]
+
+        assert final_results == expected_final_results
+        assert final_failures == expected_final_failures
+
+
+def test_ingest_in_chunks_handles_no_failures(ingestor_without_doc, mock_files_in_workspace):
+    """
+    Tests ingest_in_chunks when the underlying ingest calls produce no failures.
+    """
+    three_docs = mock_files_in_workspace(num_files=3)
+    ingestor = ingestor_without_doc.files(three_docs)
+    ingestor._vdb_bulk_upload = MagicMock()
+
+    mock_results_per_chunk = [
+        (["result1"], []),
+        (["result2", "result3"], []),
+    ]
+
+    with patch.object(ingestor, "ingest", side_effect=mock_results_per_chunk) as mock_ingest:
+        final_results, final_failures = ingestor.ingest_in_chunks(chunk_size=2, return_failures=True)
+
+        assert mock_ingest.call_count == 2
+        assert final_results == ["result1", "result2", "result3"]
+        assert final_failures == []
+
+
+def test_ingest_in_chunks_returns_only_results_when_failures_not_requested(
+    ingestor_without_doc, mock_files_in_workspace
+):
+    """
+    Tests that ingest_in_chunks returns only the results list when return_failures=False.
+    """
+    three_docs = mock_files_in_workspace(num_files=3)
+    ingestor = ingestor_without_doc.files(three_docs)
+    ingestor._vdb_bulk_upload = MagicMock()
+
+    mock_results_per_chunk = [
+        (["result1"], [("failure1", "error")]),
+        (["result2"], []),
+    ]
+
+    with patch.object(ingestor, "ingest", side_effect=mock_results_per_chunk) as mock_ingest:
+        final_results = ingestor.ingest_in_chunks(chunk_size=2, return_failures=False)
+
+        assert mock_ingest.call_count == 2
+        assert final_results == ["result1", "result2"]

@@ -393,6 +393,7 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
+        chunk_size: Optional[int] = None,
         **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
@@ -411,6 +412,12 @@ class Ingestor:
             Whether to display a progress bar. Default is False.
         return_failures : bool, optional
             If True, return a tuple (results, failures); otherwise, return only results. Default is False.
+        save_to_disk : bool, optional
+            A convenience flag to enable saving results to disk in a temporary directory.
+            Equivalent to calling `.save_to_disk()` with default settings. Default is False.
+        chunk_size : int, optional
+            If set, documents will be processed in chunks of this size to limit disk usage.
+            If None (default), all documents are processed in a single pass.
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
@@ -426,6 +433,12 @@ class Ingestor:
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
+
+        if chunk_size is not None:
+            results, failures = self.ingest_in_chunks(
+                chunk_size=chunk_size, show_progress=show_progress, return_failures=return_failures
+            )
+            return (results, failures) if return_failures else results
 
         self._prepare_ingest_run()
 
