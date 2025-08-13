@@ -1,10 +1,22 @@
+import os
+import sys
+import time
+import json
+import logging
+from datetime import datetime
+
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
-import os
-import time
-import json
-from datetime import datetime
+# Import utils functions to replace local duplicates
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "interact"))
+from utils import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
+
+# Future: Will integrate with modular ingest_documents.py when VDB upload is separated
+
+# Suppress LazyLoadedList file not found errors to reduce terminal bloat
+lazy_logger = logging.getLogger("nv_ingest_client.client.interface")
+lazy_logger.setLevel(logging.CRITICAL)
 
 try:
     from pymilvus import MilvusClient
@@ -24,76 +36,72 @@ def _get_env(name: str, default: str | None = None) -> str | None:
 
 
 def _default_collection_name() -> str:
-    return f"dc20_{_now_timestr()}"
-
-
-def _embed_info() -> tuple[str, int]:
-    # Keep it simple and configurable; default matches compose's embedding NIM
-    model_name = _get_env("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
-    # Known dims for common models; fall back to 2048
-    if model_name.endswith("e5-v5"):
-        return model_name, 1024
-    return model_name, 2048
-
-
-def _log_dict(d: dict) -> None:
-    print(json.dumps(d))
-
-
-def _milvus_chunks(collection_name: str) -> None:
-    if MilvusClient is None:
-        return
-    try:
-        client = MilvusClient(uri="http://localhost:19530")
-        stats = client.get_collection_stats(collection_name)
-        _log_dict({"metric": f"{collection_name}_chunks", "stats": stats})
-        client.close()
-    except Exception as e:
-        _log_dict({"warning": f"milvus_stats_failed: {e}"})
-
-
-def _segment_results(results):
-    text_results = [[el for el in doc if el.get("document_type") == "text"] for doc in results]
-    table_results = [
-        [el for el in doc if el.get("metadata", {}).get("content_metadata", {}).get("subtype") == "table"]
-        for doc in results
-    ]
-    chart_results = [
-        [el for el in doc if el.get("metadata", {}).get("content_metadata", {}).get("subtype") == "chart"]
-        for doc in results
-    ]
-    return text_results, table_results, chart_results
+    # Make collection name configurable via TEST_NAME env var, default to dc20
+    test_name = _get_env("TEST_NAME", "dc20")
+    return f"{test_name}_{_now_timestr()}"
 
 
 def main() -> int:
-    data_dir = _get_env("DATASET_DIR", "/datasets/bo20")
-    if not data_dir or not os.path.isdir(data_dir):
-        print(f"DATASET_DIR does not exist: {data_dir}")
+    # Dataset-agnostic: no hardcoded paths, configurable via environment
+    data_dir = _get_env("DATASET_DIR")
+    if not data_dir:
+        print("ERROR: DATASET_DIR environment variable is required")
+        print("Example: DATASET_DIR=/datasets/bo20 python dc20_e2e.py")
+        return 2
+
+    if not os.path.isdir(data_dir):
+        print(f"ERROR: Dataset directory does not exist: {data_dir}")
+        print("Please check the DATASET_DIR path and ensure it's accessible")
         return 2
 
     spill_dir = _get_env("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
     collection_name = _get_env("COLLECTION_NAME", _default_collection_name())
-    hostname = "localhost"
-    sparse = True
-    gpu_search = False
+    hostname = _get_env("HOSTNAME", "localhost")
+    sparse = _get_env("SPARSE", "true").lower() == "true"
+    gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
 
-    model_name, dense_dim = _embed_info()
+    # Extraction configuration from environment variables
+    extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
+    extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
+    extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
+    extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
+    text_depth = _get_env("TEXT_DEPTH", "page")
+    table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
+    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+
+    # Logging configuration
+    log_path = _get_env("LOG_PATH", "test_results")
+
+    model_name, dense_dim = embed_info()
+
+    # Log configuration for transparency
+    print("=== Configuration ===")
+    print(f"Dataset: {data_dir}")
+    print(f"Collection: {collection_name}")
+    print(f"Spill: {spill_dir}")
+    print(f"Hostname: {hostname}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
+    print(f"Sparse: {sparse}, GPU search: {gpu_search}")
+    print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
+    print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
+    print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    print("====================")
 
     ingestion_start = time.time()
+
     ingestor = (
         Ingestor(message_client_hostname=hostname, message_client_port=7670)
         .files(data_dir)
         .extract(
-            extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
-            extract_images=False,
-            text_depth="page",
-            table_output_format="markdown",
-            extract_infographics=True,
+            extract_text=extract_text,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            extract_images=extract_images,
+            text_depth=text_depth,
+            table_output_format=table_output_format,
+            extract_infographics=extract_infographics,
         )
         .embed(model_name=model_name)
         .vdb_upload(
@@ -108,16 +116,16 @@ def main() -> int:
 
     results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
     ingestion_time = time.time() - ingestion_start
-    _log_dict({"metric": "result_count", "value": len(results)})
-    _log_dict({"metric": "failure_count", "value": len(failures)})
-    _log_dict({"metric": "ingestion_time_s", "value": ingestion_time})
+    kv_event_log("result_count", len(results), log_path)
+    kv_event_log("failure_count", len(failures), log_path)
+    kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
     # Optional: log chunk stats and per-type breakdown
-    _milvus_chunks(collection_name)
-    text_results, table_results, chart_results = _segment_results(results)
-    _log_dict({"metric": "text_chunks", "value": sum(len(x) for x in text_results)})
-    _log_dict({"metric": "table_chunks", "value": sum(len(x) for x in table_results)})
-    _log_dict({"metric": "chart_chunks", "value": sum(len(x) for x in chart_results)})
+    milvus_chunks(f"http://{hostname}:19530", collection_name)
+    text_results, table_results, chart_results = segment_results(results)
+    kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
+    kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)
+    kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
 
     # Retrieval sanity
     queries = [
@@ -135,24 +143,27 @@ def main() -> int:
         top_k=5,
         gpu_search=gpu_search,
     )
-    _log_dict({"metric": "retrieval_time_s", "value": time.time() - querying_start})
+    kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
+    test_name = _get_env("TEST_NAME", "dc20")
     summary = {
+        "test_name": test_name,
         "dataset_dir": data_dir,
         "collection_name": collection_name,
+        "hostname": hostname,
         "model_name": model_name,
         "dense_dim": dense_dim,
+        "sparse": sparse,
+        "gpu_search": gpu_search,
         "ingestion_time_s": ingestion_time,
         "result_count": len(results),
         "failure_count": len(failures),
     }
-    print("dc20_e2e summary:")
+    print(f"{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

@@ -20,6 +20,27 @@ def run_cmd(cmd: list[str]) -> int:
     return subprocess.call(cmd)
 
 
+def stop_services() -> int:
+    """
+    Simple cleanup of Docker services.
+    """
+    print("Performing service cleanup...")
+
+    # Stop all services with all profiles
+    down_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "down"]
+    rc = run_cmd(down_cmd)
+    if rc != 0:
+        print(f"Warning: docker compose down returned {rc}")
+
+    # Remove containers forcefully
+    rm_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "rm", "--force"]
+    rc = run_cmd(rm_cmd)
+    if rc != 0:
+        print(f"Warning: docker compose rm returned {rc}")
+
+    return 0
+
+
 def readiness_wait(timeout_s: int) -> bool:
     import urllib.request
 
@@ -62,7 +83,12 @@ def load_env_file(env_file: str | None):
 def run_case_dc20(stdout_path: str) -> int:
     """Run the dc20 case as a subprocess to keep runner simple and capture output."""
     case_path = os.path.join(os.path.dirname(__file__), "cases", "dc20_e2e.py")
-    proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True)
+
+    # Set LOG_PATH to artifacts directory for kv_event_log
+    env = os.environ.copy()
+    env["LOG_PATH"] = os.path.dirname(stdout_path)
+
+    proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True, env=env)
     # Echo to console and also save to file
     if proc.stdout:
         print(proc.stdout, end="")
@@ -107,7 +133,10 @@ def main():
     try:
         if args.infra == "managed":
             compose_cmd = [
-                "docker", "compose", "-f", COMPOSE_FILE,
+                "docker",
+                "compose",
+                "-f",
+                COMPOSE_FILE,
                 "--profile",
             ]
             # Apply the first profile with --profile, remaining as repeated flags
@@ -138,25 +167,23 @@ def main():
 
         # Write summary stub (case also prints its own JSON summary)
         with open(summary_path, "w") as f:
-            json.dump({
-                "case": args.case,
-                "infra": args.infra,
-                "profiles": args.profiles,
-                "stdout": os.path.basename(stdout_path),
-                "return_code": rc,
-            }, f, indent=2)
+            json.dump(
+                {
+                    "case": args.case,
+                    "infra": args.infra,
+                    "profiles": args.profiles,
+                    "stdout": os.path.basename(stdout_path),
+                    "return_code": rc,
+                },
+                f,
+                indent=2,
+            )
 
         return rc
     finally:
         if args.infra == "managed" and not args.keep_up:
-            down_cmd = [
-                "docker", "compose", "-f", COMPOSE_FILE,
-                "down"
-            ]
-            run_cmd(down_cmd)
+            stop_services()
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
