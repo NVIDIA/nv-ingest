@@ -33,6 +33,7 @@ from nv_ingest_api.util.converters.formats import ingest_json_results_to_blob
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
+from nv_ingest.api.dependency import get_ingest_service
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -40,15 +41,7 @@ tracer = trace.get_tracer(__name__)
 router = APIRouter()
 
 
-async def _get_ingest_service() -> IngestServiceMeta:
-    """
-    Gather the appropriate Ingestion Service to use for the nv-ingest endpoint.
-    """
-    logger.debug("Creating RedisIngestService singleton for dependency injection")
-    return RedisIngestService.get_instance()
-
-
-INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
+INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(get_ingest_service)]
 STATE_RETRIEVED_DESTRUCTIVE = "RETRIEVED_DESTRUCTIVE"
 STATE_RETRIEVED_NON_DESTRUCTIVE = "RETRIEVED_NON_DESTRUCTIVE"
 STATE_RETRIEVED_CACHED = "RETRIEVED_CACHED"
