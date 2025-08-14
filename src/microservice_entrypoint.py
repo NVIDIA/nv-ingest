@@ -15,8 +15,6 @@ if _env_log_level.upper() == "DEFAULT":
 # Remove duplicate configure_logging call - only configure once in CLI function
 # configure_logging(_env_log_level)
 
-logger = logging.getLogger(__name__)
-
 
 @click.command()
 @click.option(
@@ -41,6 +39,7 @@ def cli(
     """
     Configures and runs the pipeline with specified options.
     """
+
     # Allow CLI override if user explicitly passed --log_level
     log_level = "INFO" if log_level == "DEFAULT" else log_level
     if log_level:
@@ -48,9 +47,13 @@ def cli(
         from nv_ingest_api.util.logging.configuration import configure_logging
 
         configure_logging(log_level)
+        # Create logger after logging has been configured to avoid any pre-config duplication
+        logger = logging.getLogger(__name__)
         logger.info(f"Log level overridden by CLI to {log_level}")
 
     try:
+        # Ensure logger is available even if the above branch is skipped (defensive)
+        logger = logging.getLogger(__name__)
         logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
         # Import modules that may configure logging only after logging is set up
         from nv_ingest.pipeline.config.loaders import load_pipeline_config
