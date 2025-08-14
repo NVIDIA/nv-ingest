@@ -50,6 +50,7 @@ jobs:
           name: test_artifacts
           path: |
             ./conda/output_conda_channel
+            ./config
             ./data
             ./examples
             ./tests/integration
@@ -105,6 +106,7 @@ jobs:
           YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
           YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
           YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
+          NV_INGEST_PIPELINE_CONFIG_PATH: ./config/default_pipeline.yaml
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
