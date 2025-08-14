@@ -57,7 +57,7 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 
 !!! note
 
-    Release 25.08 does not support A10G and L40S hardware. For details, refer to [Release Notes](releasenotes-nv-ingest.md).
+    Release 25.09 does not support A10G and L40S hardware. For details, refer to [Release Notes](releasenotes-nv-ingest.md).
 
 
 

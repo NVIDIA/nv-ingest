@@ -8,9 +8,9 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 
 
-## Release 25.8.0
+## Release 25.09 (25.9.0)
 
-The NeMo Retriever extraction 25.8.0 release adds new hardware and software support, and other improvements, including the following:
+The NeMo Retriever extraction 25.09 release adds new hardware and software support, and other improvements, including the following:
 
 - Add functional support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
 - Add functional support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
