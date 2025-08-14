@@ -8,11 +8,6 @@ import os
 
 import click
 
-from nv_ingest.pipeline.config.loaders import load_pipeline_config
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
-from nv_ingest_api.util.string_processing.configuration import dump_pipeline_to_graphviz
-
 _env_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if _env_log_level.upper() == "DEFAULT":
     _env_log_level = "INFO"
@@ -33,7 +28,8 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--log-level",
-    type=click.Choice([level.value for level in LogLevel], case_sensitive=False),
+    # Avoid importing logging config module at import time to prevent duplicate handlers
+    type=click.Choice(["DEFAULT", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False),
     default=os.environ.get("INGEST_LOG_LEVEL", "DEFAULT"),
     show_default=True,
     help="Logging level for the application.",
@@ -48,11 +44,18 @@ def cli(
     # Allow CLI override if user explicitly passed --log_level
     log_level = "INFO" if log_level == "DEFAULT" else log_level
     if log_level:
+        # Import and configure logging only after CLI resolves the desired level
+        from nv_ingest_api.util.logging.configuration import configure_logging
+
         configure_logging(log_level)
         logger.info(f"Log level overridden by CLI to {log_level}")
 
     try:
         logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
+        # Import modules that may configure logging only after logging is set up
+        from nv_ingest.pipeline.config.loaders import load_pipeline_config
+        from nv_ingest_api.util.string_processing.configuration import dump_pipeline_to_graphviz
+
         pipeline_config = load_pipeline_config(pipeline_config_path)
         logger.info("Pipeline configuration loaded and validated.")
 
@@ -67,6 +70,9 @@ def cli(
         raise
 
     logger.debug(f"Ingest Configuration:\n{json.dumps(pipeline_config.model_dump(), indent=2)}")
+
+    # Import and execute pipeline runner only after logging is configured
+    from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 
     run_pipeline(pipeline_config, libmode=False)
 

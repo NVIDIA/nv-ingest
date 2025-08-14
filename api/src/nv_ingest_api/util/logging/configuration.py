@@ -4,7 +4,7 @@
 
 
 import logging
-import sys
+import logging.config
 from enum import Enum
 
 
@@ -30,9 +30,28 @@ def configure_logging(level_name: str) -> None:
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {level_name}")
 
-    logging.basicConfig(
-        level=numeric_level,
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        stream=sys.stdout,
-        force=True,  # <- reconfigures even if basicConfig was called earlier (Python 3.8+)
-    )
+    # Use dictConfig with disable_existing_loggers=True to eliminate any import-time
+    # handlers from third-party libraries and ensure a single, consistent console handler.
+    config_dict = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "formatters": {
+            "standard": {
+                "format": "%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+            }
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": numeric_level,
+                "formatter": "standard",
+                "stream": "ext://sys.stdout",
+            }
+        },
+        "root": {
+            "level": numeric_level,
+            "handlers": ["console"],
+        },
+    }
+
+    logging.config.dictConfig(config_dict)
