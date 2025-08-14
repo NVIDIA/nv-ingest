@@ -8,9 +8,9 @@ from datetime import datetime
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
-# Import utils functions to replace local duplicates
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "interact"))
-from utils import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
+# Import from interact module (now properly structured)
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 

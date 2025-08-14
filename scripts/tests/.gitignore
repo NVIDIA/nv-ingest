@@ -1,8 +1,0 @@
-# Ignore artifacts and local logs by default
-artifacts/
-*.log
-*.tmp
-*.bak
-*.swp
-
-

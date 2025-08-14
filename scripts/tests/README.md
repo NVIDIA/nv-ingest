@@ -6,7 +6,7 @@ A configurable, dataset-agnostic testing framework for end-to-end validation of 
 
 ### Prerequisites
 - Docker and Docker Compose
-- Access to test datasets (default: `/datasets/bo20`)
+- Access to test datasets (default: `/datasets`) NOTE: Future versions 
 - Python environment with nv-ingest-client
 
 ### Run Your First Test
@@ -162,6 +162,27 @@ scripts/tests/artifacts/20240813_171507/
 ├── stdout.txt           # Complete test output
 └── dc20_e2e.json       # Structured metrics and events
 ```
+
+### Programmatic Access
+
+For automated tools and CI/CD integration:
+
+```python
+from scripts.interact import load_test_artifacts
+
+# Load and validate test results
+artifacts = load_test_artifacts('artifacts/20240813_171507')
+
+# Check test success
+success = artifacts.summary.return_code == 0
+
+# Extract metrics (example for DC20 test)
+if 'dc20_e2e.json' in artifacts.test_results:
+    events = artifacts.test_results['dc20_e2e.json']
+    ingestion_time = next(e['value'] for e in events if e['metric_name'] == 'ingestion_time_s')
+```
+
+Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
 
 ## Development Guide
 
