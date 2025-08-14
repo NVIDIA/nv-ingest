@@ -22,9 +22,9 @@ nv-ingest-cli --help
 
 ## Examples
 
-Use the following code examples to submit a document to the `nv-ingest-ms-runtime` service.
+Use the following code examples to submit a document to the `nv-ingest-rest-api` service.
 
-Each of the following commands can be run from the host machine, or from within the `nv-ingest-ms-runtime` container.
+Each of the following commands can be run from the host machine, or from within the `nv-ingest-rest-api` container.
 
 - Host: `nv-ingest-cli ...`
 - Container: `nv-ingest-cli ...`

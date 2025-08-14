@@ -9,7 +9,7 @@
     //   "grafana",
     //   "milvus",
     //   "minio",
-    //   "nv-ingest-ms-runtime",
+    //   "nv-ingest-rest-api",
     //   "otel-collector",
     //   "prometheus",
     //   "redis",

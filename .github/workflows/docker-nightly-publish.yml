@@ -33,10 +33,17 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
       # Build the Docker image using the Dockerfile
-      - name: Build Docker image
+      - name: Build nv-ingest-rest-api image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
+          docker build --target rest-api --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest-rest-api:${{ env.CURRENT_DATE }} .
+
+      - name: Build nv-ingest-worker image
+        run: |
+          docker build --target worker --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest-worker:${{ env.CURRENT_DATE }} .
 
       # Push the container to NGC
-      - name: Upload nv-ingest container
-        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }}
+      - name: Upload nv-ingest-rest-api container
+        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest-rest-api:${{ env.CURRENT_DATE }}
+
+      - name: Upload nv-ingest-worker container
+        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest-worker:${{ env.CURRENT_DATE }}
