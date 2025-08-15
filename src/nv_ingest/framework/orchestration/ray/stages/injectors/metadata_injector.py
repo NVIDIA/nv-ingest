@@ -23,6 +23,7 @@ from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 # logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class MetadataInjectionStage(RayActorStage):
         # Call the base initializer to set attributes like self._running.
         super().__init__(config)
         # Additional initialization can be added here if necessary.
-        logger.info("MetadataInjectionStage initialized with config: %s", config)
+        logger.info("MetadataInjectionStage initialized with config: %s", sanitize_for_logging(config))
 
     @traceable("metadata_injector")
     @nv_ingest_node_failure_try_except(annotation_id="metadata_injector", raise_on_failure=False)

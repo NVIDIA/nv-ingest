@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxConfigSchema, DocxExtractorSchema
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 
 ### Tests for DocxConfigSchema ###
@@ -81,3 +82,36 @@ def test_docx_extractor_forbid_extra_fields():
 def test_docx_extractor_invalid_types():
     with pytest.raises(ValidationError):
         DocxExtractorSchema(max_queue_size="not_int", n_workers="also_not_int")
+
+
+### Sanitization and Redaction Tests ###
+
+
+def test_docx_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    cfg = DocxConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        auth_token="docx_secret",
+    )
+
+    rep = repr(cfg)
+    s = str(cfg)
+    assert "docx_secret" not in rep
+    assert "docx_secret" not in s
+
+    sanitized = sanitize_for_logging(cfg)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_docx_extractor_schema_sanitize_nested_config():
+    docx_cfg = DocxConfigSchema(yolox_endpoints=("grpc_service", None), auth_token="nested_docx_secret")
+    schema = DocxExtractorSchema(
+        max_queue_size=4,
+        n_workers=2,
+        raise_on_failure=False,
+        docx_extraction_config=docx_cfg,
+    )
+
+    sanitized = sanitize_for_logging(schema)
+    assert isinstance(sanitized, dict)
+    assert sanitized["docx_extraction_config"]["auth_token"] == "***REDACTED***"

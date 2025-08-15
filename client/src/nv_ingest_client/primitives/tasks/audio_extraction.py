@@ -12,6 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 
 from .task_base import Task
 
@@ -19,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class AudioExtractionSchema(BaseModel):
-    auth_token: Optional[str] = None
+    auth_token: Optional[str] = Field(default=None, repr=False)
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
-    function_id: Optional[str] = None
+    function_id: Optional[str] = Field(default=None, repr=False)
     use_ssl: Optional[bool] = None
-    ssl_cert: Optional[str] = None
+    ssl_cert: Optional[str] = Field(default=None, repr=False)
     segment_audio: Optional[bool] = None
 
     model_config = ConfigDict(extra="forbid")

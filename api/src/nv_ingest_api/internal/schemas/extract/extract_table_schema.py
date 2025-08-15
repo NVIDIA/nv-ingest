@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import field_validator, model_validator, ConfigDict, BaseModel
+from pydantic import field_validator, model_validator, ConfigDict, BaseModel, Field
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class TableExtractorConfigSchema(BaseModel):
         Pydantic config option to forbid extra fields.
     """
 
-    auth_token: Optional[str] = None
+    auth_token: Optional[str] = Field(default=None, repr=False)
 
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
