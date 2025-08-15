@@ -45,6 +45,32 @@ ulimit -u 10,000
 
 
 
+## Out-of-Memory (OOM) Error when Processing Large Datasets
+
+When processing a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error.
+This happens because, by default, nv-ingest stores all the extracted results from every document in system memory (RAM).
+If the total size of these results exceeds the available memory, the process will fail.
+
+To resolve this issue, use the `save_to_disk()` method.
+This method configures the Ingestor to write the results for each document to temporary files on disk instead of holding them in memory.
+This significantly reduces the memory footprint of the application, allowing you to process much larger datasets.
+
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/very_large_dataset/*.pdf")
+    .save_to_disk()  # Offload results to disk to prevent OOM errors
+    .extract()
+)
+
+# The ingestor now runs with a low memory footprint
+results = ingestor.ingest()
+```
+
+
+
 ## Embedding service fails to start with an unsupported batch size error
 
 On certain hardware, for example RTX 6000, 
