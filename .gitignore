@@ -227,3 +227,7 @@ docs/site
 
 # Ignore "private_local" scripts that users might have in their local copy of nv-ingest they don't want to commit
 scripts/private_local/*
+
+# Test results should go to artifacts directory managed by run.py
+test_results/
+scripts/tests/artifacts/
