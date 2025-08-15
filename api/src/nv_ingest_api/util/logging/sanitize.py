@@ -14,16 +14,18 @@ except Exception:  # pragma: no cover - pydantic always present in this repo
 
 
 _DEFAULT_SENSITIVE_KEYS: Set[str] = {
-    "api_key",
-    "auth_token",
-    "password",
-    "secret",
-    "client_secret",
-    "refresh_token",
     "access_token",
+    "api_key",
     "authorization",
-    "x-api-key",
+    "auth_token",
+    "client_secret",
+    "hf_access_token",
+    "hugging_face_access_token",
+    "password",
+    "refresh_token",
+    "secret",
     "ssl_cert",
+    "x-api-key",
 }
 
 _REDACTION = "***REDACTED***"
