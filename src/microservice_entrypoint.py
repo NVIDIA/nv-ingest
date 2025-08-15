@@ -7,75 +7,77 @@ import logging
 import os
 
 import click
-from pydantic import ValidationError
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
-from nv_ingest_api.util.converters.containers import merge_dict
-from nv_ingest_api.util.logging.configuration import LogLevel
-from nv_ingest_api.util.logging.configuration import configure_logging
-from nv_ingest_api.util.schema.schema_validator import validate_schema
-
-_env_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
+_env_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if _env_log_level.upper() == "DEFAULT":
     _env_log_level = "INFO"
 
-# Configure logging once, early
-configure_logging(_env_log_level)
-
-logger = logging.getLogger(__name__)
+# Remove duplicate configure_logging call - only configure once in CLI function
+# configure_logging(_env_log_level)
 
 
 @click.command()
 @click.option(
-    "--ingest_config_path",
+    "--pipeline-config-path",
     type=str,
-    envvar="NV_INGEST_CONFIG_PATH",
-    help="Path to the JSON configuration file.",
-    hidden=True,
+    default="config/default_pipeline.yaml",
+    envvar="NV_INGEST_PIPELINE_CONFIG_PATH",
+    help="Path to the YAML configuration file for the ingestion pipeline.",
 )
-@click.option("--edge_buffer_size", default=32, type=int, help="Batch size for the pipeline.")
 @click.option(
-    "--log_level",
-    type=click.Choice([level.value for level in LogLevel], case_sensitive=False),
-    default=os.environ.get("INGEST_LOG_LEVEL", "INFO"),
+    "--log-level",
+    # Avoid importing logging config module at import time to prevent duplicate handlers
+    type=click.Choice(["DEFAULT", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False),
+    default=os.environ.get("INGEST_LOG_LEVEL", "DEFAULT"),
     show_default=True,
-    help="Override the log level (optional).",
+    help="Logging level for the application.",
 )
 def cli(
-    ingest_config_path: str,
-    edge_buffer_size: int,
+    pipeline_config_path: str,
     log_level: str,
 ):
     """
     Configures and runs the pipeline with specified options.
     """
+
     # Allow CLI override if user explicitly passed --log_level
     log_level = "INFO" if log_level == "DEFAULT" else log_level
     if log_level:
+        # Import and configure logging only after CLI resolves the desired level
+        from nv_ingest_api.util.logging.configuration import configure_logging
+
         configure_logging(log_level)
+        # Create logger after logging has been configured to avoid any pre-config duplication
+        logger = logging.getLogger(__name__)
         logger.info(f"Log level overridden by CLI to {log_level}")
 
-    cli_ingest_config = {}  # Placeholder for future CLI overrides
-
     try:
-        if ingest_config_path:
-            ingest_config = validate_schema(ingest_config_path, PipelineCreationSchema)
-        else:
-            ingest_config = {}
+        # Ensure logger is available even if the above branch is skipped (defensive)
+        logger = logging.getLogger(__name__)
+        logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
+        # Import modules that may configure logging only after logging is set up
+        from nv_ingest.pipeline.config.loaders import load_pipeline_config
+        from nv_ingest_api.util.string_processing.configuration import dump_pipeline_to_graphviz
 
-        final_ingest_config = merge_dict(ingest_config, cli_ingest_config)
+        pipeline_config = load_pipeline_config(pipeline_config_path)
+        logger.info("Pipeline configuration loaded and validated.")
 
-        validated_config = PipelineCreationSchema(**final_ingest_config)  # noqa
-        logger.info("Configuration loaded and validated.")
+        # Generate visualization
+        dump_pipeline_to_graphviz(pipeline_config, "./logs/running_pipeline.dot")
 
-    except ValidationError as e:
-        logger.error(f"Validation error: {e}")
-        click.echo(f"Validation error: {e}")
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found at: {pipeline_config_path}")
+        raise
+    except Exception as e:
+        logger.error(f"Error parsing or validating YAML configuration: {e}")
         raise
 
-    logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
+    logger.debug(f"Ingest Configuration:\n{json.dumps(pipeline_config.model_dump(), indent=2)}")
 
-    run_pipeline(validated_config)
+    # Import and execute pipeline runner only after logging is configured
+    from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+
+    run_pipeline(pipeline_config, libmode=False)
 
 
 if __name__ == "__main__":

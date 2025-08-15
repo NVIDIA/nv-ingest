@@ -15,6 +15,11 @@ from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema im
 
 logger = logging.getLogger(__name__)
 
+# Reduce SDK HTTP logging verbosity so request/response logs are not emitted
+logging.getLogger("openai").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+
 
 MULTI_MODAL_MODELS = ["llama-3.2-nemoretriever-1b-vlm-embed-v1"]
 

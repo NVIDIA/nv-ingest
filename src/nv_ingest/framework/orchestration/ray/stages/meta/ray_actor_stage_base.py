@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import gc
 import sys
 import threading
 import time
@@ -9,12 +10,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 import os
 import psutil
-import gc
 
 import ray
 import ray.actor
 from pydantic import BaseModel
 import logging
+import pyarrow as pa
 
 from ray import get_runtime_context
 
@@ -50,6 +51,9 @@ class RayActorStage(ABC):
     ----------
     config : BaseModel
         Configuration object for the stage.
+    stage_name : Optional[str]
+        Name of the stage from YAML pipeline configuration. Used by
+        stage-aware decorators for consistent naming.
     _input_queue : Optional[Any]
         Handle to the Ray queue from which input items are read.
         Expected to be set via `set_input_queue`.
@@ -81,7 +85,7 @@ class RayActorStage(ABC):
         Lock to protect access to shutdown-related state (`_shutting_down`).
     """
 
-    def __init__(self, config: BaseModel, log_to_stdout=False) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None, log_to_stdout=False) -> None:
         """
         Initialize the RayActorStage.
 
@@ -90,8 +94,14 @@ class RayActorStage(ABC):
         config : BaseModel
             Configuration object specific to the stage's behavior. Passed by
             the orchestrator during actor creation.
+        stage_name : Optional[str]
+            Name of the stage from YAML pipeline configuration. Used by
+            stage-aware decorators for consistent naming.
+        log_to_stdout : bool
+            Whether to enable stdout logging.
         """
         self.config: BaseModel = config
+        self.stage_name: Optional[str] = stage_name
         self._input_queue: Optional[Any] = None  # Ray Queue handle expected
         self._output_queue: Optional[Any] = None  # Ray Queue handle expected
         self._running: bool = False
@@ -130,12 +140,13 @@ class RayActorStage(ABC):
 
         self._actor_id_str = self._get_actor_id_str()
 
-        # --- PyArrow memory cleanup configuration/state ---
-        # Allow stages to configure the cleanup interval (seconds) via their config.
-        # Defaults to 5 minutes if not provided.
-        self._memory_cleanup_interval_seconds: int = int(getattr(self.config, "memory_cleanup_interval_seconds", 300))
-        self._last_memory_cleanup_time: float = time.time()
-        self._memory_cleanups_performed: int = 0
+        # --- PyArrow Memory Management ---
+        # Time-based periodic cleanup to prevent long-term memory accumulation
+        self._memory_cleanup_interval_seconds = getattr(
+            config, "memory_cleanup_interval_seconds", 300
+        )  # 5 minutes default
+        self._last_memory_cleanup_time = time.time()
+        self._memory_cleanups_performed = 0
 
     @staticmethod
     def _get_actor_id_str() -> str:
@@ -429,8 +440,6 @@ class RayActorStage(ABC):
             gc.collect()
 
             try:
-                import pyarrow as pa  # Local import to avoid hard dependency at import time
-
                 pool = pa.default_memory_pool()
                 try:
                     before_bytes = getattr(pool, "bytes_allocated", lambda: 0)()
@@ -579,7 +588,7 @@ class RayActorStage(ABC):
             self._logger.warning(f"{self._actor_id_str}: Start called but actor is already running.")
             return False
 
-        self._logger.info(f"{self._actor_id_str}: Starting actor...")
+        self._logger.debug(f"{self._actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
         self._running = True
         self._shutting_down = False  # Reset shutdown flag on start
@@ -598,14 +607,14 @@ class RayActorStage(ABC):
         )
         self._processing_thread.start()
 
-        self._logger.info(f"{self._actor_id_str}: Actor started successfully.")
+        self._logger.debug(f"{self._actor_id_str}: Actor started successfully.")
 
         return True
 
     @ray.method(num_returns=0)
     def stop(self) -> None:
         """Stops the actor's processing loop by setting the running flag to False."""
-        self._logger.info(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
+        self._logger.debug(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
         self._running = False
 
     def is_shutdown_complete(self) -> bool:

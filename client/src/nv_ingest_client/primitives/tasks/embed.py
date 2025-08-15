@@ -7,80 +7,13 @@
 import logging
 from typing import Any
 from typing import Dict
-from typing import Literal
 from typing import Optional
-from typing import Type
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import model_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class EmbedTaskSchema(BaseModel):
-    """
-    Schema for embed task configuration.
-
-    This schema contains configuration details for an embedding task,
-    including the endpoint URL, model name, API key, and error filtering flag.
-
-    Attributes
-    ----------
-    endpoint_url : Optional[str]
-        URL of the embedding endpoint. Default is None.
-    model_name : Optional[str]
-        Name of the embedding model. Default is None.
-    api_key : Optional[str]
-        API key for authentication with the embedding service. Default is None.
-    filter_errors : bool
-        Flag to indicate whether errors should be filtered. Default is False.
-    """
-
-    endpoint_url: Optional[str] = None
-    model_name: Optional[str] = None
-    api_key: Optional[str] = None
-    filter_errors: bool = False
-
-    text_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
-    image_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
-    structured_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
-    audio_elements_modality: Optional[Literal["text"]] = None
-
-    @model_validator(mode="before")
-    def handle_deprecated_fields(cls: Type["EmbedTaskSchema"], values: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Handle deprecated fields before model validation.
-
-        This validator checks for the presence of deprecated keys ('text' and 'tables')
-        in the input dictionary and removes them. Warnings are issued if these keys are found.
-
-        Parameters
-        ----------
-        values : Dict[str, Any]
-            Input dictionary of model values.
-
-        Returns
-        -------
-        Dict[str, Any]
-            The updated dictionary with deprecated fields removed.
-        """
-        if "text" in values:
-            logger.warning(
-                "'text' parameter is deprecated and will be ignored. Future versions will remove this argument."
-            )
-            values.pop("text")
-        if "tables" in values:
-            logger.warning(
-                "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
-            )
-            values.pop("tables")
-        return values
-
-    model_config = ConfigDict(extra="forbid")
-    model_config["protected_namespaces"] = ()
 
 
 class EmbedTask(Task):
@@ -133,14 +66,26 @@ class EmbedTask(Task):
                 "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
             )
 
-        self._endpoint_url: Optional[str] = endpoint_url
-        self._model_name: Optional[str] = model_name
-        self._api_key: Optional[str] = api_key
-        self._filter_errors: bool = filter_errors
-        self._text_elements_modality: Optional[bool] = text_elements_modality
-        self._image_elements_modality: Optional[bool] = image_elements_modality
-        self._structured_elements_modality: Optional[bool] = structured_elements_modality
-        self._audio_elements_modality: Optional[bool] = audio_elements_modality
+        # Use the API schema for validation
+        validated_data = IngestTaskEmbedSchema(
+            endpoint_url=endpoint_url,
+            model_name=model_name,
+            api_key=api_key,
+            filter_errors=filter_errors,
+            text_elements_modality=text_elements_modality,
+            image_elements_modality=image_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+            audio_elements_modality=audio_elements_modality,
+        )
+
+        self._endpoint_url = validated_data.endpoint_url
+        self._model_name = validated_data.model_name
+        self._api_key = validated_data.api_key
+        self._filter_errors = validated_data.filter_errors
+        self._text_elements_modality = validated_data.text_elements_modality
+        self._image_elements_modality = validated_data.image_elements_modality
+        self._structured_elements_modality = validated_data.structured_elements_modality
+        self._audio_elements_modality = validated_data.audio_elements_modality
 
     def __str__(self) -> str:
         """
