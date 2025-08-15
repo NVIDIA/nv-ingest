@@ -6,6 +6,7 @@ Use this documentation to learn how [NeMo Retriever extraction](overview.md) han
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+
 ## Overview
 
 NeMo Retriever extraction supports extracting text representations of various forms of content, 
@@ -20,6 +21,25 @@ It does not store the embeddings for images.
 NeMo Retriever extraction supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md). 
 Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
  
+### Partial Failures and Upload Semantics
+
+When chaining `.vdb_upload(...)` on an `Ingestor`, upload behavior depends on the `return_failures` flag passed to `ingest()`:
+
+- `return_failures=False` (default): If any ingestion jobs fail, `ingest()` raises a `RuntimeError` and no upload occurs (all-or-nothing).
+- `return_failures=True`: `ingest()` returns `(results, failures)` and uploads only the successful results; it does not raise. Inspect `failures` and retry as needed.
+
+Example:
+
+```python
+results, failures = (
+    Ingestor(client=client)
+    .files(["doc1.pdf", "doc2.pdf"]).extract().embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+    .ingest(return_failures=True)
+)
+print(f"Uploaded {len(results)} successes; {len(failures)} failures")
+```
+
 
 
 ## Upload to Milvus
@@ -65,5 +85,9 @@ Ingestor(client=client)
 You can ingest to other data stores by using the `Ingestor.vdb_upload` method; 
 however, you must configure other data stores and connections yourself. 
 NeMo Retriever extraction does not provide connections to other data sources. 
+
+!!! important
+
+    NVIDIA makes no claim about accuracy, performance, or functionality of any vector database except Milvus. If you use a different vector database, it's your responsibility to test and maintain it.
 
 For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).

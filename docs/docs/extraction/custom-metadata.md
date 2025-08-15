@@ -36,8 +36,7 @@ You can create whatever metadata is helpful for your scenario.
 ```python
 import pandas as pd
 
-meta_df = pd.DataFrame
-(
+meta_df = pd.DataFrame(
     {
         "source": ["data/woods_frost.pdf", "data/multimodal_test.pdf"],
         "category": ["Alpha", "Bravo"],
@@ -70,24 +69,24 @@ sparse = True
 ingestor = ( 
     Ingestor(message_client_hostname=hostname)
         .files(["data/woods_frost.pdf", "data/multimodal_test.pdf"])
-            .extract(
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_images=True,
-                text_depth="page"
-            )
-                .embed(text=True, tables=True)
-                    .vdb_upload(
-                        collection_name=collection_name, 
-                        milvus_uri=f"http://{hostname}:19530", 
-                        sparse=sparse, 
-                        minio_endpoint=f"{hostname}:9000", 
-                        dense_dim=2048,
-                        meta_dataframe=file_path, 
-                        meta_source_field="source", 
-                        meta_fields=["category, department, timestamp"]
-                    )
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            text_depth="page"
+        )
+        .embed()
+        .vdb_upload(
+            collection_name=collection_name, 
+            milvus_uri=f"http://{hostname}:19530", 
+            sparse=sparse, 
+            minio_endpoint=f"{hostname}:9000", 
+            dense_dim=2048,
+            meta_dataframe=file_path, 
+            meta_source_field="source", 
+            meta_fields=["category", "department", "timestamp"]
+        )
 )
 results = ingestor.ingest_async().result()
 ```
@@ -156,20 +155,19 @@ filter_expr = 'content_metadata["department"] == "Engineering"'
 queries = ["this is expensive"]
 q_results = []
 for que in queries:
-    q_results
-        .append(
-            nvingest_retrieval(
-                [que], 
-                collection_name, 
-                f"http://{hostname}:19530", 
-                embedding_endpoint=f"http://{hostname}:8012/v1",  
-                hybrid=sparse, 
-                top_k=top_k, 
-                model_name=model_name, 
-                gpu_search=False, 
-                _filter=filter_expr
-            )
+    q_results.append(
+        nvingest_retrieval(
+            [que], 
+            collection_name, 
+            milvus_uri=f"http://{hostname}:19530", 
+            embedding_endpoint=f"http://{hostname}:8012/v1",  
+            hybrid=sparse, 
+            top_k=top_k, 
+            model_name=model_name, 
+            gpu_search=False, 
+            _filter=filter_expr
         )
+    )
 
 print(f"{q_results}")
 ```
