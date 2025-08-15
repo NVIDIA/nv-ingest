@@ -13,6 +13,7 @@ from typing import Type
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 from pydantic import model_validator
 
 from .task_base import Task
@@ -41,7 +42,7 @@ class EmbedTaskSchema(BaseModel):
 
     endpoint_url: Optional[str] = None
     model_name: Optional[str] = None
-    api_key: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
     filter_errors: bool = False
 
     text_elements_modality: Optional[Literal["text", "image", "text_image"]] = None

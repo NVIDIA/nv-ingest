@@ -135,7 +135,7 @@ services:
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       # NOTE: The default EMBEDDER_BATCH_SIZE of 30 is optimized for A100 and H100 hardware.
       # The ONNX profile, which is used on some hardware, such as RTX 6000, only supports a maximum batch size of 3.
-      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-30}
+      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-3}
       - OMP_NUM_THREADS=1
       # NOTE: NIM_TRITON_PERFORMANCE_MODE does not work for llama-3.2-nemoretriever-1b-vlm-embed-v1 and must be commented out.
       - NIM_TRITON_PERFORMANCE_MODE=throughput
@@ -277,6 +277,7 @@ services:
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
       - RAY_num_grpc_threads=1
+      - RAY_memory_monitor_refresh_ms=0
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       # - INGEST_DYNAMIC_MEMORY_KP=0.2

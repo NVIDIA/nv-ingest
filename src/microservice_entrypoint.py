@@ -14,6 +14,7 @@ from nv_ingest_api.util.converters.containers import merge_dict
 from nv_ingest_api.util.logging.configuration import LogLevel
 from nv_ingest_api.util.logging.configuration import configure_logging
 from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 _env_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if _env_log_level.upper() == "DEFAULT":
@@ -73,7 +74,9 @@ def cli(
         click.echo(f"Validation error: {e}")
         raise
 
-    logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
+    # Sanitize configuration before logging to avoid leaking secrets
+    _sanitized_cfg = sanitize_for_logging(final_ingest_config)
+    logger.debug(f"Ingest Configuration:\n{json.dumps(_sanitized_cfg, indent=2)}")
 
     run_pipeline(validated_config)
 

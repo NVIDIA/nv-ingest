@@ -11,6 +11,7 @@ from typing import Dict
 from typing import Optional
 
 from pydantic import ConfigDict, BaseModel
+from pydantic import Field
 
 from .task_base import Task
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class CaptionTaskSchema(BaseModel):
-    api_key: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
     model_name: Optional[str] = None

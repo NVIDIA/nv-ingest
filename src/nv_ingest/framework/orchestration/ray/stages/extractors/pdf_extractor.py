@@ -17,6 +17,7 @@ from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtract
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class PDFExtractorStage(RayActorStage):
 
         # Remove the "extract" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "extract")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Perform PDF extraction.
         execution_trace_log = {}

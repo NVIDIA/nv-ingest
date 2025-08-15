@@ -10,6 +10,7 @@ from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import (
     NemoRetrieverParseConfigSchema,
     PDFExtractorSchema,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 
 ### Tests for PDFiumConfigSchema ###
@@ -111,3 +112,55 @@ def test_pdf_extractor_forbid_extra_fields():
 def test_pdf_extractor_invalid_types():
     with pytest.raises(ValidationError):
         PDFExtractorSchema(max_queue_size="wrong_type", n_workers="also_wrong")
+
+
+### Sanitization and Redaction Tests ###
+
+
+def test_pdfium_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    cfg = PDFiumConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        auth_token="pdfium_secret",
+    )
+
+    rep = repr(cfg)
+    s = str(cfg)
+    assert "pdfium_secret" not in rep
+    assert "pdfium_secret" not in s
+
+    sanitized = sanitize_for_logging(cfg)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_nemo_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    cfg = NemoRetrieverParseConfigSchema(
+        nemoretriever_parse_endpoints=("grpc_service", None),
+        auth_token="nemo_secret",
+    )
+
+    rep = repr(cfg)
+    s = str(cfg)
+    assert "nemo_secret" not in rep
+    assert "nemo_secret" not in s
+
+    sanitized = sanitize_for_logging(cfg)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_pdf_extractor_schema_sanitize_nested_configs():
+    pdfium_cfg = PDFiumConfigSchema(yolox_endpoints=("grpc_service", None), auth_token="tok1")
+    nemo_cfg = NemoRetrieverParseConfigSchema(nemoretriever_parse_endpoints=("grpc_service", None), auth_token="tok2")
+    schema = PDFExtractorSchema(
+        max_queue_size=5,
+        n_workers=3,
+        raise_on_failure=False,
+        pdfium_config=pdfium_cfg,
+        nemoretriever_parse_config=nemo_cfg,
+    )
+
+    sanitized = sanitize_for_logging(schema)
+    assert isinstance(sanitized, dict)
+    assert sanitized["pdfium_config"]["auth_token"] == "***REDACTED***"
+    assert sanitized["nemoretriever_parse_config"]["auth_token"] == "***REDACTED***"

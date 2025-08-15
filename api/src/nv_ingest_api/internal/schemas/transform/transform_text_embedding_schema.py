@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class TextEmbeddingSchema(BaseModel):
-    api_key: str = Field(default="api_key")
+    api_key: str = Field(default="api_key", repr=False)
     batch_size: int = Field(default=4)
     embedding_model: str = Field(default="nvidia/llama-3.2-nv-embedqa-1b-v2")
     embedding_nim_endpoint: str = Field(default="http://embedding:8000/v1")
