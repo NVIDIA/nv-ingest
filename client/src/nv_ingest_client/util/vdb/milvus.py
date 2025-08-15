@@ -1865,6 +1865,7 @@ class Milvus(VDB):
         meta_source_field: str = None,
         meta_fields: list[str] = None,
         stream: bool = False,
+        threshold: int = 1000,
         **kwargs,
     ):
         """
