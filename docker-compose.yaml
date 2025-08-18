@@ -280,7 +280,6 @@ services:
       - RAY_num_grpc_threads=1
       - RAY_num_server_call_thread=1
       - RAY_worker_num_grpc_internal_threads=1
-      - RAY_memory_monitor_refresh_ms=0
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       # - INGEST_DYNAMIC_MEMORY_KP=0.2
