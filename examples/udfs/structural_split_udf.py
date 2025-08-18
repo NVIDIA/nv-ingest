@@ -56,28 +56,23 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
 
     # Configuration - which headers to split on
     markdown_headers = ["#", "##", "###", "####", "#####", "######"]
-    split_source_types = ["text"]
 
-    # Find rows that should be split (text documents with text source type)
+    # Find rows that should be split (text primitives regardless of original source type)
     rows_to_split = []
     rows_to_keep = []
 
     for idx, row in df.iterrows():
-        # Check if this is a text document
-        is_text_doc = row.get("document_type") == "text" or str(row.get("document_type", "")).lower() == "text"
+        # Check if this is a text primitive (regardless of whether it came from PDF, DOCX, etc.)
+        is_text_primitive = row.get("document_type") == "text" or str(row.get("document_type", "")).lower() == "text"
 
-        # Check source type in metadata
-        metadata = row.get("metadata", {})
-        source_metadata = metadata.get("source_metadata", {})
-        source_type = source_metadata.get("source_type", "")
-        is_text_source = str(source_type).lower() in split_source_types
-
-        if is_text_doc and is_text_source:
+        if is_text_primitive:
             rows_to_split.append((idx, row))
         else:
             rows_to_keep.append(row)
 
-    logger.debug(f"UDF: Found {len(rows_to_split)} rows to split, {len(rows_to_keep)} to keep")
+    logger.debug(
+        f"UDF: Found {len(rows_to_split)} text primitives to split, {len(rows_to_keep)} non-text primitives to keep"
+    )
 
     # Split the eligible rows
     new_rows = []
