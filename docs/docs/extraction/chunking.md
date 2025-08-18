@@ -71,7 +71,8 @@ To use a different tokenizer, such as `intfloat/e5-large-unsupervised`, you can 
 ingestor = ingestor.split(
     tokenizer="intfloat/e5-large-unsupervised",
     chunk_size=1024,
-    chunk_overlap=150
+    chunk_overlap=150,
+    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"}
 )
 ```
 

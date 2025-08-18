@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import gc
 import sys
 import threading
 import time
@@ -14,6 +15,7 @@ import ray
 import ray.actor
 from pydantic import BaseModel
 import logging
+import pyarrow as pa
 
 from ray import get_runtime_context
 
@@ -49,6 +51,9 @@ class RayActorStage(ABC):
     ----------
     config : BaseModel
         Configuration object for the stage.
+    stage_name : Optional[str]
+        Name of the stage from YAML pipeline configuration. Used by
+        stage-aware decorators for consistent naming.
     _input_queue : Optional[Any]
         Handle to the Ray queue from which input items are read.
         Expected to be set via `set_input_queue`.
@@ -80,7 +85,7 @@ class RayActorStage(ABC):
         Lock to protect access to shutdown-related state (`_shutting_down`).
     """
 
-    def __init__(self, config: BaseModel, log_to_stdout=False) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None, log_to_stdout=False) -> None:
         """
         Initialize the RayActorStage.
 
@@ -89,8 +94,14 @@ class RayActorStage(ABC):
         config : BaseModel
             Configuration object specific to the stage's behavior. Passed by
             the orchestrator during actor creation.
+        stage_name : Optional[str]
+            Name of the stage from YAML pipeline configuration. Used by
+            stage-aware decorators for consistent naming.
+        log_to_stdout : bool
+            Whether to enable stdout logging.
         """
         self.config: BaseModel = config
+        self.stage_name: Optional[str] = stage_name
         self._input_queue: Optional[Any] = None  # Ray Queue handle expected
         self._output_queue: Optional[Any] = None  # Ray Queue handle expected
         self._running: bool = False
@@ -128,6 +139,14 @@ class RayActorStage(ABC):
         self._logger = setup_stdout_logging(self.__class__.__name__) if log_to_stdout else logging.getLogger(__name__)
 
         self._actor_id_str = self._get_actor_id_str()
+
+        # --- PyArrow Memory Management ---
+        # Time-based periodic cleanup to prevent long-term memory accumulation
+        self._memory_cleanup_interval_seconds = getattr(
+            config, "memory_cleanup_interval_seconds", 300
+        )  # 5 minutes default
+        self._last_memory_cleanup_time = time.time()
+        self._memory_cleanups_performed = 0
 
     @staticmethod
     def _get_actor_id_str() -> str:
@@ -344,6 +363,16 @@ class RayActorStage(ABC):
                     # This is the primary path for "successful processing".
                     self.stats["processed"] += 1
 
+                    # Time-based PyArrow memory cleanup check (best-effort, low overhead)
+                    try:
+                        current_time = time.time()
+                        if (current_time - self._last_memory_cleanup_time) >= self._memory_cleanup_interval_seconds:
+                            self._force_arrow_memory_cleanup()
+                            self._last_memory_cleanup_time = current_time
+                    except Exception:
+                        # Never allow cleanup issues to interfere with processing
+                        pass
+
                 except ray.exceptions.ObjectLostError:
                     # This error is handled inside the loop to prevent the actor from crashing.
                     # We log it and continue to the next message.
@@ -386,9 +415,68 @@ class RayActorStage(ABC):
             # This block executes when the processing thread is about to exit,
             # either due to self._running becoming False or an unhandled critical exception.
             self._logger.debug(f"[{self._actor_id_str}] Processing loop thread finished.")
+            # Perform a best-effort final memory cleanup on exit
+            try:
+                self._force_arrow_memory_cleanup()
+            except Exception:
+                pass
             # Signal that this actor's processing duties are complete.
             # External monitors (e.g., via a future from stop()) can use this signal.
             self._shutdown_signal_complete = True
+
+    def _force_arrow_memory_cleanup(self) -> None:
+        """
+        Best-effort memory cleanup for PyArrow allocations.
+
+        - Runs Python garbage collection to drop unreachable references.
+        - If PyArrow is available and its default memory pool supports
+          release_unused(), request it to return free pages to the OS.
+
+        Designed to be safe to call periodically; any failures are logged at
+        debug/warning levels and are non-fatal.
+        """
+        try:
+            # First, trigger Python GC to maximize reclaimable memory
+            gc.collect()
+
+            try:
+                pool = pa.default_memory_pool()
+                try:
+                    before_bytes = getattr(pool, "bytes_allocated", lambda: 0)()
+                except Exception:
+                    before_bytes = 0
+
+                released = False
+                if hasattr(pool, "release_unused"):
+                    try:
+                        pool.release_unused()
+                        released = True
+                    except Exception as e_release:
+                        self._logger.debug(f"[{self._actor_id_str}] Arrow pool release_unused() failed: {e_release}")
+
+                try:
+                    after_bytes = getattr(pool, "bytes_allocated", lambda: before_bytes)()
+                except Exception:
+                    after_bytes = before_bytes
+
+                if released:
+                    delta_mb = max(0, (before_bytes - after_bytes) / (1024 * 1024))
+                    if delta_mb > 0:
+                        self._logger.debug(
+                            f"[{self._actor_id_str}] Arrow cleanup released ~{delta_mb:.2f}"
+                            f" MB (pool now {after_bytes/(1024*1024):.2f} MB)."
+                        )
+                self._memory_cleanups_performed += 1
+            except ModuleNotFoundError:
+                # PyArrow not present; nothing to do beyond GC.
+                self._memory_cleanups_performed += 1
+            except Exception as e_pa:
+                # Any other PyArrow-related issues are non-fatal.
+                self._logger.debug(f"[{self._actor_id_str}] Arrow cleanup skipped due to error: {e_pa}")
+                self._memory_cleanups_performed += 1
+        except Exception as e:
+            # As a last resort, swallow any errors to avoid interfering with the actor loop.
+            self._logger.debug(f"[{self._actor_id_str}] Memory cleanup encountered an error: {e}")
 
     def _get_memory_usage_mb(self) -> float:
         """
@@ -500,7 +588,7 @@ class RayActorStage(ABC):
             self._logger.warning(f"{self._actor_id_str}: Start called but actor is already running.")
             return False
 
-        self._logger.info(f"{self._actor_id_str}: Starting actor...")
+        self._logger.debug(f"{self._actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
         self._running = True
         self._shutting_down = False  # Reset shutdown flag on start
@@ -519,14 +607,14 @@ class RayActorStage(ABC):
         )
         self._processing_thread.start()
 
-        self._logger.info(f"{self._actor_id_str}: Actor started successfully.")
+        self._logger.debug(f"{self._actor_id_str}: Actor started successfully.")
 
         return True
 
     @ray.method(num_returns=0)
     def stop(self) -> None:
         """Stops the actor's processing loop by setting the running flag to False."""
-        self._logger.info(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
+        self._logger.debug(f"[{self._actor_id_str}] Stop signal received. Initiating graceful shutdown.")
         self._running = False
 
     def is_shutdown_complete(self) -> bool:

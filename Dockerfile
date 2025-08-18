@@ -92,6 +92,7 @@ ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
 SHELL ["/bin/bash", "-c"]
 
+COPY scripts scripts
 COPY tests tests
 COPY data data
 COPY api api
@@ -125,6 +126,7 @@ RUN rm -rf src
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
+COPY config/default_pipeline.yaml ./config/
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh

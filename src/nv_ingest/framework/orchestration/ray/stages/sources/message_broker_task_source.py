@@ -3,9 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import multiprocessing
 import uuid
-import socket
 from typing import Optional, Literal, Dict, Any, Union
 
 import ray
@@ -13,6 +11,7 @@ import json
 import copy
 import threading
 import time
+import random
 from datetime import datetime
 
 import pandas as pd
@@ -102,11 +101,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
 
     # Use the updated config type hint
-    def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config, log_to_stdout=False)
-        self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
+    def __init__(self, config: MessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
+        self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
         self._logger.debug(
-            "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
+            "Initializing MessageBrokerTaskSourceStage with config: %s", config.model_dump()
         )  # Log validated config
 
         # Access validated configuration directly via self.config
@@ -126,13 +125,18 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
 
+        # Backoff state for graceful retries when broker is unavailable
+        self._fetch_failure_count: int = 0
+        self._current_backoff_sleep: float = 0.0
+        self._last_backoff_log_time: float = 0.0
+
         self._logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
     def _create_client(self):
         # Access broker config via self.config.broker_client
         broker_config = self.config.broker_client
-        self._logger.info("Creating client of type: %s", broker_config.client_type)
+        self._logger.debug("Creating client of type: %s", broker_config.client_type)
 
         if broker_config.client_type == "redis":
             client = RedisClient(
@@ -265,6 +269,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             job = self.client.fetch_message(self.task_queue, timeout)
             if job is None:
                 self._logger.debug("No message received from '%s'", self.task_queue)
+                # Do not treat normal empty polls as failures
+                self._fetch_failure_count = 0
+                self._current_backoff_sleep = 0.0
                 return None
             self._logger.debug("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
@@ -277,12 +284,46 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     return None
                 job = json.loads(job.response)
             self._logger.debug("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
+            # Success: reset backoff state
+            self._fetch_failure_count = 0
+            self._current_backoff_sleep = 0.0
             return job
         except TimeoutError:
             self._logger.debug("Timeout waiting for message")
+            # Timeout is not a connectivity failure; do not escalate backoff
             return None
         except Exception as err:
-            self._logger.exception("Error during message fetching: %s", err)
+            # Connectivity or other fetch issue: apply graceful backoff and avoid stacktrace spam
+            self._fetch_failure_count += 1
+
+            # Compute exponential backoff with jitter, capped by configured max_backoff
+            try:
+                max_backoff = getattr(self.config.broker_client, "max_backoff", 5.0)
+            except Exception:
+                max_backoff = 5.0
+            # Start from 0.5s, double each failure
+            base = 0.5
+            backoff_no_jitter = min(max_backoff, base * (2 ** (self._fetch_failure_count - 1)))
+            jitter = random.uniform(0, backoff_no_jitter * 0.2)
+            self._current_backoff_sleep = backoff_no_jitter + jitter
+
+            now = time.time()
+            # Throttle warning logs to at most once per 5 seconds to avoid spam
+            if now - self._last_backoff_log_time >= 5.0:
+                self._logger.warning(
+                    "Broker fetch failed (%d consecutive failures). Backing off for %.2fs. Error: %s",
+                    self._fetch_failure_count,
+                    self._current_backoff_sleep,
+                    err,
+                )
+                self._last_backoff_log_time = now
+            else:
+                self._logger.debug(
+                    "Broker fetch failed (%d). Backoff %.2fs. Error: %s",
+                    self._fetch_failure_count,
+                    self._current_backoff_sleep,
+                    err,
+                )
             return None
 
     def _read_input(self) -> any:
@@ -293,8 +334,17 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._logger.debug("read_input: calling _fetch_message()")
         job = self._fetch_message(timeout=100)
         if job is None:
-            self._logger.debug("read_input: No job received, sleeping for poll_interval: %s", self.config.poll_interval)
-            time.sleep(self.config.poll_interval)
+            # Sleep for either the configured poll interval or the current backoff, whichever is larger
+            sleep_time = max(self.config.poll_interval, getattr(self, "_current_backoff_sleep", 0.0))
+            self._logger.debug(
+                "read_input: No job received; sleeping %.2fs (poll_interval=%.2fs, backoff=%.2fs)",
+                sleep_time,
+                self.config.poll_interval,
+                getattr(self, "_current_backoff_sleep", 0.0),
+            )
+            time.sleep(sleep_time)
+            # Reset one-shot backoff so that repeated failures recompute progressively
+            self._current_backoff_sleep = 0.0
 
             return None
 
@@ -314,7 +364,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This loop fetches messages from the broker and writes them to the output queue,
         but blocks on the pause event when the stage is paused.
         """
-        self._logger.info("Processing loop started")
+        self._logger.debug("Processing loop started")
         iteration = 0
         while self._running:
             iteration += 1
@@ -381,25 +431,25 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self._active_processing = False
                 self._shutdown_signal_complete = True
 
-        self._logger.info("Processing loop ending")
+        self._logger.debug("Processing loop ending")
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
         if self._running:
-            self._logger.info("Start called but stage is already running.")
+            self._logger.warning("Start called but stage is already running.")
             return False
         self._running = True
         self.start_time = time.time()
         self._message_count = 0
-        self._logger.info("Starting processing loop thread.")
+        self._logger.debug("Starting processing loop thread.")
         threading.Thread(target=self._processing_loop, daemon=True).start()
-        self._logger.info("MessageBrokerTaskSourceStage started.")
+        self._logger.debug("MessageBrokerTaskSourceStage started.")
         return True
 
     @ray.method(num_returns=1)
     def stop(self) -> bool:
         self._running = False
-        self._logger.info("Stop called on MessageBrokerTaskSourceStage")
+        self._logger.debug("Stop called on MessageBrokerTaskSourceStage")
         return True
 
     @ray.method(num_returns=1)
@@ -425,7 +475,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     @ray.method(num_returns=1)
     def set_output_queue(self, queue_handle: any) -> bool:
         self.output_queue = queue_handle
-        self._logger.info("Output queue set: %s", queue_handle)
+        self._logger.debug("Output queue set: %s", queue_handle)
         return True
 
     @ray.method(num_returns=1)
@@ -440,7 +490,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is paused.
         """
         self._pause_event.clear()
-        self._logger.info("Stage paused.")
+        self._logger.debug("Stage paused.")
 
         return True
 
@@ -456,7 +506,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is resumed.
         """
         self._pause_event.set()
-        self._logger.info("Stage resumed.")
+        self._logger.debug("Stage resumed.")
         return True
 
     @ray.method(num_returns=1)
@@ -466,49 +516,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This method pauses the stage, waits for any current processing to finish,
         replaces the output queue, and then resumes the stage.
         """
-        self._logger.info("Swapping output queue: pausing stage first.")
+        self._logger.debug("Swapping output queue: pausing stage first.")
         self.pause()
         self.set_output_queue(new_queue)
-        self._logger.info("Output queue swapped. Resuming stage.")
+        self._logger.debug("Output queue swapped. Resuming stage.")
         self.resume()
         return True
-
-
-def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
-    """
-    Starts a SimpleMessageBroker server in a separate process.
-
-    Parameters
-    ----------
-    broker_client : dict
-        Broker configuration. Expected keys include:
-          - "port": the port to bind the server to,
-          - "broker_params": optionally including "max_queue_size",
-          - and any other parameters required by SimpleMessageBroker.
-
-    Returns
-    -------
-    multiprocessing.Process
-        The process running the SimpleMessageBroker server.
-    """
-
-    def broker_server():
-        from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
-
-        # Use max_queue_size from broker_params or default to 10000.
-        broker_params = broker_client.get("broker_params", {})
-        max_queue_size = broker_params.get("max_queue_size", 10000)
-        server_host = broker_client.get("host", "0.0.0.0")
-        server_port = broker_client.get("port", 7671)
-        # Optionally, set socket options here for reuse.
-        server = SimpleMessageBroker(server_host, server_port, max_queue_size)
-        # Enable address reuse on the server socket.
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.serve_forever()
-
-    p = multiprocessing.Process(target=broker_server)
-    p.daemon = False
-    p.start()
-    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client['port']}")
-
-    return p

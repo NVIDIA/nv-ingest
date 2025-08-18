@@ -82,19 +82,19 @@ def test_valid_signature_passes():
 
 def test_wrong_param_names():
     sig = inspect.signature(wrong_param_names)
-    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'stage_config'"):
         ingest_stage_callable_signature(sig)
 
 
 def test_swapped_param_names():
     sig = inspect.signature(swapped_param_names)
-    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'stage_config'"):
         ingest_stage_callable_signature(sig)
 
 
 def test_correct_types_wrong_param_names():
     sig = inspect.signature(correct_types_wrong_param_names)
-    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'stage_config'"):
         ingest_stage_callable_signature(sig)
 
 

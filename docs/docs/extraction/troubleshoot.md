@@ -2,6 +2,10 @@
 
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
 
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
 
 ## Can't process long, non-language text strings
 
@@ -38,6 +42,22 @@ Before you change the `-u` setting, consider the following:
 ```bash
 ulimit -u 10,000
 ```
+
+
+
+## Embedding service fails to start with an unsupported batch size error
+
+On certain hardware, for example RTX 6000, 
+the embedding service might fail to start and you might see an error similar to the following.
+
+```bash
+ValueError: Configured max_batch_size (30) is larger than the model''s supported max_batch_size (3).
+```
+
+If you are using hardware where the embedding NIM uses the ONNX model profile, 
+you must set `EMBEDDER_BATCH_SIZE=3` in your environment. 
+You can set the variable in your .env file or directly in your environment.
+
 
 
 ## Extract method nemoretriever-parse doesn't support image files
