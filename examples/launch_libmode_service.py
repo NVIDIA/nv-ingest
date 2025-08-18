@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 
 # Configure the logger
@@ -20,18 +20,11 @@ configure_local_logging(local_log_level)
 
 
 def main():
-    # Possibly override config parameters
-    config_data = {}
-
-    # Filter out None values to let the schema defaults handle them
-    config_data = {key: value for key, value in config_data.items() if value is not None}
-
-    # Construct the pipeline configuration
-    ingest_config = PipelineCreationSchema(**config_data)
-
+    """
+    Launch the libmode pipeline service using the embedded default configuration.
+    """
     try:
         _ = run_pipeline(
-            ingest_config,
             block=True,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,
@@ -41,7 +34,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     except Exception as e:
-        logger.error(f"Error running pipeline: {e}")
+        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

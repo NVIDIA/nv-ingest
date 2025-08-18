@@ -4,6 +4,7 @@
 
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -17,6 +18,8 @@ from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,8 @@ class HtmlExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted text DataFrame.
     """
 
-    def __init__(self, config: HtmlExtractorSchema) -> None:
-        super().__init__(config, log_to_stdout=False)
+    def __init__(self, config: HtmlExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         try:
             self.validated_config = config
             self._logger.info("HtmlExtractorStage configuration validated successfully.")
@@ -41,9 +44,10 @@ class HtmlExtractorStage(RayActorStage):
             self._logger.exception(f"Error validating Html Extractor config: {e}")
             raise
 
-    @traceable("html_extractor")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "html"})])
-    @nv_ingest_node_failure_try_except(annotation_id="html_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting content from html.
