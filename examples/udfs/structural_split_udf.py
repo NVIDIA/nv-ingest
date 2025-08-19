@@ -49,7 +49,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
     # Get the payload DataFrame
     df = control_message.payload()
     if df is None or len(df) == 0:
-        logger.warning("UDF: No payload found in control message")
+        logger.warning("[text_splitter/structural_markdown]: No payload found in control message")
         return control_message
 
     logger.info(f"UDF: Processing DataFrame with {len(df)} rows")
