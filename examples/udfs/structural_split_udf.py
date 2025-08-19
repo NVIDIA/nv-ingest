@@ -44,7 +44,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
     import pandas as pd
 
     logger = logging.getLogger(__name__)
-    logger.info("UDF: Starting structural text splitting")
+    logger.debug("[text_splitter/structural_markdown]: Starting structural text splitting")
 
     # Get the payload DataFrame
     df = control_message.payload()
