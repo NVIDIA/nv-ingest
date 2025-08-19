@@ -174,9 +174,6 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-<<<<<<< HEAD
-results = ingestor.ingest(show_progress=True)
-=======
 
 # Return both successes and failures
 # Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
@@ -185,7 +182,6 @@ results, failures = ingestor.ingest(show_progress=True, return_failures=True)
 # Return only successes
 # results = ingestor.ingest(show_progress=True)
 
->>>>>>> 4eccaccf (docs: Updates including return_failures edit, Overview addition, html(markdown), and 400 MB Relnote)
 t1 = time.time()
 print(f"Total time: {t1 - t0} seconds")
 
@@ -297,10 +293,6 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 4eccaccf (docs: Updates including return_failures edit, Overview addition, html(markdown), and 400 MB Relnote)
 
 ## GitHub Repository Structure
 
