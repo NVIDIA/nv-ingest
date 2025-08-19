@@ -48,7 +48,7 @@ Use the following code.
 # Return both successes and failures
 results, failures = ingestor.ingest(show_progress=True, return_failures=True)
 
-print(len(results), "successful documents")
+print(f"{len(results)} successful docs; {len(failures)} failures")
 
 if failures:
     print("Failures:", failures[:1])
