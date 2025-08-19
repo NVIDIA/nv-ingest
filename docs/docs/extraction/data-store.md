@@ -73,8 +73,6 @@ NeMo Retriever extraction does not provide connections to other data sources.
 
     NVIDIA makes no claim about accuracy, performance, or functionality of any vector database except Milvus. If you use a different vector database, it's your responsibility to test and maintain it.
 
-For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
-
 
 
 ## Related Topics
