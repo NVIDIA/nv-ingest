@@ -71,7 +71,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
             rows_to_keep.append(row)
 
     logger.debug(
-        f"UDF: Found {len(rows_to_split)} text primitives to split, {len(rows_to_keep)} non-text primitives to keep"
+        f"[text_splitter/structural_markdown]: Found {len(rows_to_split)} text primitives to split, {len(rows_to_keep)} non-text primitives to keep"
     )
 
     # Split the eligible rows
