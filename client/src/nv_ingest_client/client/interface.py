@@ -416,9 +416,8 @@ class Ingestor:
             If True, return a tuple (results, failures); otherwise, return only results. Default is False.
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
-            'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'verbose'. Unrecognized keys are passed through to
-            process_jobs_concurrently.
+            'timeout', 'max_job_retries', 'retry_delay', 'data_only', 'verbose'.
+            Unrecognized keys are passed through to process_jobs_concurrently.
 
         Returns
         -------
