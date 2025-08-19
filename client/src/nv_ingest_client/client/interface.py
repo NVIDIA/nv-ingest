@@ -122,7 +122,7 @@ class LazyLoadedList(collections.abc.Sequence):
         self._offsets = []
         line_count = 0
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, self._read_mode) as f:
                 while True:
                     current_pos = f.tell()
                     line = f.readline()
@@ -147,19 +147,14 @@ class LazyLoadedList(collections.abc.Sequence):
         if self._len is not None:
             return self._len
 
-        count = 0
-        for _ in self:
-            count += 1
-        self._len = count
+        if self._offsets is not None:
+            self._len = len(self._offsets)
+            return self._len
+        self._build_index()
 
         return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
-        if self.compression:
-            for i, item in enumerate(self):
-                if i == idx:
-                    return item
-
         if not isinstance(idx, int):
             raise TypeError(f"List indices must be integers or slices, not {type(idx).__name__}")
 
@@ -179,7 +174,7 @@ class LazyLoadedList(collections.abc.Sequence):
             raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, self._read_mode) as f:
                 f.seek(self._offsets[idx])
                 line_bytes = f.readline()
                 return json.loads(line_bytes.decode("utf-8"))
