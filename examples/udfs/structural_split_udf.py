@@ -144,7 +144,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
     # Update the control message
     control_message.payload(new_df)
 
-    logger.info(f"UDF: Structural splitting complete: {len(df)} → {len(new_df)} rows")
+    logger.debug(f"[text_splitter/structural_markdown]: Structural splitting complete: {len(df)} → {len(new_df)} rows")
     if len(new_df) > len(df):
         chunks_created = len(new_df) - len(df)
         logger.info(f"UDF: Created {chunks_created} additional chunks")
