@@ -212,7 +212,7 @@ def structural_split_coarse(control_message: "IngestControlMessage") -> "IngestC
     Alternative UDF that only splits on major headers (# and ##) for larger chunks.
     """
     logger = logging.getLogger(__name__)
-    logger.info("UDF: Starting coarse structural text splitting")
+    logger.debug("[text_splitter/structural_markdown]: Starting coarse structural text splitting")
 
     # For this example, we'll just call the main function
     # In practice, you would implement the full logic with different header patterns
