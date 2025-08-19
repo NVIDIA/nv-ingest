@@ -17,7 +17,7 @@ The previously released 25.6.2 container on NGC remains unchanged.
 
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
@@ -39,7 +39,7 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
