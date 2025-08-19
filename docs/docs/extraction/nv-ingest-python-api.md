@@ -218,4 +218,3 @@ ingestor = ingestor.embed(
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
 - [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
 - [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
-- [Use Multimodal Embedding](vlm-embed.md)
