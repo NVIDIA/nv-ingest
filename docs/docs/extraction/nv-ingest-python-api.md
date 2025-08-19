@@ -57,8 +57,8 @@ if failures:
 When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
 The behavior of the upload depends on the following values of `return_failures`:
 
-- **return_failures=False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
-- **return_failures=True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest()` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
+- **False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
+- **True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
 
 
 The following example uploads data to Milvus and returns any failures.
