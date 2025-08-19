@@ -28,7 +28,7 @@ The NeMo Retriever extraction 25.09 release adds new hardware and software suppo
 
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - A10G is not supported. For details, refer to [Support Matrix](support-matrix.md).
 - `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
@@ -58,7 +58,7 @@ The previously released 25.6.2 container on NGC remains unchanged.
 
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
@@ -80,7 +80,7 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
