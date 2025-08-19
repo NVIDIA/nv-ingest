@@ -5,6 +5,7 @@
 import os
 import time
 import socket
+from pathlib import Path
 
 import pytest
 
@@ -53,7 +54,9 @@ def pipeline_process():
     os.environ["INGEST_LAUNCH_SIMPLE_BROKER"] = "true"
 
     # Load pipeline configuration from the default pipeline YAML (with env var substitution)
-    pipeline_config_path = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH", "config/default_pipeline.yaml")
+    repo_root = Path(__file__).resolve().parents[2]  # 2 levels: tests/integration
+    default_pipeline_config_path = repo_root / "config" / "default_pipeline.yaml"
+    pipeline_config_path = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH", default_pipeline_config_path)
     config = load_pipeline_config(pipeline_config_path)
 
     # Set environment to disable dynamic scaling for testing
