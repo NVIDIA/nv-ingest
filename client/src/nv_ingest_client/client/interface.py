@@ -471,7 +471,7 @@ class Ingestor:
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
-                    compression="gzip",
+                    compression=self._ouptut_config["compression"],
                 )
 
                 if num_items_saved > 0:
@@ -919,6 +919,7 @@ class Ingestor:
         self,
         output_directory: Optional[str] = None,
         cleanup: bool = True,
+        compression: Optional[str] = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
@@ -958,6 +959,7 @@ class Ingestor:
         self._output_config = {
             "output_directory": output_directory,
             "cleanup": cleanup,
+            "compression": compression,
         }
         ensure_directory_with_permissions(output_directory)
 
