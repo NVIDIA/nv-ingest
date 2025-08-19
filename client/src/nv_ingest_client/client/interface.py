@@ -101,11 +101,10 @@ class LazyLoadedList(collections.abc.Sequence):
             self._offsets = []
 
         self._open = gzip.open if self.compression == "gzip" else open
-        self._read_mode = "rb"
 
     def __iter__(self) -> Iterator[Any]:
         try:
-            with self._open(self.filepath, self._read_mode) as f:
+            with self._open(self.filepath, "rt", encoding="utf-8") as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -122,7 +121,7 @@ class LazyLoadedList(collections.abc.Sequence):
         self._offsets = []
         line_count = 0
         try:
-            with self._open(self.filepath, self._read_mode) as f:
+            with self._open(self.filepath, "rb") as f:
                 while True:
                     current_pos = f.tell()
                     line = f.readline()
@@ -174,7 +173,7 @@ class LazyLoadedList(collections.abc.Sequence):
             raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with self._open(self.filepath, self._read_mode) as f:
+            with self._open(self.filepath, "rb") as f:
                 f.seek(self._offsets[idx])
                 line_bytes = f.readline()
                 return json.loads(line_bytes.decode("utf-8"))
