@@ -15,6 +15,13 @@ Only the release branch and the `nv-ingest-client` package have been updated in 
 The previously released 25.6.2 container on NGC remains unchanged.
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 
 ## Release 25.6.2
 
@@ -30,9 +37,17 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/examples/metadata_and_filtered_search.ipynb).
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 ### Breaking Changes
 
 There are no breaking changes in this version.
+
 
 ### Upgrade
 

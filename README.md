@@ -47,7 +47,7 @@ NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
@@ -174,9 +174,16 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest(show_progress=True)
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
@@ -186,7 +193,7 @@ You can see the extracted text that represents the content of the ingested test 
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text

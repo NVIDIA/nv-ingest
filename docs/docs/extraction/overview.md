@@ -35,7 +35,7 @@ NeMo Retriever extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)

@@ -122,7 +122,7 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
-In the below examples, we are doing text, chart, table, and image extraction:
+In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
@@ -166,13 +166,25 @@ ingestor = (
         dense_dim=2048
     )
 )
+
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Total time: {t1-t0} seconds")
+
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 !!! note
@@ -180,11 +192,13 @@ print(ingest_json_results_to_blob(results[0]))
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
 
+The output looks similar to the following.
+
 ```
 Starting ingestion..
 1 records to insert to milvus
 logged 8 records
-Time taken: 5.479151725769043 seconds
+Total time: 5.479151725769043 seconds
 This chart shows some gadgets, and some very fictitious costs. Gadgets and their cost   Chart 1 - Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost
 Table 1
 | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
@@ -271,7 +285,8 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
+You should see output that indicates the document processing status followed by a breakdown of time spent during job execution.
+
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to
