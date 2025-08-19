@@ -87,7 +87,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
 
             decoded_content = base64.b64decode(content).decode("utf-8")
             content = decoded_content
-            logger.debug("UDF: Decoded base64 content")
+            logger.debug("[text_splitter/structural_markdown]: Decoded base64 content")
         except Exception:
             # Content is already plain text, use as-is
             pass
