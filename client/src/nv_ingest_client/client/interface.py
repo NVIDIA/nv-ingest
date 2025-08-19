@@ -101,11 +101,11 @@ class LazyLoadedList(collections.abc.Sequence):
             self._offsets = []
 
         self._open = gzip.open if self.compression == "gzip" else open
-        self._read_mode = "rt"
+        self._read_mode = "rb"
 
     def __iter__(self) -> Iterator[Any]:
         try:
-            with self._open(self.filepath, self._read_mode, encoding="utf-8") as f:
+            with self._open(self.filepath, self._read_mode) as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -462,7 +462,9 @@ class Ingestor:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
-                file_suffix = f".{file_ext.strip('.')}.results.jsonl.gz"
+                file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+                if self._output_config["compression"] == "gzip":
+                    file_suffix += ".gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 # --- CHANGE: Pass compression argument to the save utility ---
@@ -471,7 +473,7 @@ class Ingestor:
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
-                    compression=self._ouptut_config["compression"],
+                    compression=self._output_config["compression"],
                 )
 
                 if num_items_saved > 0:
@@ -487,7 +489,9 @@ class Ingestor:
                     )
 
                     # --- CHANGE: Tell LazyLoadedList it's compressed ---
-                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved, compression="gzip")
+                    results = LazyLoadedList(
+                        jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
+                    )
                     if results_lock:
                         with results_lock:
                             final_results_payload_list.append(results)
@@ -944,6 +948,12 @@ class Ingestor:
             when the Ingestor's context is exited (i.e., when used in a `with`
             statement).
             Defaults to True.
+        compression : str, optional
+            The compression algorithm to use for the saved result files.
+            Currently, the only supported value is `'gzip'`. To disable
+            compression, set this parameter to `None`. Defaults to `'gzip'`,
+            which significantly reduces the disk space required for results.
+            When enabled, files are saved with a `.gz` suffix (e.g., `results.jsonl.gz`).
 
         Returns
         -------
