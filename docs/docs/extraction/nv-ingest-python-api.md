@@ -24,6 +24,65 @@ The following table describes methods of the `Ingestor` class.
 | `vdb_upload` | Pushes extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
 
+
+## Track Job Progress
+
+For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+Use the following code.
+
+```python
+# Return only successes
+results = ingestor.ingest(show_progress=True)
+
+print(len(results), "successful documents")
+```
+
+
+
+## Capture Job Failures
+
+You can capture job failures by setting `return_failures` to true. 
+Use the following code.
+
+```python
+# Return both successes and failures
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+print(len(results), "successful documents")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
+When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
+The behavior of the upload depends on the following values of `return_failures`:
+
+- **return_failures=False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
+- **return_failures=True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest()` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
+
+
+The following example uploads data to Milvus and returns any failures.
+
+```python
+ingestor = (
+    Ingestor(client=client)
+    .files(["/path/doc1.pdf", "/path/doc2.pdf"])
+    .extract()
+    .embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+)
+
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(return_failures=True)
+
+print(f"Uploaded {len(results)} successful docs; {len(failures)} failures")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
+
+
 ## Quick Start: Extracting PDFs
 
 The following example demonstrates how to initialize `Ingestor`, load a PDF file, and extract its contents.
@@ -77,7 +136,7 @@ ingestor = ingestor.extract(
 
 ### Extract Non-standard Document Types
 
-NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
+Use the following code to extract text from `.md`, `.sh`, and `.html` files.
 
 ```python
 ingestor = Ingestor().files(["path/to/doc1.md", "path/to/doc2.html"])
@@ -100,17 +159,6 @@ Use the following code to specify a custom document type for extraction.
 
 ```python
 ingestor = ingestor.extract(document_type="pdf")
-```
-
-
-
-## Track Job Progress
-
-For large document batches, you can enable a progress bar by setting `show_progress` to true. 
-Use the following code.
-
-```python
-result = ingestor.extract().ingest(show_progress=True)
 ```
 
 
@@ -161,3 +209,13 @@ ingestor = ingestor.embed(
     api_key="nvapi-"
 )
 ```
+
+
+
+## Related Topics
+
+- [Split Documents](chunking.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Multimodal Embedding](vlm-embed.md)
