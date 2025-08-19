@@ -25,17 +25,20 @@ The NeMo Retriever extraction 25.09 release adds new hardware and software suppo
 - Add support for Integer, float, boolean, and array in custom metadata during Milvus entity creation.
 - Add support for running more than one VLM at a time by using Helm.  For details, refer to [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
 
+
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
 - A10G and L40S are not supported. For details, refer to [Support Matrix](support-matrix.md).
 - `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
 
 ### Breaking Changes
 
 There are no breaking changes in this version.
+
 
 ### Upgrade
 
@@ -53,6 +56,13 @@ Only the release branch and the `nv-ingest-client` package have been updated in 
 The previously released 25.6.2 container on NGC remains unchanged.
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 
 ## Release 25.6.2
 
@@ -68,9 +78,17 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/examples/metadata_and_filtered_search.ipynb).
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 ### Breaking Changes
 
 There are no breaking changes in this version.
+
 
 ### Upgrade
 
