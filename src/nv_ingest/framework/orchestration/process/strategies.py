@@ -11,6 +11,7 @@ Strategy pattern for clean separation of execution concerns.
 """
 
 import atexit
+import os
 import logging
 import multiprocessing
 import time
@@ -140,7 +141,20 @@ class SubprocessStrategy(ProcessExecutionStrategy):
             daemon=False,
         )
 
-        process.start()
+        # Hint to the lifecycle manager to skip starting the broker in the parent
+        prev_val = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+        os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"] = "1"
+        try:
+            process.start()
+        finally:
+            # Restore original env to avoid affecting other code paths
+            if prev_val is None:
+                try:
+                    del os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"]
+                except KeyError:
+                    pass
+            else:
+                os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"] = prev_val
         interface = RayPipelineSubprocessInterface(process)
 
         if options.block:

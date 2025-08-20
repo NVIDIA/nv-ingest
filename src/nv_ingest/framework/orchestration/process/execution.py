@@ -27,6 +27,7 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipeline,
 )
 from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
+from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from nv_ingest.pipeline.config.replica_resolver import resolve_static_replicas
 from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config
@@ -420,6 +421,12 @@ def run_pipeline_process(
     if stderr:
         sys.stderr = stderr
 
+    # Ensure the subprocess is killed if the parent dies to avoid hangs
+    try:
+        set_pdeathsig(signal.SIGKILL)
+    except Exception as e:
+        logger.debug(f"set_pdeathsig not available or failed: {e}")
+
     # Create a new process group so we can terminate the entire subtree cleanly
     try:
         os.setpgrp()
@@ -449,13 +456,37 @@ def run_pipeline_process(
     # Test logging output
     logger.info("DEBUG: Logger info - may not appear if logging handlers not redirected")
 
+    # If requested, start the simple broker inside this subprocess so it shares the process group
+    broker_proc = None
     try:
+        if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
+            try:
+                # Only launch if the config requests it
+                if getattr(pipeline_config, "pipeline", None) and getattr(
+                    pipeline_config.pipeline, "launch_simple_broker", False
+                ):
+                    _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
+                    broker_proc = start_simple_message_broker({})
+            except Exception as e:
+                _safe_log(logging.ERROR, f"Failed to start SimpleMessageBroker in subprocess: {e}")
+                # Continue without broker; launch will fail fast if required
+
         # Launch the pipeline (blocking)
         launch_pipeline(pipeline_config, block=True)
 
     except Exception as e:
         logger.error(f"Subprocess pipeline execution failed: {e}")
         raise
+    finally:
+        # Best-effort: if we created a broker here and the pipeline exits normally,
+        # attempt a graceful terminate. In failure/termination paths the process group kill
+        # from parent or signal handler will take care of it.
+        if broker_proc is not None:
+            try:
+                if hasattr(broker_proc, "is_alive") and broker_proc.is_alive():
+                    broker_proc.terminate()
+            except Exception:
+                pass
 
 
 def kill_pipeline_process_group(process: multiprocessing.Process) -> None:
