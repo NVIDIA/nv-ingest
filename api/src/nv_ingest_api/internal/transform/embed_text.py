@@ -75,8 +75,11 @@ def _make_async_request(
     response = {}
 
     try:
+        # Normalize API key to avoid sending an empty bearer token via SDK internals
+        _token = (api_key or "").strip()
+        _api_key = _token if _token else "<no key provided>"
         client = OpenAI(
-            api_key=api_key,
+            api_key=_api_key,
             base_url=embedding_nim_endpoint,
         )
 
