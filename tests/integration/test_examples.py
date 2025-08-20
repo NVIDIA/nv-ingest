@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import re
 
 import pytest
 
@@ -7,13 +8,14 @@ import pytest
 @pytest.mark.integration
 def test_launch_libmode_and_run_ingestor():
     """
-    Simple integration test: run the libmode example script and assert success.
+    Run the libmode example and assert it completes and produces results.
 
-    This test uses a hard timeout and ensures the child process is cleaned up
-    on timeout to avoid leaving orphaned processes that could hang CI workers.
-    We do not capture stdout/stderr to avoid any potential pipe buffering
-    interference from Ray's verbose logs during shutdown; instead, we rely on
-    the process return code for success.
+    - Captures combined stdout/stderr and streams it, looking for the success marker:
+      "Got <n> results." (n >= 1)
+    - Bounds test runtime with a hard deadline.
+    - After success, allows a short grace period for a clean shutdown; then
+      terminates the process group if still running to keep CI fast and reliable.
+    - Prints captured output on failure for easier debugging.
     """
     import os
     import signal
@@ -28,8 +30,19 @@ def test_launch_libmode_and_run_ingestor():
     env = os.environ.copy()
     # Ensure unbuffered Python output from the child for timely line reads
     env.setdefault("PYTHONUNBUFFERED", "1")
+    # Reduce noisy logs in CI if supported by example
+    env.setdefault("INGEST_LOG_LEVEL", "INFO")
 
-    # Capture stdout to detect completion, merge stderr for debugging
+    # Timeouts and polling intervals
+    deadline_seconds = 180
+    post_success_grace = 30  # allow the example to shutdown cleanly after success
+    term_grace = 15  # wait after SIGTERM before escalating
+    kill_grace = 5  # final wait after SIGKILL
+    select_timeout = 0.5
+
+    # Capture stdout to detect completion; merge stderr for debugging
+    start_time = time.time()
+    print(f"[DEBUG] Launching example: {script}")
     proc = subprocess.Popen(
         [sys.executable, str(script)],
         stdout=subprocess.PIPE,
@@ -40,36 +53,53 @@ def test_launch_libmode_and_run_ingestor():
         cwd=str(repo_root),
         start_new_session=True,
     )
+    print(
+        f"[DEBUG] Started example PID={proc.pid}; deadline={deadline_seconds}s, "
+        f"post_success_grace={post_success_grace}s"
+    )
 
-    deadline = time.time() + 180
+    deadline = time.time() + deadline_seconds
     output_lines = []
     saw_success = False
+    results_count = None
+
+    success_re = re.compile(r"Got\s+(\d+)\s+results\.")
 
     # Read incrementally and watch for success marker
     while time.time() < deadline:
         if proc.poll() is not None:
             break
         if proc.stdout is not None:
-            rlist, _, _ = select.select([proc.stdout], [], [], 0.5)
+            rlist, _, _ = select.select([proc.stdout], [], [], select_timeout)
             if rlist:
                 line = proc.stdout.readline()
                 if line:
                     output_lines.append(line)
-                    if "Got 1 results." in line:
-                        saw_success = True
-                        # Proactively stop the example to avoid shutdown hangs
+                    m = success_re.search(line)
+                    if m:
+                        results_count = int(m.group(1))
+                        saw_success = results_count is not None and results_count >= 1
+                        # Allow a brief grace period for a clean shutdown
                         try:
-                            os.killpg(proc.pid, signal.SIGTERM)
-                        except Exception:
-                            pass
-                        # Allow graceful time, then force kill if needed
-                        try:
-                            proc.wait(timeout=20)
+                            proc.wait(timeout=post_success_grace)
                         except subprocess.TimeoutExpired:
+                            # Proactively stop the example process group to bound test time
                             try:
-                                os.killpg(proc.pid, signal.SIGKILL)
+                                os.killpg(proc.pid, signal.SIGTERM)
                             except Exception:
                                 pass
+                            try:
+                                proc.wait(timeout=term_grace)
+                            except subprocess.TimeoutExpired:
+                                try:
+                                    os.killpg(proc.pid, signal.SIGKILL)
+                                except Exception:
+                                    pass
+                                # Best-effort final wait
+                                try:
+                                    proc.wait(timeout=kill_grace)
+                                except Exception:
+                                    pass
                         break
         else:
             time.sleep(0.1)
@@ -81,10 +111,10 @@ def test_launch_libmode_and_run_ingestor():
         except Exception:
             pass
         captured = "".join(output_lines)
-        print(captured)
-        pytest.fail("Example script timed out after 180s")
+        print("\n[DEBUG] Example output before timeout:\n" + captured)
+        pytest.fail(f"Example script timed out after {deadline_seconds}s")
 
-    # Collect any remaining output
+    # Collect any remaining output (process has exited at this point)
     try:
         remaining_out = proc.stdout.read() if proc.stdout else ""
     except Exception:
@@ -92,8 +122,16 @@ def test_launch_libmode_and_run_ingestor():
     captured = "".join(output_lines) + (remaining_out or "")
 
     # Validate
-    if proc.returncode != 0 and not saw_success:
-        print(captured)
-        pytest.fail(f"Example script exited with code {proc.returncode}")
-    # At minimum, ensure the success marker was observed
-    assert saw_success, "Did not observe expected success output from example"
+    if not saw_success:
+        print("\n[DEBUG] Full example output (no success marker observed):\n" + captured)
+        pytest.fail("Did not observe expected success output from example")
+
+    if results_count is not None and results_count < 1:
+        print("\n[DEBUG] Full example output (results_count < 1):\n" + captured)
+        pytest.fail(f"Expected >= 1 results but saw {results_count}")
+
+    # Prefer a clean exit but tolerate forced termination if success was observed
+    duration = time.time() - start_time
+    if proc.returncode not in (0, None):
+        print("\n[DEBUG] Example non-zero return code post-success:", proc.returncode)
+    print(f"[DEBUG] Example finished in {duration:.1f}s; returncode={proc.returncode}; results_count={results_count}")

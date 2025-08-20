@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import multiprocessing
-import os
-import signal
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -22,6 +20,7 @@ import logging
 import time
 
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
+from nv_ingest.framework.orchestration.process.termination import kill_pipeline_process_group
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
@@ -120,24 +119,19 @@ class RayPipelineSubprocessInterface(PipelineInterface):
 
     def stop(self) -> None:
         """
-        Stops the subprocess pipeline. Tries terminate(), then escalates to SIGKILL on the process group if needed.
+        Stops the subprocess pipeline and its entire process group to ensure
+        any child processes (e.g., the simple message broker) are terminated.
         """
-        if not self._process.is_alive():
+        try:
+            pid = int(self._process.pid)
+        except Exception:
             return
 
+        # Always attempt to terminate the entire process group
         try:
-            self._process.terminate()
-            self._process.join(timeout=5.0)
+            kill_pipeline_process_group(pid)
         except Exception as e:
-            logger.warning(f"Failed to terminate process cleanly: {e}")
-
-        if self._process.is_alive():
-            try:
-                pgid = os.getpgid(self._process.pid)
-                os.killpg(pgid, signal.SIGKILL)
-            except Exception as e:
-                logger.error(f"Failed to force-kill process group: {e}")
-            self._process.join(timeout=3.0)
+            logger.warning(f"kill_pipeline_process_group failed: {e}")
 
 
 class RayPipelineInterface(PipelineInterface):
