@@ -32,7 +32,7 @@ stages:
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      min_replicas: 0
+      min_replicas: 1
       max_replicas:
         strategy: "static"
         value: 1
@@ -297,7 +297,7 @@ stages:
 
   - name: "text_splitter"
     type: "stage"
-    phase: 4  # TRANSFORM
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
     config:
       chunk_size: 512
@@ -428,89 +428,78 @@ edges:
     to: "metadata_injector"
     queue_size: 32
 
-  # Extraction
+  # Document Extractors
   - from: "metadata_injector"
     to: "pdf_extractor"
     queue_size: 32
-
   - from: "pdf_extractor"
-    to: "html_extractor"
+    to: "audio_extractor"
     queue_size: 32
-
-  - from: "pdf_extractor"
+  - from: "audio_extractor"
     to: "docx_extractor"
     queue_size: 32
-
-  - from: "pdf_extractor"
+  - from: "docx_extractor"
     to: "pptx_extractor"
     queue_size: 32
-
-  - from: "pdf_extractor"
+  - from: "pptx_extractor"
     to: "image_extractor"
     queue_size: 32
-
-  - from: "pdf_extractor"
-    to: "table_extractor"
+  - from: "image_extractor"
+    to: "html_extractor"
     queue_size: 32
-
-  - from: "pdf_extractor"
-    to: "chart_extractor"
-    queue_size: 32
-
-  - from: "pdf_extractor"
+  - from: "html_extractor"
     to: "infographic_extractor"
     queue_size: 32
 
-  # Mutators
+  # Primitive Extractors
+  - from: "infographic_extractor"
+    to: "table_extractor"
+    queue_size: 32
+  - from: "table_extractor"
+    to: "chart_extractor"
+    queue_size: 32
   - from: "chart_extractor"
     to: "image_filter"
     queue_size: 32
 
-  - from: "image_extractor"
-    to: "image_filter"
-    queue_size: 32
-
+  # Primitive Mutators
   - from: "image_filter"
     to: "image_dedup"
     queue_size: 32
-
-  - from: "html_extractor"
+  - from: "image_dedup"
     to: "text_splitter"
     queue_size: 32
 
-  # Transforms
+  # Primitive Transforms
   - from: "text_splitter"
+    to: "image_caption"
+    queue_size: 32
+  - from: "image_caption"
     to: "text_embedder"
     queue_size: 32
-
-  # Outputs and Telemetry
   - from: "text_embedder"
-    to: "embedding_storage"
-    queue_size: 32
-
-  - from: "image_dedup"
     to: "image_storage"
     queue_size: 32
 
+  # Primitive Storage
+  - from: "image_storage"
+    to: "embedding_storage"
+    queue_size: 32
   - from: "embedding_storage"
     to: "broker_response"
     queue_size: 32
 
-  - from: "image_storage"
-    to: "broker_response"
-    queue_size: 32
-
+  # Response and Telemetry
   - from: "broker_response"
     to: "otel_tracer"
     queue_size: 32
-
   - from: "otel_tracer"
     to: "default_drain"
     queue_size: 32
 
 # Pipeline Runtime Configuration
 pipeline:
-  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
+  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|true
   dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
   static_memory_threshold: $INGEST_STATIC_MEMORY_THRESHOLD|0.75
   pid_controller:
@@ -521,9 +510,5 @@ pipeline:
     penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
     error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
     rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
-  pipeline_framework: $INGEST_PIPELINE_FRAMEWORK|ray
-  message_broker_interface:
-    type: $MESSAGE_CLIENT_TYPE|rest
-    host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
-    port: $MESSAGE_CLIENT_PORT|7670
+  launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|true
 """
