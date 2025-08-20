@@ -98,7 +98,7 @@ def _run_inference(
         )
     else:
         future_ocr_kwargs.update(
-            model_name="scene_text",
+            model_name=ocr_model_name,
             input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="word",
