@@ -26,6 +26,8 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
 from nv_ingest.framework.orchestration.process.execution import (
     launch_pipeline,
     run_pipeline_process,
+)
+from nv_ingest.framework.orchestration.process.termination import (
     kill_pipeline_process_group,
 )
 

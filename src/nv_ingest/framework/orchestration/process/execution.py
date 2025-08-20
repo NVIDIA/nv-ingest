@@ -17,17 +17,17 @@ import sys
 import time
 from ctypes import CDLL
 from datetime import datetime
-from typing import Union, Tuple, Optional, TextIO
+from typing import Union, Tuple, Optional, TextIO, Any
 import json
 
 import ray
 from ray import LoggingConfig
 
-from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
-    RayPipeline,
+from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
+from nv_ingest.framework.orchestration.process.termination import (
+    kill_pipeline_process_group as _kill_pipeline_process_group,
 )
 from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
-from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from nv_ingest.pipeline.config.replica_resolver import resolve_static_replicas
 from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config
@@ -251,7 +251,7 @@ def launch_pipeline(
     block: bool = True,
     disable_dynamic_scaling: Optional[bool] = None,
     dynamic_memory_threshold: Optional[float] = None,
-) -> Tuple[Union[RayPipeline, None], Optional[float]]:
+) -> Tuple[Union[Any, None], Optional[float]]:
     """
     Launch a pipeline using the provided configuration.
 
@@ -271,8 +271,8 @@ def launch_pipeline(
 
     Returns
     -------
-    Tuple[Union[RayPipeline, None], Optional[float]]
-        Raw RayPipeline object and elapsed time. For blocking execution,
+    Tuple[Union[Any, None], Optional[float]]
+        Raw pipeline object (type elided to avoid circular import) and elapsed time. For blocking execution,
         returns (None, elapsed_time). For non-blocking, returns (pipeline, None).
     """
     logger.info("Starting pipeline setup")
@@ -490,83 +490,6 @@ def run_pipeline_process(
 
 
 def kill_pipeline_process_group(process: multiprocessing.Process) -> None:
-    """
-    Kill a pipeline process and its entire process group.
-
-    Note: Although the type annotation specifies a multiprocessing.Process for
-    compatibility with existing tests and public API, this function is robust
-    to also being passed a raw PID (int) at runtime.
-
-    Behavior:
-    - Send SIGTERM to the process group; if still alive after grace period, escalate to SIGKILL.
-    - If a Process object is provided, attempt to join() with timeouts.
-    - If only a PID is provided, skip joins and just signal the process group with grace/force.
-
-    Parameters
-    ----------
-    process : multiprocessing.Process
-        Process handle (or a raw PID int) for the process whose process group should be terminated.
-    """
-    # Resolve PID and optional Process handle
-    proc: Optional[object] = None
-    pid: Optional[int] = None
-
-    if isinstance(process, int):
-        pid = process
-    elif hasattr(process, "pid"):
-        # Duck-type any object that exposes a pid (e.g., multiprocessing.Process or Mock)
-        proc = process
-        try:
-            pid = int(getattr(proc, "pid"))
-        except Exception as e:
-            raise AttributeError(f"Invalid process-like object without usable pid: {e}")
-    else:
-        raise AttributeError(
-            "kill_pipeline_process_group expects a multiprocessing.Process or a PID int (process-like object with .pid)"
-        )
-
-    # If we have a Process handle and it's already dead, nothing to do
-    if proc is not None and hasattr(proc, "is_alive") and not proc.is_alive():
-        _safe_log(logging.DEBUG, "Process already terminated")
-        return
-
-    if pid is None:
-        # Defensive guard; should not happen
-        raise AttributeError("Unable to determine PID for process group termination")
-
-    _safe_log(logging.INFO, f"Terminating pipeline process group (PID: {pid})")
-    try:
-        # Send graceful termination to the entire process group
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
-
-        # If we have a Process handle, give it a chance to exit cleanly
-        if proc is not None and hasattr(proc, "join"):
-            try:
-                proc.join(timeout=5.0)
-            except Exception:
-                pass
-            still_alive = getattr(proc, "is_alive", lambda: True)()
-        else:
-            # Without a handle, provide a small grace period
-            time.sleep(2.0)
-            # Best-effort check: if getpgid fails, it's gone
-            try:
-                _ = os.getpgid(pid)
-                still_alive = True
-            except Exception:
-                still_alive = False
-
-        if still_alive:
-            _safe_log(logging.WARNING, "Process group did not terminate gracefully, using SIGKILL")
-            try:
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
-            finally:
-                if proc is not None and hasattr(proc, "join"):
-                    try:
-                        proc.join(timeout=3.0)
-                    except Exception:
-                        pass
-
-    except (ProcessLookupError, OSError) as e:
-        # Process or group may already be gone
-        _safe_log(logging.DEBUG, f"Process group already terminated or not found: {e}")
+    """Backward-compatible shim that delegates to process.termination implementation."""
+    _safe_log(logging.DEBUG, "Delegating kill_pipeline_process_group to process.termination module")
+    _kill_pipeline_process_group(process)

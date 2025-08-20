@@ -20,7 +20,7 @@ import logging
 import time
 
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
-from nv_ingest.framework.orchestration.process.execution import kill_pipeline_process_group
+from nv_ingest.framework.orchestration.process.termination import kill_pipeline_process_group
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
