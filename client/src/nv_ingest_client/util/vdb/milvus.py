@@ -170,10 +170,15 @@ def grab_meta_collection_info(
     embedding_model: str = None,
     embedding_dim: int = None,
     client: MilvusClient = None,
+    milvus_uri: str = None,
+    username: str = None,
+    password: str = None,
 ):
     timestamp = timestamp or ""
     embedding_model = embedding_model or ""
     embedding_dim = embedding_dim or ""
+    if milvus_uri:
+        client = MilvusClient(milvus_uri, token=f"{username}:{password}")
     results = client.query_iterator(
         collection_name=meta_collection_name,
         output_fields=[
@@ -771,7 +776,7 @@ def bulk_insert_milvus(
     """
     minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
 
-    connections.connect(uri=milvus_uri, username=username, password=password)
+    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
     t_bulk_start = time.time()
     task_ids = []
     uploaded_files = []
