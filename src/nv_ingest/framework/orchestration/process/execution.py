@@ -328,17 +328,37 @@ def launch_pipeline(
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()
-    ingest_pipeline = IngestPipelineBuilder(pipeline_config)
-    ingest_pipeline.build()
+    ingest_pipeline = None
+    try:
+        ingest_pipeline = IngestPipelineBuilder(pipeline_config)
+        ingest_pipeline.build()
 
-    # Record setup time
-    end_setup = start_run = datetime.now()
-    setup_time = (end_setup - start_abs).total_seconds()
-    logger.info(f"Pipeline setup complete in {setup_time:.2f} seconds")
+        # Record setup time
+        end_setup = start_run = datetime.now()
+        setup_time = (end_setup - start_abs).total_seconds()
+        logger.info(f"Pipeline setup complete in {setup_time:.2f} seconds")
 
-    # Run the pipeline
-    logger.debug("Running pipeline")
-    ingest_pipeline.start()
+        # Run the pipeline
+        logger.debug("Running pipeline")
+        ingest_pipeline.start()
+    except Exception as e:
+        # Ensure any partial startup is torn down
+        logger.error(f"Pipeline startup failed, initiating cleanup: {e}", exc_info=True)
+        try:
+            if ingest_pipeline is not None:
+                try:
+                    ingest_pipeline.stop()
+                except Exception:
+                    pass
+        finally:
+            try:
+                if ray.is_initialized():
+                    ray.shutdown()
+                    logger.info("Ray shutdown complete after startup failure.")
+            finally:
+                pass
+        # Re-raise to surface failure to caller
+        raise
 
     if block:
         try:
@@ -350,6 +370,14 @@ def launch_pipeline(
             ingest_pipeline.stop()
             ray.shutdown()
             logger.info("Ray shutdown complete.")
+        except Exception as e:
+            logger.error(f"Unexpected error during pipeline run: {e}", exc_info=True)
+            try:
+                ingest_pipeline.stop()
+            finally:
+                if ray.is_initialized():
+                    ray.shutdown()
+            raise
 
         # Record execution times
         end_run = datetime.now()
@@ -397,6 +425,22 @@ def run_pipeline_process(
         os.setpgrp()
     except Exception as e:
         logger.debug(f"os.setpgrp() not available or failed: {e}")
+
+    # Install signal handlers for graceful shutdown in the subprocess
+    def _handle_signal(signum, frame):
+        try:
+            _safe_log(logging.INFO, f"Received signal {signum}; shutting down Ray and exiting...")
+            if ray.is_initialized():
+                ray.shutdown()
+        finally:
+            # Exit immediately after best-effort cleanup
+            os._exit(0)
+
+    try:
+        signal.signal(signal.SIGINT, _handle_signal)
+        signal.signal(signal.SIGTERM, _handle_signal)
+    except Exception as e:
+        logger.debug(f"Signal handlers not set: {e}")
 
     # Test output redirection
     print("DEBUG: Direct print to stdout - should appear in parent process")
