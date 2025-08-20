@@ -1016,7 +1016,6 @@ class NvIngestClient:
         job_indices: Union[str, List[str]],
         job_queue_id: Optional[str] = None,
         batch_size: Optional[int] = None,
-        concurrency_limit: int = 64,
         timeout: int = 100,
         max_job_retries: Optional[int] = None,
         retry_delay: float = 5.0,
@@ -1040,8 +1039,6 @@ class NvIngestClient:
             Maximum number of jobs to process in each internal batch.
             Higher values may improve throughput but increase memory usage.
             Must be >= 1. Default is 32.
-        concurrency_limit : int, optional
-            Max number of simultaneous in-flight jobs. Default is 64.
         timeout : int, optional
             Timeout in seconds per fetch attempt. Default is 100.
         max_job_retries : int, optional
