@@ -131,12 +131,20 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
 results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
 if failures:
     print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
@@ -145,16 +153,12 @@ if failures:
 
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
-!!! important "About return_failures and vdb_upload"
-
-    - `ingestor.ingest(..., return_failures=False)` (default): returns only successful results. If `.vdb_upload(...)` is configured and any jobs fail, `ingest()` raises `RuntimeError` and does not upload (all-or-nothing).
-    - `ingestor.ingest(..., return_failures=True)`: returns `(results, failures)`. If `.vdb_upload(...)` is configured and some jobs fail, `ingest()` uploads only the successful results and does not raise; inspect `failures` for remediation.
 
 You can see the extracted text that represents the content of the ingested test document.
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text

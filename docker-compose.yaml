@@ -264,7 +264,7 @@ services:
     cap_add:
       - sys_nice
     environment:
-      - ARROW_DEFAULT_MEMORY_POOL=system
+      #- ARROW_DEFAULT_MEMORY_POOL=system
       - OMP_NUM_THREADS=1
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
@@ -273,10 +273,13 @@ services:
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
-      - INGEST_EDGE_BUFFER_SIZE=64
+      - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
+      # Ray internals configuration
       - RAY_num_grpc_threads=1
+      - RAY_num_server_call_thread=1
+      - RAY_worker_num_grpc_internal_threads=1
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       # - INGEST_DYNAMIC_MEMORY_KP=0.2
