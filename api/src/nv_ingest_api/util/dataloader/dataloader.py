@@ -11,8 +11,12 @@ import subprocess
 import json
 import logging
 import math
-import importlib
+import importlib.util
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+import os
+import glob
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +68,49 @@ def _probe(filename, format=None, file_handle=None, timeout=None, **kwargs):
     return json.loads(out.decode("utf-8"))
 
 
+def _get_audio_from_video(input_path: str, output_file: str, cache_path: str = None):
+    """
+    Get the audio from a video file. if audio extraction fails, return None.
+    input_path: str, path to the video file
+    output_dir: str, path to the output directory
+    cache_path: str, path to the cache directory
+    """
+    output_path = Path(output_file)
+    output_dir = output_path.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        capture_output, capture_error = (
+            ffmpeg.input(str(input_path))
+            .output(str(output_path), acodec="libmp3lame", map="0:a")
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        return output_path
+    except ffmpeg.Error as e:
+        logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
+        return None
+
+
+def strip_audio_from_video_files(input_path: str, output_dir: str, cache_path: str = None):
+    """
+    Strip the audio from a series of video files and return the paths to the new files.
+    input_path: str, path to the video file
+    output_dir: str, path to the output directory
+    cache_path: str, path to the cache directory
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    futures = []
+    results = None
+    path = Path(input_path)
+    files = [path] if path.is_file() else glob.glob(os.path.join(path, "*.mp4"))
+    files = [Path(file) for file in files]
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = [executor.submit(_get_audio_from_video, file, output_path / f"{file.stem}.mp3") for file in files]
+        results = [str(future.result()) for future in tqdm(futures)]
+    return results
+
+
 class MediaInterface(LoaderInterface):
 
     def __init__(self):
@@ -95,25 +142,7 @@ class MediaInterface(LoaderInterface):
         return probe, num_splits, duration
 
     def get_audio_from_video(self, input_path: str, output_file: str, cache_path: str = None):
-        """
-        Get the audio from a video file. if audio extraction fails, return None.
-        input_path: str, path to the video file
-        output_dir: str, path to the output directory
-        cache_path: str, path to the cache directory
-        """
-        output_path = Path(output_file)
-        output_dir = output_path.parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            capture_output, capture_error = (
-                ffmpeg.input(str(input_path))
-                .output(str(output_path), c="copy", map="0:a")
-                .run(capture_stdout=True, capture_stderr=True)
-            )
-            return output_path
-        except ffmpeg.Error as e:
-            logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
-            return None
+        return _get_audio_from_video(input_path, output_file, cache_path)
 
     def split(
         self,
@@ -261,6 +290,7 @@ class DataLoader:
         size: int = 2,
         video_audio_separate: bool = False,
     ):
+        interface = interface if interface else MediaInterface()
         self.thread = None
         self.thread_stop = False
         self.queue = queue.Queue(size)
