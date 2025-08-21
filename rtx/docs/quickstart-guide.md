@@ -132,6 +132,12 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     ceb5f134adcc  docker.io/zilliz/attu:v2.3.5                                /bin/bash -c /app...  11 minutes ago  Up 11 minutes            0.0.0.0:3001->3000/tcp                                                                                                                                         milvus-attu
     ```
 
+12. Reclaim memory
+
+    WSL is known for not reclaiming cached memory fast enough; run the following drop_cache command in powershell to reclaim immediately
+    ```
+    wsl -u root -d NVIDIA-Workbench -- sh -c "sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'"
+    ```
 
 ## Step 3: Install Python Dependencies
 
