@@ -29,6 +29,8 @@ from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
+NEMORETRIEVER_OCR_EA_MODEL_NAME = "scene_text"
+NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +144,7 @@ class OCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
-        model_name = kwargs.get("model_name", "paddle")
+        model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
         merge_level = kwargs.get("merge_level", "paragraph")
 
         if protocol == "grpc":
@@ -153,7 +155,7 @@ class OCRModelInterface(ModelInterface):
             max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
 
             for img in images:
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     arr, _dims = preprocess_image_for_paddle(img)
                 else:
                     arr, _dims = preprocess_image_for_ocr(
@@ -165,7 +167,7 @@ class OCRModelInterface(ModelInterface):
 
                 dims.append(_dims)
 
-                if model_name == "scene_text_ensemble":
+                if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
                     arr = arr.transpose((1, 2, 0))
                     arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
                 else:
@@ -184,7 +186,7 @@ class OCRModelInterface(ModelInterface):
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
 
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     batches.append(batched_input)
                 else:
                     merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
@@ -215,7 +217,7 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     payload = {"input": input_chunk}
                 else:
                     payload = {
@@ -235,7 +237,7 @@ class OCRModelInterface(ModelInterface):
         response: Any,
         protocol: str,
         data: Optional[Dict[str, Any]] = None,
-        model_name: str = "paddle",
+        model_name: str = DEFAULT_OCR_MODEL_NAME,
         **kwargs: Any,
     ) -> Any:
         """
@@ -376,7 +378,7 @@ class OCRModelInterface(ModelInterface):
         self,
         response: np.ndarray,
         dimensions: List[Dict[str, Any]],
-        model_name: str = "paddle",
+        model_name: str = DEFAULT_OCR_MODEL_NAME,
     ) -> List[Tuple[str, str]]:
         """
         Parse a gRPC response for one or more images. The response can have two possible shapes:
@@ -411,7 +413,7 @@ class OCRModelInterface(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name == "scene_text_ensemble":
+        if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
             response = response.transpose((1, 0))
 
         # If we have shape (3,), convert to (3, 1)
@@ -456,7 +458,7 @@ class OCRModelInterface(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=True if model_name == "paddle" else False,
+                scale_coordinates=True if model_name == DEFAULT_OCR_MODEL_NAME else False,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])
