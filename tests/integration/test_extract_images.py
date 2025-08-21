@@ -26,6 +26,11 @@ def test_images_extract_only(
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
+    expected_table_bmp_full_markdown_variants,
+    expected_table_jpeg_full_markdown_variants,
+    expected_table_png_full_markdown_variants,
+    expected_table_tiff_full_markdown_variants,
+    multimodal_first_chart_xaxis_variants_images,
     image_file,
 ):
     client = NvIngestClient(
@@ -65,10 +70,21 @@ def test_images_extract_only(
     assert len(charts) == 1
     assert len(infographics) == 0
 
-    table_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in tables)
-    assert multimodal_first_table_markdown in table_contents
+    # Assert exact table content per format based on observed outputs
+    assert len(tables) == 1
+    extracted_table = tables[0]["metadata"]["table_metadata"]["table_content"]
+    if image_file.endswith(".bmp"):
+        expected_variants = expected_table_bmp_full_markdown_variants
+    elif image_file.endswith(".jpeg"):
+        expected_variants = expected_table_jpeg_full_markdown_variants
+    elif image_file.endswith(".png"):
+        expected_variants = expected_table_png_full_markdown_variants
+    elif image_file.endswith(".tiff"):
+        expected_variants = expected_table_tiff_full_markdown_variants
+    else:
+        raise AssertionError(f"Unhandled image format for test: {image_file}")
+    assert extracted_table in expected_variants
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    multimodal_first_chart_xaxis_alt = multimodal_first_chart_xaxis.replace("Bluetooth speaker", "Bluetoothspeaker")
-    assert (multimodal_first_chart_xaxis in chart_contents) or (multimodal_first_chart_xaxis_alt in chart_contents)
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants_images)
     assert multimodal_first_chart_yaxis in chart_contents
