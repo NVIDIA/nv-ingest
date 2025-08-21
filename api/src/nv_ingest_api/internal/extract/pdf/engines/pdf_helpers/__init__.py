@@ -11,6 +11,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 import pandas as pd
 from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
@@ -131,7 +132,7 @@ def _orchestrate_row_extraction(
         method_config = extractor_config[config_key]
     else:
         # If no matching config is found, log a warning but don't fail
-        logger.warning(f"No {config_key} found in extractor_config: {extractor_config}")
+        logger.warning(f"No {config_key} found in extractor_config: {sanitize_for_logging(extractor_config)}")
         method_config = None
 
     # Add the method-specific config to the parameters if available
@@ -141,7 +142,7 @@ def _orchestrate_row_extraction(
 
     # The resulting parameters constitute the complete extractor_config
     extractor_config = params
-    logger.debug(f"Final extractor_config: {extractor_config}")
+    logger.debug(f"Final extractor_config: {sanitize_for_logging(extractor_config)}")
 
     result = _work_extract_pdf(
         pdf_stream=pdf_stream,

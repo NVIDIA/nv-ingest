@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
 
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema, NemoRetrieverParseConfigSchema
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -180,29 +181,31 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
             if extractor_schema is None:
                 extractor_schema = {f"{extract_method}_config": extraction_config_dict}
 
-            # Log the task and extractor configurations for debugging
+            # Log the task and extractor configurations for debugging (sanitized)
             logger.debug("\n" + "=" * 80)
             logger.debug(f"DEBUG - API Function: {api_fn.__name__}")
             logger.debug(f"DEBUG - Extract Method: {extract_method}")
             logger.debug("-" * 80)
 
-            # Format the task config as a string and log it
-            task_config_str = pprint.pformat(task_config, width=100, sort_dicts=False)
-            logger.debug(f"DEBUG - Task Config:\n{task_config_str}")
+            # Sanitize and format the task config as a string and log it
+            sanitized_task_config = sanitize_for_logging(task_config)
+            task_config_str = pprint.pformat(sanitized_task_config, width=100, sort_dicts=False)
+            logger.debug(f"DEBUG - Task Config (sanitized):\n{task_config_str}")
             logger.debug("-" * 80)
 
-            # Format the extractor config as a string and log it
+            # Sanitize and format the extractor config as a string and log it
             if hasattr(extractor_schema, "model_dump"):
-                extractor_config_str = pprint.pformat(extractor_schema.model_dump(), width=100, sort_dicts=False)
+                sanitized_extractor_config = sanitize_for_logging(extractor_schema.model_dump())
             else:
-                extractor_config_str = pprint.pformat(extractor_schema, width=100, sort_dicts=False)
+                sanitized_extractor_config = sanitize_for_logging(extractor_schema)
+            extractor_config_str = pprint.pformat(sanitized_extractor_config, width=100, sort_dicts=False)
             logger.debug(f"DEBUG - Extractor Config Type: {type(extractor_schema)}")
-            logger.debug(f"DEBUG - Extractor Config:\n{extractor_config_str}")
+            logger.debug(f"DEBUG - Extractor Config (sanitized):\n{extractor_config_str}")
             logger.debug("=" * 80 + "\n")
 
-            # Call the backend API function.
-            pprint.pprint(task_config)
-            pprint.pprint(extractor_schema)
+            # Call the backend API function. Print sanitized configs for any debug consumers of stdout.
+            pprint.pprint(sanitized_task_config)
+            pprint.pprint(sanitized_extractor_config)
             result = api_fn(ledger, task_config, extractor_schema, execution_trace_log)
 
             # If the result is a tuple, return only the first element

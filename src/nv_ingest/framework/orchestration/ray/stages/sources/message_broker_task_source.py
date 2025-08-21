@@ -29,6 +29,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 # Import clients
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def __init__(self, config: MessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
         super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
+
+        # Sanitize config before logging to avoid leaking secrets
+        _sanitized = sanitize_for_logging(config)
         self._logger.debug(
-            "Initializing MessageBrokerTaskSourceStage with config: %s", config.model_dump()
+            "Initializing MessageBrokerTaskSourceStage with config: %s", _sanitized
         )  # Log validated config
 
         # Access validated configuration directly via self.config
