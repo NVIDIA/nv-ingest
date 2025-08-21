@@ -475,6 +475,11 @@ You can specify multiple `--profile` options.
 
     Advanced features require additional GPU support and disk space. For more information, refer to [Support Matrix](support-matrix.md).
 
+## FAQ
+
+- Containers are configured to consume minimal memory. Users may modify the environment variables in [podman-compose.yaml](../podman-compose.yaml) as needed. See the following documentation for configuring retriever NIMs
+    - [Environment Variables for NeMo Retriever Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/environment-variables.html)
+    - [Environment Variables for NVIDIA NIM for Object Detection](https://docs.nvidia.com/nim/ingestion/object-detection/latest/environment-variables.html)
 
 
 ## Related Topics
