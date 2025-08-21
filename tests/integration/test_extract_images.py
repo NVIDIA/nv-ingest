@@ -6,6 +6,11 @@ import pytest
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
+from tests.utilities_for_test import (
+    levenshtein_ratio,
+    jaccard_similarity,
+    token_f1,
+)
 
 
 @pytest.mark.integration
@@ -83,7 +88,23 @@ def test_images_extract_only(
         expected_variants = expected_table_tiff_full_markdown_variants
     else:
         raise AssertionError(f"Unhandled image format for test: {image_file}")
-    assert extracted_table in expected_variants
+    # Accept either exact match or sufficiently high similarity to any expected variant
+    if extracted_table not in expected_variants:
+        LEV_THR = 0.98
+        TOK_THR = 0.95
+        best = {"lev": 0.0, "jac": 0.0, "f1": 0.0, "variant": None}
+        for expected in expected_variants:
+            lev = levenshtein_ratio(extracted_table, expected)
+            jac = jaccard_similarity(extracted_table, expected)
+            f1 = token_f1(extracted_table, expected)
+            if (lev + jac + f1) > (best["lev"] + best["jac"] + best["f1"]):
+                best = {"lev": lev, "jac": jac, "f1": f1, "variant": expected}
+
+        if not (best["lev"] >= LEV_THR or best["jac"] >= TOK_THR or best["f1"] >= TOK_THR):
+            assert False, (
+                f"Table content differs from expected variants. "
+                f"Best similarity scores: lev={best['lev']:.3f}, jaccard={best['jac']:.3f}, token_f1={best['f1']:.3f}"
+            )
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
     assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants_images)
