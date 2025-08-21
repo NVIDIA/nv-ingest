@@ -26,6 +26,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
     preprocess_image_for_paddle,
 )
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
 
@@ -149,6 +150,7 @@ class OCRModelInterface(ModelInterface):
             processed: List[np.ndarray] = []
 
             max_length = max(max(img.shape[:2]) for img in images)
+            max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
 
             for img in images:
                 if model_name == "paddle":
@@ -162,8 +164,15 @@ class OCRModelInterface(ModelInterface):
                     )
 
                 dims.append(_dims)
-                arr = arr.astype(np.float32)
-                arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
+
+                if model_name == "scene_text_ensemble":
+                    arr = arr.transpose((1, 2, 0))
+                    arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
+                else:
+                    arr = arr.astype(np.float32)
+
+                arr = np.expand_dims(arr, axis=0)
+
                 processed.append(arr)
 
             batches = []
@@ -402,12 +411,14 @@ class OCRModelInterface(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
+        if model_name == "scene_text_ensemble":
+            response = response.transpose((1, 0))
+
         # If we have shape (3,), convert to (3, 1)
         if response.ndim == 1 and response.shape == (3,):
             response = response.reshape(3, 1)
         elif response.ndim != 2 or response.shape[0] != 3:
             raise ValueError(f"Unexpected response shape: {response.shape}. Expecting (3,) or (3, n).")
-
         batch_size = response.shape[1]
         results: List[Tuple[str, str]] = []
 
@@ -425,11 +436,17 @@ class OCRModelInterface(ModelInterface):
             conf_scores = json.loads(confs_bytestr.decode("utf8"))
 
             # Some gRPC responses nest single-item lists; flatten them if needed
-            if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
+            if (
+                (isinstance(bounding_boxes, list) and len(bounding_boxes) == 1 and isinstance(bounding_boxes[0], list))
+                and (
+                    isinstance(text_predictions, list)
+                    and len(text_predictions) == 1
+                    and isinstance(text_predictions[0], list)
+                )
+                and (isinstance(conf_scores, list) and len(conf_scores) == 1 and isinstance(conf_scores[0], list))
+            ):
                 bounding_boxes = bounding_boxes[0]
-            if isinstance(text_predictions, list) and len(text_predictions) == 1:
                 text_predictions = text_predictions[0]
-            if isinstance(conf_scores, list) and len(conf_scores) == 1:
                 conf_scores = conf_scores[0]
 
             # 4) Postprocess
