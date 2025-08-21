@@ -24,23 +24,29 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
 
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-1. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
+1. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login`
 
+    Export your personal credentials as environment variables:
+    ```shell
+    export NGC_API_KEY=<PASTE_API_KEY_HERE>
+    ```
+
+    Login to NVIDIA NGC so that you can pull the NIM container:
     ```shell
     echo "$NGC_API_KEY" | podman login nvcr.io --username '$oauthtoken' --password-stdin
     ```
 
-2. Install conda; see [documentation](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) for steps
+3. Install conda; see [documentation](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) for steps
 
-3. Git clone the repo:
+4. Git clone the repo:
 
     `git clone -b release/25.6.3 https://github.com/nvidia/nv-ingest`
 
-4. Change the directory to the cloned repo
+5. Change the directory to the cloned repo
    
     `cd nv-ingest`
 
-5. Create a .env file that contains your NGC API key.
+6. Create a .env file that contains your NGC API key.
 
     !!! note
 
@@ -53,14 +59,14 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
 
-6. Install podman compose
+7. Install podman compose
     ```
     conda create --name podman python=3.12.11
     conda activate podman
     pip install podman-compose>=1.1.0
     ```
 
-7. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers. Check the name of the generated devices by running
+8. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers. Check the name of the generated devices by running
 
     `nvidia-ctk cdi list`
    
