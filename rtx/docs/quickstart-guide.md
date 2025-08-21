@@ -1,6 +1,5 @@
 # Deploy With Podman Compose (Self-Hosted) for NeMo Retriever Extraction
 
-Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
 ## Step 1: Set up Windows Subsystem for Linux 2 - WSL2 - Distro
 
