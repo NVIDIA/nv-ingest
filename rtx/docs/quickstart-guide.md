@@ -38,7 +38,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
 
 4. Change the directory to the cloned repo
    
-    `cd nv-ingest`.
+    `cd nv-ingest`
 
 5. Create a .env file that contains your NVIDIA Build API key.
 
@@ -70,7 +70,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     nvidia.com/gpu=all
     ```
     
-    If you see the following error when running `nvidia-ctk cdi list`, try again after removing `/etc/cdi/nvidia.json` file.
+    If you see the following warning when running `nvidia-ctk cdi list`, try again after removing `/etc/cdi/nvidia.json` file.
     
     ```
     WARN[0000] The following registry errors were reported:
