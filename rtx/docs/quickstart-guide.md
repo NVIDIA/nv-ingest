@@ -2,13 +2,18 @@
 
 Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
-## Step 1: Open the Windows Subsystem for Linux 2 - WSL2 - Distro
+## Step 1: Set up Windows Subsystem for Linux 2 - WSL2 - Distro
 
-[Install WSL2](https://assets.ngc.nvidia.com/products/api-catalog/rtx/NIMSetup.exe). For additional instructions refer to the [documentation](https://docs.nvidia.com/nim/wsl2/latest/getting-started.html#installation).
+1. Ensure virtualization is enabled in the system BIOS
+    In Windows, open the Task Manager. Select the Performance tab and click on CPU. Check if Virtualization is enabled. If it is disabled, see [here](https://support.microsoft.com/en-us/windows/enable-virtualization-on-windows-c5578302-6e43-4b4b-a449-8ced115f58e1) to enable.
 
-Once installed, open the NVIDIA-Workbench WSL2 distro using the following command in the Windows terminal.
+2. Open the NVIDIA-Workbench
 
-`wsl -d NVIDIA-Workbench` 
+    [Install WSL2](https://assets.ngc.nvidia.com/products/api-catalog/rtx/NIMSetup.exe). For additional instructions refer to the [documentation](https://docs.nvidia.com/nim/wsl2/latest/getting-started.html#installation).
+    
+    Once installed, open the NVIDIA-Workbench WSL2 distro using the following command in the Windows terminal.
+    
+    `wsl -d NVIDIA-Workbench` 
 
 ## Step 2: Starting Containers
 
@@ -19,34 +24,23 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
 
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
+1. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
 
-1. Install conda; see [documentation](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) for steps
+    ```shell
+    echo "$NGC_API_KEY" | podman login nvcr.io --username '$oauthtoken' --password-stdin
+    ```
 
-2. Git clone the repo:
+2. Install conda; see [documentation](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) for steps
 
-    `git clone https://github.com/nvidia/nv-ingest`
+3. Git clone the repo:
 
-3. Change the directory to the cloned repo
+    `git clone -b release/25.6.3 https://github.com/nvidia/nv-ingest`
+
+4. Change the directory to the cloned repo
    
     `cd nv-ingest`.
 
-4. Install podman compose
-    ```
-    conda create --name podman python=3.12.11
-    conda activate podman
-    pip install podman-compose>=1.1.0
-    ```
-
-5. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
-
-    ```shell
-    # This is required to access pre-built containers and NIM microservices
-    $ podman login nvcr.io
-    Username: $oauthtoken
-    Password: <Your Key>
-    ```
-   
-6. Create a .env file that contains your NVIDIA Build API key.
+5. Create a .env file that contains your NVIDIA Build API key.
 
     !!! note
 
@@ -58,12 +52,35 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
+
+6. Install podman compose
+    ```
+    conda create --name podman python=3.12.11
+    conda activate podman
+    pip install podman-compose>=1.1.0
+    ```
+
+7. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers. Check the name of the generated devices by running
+
+    `nvidia-ctk cdi list`
    
-7. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers:
+    The following example output is for a machine with a single GPU
+    ```
+    INFO[0000] Found 1 CDI devices
+    nvidia.com/gpu=all
+    ```
+    
+    If you see the following error when running `nvidia-ctk cdi list`, try again after removing `/etc/cdi/nvidia.json` file.
+    
+    ```
+    WARN[0000] The following registry errors were reported:
+    WARN[0000] /etc/cdi/nvidia.json: [conflicting device "nvidia.com/gpu=all" (specs "/etc/cdi/nvidia.yaml", "/etc/cdi/nvidia.json")]
+    WARN[0000] /etc/cdi/nvidia.yaml: [conflicting device "nvidia.com/gpu=all" (specs "/etc/cdi/nvidia.yaml", "/etc/cdi/nvidia.json")]
+    INFO[0000] Found 0 CDI devices
+    ```
 
-    `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`
 
-8. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+9. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `podman-compose -f rtx/podman-compose.yaml --env-file .env --profile retrieval --profile table-structure up`
 
@@ -71,7 +88,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
 
         By default, we have configured log levels to be verbose. It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml).
 
-9. When core services have fully started, `nvidia-smi` should show processes like the following:
+10. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -89,7 +106,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
     +---------------------------------------------------------------------------------------+
     ```
 
-10. Observe the started containers with `podman ps`:
+11. Observe the started containers with `podman ps`:
 
     ```
     CONTAINER ID  IMAGE                                                       COMMAND               CREATED         STATUS                   PORTS                                                                                                                                                          NAMES
