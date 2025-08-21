@@ -193,7 +193,10 @@ async def async_llama_parse(
         A string of extracted text.
     """
     base_url = "https://api.cloud.llamaindex.ai/api/parsing"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    # Normalize in case api_key contains only whitespace; avoid sending an empty bearer token
+    _token = (api_key or "").strip()
+    _auth_value = f"Bearer {_token}" if _token else "Bearer <no key provided>"
+    headers = {"Authorization": _auth_value}
     mime_type = "application/pdf"
 
     try:
