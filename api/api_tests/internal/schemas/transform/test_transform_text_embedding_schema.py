@@ -11,7 +11,7 @@ from nv_ingest_api.util.logging.configuration import LogLevel
 
 def test_text_embedding_schema_defaults():
     schema = TextEmbeddingSchema()
-    assert schema.api_key == "api_key"
+    assert schema.api_key == ""
     assert schema.batch_size == 4
     assert schema.embedding_model.startswith("nvidia/")
     assert schema.embedding_nim_endpoint.startswith("http")

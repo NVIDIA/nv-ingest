@@ -122,6 +122,6 @@ results = ingestor.ingest()
 
 ## Related Topics
 
-- [Support Matrix](support-matrix.md).
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
