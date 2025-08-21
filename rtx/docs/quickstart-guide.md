@@ -317,7 +317,8 @@ nv-ingest-cli \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_tables": "true", "extract_images": "true", "extract_charts": "true"}' \
   --client_host=localhost \
-  --client_port=7670
+  --client_port=7671
+  --client_type=simple
 ```
 
 You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
