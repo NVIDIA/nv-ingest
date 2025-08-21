@@ -40,7 +40,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
    
     `cd nv-ingest`
 
-5. Create a .env file that contains your NVIDIA Build API key.
+5. Create a .env file that contains your NGC API key.
 
     !!! note
 
