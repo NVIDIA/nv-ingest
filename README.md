@@ -8,12 +8,12 @@ SPDX-License-Identifier: Apache-2.0
 
 NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
 NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
-to find, contextualize, and extract text, tables, charts and images that you can use in downstream generative applications.
+to find, contextualize, and extract text, tables, charts and infographics that you can use in downstream generative applications.
 
 > [!Note]
 > NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
@@ -47,7 +47,7 @@ NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
@@ -87,7 +87,7 @@ Library mode deployment of nv-ingest requires:
 
 ### Step 1: Prepare Your Environment
 
-Create a fresh Conda environment to install nv-ingest and dependencies.
+Create a fresh Python environment to install nv-ingest and dependencies.
 
 ```shell
 uv venv --python 3.12 nvingest && \
@@ -105,7 +105,7 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
+To confirm that you have activated your Python environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
 ```
 which python
@@ -121,7 +121,7 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time, sys
+import logging, os, time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
@@ -172,19 +172,30 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest(show_progress=True)
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
+# (optional) Review any failures that were returned
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 You can see the extracted text that represents the content of the ingested test document.
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text
@@ -283,6 +294,7 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 > Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+
 
 
 ## GitHub Repository Structure

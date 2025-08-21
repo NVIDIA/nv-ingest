@@ -1,10 +1,15 @@
-# Use the NV-Ingest Python API
+# Use the NeMo Retriever Extraction Python API
 
-The [NV-Ingest](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 !!! tip
 
     There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
 
 ## Summary of Key Methods
 
@@ -16,12 +21,71 @@ The following table describes methods of the `Ingestor` class.
 |--------------|-----------------------------------|
 | `caption`    | Extract captions from images within the document. |
 | `embed`      | Generate embeddings from extracted content. |
-| `extract`    | Add an extraction task (text, tables, charts). |
+| `extract`    | Add an extraction task (text, tables, charts, infographics). |
 | `files`      | Add document paths for processing. |
 | `ingest`     | Submit jobs and retrieve results synchronously. |
 | `load`       | Ensure files are locally accessible (downloads if needed). |
 | `split`      | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `vdb_upload` | Pushes extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+
+
+
+## Track Job Progress
+
+For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+Use the following code.
+
+```python
+# Return only successes
+results = ingestor.ingest(show_progress=True)
+
+print(len(results), "successful documents")
+```
+
+
+
+## Capture Job Failures
+
+You can capture job failures by setting `return_failures` to true. 
+Use the following code.
+
+```python
+# Return both successes and failures
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+print(f"{len(results)} successful docs; {len(failures)} failures")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
+When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
+The behavior of the upload depends on the following values of `return_failures`:
+
+- **False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
+- **True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
+
+
+The following example uploads data to Milvus and returns any failures.
+
+```python
+ingestor = (
+    Ingestor(client=client)
+    .files(["/path/doc1.pdf", "/path/doc2.pdf"])
+    .extract()
+    .embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+)
+
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(return_failures=True)
+
+print(f"Uploaded {len(results)} successful docs; {len(failures)} failures")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
 
 
 ## Quick Start: Extracting PDFs
@@ -77,7 +141,7 @@ ingestor = ingestor.extract(
 
 ### Extract Non-standard Document Types
 
-NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
+Use the following code to extract text from `.md`, `.sh`, and `.html` files.
 
 ```python
 ingestor = Ingestor().files(["path/to/doc1.md", "path/to/doc2.html"])
@@ -104,17 +168,6 @@ ingestor = ingestor.extract(document_type="pdf")
 
 
 
-## Track Job Progress
-
-For large document batches, you can enable a progress bar by setting `show_progress` to true. 
-Use the following code.
-
-```python
-result = ingestor.extract().ingest(show_progress=True)
-```
-
-
-
 ## Extract Captions from Images
 
 The `caption` method generates image captions by using a vision-language model. 
@@ -132,7 +185,7 @@ To specify a different API endpoint, pass additional parameters to `caption`.
 
 ```python
 ingestor = ingestor.caption(
-    endpoint_url="https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
+    endpoint_url="https://integrate.api.nvidia.com/v1/chat/completions",
     model_name="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     api_key="nvapi-"
 )
@@ -161,3 +214,41 @@ ingestor = ingestor.embed(
     api_key="nvapi-"
 )
 ```
+
+
+
+## Extract Audio
+
+Use the following code to extract mp3 audio content.
+
+```python
+from nv_ingest_client.client import Ingestor
+
+ingestor = Ingestor().files("audio_file.mp3")
+
+ingestor = ingestor.extract(
+        document_type="mp3",
+        extract_text=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images=False,
+        extract_infographics=False,
+    ).split(
+        tokenizer="meta-llama/Llama-3.2-1B",
+        chunk_size=150,
+        chunk_overlap=0,
+        params={"split_source_types": ["mp3"], "hf_access_token": "hf_***"}
+    )
+
+results = ingestor.ingest()
+```
+
+
+
+## Related Topics
+
+- [Split Documents](chunking.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Multimodal Embedding](vlm-embed.md)

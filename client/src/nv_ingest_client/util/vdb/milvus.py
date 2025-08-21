@@ -1,23 +1,28 @@
+import ast
+import copy
 import datetime
+import json
 import logging
+import os
 import time
+from functools import partial
+from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Tuple
 from typing import Union
 from urllib.parse import urlparse
-from pathlib import Path
-import pandas as pd
-from functools import partial
-import json
-import os
-import numpy as np
-import ast
-import copy
 
+import numpy as np
+import pandas as pd
 import requests
+from minio import Minio
+from minio.commonconfig import CopySource
+from minio.deleteobjects import DeleteObject
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+from nv_ingest_client.util.transport import infer_microservice
 from nv_ingest_client.util.util import ClientConfigSchema
+from nv_ingest_client.util.vdb.adt_vdb import VDB
 from pymilvus import AnnSearchRequest
 from pymilvus import BulkInsertState
 from pymilvus import Collection
@@ -34,15 +39,13 @@ from pymilvus.bulk_writer import RemoteBulkWriter
 from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus.orm.types import CONSISTENCY_STRONG
+from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
-from nv_ingest_client.util.transport import infer_microservice
-from nv_ingest_client.util.vdb.adt_vdb import VDB
-
 
 logger = logging.getLogger(__name__)
 
-CONSISTENCY = CONSISTENCY_STRONG
+CONSISTENCY = CONSISTENCY_BOUNDED
+MINIO_DEFAULT_BUCKET_NAME = "a-bucket"
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -81,11 +84,10 @@ def create_nvingest_meta_schema():
 
 def create_meta_collection(
     schema: CollectionSchema,
-    milvus_uri: str = "http://localhost:19530",
     collection_name: str = "meta",
     recreate=False,
+    client: MilvusClient = None,
 ):
-    client = MilvusClient(milvus_uri)
     if client.has_collection(collection_name) and not recreate:
         # already exists, dont erase and recreate
         return
@@ -103,7 +105,6 @@ def create_meta_collection(
 def write_meta_collection(
     collection_name: str,
     fields: List[str],
-    milvus_uri: str = "http://localhost:19530",
     creation_timestamp: str = None,
     dense_index: str = None,
     dense_dim: int = None,
@@ -111,6 +112,7 @@ def write_meta_collection(
     embedding_model: str = None,
     sparse_model: str = None,
     meta_collection_name: str = "meta",
+    client: MilvusClient = None,
 ):
     client_config = ClientConfigSchema()
     data = {
@@ -129,14 +131,12 @@ def write_meta_collection(
         },
         "user_fields": [field.name for field in fields],
     }
-    client = MilvusClient(milvus_uri)
     client.insert(collection_name=meta_collection_name, data=data)
 
 
 def log_new_meta_collection(
     collection_name: str,
     fields: List[str],
-    milvus_uri: str = "http://localhost:19530",
     creation_timestamp: str = None,
     dense_index: str = None,
     dense_dim: int = None,
@@ -145,13 +145,13 @@ def log_new_meta_collection(
     sparse_model: str = None,
     meta_collection_name: str = "meta",
     recreate: bool = False,
+    client: MilvusClient = None,
 ):
     schema = create_nvingest_meta_schema()
-    create_meta_collection(schema, milvus_uri, recreate=recreate)
+    create_meta_collection(schema, client=client, recreate=recreate)
     write_meta_collection(
         collection_name,
         fields=fields,
-        milvus_uri=milvus_uri,
         creation_timestamp=creation_timestamp,
         dense_index=dense_index,
         dense_dim=dense_dim,
@@ -159,6 +159,7 @@ def log_new_meta_collection(
         embedding_model=embedding_model,
         sparse_model=sparse_model,
         meta_collection_name=meta_collection_name,
+        client=client,
     )
 
 
@@ -168,12 +169,16 @@ def grab_meta_collection_info(
     timestamp: str = None,
     embedding_model: str = None,
     embedding_dim: int = None,
-    milvus_uri: str = "http://localhost:19530",
+    client: MilvusClient = None,
+    milvus_uri: str = None,
+    username: str = None,
+    password: str = None,
 ):
     timestamp = timestamp or ""
     embedding_model = embedding_model or ""
     embedding_dim = embedding_dim or ""
-    client = MilvusClient(milvus_uri)
+    if milvus_uri:
+        client = MilvusClient(milvus_uri, token=f"{username}:{password}")
     results = client.query_iterator(
         collection_name=meta_collection_name,
         output_fields=[
@@ -250,7 +255,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(
         field_name="content_metadata",
         datatype=DataType.JSON,
-        nullable=True if local_index else False,
+        nullable=True if not local_index else False,
     )
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
@@ -325,6 +330,7 @@ def create_nvingest_index_params(
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )
@@ -406,6 +412,8 @@ def create_nvingest_collection(
     gpu_search: bool = False,
     dense_dim: int = 2048,
     recreate_meta: bool = False,
+    username: str = None,
+    password: str = None,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -415,9 +423,7 @@ def create_nvingest_collection(
     ----------
     collection_name : str
         Name of the collection to be created.
-    milvus_uri : str,
-        Milvus address with http(s) preffix and port. Can also be a file path, to activate
-        milvus-lite.
+
     sparse : bool, optional
         When set to true, this adds a Sparse index to the IndexParams, usually activated for
         hybrid search.
@@ -428,6 +434,11 @@ def create_nvingest_collection(
         If true, creates a GPU_CAGRA index for dense embeddings.
     dense_dim : int, optional
         Sets the dimension size for the dense embedding in the milvus schema.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
+
 
     Returns
     -------
@@ -437,7 +448,7 @@ def create_nvingest_collection(
     """
     local_index = False
     if urlparse(milvus_uri).scheme:
-        connections.connect(uri=milvus_uri)
+        connections.connect(uri=milvus_uri, token=f"{username}:{password}")
         server_version = utility.get_server_version()
         if "lite" in server_version:
             gpu_index = False
@@ -446,7 +457,7 @@ def create_nvingest_collection(
         if milvus_uri.endswith(".db"):
             local_index = True
 
-    client = MilvusClient(milvus_uri)
+    client = MilvusClient(milvus_uri, token=f"{username}:{password}")
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse, local_index=local_index)
     index_params = create_nvingest_index_params(
         sparse=sparse,
@@ -459,11 +470,11 @@ def create_nvingest_collection(
     log_new_meta_collection(
         collection_name,
         fields=schema.fields,
-        milvus_uri=milvus_uri,
         dense_index=str(d_idx),
         dense_dim=dense_dim,
         sparse_index=str(s_idx),
         recreate=recreate_meta,
+        client=client,
     )
     return schema
 
@@ -524,8 +535,10 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "text": text,
         "vector": cp_element["metadata"].pop("embedding"),
         "source": cp_element["metadata"].pop("source_metadata"),
-        "content_metadata": cp_element["metadata"],
+        "content_metadata": cp_element["metadata"].pop("content_metadata"),
     }
+    # need to grab the user defined fields and add them to the content_metadata
+    record["content_metadata"].update(cp_element["metadata"])
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
     return record
@@ -605,7 +618,10 @@ def _pull_text(
         elif element["metadata"]["content_metadata"]["subtype"] == "infographic" and not enable_infographics:
             text = None
     elif element["document_type"] == "image" and enable_images:
-        text = element["metadata"]["image_metadata"]["caption"]
+        if element["metadata"]["content_metadata"]["subtype"] == "page_image":
+            text = element["metadata"]["image_metadata"]["text"]
+        else:
+            text = element["metadata"]["image_metadata"]["caption"]
     elif element["document_type"] == "audio" and enable_audio:
         text = element["metadata"]["audio_metadata"]["audio_transcript"]
     verify_emb = verify_embedding(element)
@@ -729,7 +745,7 @@ def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
     for element in records:
         writer.append_row(element)
     writer.commit()
-    print(f"Wrote data to: {writer.batch_files}")
+    logger.debug(f"Wrote data to: {writer.batch_files}")
     return writer
 
 
@@ -737,6 +753,12 @@ def bulk_insert_milvus(
     collection_name: str,
     writer: RemoteBulkWriter,
     milvus_uri: str = "http://localhost:19530",
+    minio_endpoint: str = "localhost:9000",
+    access_key: str = "minioadmin",
+    secret_key: str = "minioadmin",
+    bucket_name: str = "nv-ingest",
+    username: str = None,
+    password: str = None,
 ):
     """
     This function initialize the bulk ingest of all minio uploaded records, and checks for
@@ -753,28 +775,54 @@ def bulk_insert_milvus(
     milvus_uri : str,
         Milvus address with http(s) preffix and port. Can also be a file path, to activate
         milvus-lite.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
     """
+    minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
 
-    connections.connect(uri=milvus_uri)
+    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
     t_bulk_start = time.time()
-    task_id = utility.do_bulk_insert(
-        collection_name=collection_name,
-        files=writer.batch_files[0],
-        consistency_level=CONSISTENCY,
-    )
+    task_ids = []
+    uploaded_files = []
+    for files in writer.batch_files:
+        for f in files:
+            # Hack: do_bulk_insert only reads from the default bucket ('a-bucket'),
+            # so we first copy objects from the source bucket into 'a-bucket' before inserting.
+            try:
+                minio_client.copy_object(MINIO_DEFAULT_BUCKET_NAME, f, CopySource(bucket_name, f))
+                uploaded_files.append(f)
+            except Exception as e:
+                logger.error(f"Error copying {f} from {bucket_name} to {MINIO_DEFAULT_BUCKET_NAME}: {e}")
+
+        task_id = utility.do_bulk_insert(
+            collection_name=collection_name,
+            files=files,
+            consistency_level=CONSISTENCY,
+        )
+        task_ids.append(task_id)
     # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
-    state = "Pending"
-    while state != "Completed":
-        task = utility.get_bulk_insert_state(task_id=task_id)
-        state = task.state_name
-        if state == "Completed":
-            t_bulk_end = time.time()
-            print("Start time:", task.create_time_str)
-            print("Imported row count:", task.row_count)
-            print(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
-        if task.state == BulkInsertState.ImportFailed:
-            print("Failed reason:", task.failed_reason)
+    while len(task_ids) > 0:
         time.sleep(1)
+        for task_id in task_ids:
+            task = utility.get_bulk_insert_state(task_id=task_id)
+            state = task.state_name
+            if state == "Completed":
+                logger.info(f"Task: {task_id}")
+                logger.info(f"Start time: {task.create_time_str}")
+                logger.info(f"Imported row count: {task.row_count}")
+                task_ids.remove(task_id)
+            if task.state == BulkInsertState.ImportFailed:
+                logger.error(f"Task: {task_id}")
+                logger.error(f"Failed reason: {task.failed_reason}")
+                task_ids.remove(task_id)
+
+    # Cleanup: remove the copied files to undo the temporary workaround before bulk insert.
+    minio_client.remove_objects(MINIO_DEFAULT_BUCKET_NAME, [DeleteObject(f) for f in uploaded_files])
+
+    t_bulk_end = time.time()
+    logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
 
 
 def create_bm25_model(
@@ -878,12 +926,14 @@ def write_to_nvingest_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     threshold: int = 1000,
     meta_dataframe=None,
     meta_source_field=None,
     meta_fields=None,
     stream: bool = False,
+    username: str = None,
+    password: str = None,
     **kwargs,
 ):
     """
@@ -924,9 +974,13 @@ def write_to_nvingest_collection(
         Minio bucket name.
     stream : bool, optional
         When true, the records will be inserted into milvus using the stream insert method.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
     """
     local_index = False
-    connections.connect(uri=milvus_uri)
+    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
     if urlparse(milvus_uri).scheme:
         server_version = utility.get_server_version()
         if "lite" in server_version:
@@ -949,7 +1003,7 @@ def write_to_nvingest_collection(
     elif local_index and sparse:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(bm25_save_path)
-    client = MilvusClient(milvus_uri)
+    client = MilvusClient(milvus_uri, token=f"{username}:{password}")
     schema = Collection(collection_name).schema
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
@@ -979,6 +1033,10 @@ def write_to_nvingest_collection(
             collection_name,
         )
     else:
+        minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+
         # Connections parameters to access the remote bucket
         conn = RemoteBulkWriter.S3ConnectParam(
             endpoint=minio_endpoint,  # the default MinIO service started along with Milvus
@@ -997,7 +1055,17 @@ def write_to_nvingest_collection(
             cleaned_records,
             text_writer,
         )
-        bulk_insert_milvus(collection_name, writer, milvus_uri)
+        bulk_insert_milvus(
+            collection_name,
+            writer,
+            milvus_uri,
+            minio_endpoint,
+            access_key,
+            secret_key,
+            bucket_name,
+            username=username,
+            password=password,
+        )
         # fixes bulk insert lag time https://github.com/milvus-io/milvus/issues/21746
         client.refresh_load(collection_name)
 
@@ -1181,6 +1249,9 @@ def nvingest_retrieval(
     nv_ranker_max_batch_size: int = 64,
     _filter: str = "",
     ef_param: int = 200,
+    client: MilvusClient = None,
+    username: str = None,
+    password: str = None,
     **kwargs,
 ):
     """
@@ -1227,6 +1298,12 @@ def nvingest_retrieval(
         Max size for the number of candidates to rerank.
     nv_ranker_top_k : int,
         The number of candidates to return after reranking.
+    client : MilvusClient, optional
+        Milvus client instance.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
     Returns
     -------
     List
@@ -1248,7 +1325,7 @@ def nvingest_retrieval(
     model_name = model_name if model_name else client_config.embedding_nim_model_name
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
-    client = MilvusClient(milvus_uri)
+    client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     final_top_k = top_k
     if nv_ranker:
         top_k = nv_ranker_top_k
@@ -1304,7 +1381,14 @@ def nvingest_retrieval(
     return results
 
 
-def remove_records(source_name: str, collection_name: str, milvus_uri: str = "http://localhost:19530"):
+def remove_records(
+    source_name: str,
+    collection_name: str,
+    milvus_uri: str = "http://localhost:19530",
+    username: str = None,
+    password: str = None,
+    client: MilvusClient = None,
+):
     """
     This function allows a user to remove chunks associated with an ingested file.
     Supply the full path of the file you would like to remove and this function will
@@ -1319,6 +1403,12 @@ def remove_records(source_name: str, collection_name: str, milvus_uri: str = "ht
     milvus_uri : str,
         Milvus address with http(s) preffix and port. Can also be a file path, to activate
         milvus-lite.
+    client : MilvusClient, optional
+        Milvus client instance.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
 
     Returns
     -------
@@ -1326,7 +1416,7 @@ def remove_records(source_name: str, collection_name: str, milvus_uri: str = "ht
         Dictionary with one key, `delete_cnt`. The value represents the number of entities
         removed.
     """
-    client = MilvusClient(milvus_uri)
+    client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     result_ids = client.delete(
         collection_name=collection_name,
         filter=f'(source["source_name"] == "{source_name}")',
@@ -1433,6 +1523,9 @@ def pull_all_milvus(
     write_dir: str = None,
     batch_size: int = 1000,
     include_embeddings: bool = False,
+    username: str = None,
+    password: str = None,
+    client: MilvusClient = None,
 ):
     """
     This function takes the input collection name and pulls all the records
@@ -1451,12 +1544,18 @@ def pull_all_milvus(
         The number of records to pull in each batch. Defaults to 1000.
     include_embeddings : bool, optional
         Whether to include the embeddings in the output. Defaults to False.
+    username : str, optional
+        Milvus username.
+    password : str, optional
+        Milvus password.
+    client : MilvusClient, optional
+        Milvus client instance.
     Returns
     -------
     List
         List of records/files with records from the collection.
     """
-    client = MilvusClient(milvus_uri)
+    client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     output_fields = ["source", "content_metadata", "text"]
     if include_embeddings:
         output_fields.append("vector")
@@ -1525,12 +1624,15 @@ def embed_index_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
     intput_type: str = "passage",
     truncate: str = "END",
+    client: MilvusClient = None,
+    username: str = None,
+    password: str = None,
     **kwargs,
 ):
     """
@@ -1562,12 +1664,18 @@ def embed_index_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
             Defaults to None.
         meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+        client : MilvusClient, optional
+            Milvus client instance.
+        username : str, optional
+            Milvus username.
+        password : str, optional
+            Milvus password.
         **kwargs: Additional keyword arguments for customization.
     """
     client_config = ClientConfigSchema()
@@ -1601,6 +1709,8 @@ def embed_index_collection(
         meta_dataframe=meta_dataframe,
         meta_source_field=meta_source_field,
         meta_fields=meta_fields,
+        username=username,
+        password=password,
         **kwargs,
     )
     # running in parts
@@ -1670,7 +1780,7 @@ def reindex_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "a-bucket",
+    bucket_name: str = "nv-ingest",
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
@@ -1711,7 +1821,7 @@ def reindex_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
@@ -1819,11 +1929,14 @@ class Milvus(VDB):
         compute_bm25_stats: bool = True,
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
-        bucket_name: str = "a-bucket",
+        bucket_name: str = "nv-ingest",
         meta_dataframe: Union[str, pd.DataFrame] = None,
         meta_source_field: str = None,
         meta_fields: list[str] = None,
         stream: bool = False,
+        threshold: int = 1000,
+        username: str = None,
+        password: str = None,
         **kwargs,
     ):
         """
@@ -1847,15 +1960,17 @@ class Milvus(VDB):
             compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
             access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
             secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
             meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
                 containing metadata. Defaults to None.
             meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
                 Defaults to None.
             meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
-            **kwargs: Additional keyword arguments for customization.
             stream (bool, optional): When true, the records will be inserted into milvus using the stream
                 insert method.
+            username (str, optional): The username for Milvus authentication. Defaults to None.
+            password (str, optional): The password for Milvus authentication. Defaults to None.
+            **kwargs: Additional keyword arguments for customization.
         """
         kwargs = locals().copy()
         kwargs.pop("self", None)
@@ -1885,6 +2000,8 @@ class Milvus(VDB):
             "gpu_index": self.__dict__.get("gpu_index", True),
             "gpu_search": self.__dict__.get("gpu_search", True),
             "dense_dim": self.__dict__.get("dense_dim", 2048),
+            "username": self.__dict__.get("username", None),
+            "password": self.__dict__.get("password", None),
         }
         return (self.collection_name, conn_dict)
 

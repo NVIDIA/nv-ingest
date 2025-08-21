@@ -2,13 +2,13 @@
 
 NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
 NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
-to find, contextualize, and extract text, tables, charts and images that you can use in downstream generative applications.
+to find, contextualize, and extract text, tables, charts and infographics that you can use in downstream generative applications.
 
 !!! note
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
@@ -35,7 +35,7 @@ NeMo Retriever extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)

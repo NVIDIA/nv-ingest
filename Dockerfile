@@ -11,9 +11,9 @@ FROM $BASE_IMG:$BASE_IMG_TAG AS base
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
-ARG DOWNLOAD_LLAMA_TOKENIZER=""
+ARG DOWNLOAD_LLAMA_TOKENIZER="False"
 ARG HF_ACCESS_TOKEN=""
-ARG MODEL_PREDOWNLOAD_PATH=""
+ARG MODEL_PREDOWNLOAD_PATH="/workspace/models/"
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
@@ -92,6 +92,7 @@ ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
 SHELL ["/bin/bash", "-c"]
 
+COPY scripts scripts
 COPY tests tests
 COPY data data
 COPY api api
@@ -125,6 +126,7 @@ RUN rm -rf src
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
+COPY config/default_pipeline.yaml ./config/
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh

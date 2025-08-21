@@ -4,19 +4,24 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
 
 import pandas as pd
 from openai import OpenAI
 
-from nv_ingest_api.internal.enums.common import ContentTypeEnum, StatusEnum, TaskTypeEnum
-from nv_ingest_api.internal.schemas.meta.metadata_schema import (
-    InfoMessageMetadataSchema,
-)
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
-from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
+
+# Reduce SDK HTTP logging verbosity so request/response logs are not emitted
+logging.getLogger("openai").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+
+
+MULTI_MODAL_MODELS = ["llama-3.2-nemoretriever-1b-vlm-embed-v1"]
 
 
 # ------------------------------------------------------------------------------
@@ -33,6 +38,7 @@ def _make_async_request(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
 ) -> list:
     """
     Interacts directly with the NIM embedding service to calculate embeddings for a batch of prompts.
@@ -69,34 +75,40 @@ def _make_async_request(
     response = {}
 
     try:
+        # Normalize API key to avoid sending an empty bearer token via SDK internals
+        _token = (api_key or "").strip()
+        _api_key = _token if _token else "<no key provided>"
         client = OpenAI(
-            api_key=api_key,
+            api_key=_api_key,
             base_url=embedding_nim_endpoint,
         )
+
+        extra_body = {
+            "input_type": input_type,
+            "truncate": truncate,
+        }
+        if modalities:
+            extra_body["modality"] = modalities
 
         resp = client.embeddings.create(
             input=prompts,
             model=embedding_model,
             encoding_format=encoding_format,
-            extra_body={"input_type": input_type, "truncate": truncate},
+            extra_body=extra_body,
         )
 
         response["embedding"] = resp.data
         response["info_msg"] = None
 
     except Exception as err:
-        info_msg = {
-            "task": TaskTypeEnum.EMBED.value,
-            "status": StatusEnum.ERROR.value,
-            "message": f"Embedding error: {err}",
-            "filter": filter_errors,
-        }
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
+        # Truncate error message to prevent memory blowup from large text content
+        err_str = str(err)
+        if len(err_str) > 500:
+            truncated_err = err_str[:200] + "... [truncated to prevent memory blowup] ..." + err_str[-100:]
+        else:
+            truncated_err = err_str
 
-        response["embedding"] = [None] * len(prompts)
-        response["info_msg"] = validated_info_msg
-
-        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
+        raise RuntimeError(f"Embedding error occurred: {truncated_err}") from err
 
     return response
 
@@ -110,6 +122,7 @@ def _async_request_handler(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
 ) -> List[dict]:
     """
     Gathers calculated embedding results from the NIM embedding service concurrently.
@@ -138,6 +151,9 @@ def _async_request_handler(
     List[dict]
         A list of response dictionaries from the embedding service.
     """
+    if modalities is None:
+        modalities = [None] * len(prompts)
+
     with ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(
@@ -150,8 +166,9 @@ def _async_request_handler(
                 input_type=input_type,
                 truncate=truncate,
                 filter_errors=filter_errors,
+                modalities=modality_batch,
             )
-            for prompt_batch in prompts
+            for prompt_batch, modality_batch in zip(prompts, modalities)
         ]
         results = [future.result() for future in futures]
 
@@ -167,6 +184,7 @@ def _async_runner(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
 ) -> dict:
     """
     Concurrently launches all NIM embedding requests and flattens the results.
@@ -204,6 +222,7 @@ def _async_runner(
         input_type,
         truncate,
         filter_errors,
+        modalities=modalities,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -263,7 +282,19 @@ def _add_embeddings(row, embeddings, info_msgs):
     return row
 
 
-def _get_pandas_text_content(row):
+def _format_image_input_string(image_b64: Optional[str]) -> str:
+    if not image_b64:
+        return
+    return f"data:image/png;base64,{image_b64}"
+
+
+def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optional[str]) -> str:
+    if (not text) or (not text.strip()) or (not image_b64):
+        return
+    return f"{text.strip()} {_format_image_input_string(image_b64)}"
+
+
+def _get_pandas_text_content(row, modality="text"):
     """
     Extracts text content from a DataFrame row.
 
@@ -280,7 +311,7 @@ def _get_pandas_text_content(row):
     return row["content"]
 
 
-def _get_pandas_table_content(row):
+def _get_pandas_table_content(row, modality="text"):
     """
     Extracts table/chart content from a DataFrame row.
 
@@ -294,10 +325,19 @@ def _get_pandas_table_content(row):
     str
         The table/chart content from the row.
     """
-    return row.get("table_metadata", {}).get("table_content")
+    if modality == "text":
+        content = row.get("table_metadata", {}).get("table_content")
+    elif modality == "image":
+        content = _format_image_input_string(row.get("content"))
+    elif modality == "text_image":
+        text = row.get("table_metadata", {}).get("table_content")
+        image = row.get("content")
+        content = _format_text_image_pair_input_string(text, image)
+
+    return content
 
 
-def _get_pandas_image_content(row):
+def _get_pandas_image_content(row, modality="text"):
     """
     Extracts image caption content from a DataFrame row.
 
@@ -311,10 +351,30 @@ def _get_pandas_image_content(row):
     str
         The image caption from the row.
     """
-    return row.get("image_metadata", {}).get("caption")
+    subtype = row.get("content_metadata", {}).get("subtype")
+    if modality == "text":
+        if subtype == "page_image":
+            content = row.get("image_metadata", {}).get("text")
+        else:
+            content = row.get("image_metadata", {}).get("caption")
+    elif modality == "image":
+        content = _format_image_input_string(row.get("content"))
+    elif modality == "text_image":
+        if subtype == "page_image":
+            text = row.get("image_metadata", {}).get("text")
+        else:
+            text = row.get("image_metadata", {}).get("caption")
+        image = row.get("content")
+        content = _format_text_image_pair_input_string(text, image)
+
+    if subtype == "page_image":
+        # A workaround to save memory for full page images.
+        row["content"] = ""
+
+    return content
 
 
-def _get_pandas_audio_content(row):
+def _get_pandas_audio_content(row, modality="text"):
     """
     A pandas UDF used to select extracted audio transcription to be used to create embeddings.
     """
@@ -408,6 +468,23 @@ def _concatenate_extractions_pandas(
 # ------------------------------------------------------------------------------
 
 
+def does_model_support_multimodal_embeddings(model: str) -> bool:
+    """
+    Checks if a given model supports multi-modal embeddings.
+
+    Parameters
+    ----------
+    model : str
+        The name of the model.
+
+    Returns
+    -------
+    bool
+        True if the model supports multi-modal embeddings, False otherwise.
+    """
+    return model in MULTI_MODAL_MODELS
+
+
 def transform_create_text_embeddings_internal(
     df_transform_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
@@ -460,6 +537,15 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
+    task_type_to_modality = {
+        ContentTypeEnum.TEXT: task_config.get("text_elements_modality") or transform_config.text_elements_modality,
+        ContentTypeEnum.STRUCTURED: (
+            task_config.get("structured_elements_modality") or transform_config.structured_elements_modality
+        ),
+        ContentTypeEnum.IMAGE: task_config.get("image_elements_modality") or transform_config.image_elements_modality,
+        ContentTypeEnum.AUDIO: task_config.get("audio_elements_modality") or transform_config.audio_elements_modality,
+        ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
+    }
 
     def _content_type_getter(row):
         return row["content_metadata"]["type"]
@@ -480,7 +566,7 @@ def transform_create_text_embeddings_internal(
         # Extract content and normalize empty or non-str to None
         extracted_content = (
             df_content["metadata"]
-            .apply(content_getter)
+            .apply(partial(content_getter, modality=task_type_to_modality[content_type]))
             .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
         )
         df_content["_content"] = extracted_content
@@ -488,9 +574,15 @@ def transform_create_text_embeddings_internal(
         # Prepare batches for only valid (non-None) content
         valid_content_mask = df_content["_content"].notna()
         if valid_content_mask.any():
-            filtered_content_batches = _generate_batches(
-                df_content.loc[valid_content_mask, "_content"].tolist(), batch_size=transform_config.batch_size
-            )
+            filtered_content_list = df_content.loc[valid_content_mask, "_content"].tolist()
+            filtered_content_batches = _generate_batches(filtered_content_list, batch_size=transform_config.batch_size)
+
+            if model_name in MULTI_MODAL_MODELS:
+                modality_list = [task_type_to_modality[content_type]] * len(filtered_content_list)
+                modality_batches = _generate_batches(modality_list, batch_size=transform_config.batch_size)
+            else:
+                modality_batches = None
+
             content_embeddings = _async_runner(
                 filtered_content_batches,
                 api_key,
@@ -500,6 +592,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.input_type,
                 transform_config.truncate,
                 False,
+                modalities=modality_batches,
             )
             # Build a simple row index -> embedding map
             embeddings_dict = dict(

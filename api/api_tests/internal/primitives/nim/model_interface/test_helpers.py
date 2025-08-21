@@ -16,7 +16,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
     get_version,
     get_model_name,
     is_ready,
-    preprocess_image_for_paddle,
+    preprocess_image_for_ocr,
 )
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
@@ -54,18 +54,12 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
         # Add some content to the image
         self.sample_image[30:70, 50:150] = 255
 
-        # Mock the normalize_image function
-        self.normalize_patcher = patch(f"{MODULE_UNDER_TEST}.normalize_image")
-        self.mock_normalize = self.normalize_patcher.start()
-        # Make normalize_image return the input unchanged but as float32
-        self.mock_normalize.side_effect = lambda img: img.astype(np.float32) / 255.0
-
         # Mock the pad_image function
         self.pad_patcher = patch(f"{MODULE_UNDER_TEST}.pad_image")
         self.mock_pad = self.pad_patcher.start()
 
         # Make pad_image return the input with simulated padding info
-        def mock_pad_effect(img, target_height, target_width, background_color, dtype):
+        def mock_pad_effect(img, target_height, target_width, background_color, dtype, how):
             padded = np.zeros((target_height, target_width, img.shape[2]), dtype=dtype)
             h, w = img.shape[:2]
             padded[:h, :w] = img
@@ -73,39 +67,15 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
 
         self.mock_pad.side_effect = mock_pad_effect
 
-        # Mock cv2.resize to track calls and simulate resizing
-        self.resize_patcher = patch("cv2.resize")
-        self.mock_resize = self.resize_patcher.start()
-
-        def mock_resize_effect(img, dim):
-            w, h = dim
-            resized = np.zeros((h, w, img.shape[2]), dtype=img.dtype)
-            return resized
-
-        self.mock_resize.side_effect = mock_resize_effect
-
     def tearDown(self):
-        self.normalize_patcher.stop()
         self.pad_patcher.stop()
-        self.resize_patcher.stop()
 
     def test_preprocess_image_default_dimension(self):
         """Test image preprocessing with default max dimension."""
-        result, metadata = preprocess_image_for_paddle(self.sample_image)
+        result, metadata = preprocess_image_for_ocr(self.sample_image)
 
         # Check that the result has the correct shape (channel, height, width)
         self.assertEqual(result.shape[0], 3)  # 3 channels
-        self.assertTrue(result.shape[1] % 32 == 0)  # Height is multiple of 32
-        self.assertTrue(result.shape[2] % 32 == 0)  # Width is multiple of 32
-
-        # Check that resize was called with the correct scale factor
-        expected_scale = 960 / 200  # 200 is the max dimension of the sample image
-        expected_new_width = int(200 * expected_scale)
-        expected_new_height = int(100 * expected_scale)
-        self.mock_resize.assert_called_once_with(self.sample_image, (expected_new_width, expected_new_height))
-
-        # Check that normalize_image was called
-        self.mock_normalize.assert_called_once()
 
         # Check that pad_image was called
         self.mock_pad.assert_called_once()
@@ -113,54 +83,26 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
         # Check metadata
         self.assertEqual(metadata["original_height"], 100)
         self.assertEqual(metadata["original_width"], 200)
-        self.assertEqual(metadata["scale_factor"], 960 / 200)
         self.assertEqual(metadata["new_height"], result.shape[1])
         self.assertEqual(metadata["new_width"], result.shape[2])
         self.assertTrue("pad_height" in metadata)
         self.assertTrue("pad_width" in metadata)
 
-    def test_preprocess_image_custom_dimension(self):
-        """Test image preprocessing with custom max dimension."""
-        custom_max_dim = 512
-        result, metadata = preprocess_image_for_paddle(self.sample_image, image_max_dimension=custom_max_dim)
-
-        # Check that resize was called with the correct scale factor
-        expected_scale = custom_max_dim / 200
-        expected_new_width = int(200 * expected_scale)
-        expected_new_height = int(100 * expected_scale)
-        self.mock_resize.assert_called_once_with(self.sample_image, (expected_new_width, expected_new_height))
-
-        # Check metadata
-        self.assertEqual(metadata["scale_factor"], custom_max_dim / 200)
-
     def test_preprocess_image_square_image(self):
         """Test preprocessing with a square image."""
         square_image = np.zeros((100, 100, 3), dtype=np.uint8)
-        result, metadata = preprocess_image_for_paddle(square_image)
-
-        # Scale factor should be based on max dimension (100)
-        expected_scale = 960 / 100
-        expected_new_dim = int(100 * expected_scale)
-        self.mock_resize.assert_called_once_with(square_image, (expected_new_dim, expected_new_dim))
+        result, metadata = preprocess_image_for_ocr(square_image)
 
         # Check metadata
-        self.assertEqual(metadata["scale_factor"], 960 / 100)
         self.assertEqual(metadata["original_height"], 100)
         self.assertEqual(metadata["original_width"], 100)
 
     def test_preprocess_image_tall_image(self):
         """Test preprocessing with a tall image (height > width)."""
         tall_image = np.zeros((300, 100, 3), dtype=np.uint8)
-        result, metadata = preprocess_image_for_paddle(tall_image)
-
-        # Scale factor should be based on max dimension (300)
-        expected_scale = 960 / 300
-        expected_new_height = int(300 * expected_scale)
-        expected_new_width = int(100 * expected_scale)
-        self.mock_resize.assert_called_once_with(tall_image, (expected_new_width, expected_new_height))
+        result, metadata = preprocess_image_for_ocr(tall_image)
 
         # Check metadata
-        self.assertEqual(metadata["scale_factor"], 960 / 300)
         self.assertEqual(metadata["original_height"], 300)
         self.assertEqual(metadata["original_width"], 100)
 

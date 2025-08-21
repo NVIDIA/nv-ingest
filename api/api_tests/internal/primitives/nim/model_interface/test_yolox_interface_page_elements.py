@@ -27,15 +27,10 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         # Mock constants
         self.constants_patcher = patch.multiple(
             MODULE_UNDER_TEST,
-            YOLOX_PAGE_IMAGE_PREPROC_WIDTH=1024,
-            YOLOX_PAGE_IMAGE_PREPROC_HEIGHT=1024,
             YOLOX_PAGE_NIM_MAX_IMAGE_SIZE=1000000,
             YOLOX_PAGE_CONF_THRESHOLD=0.5,
             YOLOX_PAGE_IOU_THRESHOLD=0.45,
             YOLOX_PAGE_MIN_SCORE=0.3,
-            YOLOX_PAGE_V1_NUM_CLASSES=4,
-            YOLOX_PAGE_V1_FINAL_SCORE={"table": 0.4, "chart": 0.4, "infographic": 0.4},
-            YOLOX_PAGE_V1_CLASS_LABELS=["table", "chart", "infographic", "title"],
             YOLOX_PAGE_V2_NUM_CLASSES=4,
             YOLOX_PAGE_V2_FINAL_SCORE={"table": 0.5, "chart": 0.5, "infographic": 0.5},
             YOLOX_PAGE_V2_CLASS_LABELS=["table", "chart", "infographic", "title"],
@@ -64,30 +59,6 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         self.logger_patcher.stop()
         self.expand_table_patcher.stop()
         self.expand_chart_patcher.stop()
-
-    def test_initialization_v1(self):
-        """Test initialization with v1 model name."""
-        model = YoloxPageElementsModelInterface("nv-yolox-page-elements-v1")
-
-        # Check parent class initialization with v1 parameters
-        self.assertEqual(model.image_preproc_width, 1024)
-        self.assertEqual(model.image_preproc_height, 1024)
-        self.assertEqual(model.nim_max_image_size, 1000000)
-        self.assertEqual(model.num_classes, 4)
-        self.assertEqual(model.conf_threshold, 0.5)
-        self.assertEqual(model.iou_threshold, 0.45)
-        self.assertEqual(model.min_score, 0.3)
-        self.assertEqual(model.final_score, {"table": 0.4, "chart": 0.4, "infographic": 0.4})
-        self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
-
-    def test_initialization_v2(self):
-        """Test initialization with v2 model name."""
-        model = YoloxPageElementsModelInterface("nemoretriever-page-elements-v2")
-
-        # Check parent class initialization with v2 parameters
-        self.assertEqual(model.num_classes, 4)
-        self.assertEqual(model.final_score, {"table": 0.5, "chart": 0.5, "infographic": 0.5})
-        self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
 
     def test_default_initialization(self):
         """Test default initialization (should use v2 parameters)."""

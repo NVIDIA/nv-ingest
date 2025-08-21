@@ -1,4 +1,4 @@
-## Use Nemo Retriever Extraction with nemoretriever-parse
+# Use NeMo Retriever Extraction with nemoretriever-parse
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
@@ -11,8 +11,12 @@ with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 
-Currently, extraction with nemoretriever-parse only supports PDFs, not image files. 
-For more information, see [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+## Limitations
+
+Currently, the limitations to using `nemoretriever-parse` with Nemo Retriever Extraction are the following:
+
+- Extraction with `nemoretriever-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+- `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For more information, refer to [Support Matrix](support-matrix.md).
 
 
 ## Run the NIM Locally by Using Docker Compose
@@ -95,3 +99,11 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
     !!! tip
 
         For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
+
+
+## Related Topics
+
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)

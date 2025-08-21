@@ -43,12 +43,23 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
+
+
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
+
+    ```
+    OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    OCR_TAG=latest
+    OCR_MODEL_NAME=scene_text
+    ```
+        
+   Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
    
-5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+6. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -56,7 +67,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -74,7 +85,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
+9. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
@@ -122,11 +133,11 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
-In the below examples, we are doing text, chart, table, and image extraction:
+In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) for table extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and either [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) or NemoRetriever OCR for table extraction.
 - **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
@@ -154,7 +165,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
@@ -166,13 +177,25 @@ ingestor = (
         dense_dim=2048
     )
 )
+
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Total time: {t1-t0} seconds")
+
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 !!! note
@@ -180,11 +203,13 @@ print(ingest_json_results_to_blob(results[0]))
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
 
+The output looks similar to the following.
+
 ```
 Starting ingestion..
 1 records to insert to milvus
 logged 8 records
-Time taken: 5.479151725769043 seconds
+Total time: 5.479151725769043 seconds
 This chart shows some gadgets, and some very fictitious costs. Gadgets and their cost   Chart 1 - Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost
 Table 1
 | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
@@ -271,7 +296,8 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
+You should see output that indicates the document processing status followed by a breakdown of time spent during job execution.
+
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to

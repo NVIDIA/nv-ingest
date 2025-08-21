@@ -16,6 +16,13 @@ from unittest.mock import patch
 
 import nv_ingest_client.client.interface as module_under_test
 import pytest
+
+from client.client_tests.utilities_for_test import (
+    cleanup_test_workspace,
+    create_test_workspace,
+    get_git_root,
+    find_root_by_pattern,
+)
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import LazyLoadedList
 from nv_ingest_client.client import NvIngestClient
@@ -32,6 +39,8 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.vdb.milvus import Milvus
+from nv_ingest_client.util.vdb import VDB
+
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -43,13 +52,81 @@ def mock_client():
 
 
 @pytest.fixture
+def workspace():
+    test_workspace = create_test_workspace("ingestor_pytest_")
+    doc1_path = os.path.join(test_workspace, "doc1.txt")
+    with open(doc1_path, "w") as f:
+        f.write("This is a test document.")
+
+    yield test_workspace, doc1_path
+
+    cleanup_test_workspace(test_workspace)
+
+
+@pytest.fixture
 def documents():
+    # Use utilities to find the actual data directory
+    git_root = get_git_root(__file__)
+    if git_root:
+        data_dir = os.path.join(git_root, "data")
+        if os.path.exists(data_dir):
+            pdf_path = os.path.join(data_dir, "multimodal_test.pdf")
+            if os.path.exists(pdf_path):
+                return [pdf_path]
+
+    # Fallback: search for data directory pattern
+    root_dir = find_root_by_pattern("data/multimodal_test.pdf", start_dir=os.path.dirname(__file__))
+    pdf_path = os.path.join(root_dir, "data", "multimodal_test.pdf")
+    if os.path.exists(pdf_path):
+        return [pdf_path]
+
+    # If no actual test file found, fall back to the original path
     return ["data/multimodal_test.pdf"]
 
 
 @pytest.fixture
 def text_documents():
-    return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
+    # Use utilities to find the actual data directory
+    git_root = get_git_root(__file__)
+    if git_root:
+        data_dir = os.path.join(git_root, "data")
+        if os.path.exists(data_dir):
+            files = [
+                os.path.join(data_dir, "test.txt"),
+                os.path.join(data_dir, "test.html"),
+                os.path.join(data_dir, "test.json"),
+                os.path.join(data_dir, "test.md"),
+                os.path.join(data_dir, "test.sh"),
+            ]
+            # Return only files that actually exist
+            existing_files = [f for f in files if os.path.exists(f)]
+            if existing_files:
+                return existing_files
+
+    # Fallback: search for data directory pattern
+    root_dir = find_root_by_pattern("data", start_dir=os.path.dirname(__file__))
+    data_dir = os.path.join(root_dir, "data")
+    if os.path.exists(data_dir):
+        files = [
+            os.path.join(data_dir, "test.txt"),
+            os.path.join(data_dir, "test.html"),
+            os.path.join(data_dir, "test.json"),
+            os.path.join(data_dir, "test.md"),
+            os.path.join(data_dir, "test.sh"),
+        ]
+        # Return only files that actually exist
+        existing_files = [f for f in files if os.path.exists(f)]
+        if existing_files:
+            return existing_files
+
+    # If no actual test files found, fall back to original paths
+    return [
+        "data/test.txt",
+        "data/test.html",
+        "data/test.json",
+        "data/test.md",
+        "data/test.sh",
+    ]
 
 
 @pytest.fixture
@@ -137,7 +214,12 @@ def test_extract_task_args_tables_and_charts_false(ingestor):
 
 
 def test_extract_task_some_args(ingestor):
-    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True, extract_infographics=True)
+    ingestor.extract(
+        extract_tables=True,
+        extract_charts=True,
+        extract_images=True,
+        extract_infographics=True,
+    )
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, ExtractTask)
@@ -181,7 +263,7 @@ def test_split_task_no_args(ingestor):
 
 
 def test_split_task_some_args(ingestor):
-    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42)
+    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42, chunk_overlap=20)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, SplitTask)
@@ -327,7 +409,10 @@ def test_ingest_return_failures(ingestor, mock_client):
     # Mock the main processing method to return both results and failures
     expected_results = [{"result": "success_1"}]
     expected_failures = [("job_id_2", "TimeoutError"), ("job_id_3", "Processing Error")]
-    mock_client.process_jobs_concurrently.return_value = (expected_results, expected_failures)
+    mock_client.process_jobs_concurrently.return_value = (
+        expected_results,
+        expected_failures,
+    )
 
     # Store expected arguments used in process_jobs_concurrently
     expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
@@ -373,7 +458,10 @@ def test_ingest_async(ingestor, mock_client):
     future2 = Future()
     future1.set_result("result_1")
     future2.set_result("result_2")
-    mock_client.submit_job_async.return_value = {future1: "job_id_1", future2: "job_id_2"}
+    mock_client.submit_job_async.return_value = {
+        future1: "job_id_1",
+        future2: "job_id_2",
+    }
 
     ingestor._job_states = {}
     ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
@@ -450,7 +538,10 @@ def test_files_with_remote_files(ingestor_without_doc):
         assert ingestor_without_doc._all_local is False
         assert ingestor_without_doc._job_specs is None
 
-        ingestor_without_doc._documents = [f"{temp_dir}/doc1.pdf", f"{temp_dir}/doc2.pdf"]
+        ingestor_without_doc._documents = [
+            f"{temp_dir}/doc1.pdf",
+            f"{temp_dir}/doc2.pdf",
+        ]
         ingestor_without_doc._all_local = True
         ingestor_without_doc._job_specs = BatchJobSpec(ingestor_without_doc._documents)
 
@@ -463,7 +554,14 @@ def test_files_with_remote_files(ingestor_without_doc):
 def test_all_tasks_adds_default_tasks(ingestor):
     ingestor.all_tasks()
 
-    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask, StoreEmbedTask}
+    task_classes = {
+        ExtractTask,
+        DedupTask,
+        FilterTask,
+        SplitTask,
+        EmbedTask,
+        StoreEmbedTask,
+    }
     added_tasks = {
         type(task) for job_specs in ingestor._job_specs._file_type_to_job_spec.values() for task in job_specs[0]._tasks
     }
@@ -556,6 +654,7 @@ def test_save_to_disk_config_structure(ingestor, tmp_path):
 
     expected_config = {
         "output_directory": output_dir_str,
+        "cleanup": True,
     }
     assert ingestor._output_config == expected_config
 
@@ -581,7 +680,11 @@ def create_jsonl_file(tmp_path):
                 for item in data:
                     f.write(json.dumps(item) + "\n")
         else:
-            default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
+            default_data = [
+                {"id": 1, "name": "Alice"},
+                {"id": 2, "name": "Bob"},
+                {"id": 3, "name": "Charlie"},
+            ]
             with open(filepath, "w", encoding="utf-8") as f:
                 for item in default_data:
                     f.write(json.dumps(item) + "\n")
@@ -591,7 +694,11 @@ def create_jsonl_file(tmp_path):
 
 
 def test_lazy_list_core_functionality(create_jsonl_file):
-    default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
+    default_data = [
+        {"id": 1, "name": "Alice"},
+        {"id": 2, "name": "Bob"},
+        {"id": 3, "name": "Charlie"},
+    ]
     filepath = create_jsonl_file(data=default_data)
 
     lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
@@ -611,3 +718,346 @@ def test_lazy_list_core_functionality(create_jsonl_file):
 
     assert lazy_list_ondemand.get_all_items() == default_data
     assert isinstance(lazy_list_ondemand.get_all_items(), list)
+
+
+def test_save_to_disk_with_default_cleanup(workspace, monkeypatch):
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", MagicMock())
+    _, doc1_path = workspace
+    ingestor_instance = Ingestor(documents=[doc1_path])
+
+    dir_to_be_cleaned = None
+    with ingestor_instance as ingestor:
+        ingestor.save_to_disk()
+        dir_to_be_cleaned = ingestor._output_config["output_directory"]
+        assert dir_to_be_cleaned is not None, "Directory for cleanup should be set"
+        assert os.path.exists(dir_to_be_cleaned), "Temp directory should exist inside context"
+
+    assert not os.path.exists(dir_to_be_cleaned), "Temp directory should be removed after exiting context"
+
+
+def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", MagicMock())
+    test_workspace, doc1_path = workspace
+    user_dir = os.path.join(test_workspace, "user_results")
+    os.makedirs(user_dir, exist_ok=True)
+
+    ingestor_instance = Ingestor(documents=[doc1_path])
+
+    with ingestor_instance as ingestor:
+        ingestor.save_to_disk(output_directory=user_dir, cleanup=True)
+        assert ingestor._output_config["output_directory"] == user_dir
+        assert os.path.exists(user_dir), "User-provided directory should exist inside context"
+
+    assert not os.path.exists(user_dir), "User-provided directory should be removed when cleanup=True"
+
+
+def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_purge_test")
+    os.makedirs(results_dir)
+
+    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(dummy_result_filepath, "w") as f:
+                f.write('{"data": "some_embedding"}\n')
+            completion_callback(results_data=[{"data": "some_embedding"}], job_id="0")
+        return ([], [])
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+        ingestor.ingest(show_progress=False)
+
+        mock_vdb_op.run.assert_called_once()
+
+    assert not os.path.exists(dummy_result_filepath), "Result file should be purged after VDB upload"
+    assert os.path.exists(results_dir)
+
+
+def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch):
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_preserve_test")
+    os.makedirs(results_dir)
+    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(dummy_result_filepath, "w") as f:
+                f.write('{"data": "some_embedding"}\n')
+            completion_callback(results_data=[{"data": "some_embedding"}], job_id="0")
+        return ([], [])
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=False)
+        ingestor.ingest(show_progress=False)
+
+        mock_vdb_op.run.assert_called_once()
+
+    assert os.path.exists(dummy_result_filepath), "Result file should be preserved"
+
+
+def test_vdb_upload_with_failures_return_failures_true(workspace, monkeypatch, caplog):
+    """Test VDB upload with failures when return_failures=True.
+
+    Should upload successful results, emit warning message, and return failures.
+    """
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_failure_test")
+    os.makedirs(results_dir)
+
+    # Mock successful results for 2 jobs and failures for 1 job
+    successful_results = [[{"data": "embedding1", "source": "doc1"}], [{"data": "embedding2", "source": "doc2"}]]
+    failures = [("job_3", "Processing failed")]
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(os.path.join(results_dir, "doc1.txt.results.jsonl"), "w") as f:
+                f.write('{"data": "embedding1"}\n')
+                f.write('{"data": "embedding2"}\n')
+            completion_callback(results_data=successful_results[0], job_id="0")
+            completion_callback(results_data=successful_results[1], job_id="1")
+        return (successful_results, failures)
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+
+        # Should return results and failures when return_failures=True
+        results, returned_failures = ingestor.ingest(show_progress=False, return_failures=True)
+
+        # Verify VDB upload was called with successful results only
+        mock_vdb_op.run.assert_called_once()
+        called_args = mock_vdb_op.run.call_args[0][0]
+        assert len(called_args) == 2, "Should have 2 LazyLoadedList objects"
+        assert all(isinstance(item, LazyLoadedList) for item in called_args), "Results should be LazyLoadedList objects"
+
+        # Verify warning message was logged
+        assert "Job was not completely successful" in caplog.text
+        assert "2 out of 3 records completed successfully" in caplog.text
+        assert "Uploading successful results to vector database" in caplog.text
+
+        # Verify return values
+        assert len(results) == 2
+        assert all(isinstance(item, LazyLoadedList) for item in results)
+        assert returned_failures == failures
+
+        # Verify purge happened after successful upload
+        assert not os.path.exists(os.path.join(results_dir, "doc1.txt.results.jsonl"))
+
+
+def test_vdb_upload_with_failures_return_failures_false(workspace, monkeypatch):
+    """Test VDB upload with failures when return_failures=False.
+
+    Should raise RuntimeError without uploading anything.
+    """
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_failure_strict_test")
+    os.makedirs(results_dir)
+
+    # Mock some successful results and some failures
+    successful_results = [[{"data": "embedding1"}]]
+    failures = [("job_2", "Processing failed")]
+
+    def fake_processor(completion_callback=None, **kwargs):
+        return (successful_results, failures)
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+
+        # Should raise RuntimeError when return_failures=False and failures exist
+        with pytest.raises(RuntimeError) as exc_info:
+            ingestor.ingest(show_progress=False, return_failures=False)
+
+        # Verify error message content
+        error_msg = str(exc_info.value)
+        assert "Failed to ingest documents, unable to complete vdb bulk upload" in error_msg
+        assert "no successful results" in error_msg
+        assert "1 out of" in error_msg and "records failed" in error_msg
+
+        # Verify VDB upload was NOT called
+        mock_vdb_op.run.assert_not_called()
+
+
+def test_vdb_upload_with_no_failures(workspace, monkeypatch):
+    """Test VDB upload with no failures.
+
+    Should work normally regardless of return_failures setting.
+    """
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_success_test")
+    os.makedirs(results_dir)
+    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+
+    # Mock only successful results, no failures
+    successful_results = [[{"data": "embedding1"}], [{"data": "embedding2"}]]
+    failures = []
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(dummy_result_filepath, "w") as f:
+                f.write('{"data": "embedding1"}\n')
+                f.write('{"data": "embedding2"}\n')
+            completion_callback(results_data=successful_results[0], job_id="0")
+            completion_callback(results_data=successful_results[1], job_id="1")
+        return (successful_results, failures)
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+
+        # Test with return_failures=False (should return only results)
+        results = ingestor.ingest(show_progress=False, return_failures=False)
+
+        # Verify VDB upload was called with all results
+        mock_vdb_op.run.assert_called_once()
+        called_args = mock_vdb_op.run.call_args[0][0]
+        assert len(called_args) == 2, "Should have 2 LazyLoadedList objects"
+        assert all(isinstance(item, LazyLoadedList) for item in called_args), "Results should be LazyLoadedList objects"
+
+        # Verify return value (only results, no failures tuple)
+        assert len(results) == 2
+        assert all(isinstance(item, LazyLoadedList) for item in results)
+
+        # Verify purge happened
+        assert not os.path.exists(dummy_result_filepath)
+
+
+def test_vdb_upload_with_all_failures_return_failures_true(workspace, monkeypatch, caplog):
+    """Test VDB upload when all jobs fail and return_failures=True.
+
+    Should not upload anything but should emit warning and return failures.
+    """
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_all_failures_test")
+    os.makedirs(results_dir)
+
+    # Mock no successful results, only failures
+    successful_results = []
+    failures = [("job_1", "Processing failed"), ("job_2", "Processing failed"), ("job_3", "Processing failed")]
+
+    def fake_processor(completion_callback=None, **kwargs):
+        return (successful_results, failures)
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+
+        # Should return empty results and all failures when return_failures=True
+        results, returned_failures = ingestor.ingest(show_progress=False, return_failures=True)
+
+        # Verify VDB upload was NOT called (no successful results to upload)
+        mock_vdb_op.run.assert_not_called()
+
+        # Verify warning message was logged
+        assert "Job was not completely successful" in caplog.text
+        assert "0 out of 3 records completed successfully" in caplog.text
+
+        # Verify return values
+        assert len(results) == 0
+        assert results == []  # Should be empty list when no successful results
+        assert returned_failures == failures
+
+
+def test_vdb_upload_return_failures_true_with_tuple_return(workspace, monkeypatch):
+    """Test that VDB upload with return_failures=True returns tuple format.
+
+    Verifies the return format is (results, failures) when return_failures=True.
+    """
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
+
+    test_workspace, doc1_path = workspace
+
+    # Mock successful results with no failures
+    successful_results = [[{"data": "embedding1"}]]
+    failures = []
+
+    def fake_processor(completion_callback=None, **kwargs):
+        return (successful_results, failures)
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.vdb_upload(vdb_op=mock_vdb_op)
+
+        # Should return tuple when return_failures=True
+        result = ingestor.ingest(show_progress=False, return_failures=True)
+
+        # Verify it's a tuple with results and failures
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        results, returned_failures = result
+        assert len(results) == 1
+        assert results == successful_results  # Should be raw data when save_to_disk() is not used
+        assert returned_failures == failures
+
+        # Verify VDB upload was called
+        mock_vdb_op.run.assert_called_once()
+        called_args = mock_vdb_op.run.call_args[0][0]
+        assert called_args == successful_results  # Should be raw data when save_to_disk() is not used

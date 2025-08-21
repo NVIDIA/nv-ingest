@@ -10,7 +10,7 @@ import os
 import pandas as pd
 import pytest
 
-from .. import get_git_root, find_root_by_pattern
+from .. import get_project_root, find_root_by_pattern
 from nv_ingest_api.interface.extract import (
     extract_infographic_data_from_image,
     extract_table_data_from_image,
@@ -60,13 +60,13 @@ def test_extract_primitives_from_pdf_integration(extract_method):
     # Get the test file path using helper functions
     test_file_rel_path = "./data/multimodal_test.pdf"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -230,13 +230,13 @@ def test_extract_pdf_with_pdfium_integration():
     # Get the test file path
     test_file_rel_path = "./data/multimodal_test.pdf"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -335,13 +335,13 @@ def test_extract_pdf_with_nemoretriever_integration():
     # Get the test file path
     test_file_rel_path = "./data/multimodal_test.pdf"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -455,13 +455,13 @@ def test_extract_primitives_from_audio_integration():
     # Get the test file path using helper functions
     test_file_rel_path = "./data/multimodal_test.wav"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -576,13 +576,13 @@ def test_extract_primitives_from_pptx_integration():
     # Get the test file path using helper functions
     test_file_rel_path = "./data/multimodal_test.pptx"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -684,13 +684,13 @@ def test_extract_primitives_from_docx_integration():
     # Get the test file path using helper functions
     test_file_rel_path = "./data/multimodal_test.docx"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -800,13 +800,13 @@ def test_extract_primitives_from_image_integration(file_extension):
     # Get the test file path using helper functions
     test_file_rel_path = f"./data/multimodal_test.{file_extension}"
 
-    # Try to find the file using git root first
-    git_root = get_git_root(__file__)
-    if git_root:
-        test_file_path = os.path.join(git_root, test_file_rel_path)
+    # Try to find the file using project root first
+    project_root = get_project_root(__file__)
+    if project_root:
+        test_file_path = os.path.join(project_root, test_file_rel_path)
 
-    # If not found via git, try heuristic approach
-    if not git_root or not os.path.exists(test_file_path):
+    # If not found via project root, try heuristic approach
+    if not project_root or not os.path.exists(test_file_path):
         root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
         if root_dir:
             test_file_path = os.path.join(root_dir, test_file_rel_path)
@@ -977,18 +977,18 @@ def test_extract_infographic_data_from_image_integration():
     )
 
     # Pull configuration values from the environment first
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8010")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8010")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
-    # Construct the paddle endpoints tuple
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    # Construct the ocr endpoints tuple
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the schema values to the function's expected arguments
     integration_args = {
-        "paddle_endpoints": paddle_endpoints,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_endpoints": ocr_endpoints,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 
@@ -1037,12 +1037,12 @@ def test_extract_table_data_from_image_integration():
     test_file_path = os.getenv("INGEST_TABLE_TEST_FILE")
 
     if not test_file_path:
-        # Try to find the file using git root first
-        git_root = get_git_root(__file__)
-        if git_root:
-            test_file_path = os.path.join(git_root, test_file_rel_path)
+        # Try to find the file using project root first
+        project_root = get_project_root(__file__)
+        if project_root:
+            test_file_path = os.path.join(project_root, test_file_rel_path)
 
-        # If not found via git, try heuristic approach
+        # If not found via project root, try heuristic approach
         if not test_file_path or not os.path.exists(test_file_path):
             root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
             if root_dir:
@@ -1099,22 +1099,22 @@ def test_extract_table_data_from_image_integration():
     _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8001/v1/infer")
     _YOLOX_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
 
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
 
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Construct the endpoint tuples
     yolox_endpoints = (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT)
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the values to the function's expected arguments
     integration_args = {
         "yolox_endpoints": yolox_endpoints,
-        "paddle_endpoints": paddle_endpoints,
+        "ocr_endpoints": ocr_endpoints,
         "yolox_protocol": _YOLOX_PROTOCOL,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 
@@ -1171,12 +1171,12 @@ def test_extract_chart_data_from_image_integration():
     test_file_path = os.getenv("INGEST_CHART_TEST_FILE")
 
     if not test_file_path:
-        # Try to find the file using git root first
-        git_root = get_git_root(__file__)
-        if git_root:
-            test_file_path = os.path.join(git_root, test_file_rel_path)
+        # Try to find the file using project root first
+        project_root = get_project_root(__file__)
+        if project_root:
+            test_file_path = os.path.join(project_root, test_file_rel_path)
 
-        # If not found via git, try heuristic approach
+        # If not found via project root, try heuristic approach
         if not test_file_path or not os.path.exists(test_file_path):
             root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
             if root_dir:
@@ -1229,22 +1229,22 @@ def test_extract_chart_data_from_image_integration():
     _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8003/v1/infer")
     _YOLOX_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
 
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
 
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Construct the endpoint tuples
     yolox_endpoints = (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT)
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the values to the function's expected arguments
     integration_args = {
         "yolox_endpoints": yolox_endpoints,
-        "paddle_endpoints": paddle_endpoints,
+        "ocr_endpoints": ocr_endpoints,
         "yolox_protocol": _YOLOX_PROTOCOL,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 

@@ -11,29 +11,11 @@ from typing import Dict
 from typing import Literal
 from typing import Union
 
-from pydantic import BaseModel, field_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class FilterTaskSchema(BaseModel):
-    content_type: str = "image"
-    min_size: int = 128
-    max_aspect_ratio: Union[float, int] = 5.0
-    min_aspect_ratio: Union[float, int] = 0.2
-    filter: bool = False
-
-    @field_validator("content_type")
-    def content_type_must_be_valid(cls, v):
-        valid_criteria = ["image"]
-        if v not in valid_criteria:
-            raise ValueError(f"content_type must be one of {valid_criteria}")
-        return v
-
-    class Config:
-        extra = "forbid"
 
 
 class FilterTask(Task):
@@ -52,14 +34,26 @@ class FilterTask(Task):
         filter: bool = False,
     ) -> None:
         """
-        Setup Split Task Config
+        Setup Filter Task Config
         """
         super().__init__()
-        self._content_type = content_type
-        self._min_size = min_size
-        self._max_aspect_ratio = max_aspect_ratio
-        self._min_aspect_ratio = min_aspect_ratio
-        self._filter = filter
+
+        # Use the API schema for validation
+        validated_data = IngestTaskFilterSchema(
+            content_type=content_type,
+            params={
+                "min_size": min_size,
+                "max_aspect_ratio": max_aspect_ratio,
+                "min_aspect_ratio": min_aspect_ratio,
+                "filter": filter,
+            },
+        )
+
+        self._content_type = validated_data.content_type
+        self._min_size = validated_data.params.min_size
+        self._max_aspect_ratio = validated_data.params.max_aspect_ratio
+        self._min_aspect_ratio = validated_data.params.min_aspect_ratio
+        self._filter = validated_data.params.filter
 
     def __str__(self) -> str:
         """
@@ -67,7 +61,7 @@ class FilterTask(Task):
         """
         info = ""
         info += "Filter Task:\n"
-        info += f"  content_type: {self._content_type}\n"
+        info += f"  content_type: {self._content_type.value}\n"
         info += f"  min_size: {self._min_size}\n"
         info += f"  max_aspect_ratio: {self._max_aspect_ratio}\n"
         info += f"  min_aspect_ratio: {self._min_aspect_ratio}\n"
@@ -86,7 +80,7 @@ class FilterTask(Task):
         }
 
         task_properties = {
-            "content_type": self._content_type,
+            "content_type": self._content_type.value,
             "params": filter_params,
         }
 
