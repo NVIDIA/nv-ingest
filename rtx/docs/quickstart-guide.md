@@ -134,7 +134,7 @@ This example demonstrates how to use the provided [podman-compose.yaml](https://
 
 12. Reclaim memory
 
-    WSL is known for not reclaiming cached memory fast enough; run the following drop_cache command in powershell to reclaim immediately. The user may run this command as many times as needed.
+    WSL is known for not reclaiming cached memory fast enough; run the following drop_cache command in PowerShell to reclaim immediately. The user may run this command as many times as needed.
     ```
     wsl -u root -d NVIDIA-Workbench -- sh -c "sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'"
     ```
