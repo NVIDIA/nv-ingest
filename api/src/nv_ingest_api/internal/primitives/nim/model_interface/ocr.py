@@ -157,18 +157,22 @@ class OCRModelInterface(ModelInterface):
             for img in images:
                 if model_name == DEFAULT_OCR_MODEL_NAME:
                     arr, _dims = preprocess_image_for_paddle(img)
-                else:
+                elif model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME:
                     arr, _dims = preprocess_image_for_ocr(
                         img,
                         target_height=max_length,
                         target_width=max_length,
                         pad_how="bottom_right",
                     )
+                elif model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+                    arr = img
+                    _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
+                else:
+                    raise ValueError(f"Unknown model name: {model_name}")
 
                 dims.append(_dims)
 
                 if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
-                    arr = arr.transpose((1, 2, 0))
                     arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
                 else:
                     arr = arr.astype(np.float32)
@@ -458,7 +462,7 @@ class OCRModelInterface(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=True if model_name == DEFAULT_OCR_MODEL_NAME else False,
+                scale_coordinates=False if model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME else True,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])
