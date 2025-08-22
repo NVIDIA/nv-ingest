@@ -125,7 +125,7 @@ ingestor = Ingestor().files("large_dataset/*.pdf")
 
 # Configure the ingestor to save results to a specific directory.
 # cleanup=False ensures the directory is not deleted by any automatic process.
-ingestor.save_to_disk(output_directory="./my_ingest_results", cleanup=False)
+ingestor.save_to_disk(output_directory="./my_ingest_results", cleanup=False)  # Offload results to disk to prevent OOM errors
 
 # 'results' is a list of LazyLoadedList objects pointing to the new .jsonl files.
 results = ingestor.extract().ingest()
