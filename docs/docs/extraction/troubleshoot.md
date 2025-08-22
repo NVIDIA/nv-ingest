@@ -51,7 +51,8 @@ When processing a very large dataset with thousands of documents, you might enco
 This happens because, by default, nv-ingest stores all the extracted results from every document in system memory (RAM).
 If the total size of these results exceeds the available memory, the process will fail.
 
-To resolve this issue, use the `save_to_disk()` method.
+To resolve this issue, use the `save_to_disk` method. 
+For details, refer to [Working with Large Datasets: Saving to Disk](link).
 This method configures the Ingestor to write the results for each document to temporary files on disk instead of holding them in memory.
 This significantly reduces the memory footprint of the application, allowing you to process much larger datasets.
 
