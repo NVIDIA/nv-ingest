@@ -12,8 +12,12 @@ from pydantic import BaseModel, Field
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_ingest_job
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
 from ..meta.python_stage_base import PythonStage
 import pandas as pd
 import uuid
@@ -59,8 +63,8 @@ class PythonMessageBrokerTaskSource(PythonStage):
     This is a simplified version without Ray dependencies.
     """
 
-    def __init__(self, config: PythonMessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config)
+    def __init__(self, config: PythonMessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         self.config = config
         self._logger = logger
         self._logger.debug("Initializing PythonMessageBrokerTaskSource with config: %s", config)
@@ -88,6 +92,8 @@ class PythonMessageBrokerTaskSource(PythonStage):
 
         self._logger.debug("PythonMessageBrokerTaskSource initialized. Task queue: %s", self.task_queue)
 
+    @nv_ingest_node_failure_try_except(annotation_id="message_broker_task_source", raise_on_failure=False)
+    @traceable()
     def on_data(self, control_message: Any) -> Optional[Any]:
         """
         For source stages, this method is called by the streaming pipeline to generate messages.

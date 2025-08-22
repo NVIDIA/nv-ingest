@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -27,8 +28,8 @@ class PythonTextEmbeddingStage(PythonStage):
     trace or extraction metadata is added.
     """
 
-    def __init__(self, config: TextEmbeddingSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: TextEmbeddingSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonTextEmbeddingStage configuration validated successfully.")
@@ -36,9 +37,10 @@ class PythonTextEmbeddingStage(PythonStage):
             logger.exception("Error validating text embedding extractor config")
             raise e
 
-    @traceable("text_embedding")
-    @filter_by_task(required_tasks=["embed"])
     @nv_ingest_node_failure_try_except(annotation_id="text_embedding", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["embed"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by generating text embeddings.

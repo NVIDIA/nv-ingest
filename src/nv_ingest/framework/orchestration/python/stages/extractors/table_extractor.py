@@ -8,6 +8,7 @@ from typing import Any, Dict, Tuple, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -48,8 +49,8 @@ class PythonTableExtractorStage(PythonStage):
       4. Optionally, stores additional extraction info in the message metadata.
     """
 
-    def __init__(self, config: TableExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: TableExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonTableExtractorStage configuration validated successfully.")
@@ -57,9 +58,10 @@ class PythonTableExtractorStage(PythonStage):
             logger.exception(f"Error validating Table Extractor config: {e}")
             raise
 
-    @traceable("table_extractor")
-    @filter_by_task(required_tasks=[("extract_tables", {})])
     @nv_ingest_node_failure_try_except(annotation_id="table_extractor", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=[("extract_tables", {})])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting table data from images.

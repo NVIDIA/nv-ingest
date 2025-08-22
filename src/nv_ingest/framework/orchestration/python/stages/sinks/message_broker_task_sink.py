@@ -10,8 +10,13 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from ..meta.python_stage_base import PythonStage
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +56,8 @@ class PythonMessageBrokerTaskSink(PythonStage):
     This is a simplified version without Ray dependencies.
     """
 
-    def __init__(self, config: PythonMessageBrokerTaskSinkConfig) -> None:
-        super().__init__(config)
+    def __init__(self, config: PythonMessageBrokerTaskSinkConfig, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         self.config = config
         self._logger = logger
         self._logger.debug("Initializing PythonMessageBrokerTaskSink with config: %s", config.dict())
@@ -197,6 +202,9 @@ class PythonMessageBrokerTaskSink(PythonStage):
         except Exception as push_error:
             self._logger.error(f"Failed to push failure message: {push_error}")
 
+    @nv_ingest_node_failure_try_except(annotation_id="message_broker_task_sink", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
     def on_data(self, control_message: Any) -> Any:
         """
         Processes the control message and pushes the resulting JSON payloads to the broker.

@@ -5,10 +5,11 @@
 from datetime import datetime
 import logging
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.enums.common import (
     DocumentTypeEnum,
     ContentTypeEnum,
@@ -34,13 +35,14 @@ class PythonMetadataInjectionStage(PythonStage):
     injection is required, and if so, injects the appropriate metadata.
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None) -> None:
         # Call the base initializer
-        super().__init__(config)
+        super().__init__(config, stage_name=stage_name)
         logger.info("PythonMetadataInjectionStage initialized with config: %s", config)
 
-    @traceable("metadata_injector")
     @nv_ingest_node_failure_try_except(annotation_id="metadata_injector", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
     def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by injecting metadata into its DataFrame payload.

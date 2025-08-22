@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -28,8 +29,8 @@ class PythonEmbeddingStorageStage(PythonStage):
       3. Updates the message payload with the stored embeddings DataFrame.
     """
 
-    def __init__(self, config: EmbeddingStorageSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: EmbeddingStorageSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonEmbeddingStorageStage configuration validated successfully.")
@@ -37,9 +38,10 @@ class PythonEmbeddingStorageStage(PythonStage):
             logger.exception(f"Error validating Embedding Storage config: {e}")
             raise
 
-    @traceable("embedding_storage")
-    @filter_by_task(required_tasks=["store_embedding"])
     @nv_ingest_node_failure_try_except(annotation_id="embedding_storage", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["store_embedding"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by storing text embeddings.

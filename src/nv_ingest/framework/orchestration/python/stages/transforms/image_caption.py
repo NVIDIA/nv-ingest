@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -27,8 +28,8 @@ class PythonImageCaptionStage(PythonStage):
     are stored in the control message.
     """
 
-    def __init__(self, config: ImageCaptionExtractionSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageCaptionExtractionSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonImageCaptionStage configuration validated successfully.")
@@ -36,9 +37,10 @@ class PythonImageCaptionStage(PythonStage):
             logger.exception(f"Error validating Image Caption config: {e}")
             raise
 
-    @traceable("image_caption")
-    @filter_by_task(required_tasks=[("caption", {})])
     @nv_ingest_node_failure_try_except(annotation_id="image_caption", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=[("caption", {})])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting image captions.

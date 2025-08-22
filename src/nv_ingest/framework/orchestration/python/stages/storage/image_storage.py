@@ -4,10 +4,11 @@
 
 import logging
 import pandas as pd
-from typing import Any
+from typing import Any, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.store.image_upload import store_images_to_minio_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -27,8 +28,8 @@ class PythonImageStorageStage(PythonStage):
     payload and updates the control message accordingly.
     """
 
-    def __init__(self, config: ImageStorageModuleSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageStorageModuleSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonImageStorageStage configuration validated successfully.")
@@ -36,9 +37,10 @@ class PythonImageStorageStage(PythonStage):
             logger.exception("Error validating image storage config")
             raise e
 
-    @traceable("image_storage")
-    @filter_by_task(required_tasks=["store"])
     @nv_ingest_node_failure_try_except(annotation_id="image_storage", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["store"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by storing images or structured content.

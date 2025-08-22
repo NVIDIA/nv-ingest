@@ -19,8 +19,10 @@ class PythonStage(ABC):
     multiprocessing-based streaming (processing loop with queues).
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None) -> None:
         self.config: BaseModel = config
+        # Stage name from YAML to support stage-aware decorators (traceable, udf_intercept, etc.)
+        self.stage_name: Optional[str] = stage_name
 
         # Queue-based processing for streaming pipelines
         self._input_queues: Optional[List[multiprocessing.Queue]] = None

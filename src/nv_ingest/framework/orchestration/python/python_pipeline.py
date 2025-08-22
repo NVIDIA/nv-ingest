@@ -111,7 +111,7 @@ class PythonPipeline:
             # Legacy behavior - handle both classes and instances
             if isinstance(source_actor, type):
                 # It's a class, instantiate it
-                self._source = source_actor(config=config)
+                self._source = source_actor(config=config, stage_name=name)
             else:
                 # It's already an instance, use as-is
                 self._source = source_actor
@@ -149,7 +149,7 @@ class PythonPipeline:
             # Legacy behavior - handle both classes and instances
             if isinstance(sink_actor, type):
                 # It's a class, instantiate it
-                self._sink = sink_actor(config=config)
+                self._sink = sink_actor(config=config, stage_name=name)
             else:
                 # It's already an instance, use as-is
                 self._sink = sink_actor
@@ -187,7 +187,7 @@ class PythonPipeline:
             # Legacy behavior - handle both classes and instances
             if isinstance(stage_actor, type):
                 # It's a class, instantiate it
-                stage_instance = stage_actor(config=config)
+                stage_instance = stage_actor(config=config, stage_name=name)
             else:
                 # It's already an instance, use as-is
                 stage_instance = stage_actor
@@ -251,7 +251,7 @@ class PythonPipeline:
         """
         try:
             # Create stage instance
-            stage_instance = stage_class(config=config)
+            stage_instance = stage_class(config=config, stage_name=stage_name)
 
             # Get input and output queues for this stage
             input_queues = self._stage_queues[stage_name]["inputs"]

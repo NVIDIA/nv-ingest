@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -27,15 +28,16 @@ class PythonTextSplitterStage(PythonStage):
     and tokenization logic. The updated DataFrame is then set back into the message.
     """
 
-    def __init__(self, config: TextSplitterSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: TextSplitterSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
         logger.info("PythonTextSplitterStage initialized with config: %s", config)
 
-    @traceable("text_splitter")
-    @filter_by_task(required_tasks=["split"])
     @nv_ingest_node_failure_try_except(annotation_id="text_splitter", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["split"])
     def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by splitting and tokenizing its text.
