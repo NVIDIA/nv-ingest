@@ -25,7 +25,7 @@ The following table describes methods of the `Ingestor` class.
 | `files`        | Add document paths for processing. |
 | `ingest`       | Submit jobs and retrieve results synchronously. |
 | `load`         | Ensure files are locally accessible (downloads if needed). |
-| `save_to_disk` | Saves ingestion results to disk instead of memory. |
+| `save_to_disk` | Save ingestion results to disk instead of memory. |
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `vdb_upload`   | Pushes extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
