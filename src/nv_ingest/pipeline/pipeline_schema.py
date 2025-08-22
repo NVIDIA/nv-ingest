@@ -322,6 +322,63 @@ class PIDControllerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PipelineFrameworkType(str, Enum):
+    """
+    Supported execution frameworks for the pipeline.
+
+    Values
+    ------
+    RAY : Execute the pipeline using the Ray-based framework.
+    PYTHON : Execute the pipeline using the lightweight Python framework (no Ray).
+    """
+
+    RAY = "ray"
+    PYTHON = "python"
+
+
+class PipelineFrameworkConfig(BaseModel):
+    """
+    Configuration for selecting the pipeline execution framework.
+
+    Attributes
+    ----------
+    type : PipelineFrameworkType
+        The execution framework to use. Defaults to RAY for backward compatibility.
+    """
+
+    type: PipelineFrameworkType = Field(
+        default=PipelineFrameworkType.RAY,
+        description="Execution framework selector (ray | python).",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PipelineServiceBrokerConfig(BaseModel):
+    """
+    Configuration for an optional in-cluster service broker.
+
+    This replaces the deprecated `launch_simple_broker` boolean flag with a
+    structured configuration that supports launch control and client parameters.
+
+    Attributes
+    ----------
+    enabled : bool
+        Whether to launch the service broker alongside the pipeline.
+    broker_client : Dict[str, Any]
+        Client configuration for the broker (e.g., host, port, broker_params). Keys are
+        passed through to the underlying broker implementation.
+    """
+
+    enabled: bool = Field(False, description="Launch the service broker alongside the pipeline.")
+    broker_client: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client configuration for the broker (host, port, broker_params, etc.)",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PipelineRuntimeConfig(BaseModel):
     """
     Configuration for pipeline runtime behavior.
@@ -336,8 +393,13 @@ class PipelineRuntimeConfig(BaseModel):
         Global memory threshold for static scaling mode (default: 0.75).
     pid_controller : PIDControllerConfig
         PID controller configuration for dynamic scaling.
-    launch_simple_broker : bool
-        If True, launches a simple message broker for the pipeline.
+    framework : PipelineFrameworkConfig
+        Execution framework selection.
+    service_broker : Optional[PipelineServiceBrokerConfig]
+        Structured configuration for the optional pipeline service broker.
+    launch_simple_broker : Optional[bool]
+        Deprecated: legacy flag for launching the simple message broker. If provided,
+        it is mapped into service_broker.enabled for backward compatibility.
     """
 
     disable_dynamic_scaling: bool = Field(False, description="Disable dynamic scaling of stage replicas.")
@@ -350,7 +412,35 @@ class PipelineRuntimeConfig(BaseModel):
     pid_controller: PIDControllerConfig = Field(
         default_factory=PIDControllerConfig, description="PID controller configuration for dynamic scaling."
     )
-    launch_simple_broker: bool = Field(False, description="Launch a simple message broker for the pipeline.")
+    framework: PipelineFrameworkConfig = Field(
+        default_factory=PipelineFrameworkConfig,
+        description="Execution framework selection.",
+    )
+    service_broker: Optional[PipelineServiceBrokerConfig] = Field(
+        default=None,
+        description="Configuration for launching an optional in-cluster service broker.",
+    )
+    # Deprecated compatibility flag; if provided maps to service_broker.enabled
+    launch_simple_broker: Optional[bool] = Field(
+        default=None,
+        description="Deprecated: use pipeline.service_broker.enabled instead.",
+    )
+
+    @model_validator(mode="after")
+    def _apply_backward_compatibility(self) -> "PipelineRuntimeConfig":
+        """
+        Maintain backward compatibility with legacy `launch_simple_broker` flag.
+
+        If the deprecated flag is present and service_broker is not explicitly provided,
+        initialize service_broker accordingly.
+        """
+        # If service_broker provided explicitly, respect it.
+        if self.service_broker is None:
+            # Map deprecated flag if present
+            if self.launch_simple_broker is not None:
+                self.service_broker = PipelineServiceBrokerConfig(enabled=bool(self.launch_simple_broker))
+        # Ensure deprecated field is not relied upon downstream
+        return self
 
     model_config = ConfigDict(extra="forbid")
 

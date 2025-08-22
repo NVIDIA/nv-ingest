@@ -461,12 +461,13 @@ def run_pipeline_process(
     try:
         if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
             try:
-                # Only launch if the config requests it
-                if getattr(pipeline_config, "pipeline", None) and getattr(
-                    pipeline_config.pipeline, "launch_simple_broker", False
-                ):
-                    _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
-                    broker_proc = start_simple_message_broker({})
+                # Only launch if the config requests it via service_broker
+                if getattr(pipeline_config, "pipeline", None):
+                    sb = getattr(pipeline_config.pipeline, "service_broker", None)
+                    if sb is not None and getattr(sb, "enabled", False):
+                        broker_client = getattr(sb, "broker_client", {}) or {}
+                        _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
+                        broker_proc = start_simple_message_broker(broker_client)
             except Exception as e:
                 _safe_log(logging.ERROR, f"Failed to start SimpleMessageBroker in subprocess: {e}")
                 # Continue without broker; launch will fail fast if required

@@ -42,7 +42,10 @@ class TestPipelineLifecycleManager:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
         mock_result = Mock(spec=ExecutionResult)
 
@@ -67,7 +70,10 @@ class TestPipelineLifecycleManager:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
+        sb = Mock()
+        sb.enabled = False
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
         mock_result = Mock(spec=ExecutionResult)
 
@@ -90,7 +96,10 @@ class TestPipelineLifecycleManager:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
+        sb = Mock()
+        sb.enabled = False
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         mock_strategy.execute.side_effect = RuntimeError("Strategy failed")
@@ -110,7 +119,10 @@ class TestPipelineLifecycleManager:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         mock_start_broker.side_effect = Exception("Broker setup failed")
@@ -131,7 +143,10 @@ class TestPipelineLifecycleManager:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
+        sb = Mock()
+        sb.enabled = False
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         # Create specific result to verify passthrough
@@ -162,7 +177,10 @@ class TestPipelineLifecycleManager:
         # Test with None options - configure strategy to fail when passed None
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
+        sb = Mock()
+        sb.enabled = False
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
 
         mock_strategy.execute.side_effect = AttributeError("'NoneType' object has no attribute 'block'")
 
@@ -179,7 +197,10 @@ class TestPipelineLifecycleManager:
         # Test with broker enabled
         mock_config_enabled = Mock()
         mock_config_enabled.pipeline = Mock()
-        mock_config_enabled.pipeline.launch_simple_broker = True
+        sb_enabled = Mock()
+        sb_enabled.enabled = True
+        sb_enabled.broker_client = {}
+        mock_config_enabled.pipeline.service_broker = sb_enabled
 
         manager._setup_message_broker(mock_config_enabled)
         mock_start_broker.assert_called_once_with({})
@@ -188,7 +209,10 @@ class TestPipelineLifecycleManager:
         mock_start_broker.reset_mock()
         mock_config_disabled = Mock()
         mock_config_disabled.pipeline = Mock()
-        mock_config_disabled.pipeline.launch_simple_broker = False
+        sb_disabled = Mock()
+        sb_disabled.enabled = False
+        sb_disabled.broker_client = {}
+        mock_config_disabled.pipeline.service_broker = sb_disabled
 
         manager._setup_message_broker(mock_config_disabled)
         mock_start_broker.assert_not_called()
@@ -204,7 +228,10 @@ class TestPipelineLifecycleManagerIntegration:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = ExecutionOptions(block=True)
 
         mock_broker_process = Mock()
@@ -230,7 +257,10 @@ class TestPipelineLifecycleManagerIntegration:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
+        sb = Mock()
+        sb.enabled = False
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = ExecutionOptions(block=False)
 
         expected_result = ExecutionResult(interface=Mock(), elapsed_time=None)
@@ -255,7 +285,10 @@ class TestPipelineLifecycleManagerIntegration:
 
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         mock_broker_process = Mock()
@@ -301,7 +334,10 @@ class TestPipelineLifecycleManagerIntegration:
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         mock_broker_process = Mock()

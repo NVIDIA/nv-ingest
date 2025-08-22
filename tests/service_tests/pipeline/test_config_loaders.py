@@ -59,7 +59,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -123,7 +124,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -192,7 +194,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -256,7 +259,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: $DISABLE_SCALING|false
   dynamic_memory_threshold: $MEMORY_THRESHOLD|0.75
-  launch_simple_broker: true
+  service_broker:
+    enabled: true
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -302,7 +306,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_yaml_content)
@@ -340,7 +345,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -377,7 +383,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_schema_content)
@@ -441,7 +448,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: "not_a_boolean"  # Should be bool
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_types_content)
@@ -490,7 +498,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false  # Dynamic scaling setting
   dynamic_memory_threshold: 0.8   # Memory threshold
-  launch_simple_broker: false     # Broker launch setting
+  service_broker:
+    enabled: false     # Broker launch setting
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_with_comments)
@@ -554,7 +563,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(multi_stage_config)
@@ -609,7 +619,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(nested_config)
@@ -694,7 +705,7 @@ pipeline:
                     assert nemo_config["auth_token"] == "test-key"
                     assert nemo_config["model_name"] == "nvidia/nemoretriever-parse"
 
-                    assert config.pipeline.launch_simple_broker == True
+                    assert config.pipeline.service_broker.enabled is True
             finally:
                 os.unlink(f.name)
 
@@ -730,7 +741,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(special_types_config)

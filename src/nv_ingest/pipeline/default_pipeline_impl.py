@@ -511,5 +511,10 @@ pipeline:
     penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
     error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
     rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
-  launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|false
+  service_broker:
+    enabled: $INGEST_SERVICE_BROKER_ENABLED|false
+    broker_client:
+      client_type: $MESSAGE_CLIENT_TYPE|"redis"
+      host: $MESSAGE_CLIENT_HOST|localhost
+      port: $MESSAGE_CLIENT_PORT|6379
 """

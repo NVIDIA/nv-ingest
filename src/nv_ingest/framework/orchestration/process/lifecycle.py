@@ -82,16 +82,21 @@ class PipelineLifecycleManager:
         logger.info("Starting pipeline lifecycle")
 
         # If running pipeline in a subprocess and broker is enabled, ensure the broker
-        # is launched in the child process group by signaling via environment variable
+        # is launched in the child process group by signaling via environment variable.
+        # Perform parameter validation by directly accessing config.pipeline so that
+        # invalid inputs (e.g., config=None) surface as AttributeError and are wrapped.
         prev_env = None
         set_env = False
-        if getattr(config, "pipeline", None) and getattr(config.pipeline, "launch_simple_broker", False):
-            if isinstance(self.strategy, SubprocessStrategy):
+
+        try:
+            # Parameter validation and broker-enabled detection
+            sb_cfg = config.pipeline.service_broker  # may raise AttributeError if config is None
+            sb_enabled = bool(getattr(sb_cfg, "enabled", False)) if sb_cfg is not None else False
+            if sb_enabled and isinstance(self.strategy, SubprocessStrategy):
                 prev_env = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
                 os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"] = "1"
                 set_env = True
 
-        try:
             # Start message broker if configured (may defer to subprocess based on env)
             self._setup_message_broker(config)
 
@@ -123,16 +128,19 @@ class PipelineLifecycleManager:
         config : PipelineConfigSchema
             Pipeline configuration containing broker settings.
         """
-        if config.pipeline.launch_simple_broker:
+        sb_cfg = getattr(config.pipeline, "service_broker", None) if getattr(config, "pipeline", None) else None
+        sb_enabled = bool(getattr(sb_cfg, "enabled", False)) if sb_cfg is not None else False
+        if sb_enabled:
             # If requested to launch broker inside the subprocess, skip here
             if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
                 logger.info("Deferring SimpleMessageBroker launch to subprocess")
                 return
             logger.info("Starting simple message broker")
             # Start the broker and retain a handle for cleanup.
-            # Use defaults (host=0.0.0.0, port=7671) as set by the broker implementation.
+            # Pass through any provided broker_client configuration (host, port, broker_params, etc.)
+            broker_client = getattr(sb_cfg, "broker_client", {}) if sb_cfg is not None else {}
             try:
-                self._broker_process = start_simple_message_broker({})
+                self._broker_process = start_simple_message_broker(broker_client)
                 # Ensure cleanup at interpreter shutdown in case caller forgets
                 atexit.register(self._terminate_broker_atexit)
                 logger.info(f"SimpleMessageBroker started (pid={getattr(self._broker_process, 'pid', None)})")

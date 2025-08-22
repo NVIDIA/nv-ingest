@@ -51,7 +51,7 @@ def pipeline_process():
     os.environ["MESSAGE_CLIENT_TYPE"] = "simple"
     os.environ["MESSAGE_CLIENT_HOST"] = "0.0.0.0"  # bind all interfaces; clients use localhost
     os.environ["MESSAGE_CLIENT_PORT"] = "7671"
-    os.environ["INGEST_LAUNCH_SIMPLE_BROKER"] = "true"
+    os.environ["INGEST_SERVICE_BROKER_ENABLED"] = "true"
 
     # Load pipeline configuration from the default pipeline YAML (with env var substitution)
     repo_root = Path(__file__).resolve().parents[2]  # 2 levels: tests/integration
