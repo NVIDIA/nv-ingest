@@ -12,7 +12,7 @@ from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageType
 
 # Correctly import the utility from the top-level tests directory
-from tests.utilities_for_test import get_project_root
+from ...utilities_for_test import get_project_root
 
 
 @pytest.fixture(scope="module")

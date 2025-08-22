@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  page-elements:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt
+
+  graphic-elements:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt
+
+  table-structure:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt
+
+  ocr:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt
+
+  embedding:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt
+
+  reranker:
+    environment:
+      - NIM_TRITON_OPTIMIZATION_MODE=vram_opt

@@ -2,7 +2,10 @@
 
 NVIDIA NeMo Retriever is a collection of microservices 
 for building and scaling multimodal data extraction, embedding, and reranking pipelines 
-with high accuracy and maximum data privacy – built with NVIDIA NIM.
+with high accuracy and maximum data privacy – built with NVIDIA NIM. 
+NeMo Retriever, part of the [NVIDIA NeMo](https://www.nvidia.com/en-us/ai-data-science/products/nemo/) software suite for managing the AI agent lifecycle, 
+ensures data privacy and seamlessly connects to proprietary data wherever it resides, 
+empowering secure, enterprise-grade retrieval.
 
 NeMo Retriever provides the following:
 
