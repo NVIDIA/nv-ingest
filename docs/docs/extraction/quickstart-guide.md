@@ -67,6 +67,23 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
+   ### Using Hardware-Specific Override Files
+
+   For optimal performance on specific hardware, you can use `docker-compose` override files.
+   These files adjust settings like memory allocation to better suit different GPU architectures.
+   
+   To use an override file, include it in your `docker compose up` command using a second `-f` flag after the base `docker-compose.yaml` file.
+   The settings in the second file will override the defaults in the first.
+   
+   For example, to use a configuration optimized for an NVIDIA A100 GPU with 40GB of VRAM, run the following command:
+   
+   ```shell
+   docker compose \
+     -f docker-compose.yaml \
+     -f docker-compose.a100-40gb.yaml \
+     --profile retrieval --profile table-structure up
+   ```
+
 8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
