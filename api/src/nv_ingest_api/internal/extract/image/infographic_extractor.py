@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -108,13 +109,26 @@ def _update_infographic_metadata(
         infer_kwargs.update(
             model_name="paddle",
         )
-    else:
+    elif ocr_model_name == "scene_text":
         infer_kwargs.update(
-            model_name="scene_text",
+            model_name=ocr_model_name,
             input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
+    elif ocr_model_name == "scene_text_ensemble":
+        infer_kwargs.update(
+            model_name=ocr_model_name,
+            max_batch_size=1,
+            force_max_batch_size=1,
+            input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
+            output_names=["OUTPUT"],
+            dtypes=["BYTES", "BYTES"],
+            merge_level="paragraph",
+        )
+    else:
+        raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
+
     try:
         ocr_results = ocr_client.infer(data_ocr, **infer_kwargs)
     except Exception as e:
@@ -152,6 +166,7 @@ def _create_clients(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
+        rate_limit_requests_per_second=int(os.getenv("OCR_RATE_LIMIT_RPS", -1)),
     )
 
     return ocr_client
