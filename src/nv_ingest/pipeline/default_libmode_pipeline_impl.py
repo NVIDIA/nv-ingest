@@ -393,25 +393,10 @@ stages:
         value: 1
 
   # Telemetry and Drain
-  - name: "otel_tracer"
-    type: "stage"
-    phase: 6  # TELEMETRY
-    stage_impl: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
-    config:
-      otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
-    replicas:
-      min_replicas: 0
-      max_replicas:
-        strategy: "static"
-        value: 1
-      static_replicas:
-        strategy: "static"
-        value: 1
-
   - name: "default_drain"
     type: "sink"
     phase: 7  # DRAIN
-    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
+    stage_impl: "nv_ingest.framework.orchestration.python.stages.sinks.default_drain:PythonDefaultDrainSink"
     config: {}
     replicas:
       min_replicas: 1
@@ -491,9 +476,6 @@ edges:
 
   # Response and Telemetry
   - from: "broker_response"
-    to: "otel_tracer"
-    queue_size: 32
-  - from: "otel_tracer"
     to: "default_drain"
     queue_size: 32
 

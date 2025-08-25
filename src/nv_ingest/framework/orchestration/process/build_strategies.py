@@ -50,15 +50,8 @@ from nv_ingest_api.util.introspection.class_inspect import (
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 # Python framework (lightweight) imports
-from nv_ingest.framework.orchestration.python.pipeline import PythonPipeline
-from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
-    PythonMessageBrokerTaskSource,
-    PythonMessageBrokerTaskSourceConfig,
-)
-from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
-    PythonMessageBrokerTaskSink,
-    PythonMessageBrokerTaskSinkConfig,
-)
+from nv_ingest.framework.orchestration.python.python_pipeline import PythonPipeline
+from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 
 logger = logging.getLogger(__name__)
 
@@ -411,34 +404,54 @@ class PythonPipelineBuildStrategy(PipelineBuildStrategy):
         return None
 
     def build(self) -> Any:
-        # Pretty print config (parity with Ray)
+        """
+        Build a strictly linear Python pipeline from the provided config.
+
+        Rules:
+        - Exactly one SOURCE (in-degree 0, out-degree 1)
+        - Zero or more STAGE nodes (each in-degree 1, out-degree 1)
+        - Exactly one SINK (in-degree 1, out-degree 0)
+        - All enabled stages must be connected in a single chain
+        - Callables are not yet supported in Python mode
+        - Replicas are not used (implicitly 1 per stage)
+        """
+        # Pretty print final config for parity with Ray
         try:
             pretty_output = pretty_print_pipeline_config(self._config, config_path=None)
             logger.info("\n" + pretty_output)
         except Exception:
             pass
 
-        # Resolve endpoints by conventional names (initial implementation)
-        source_stage_cfg = _find_stage_by_name_local(self._config, "source_stage")
-        sink_stage_cfg = _find_stage_by_name_local(self._config, "broker_response")
-        if source_stage_cfg is None or sink_stage_cfg is None:
-            raise ValueError(
-                "Python framework requires stages named 'source_stage' and 'broker_response' "
-                "in this initial implementation"
-            )
+        # Validate and derive a linear ordering of enabled stages
+        ordered_stage_cfgs = self._validate_and_order_linear_stages(self._config)
 
-        # Build Python stage configs
-        src_cfg = PythonMessageBrokerTaskSourceConfig(**(source_stage_cfg.config or {}))
-        snk_cfg = PythonMessageBrokerTaskSinkConfig(**(sink_stage_cfg.config or {}))
+        # Instantiate pipeline in linear mode
+        pipeline: PythonPipeline = PythonPipeline(enable_streaming=False)
 
-        # Instantiate stages (propagate YAML-driven names)
-        source = PythonMessageBrokerTaskSource(config=src_cfg, stage_name=source_stage_cfg.name)
-        sink = PythonMessageBrokerTaskSink(config=snk_cfg, stage_name=sink_stage_cfg.name)
+        # Build and add each stage in order
+        for stage_cfg in ordered_stage_cfgs:
+            if stage_cfg.callable is not None:
+                raise ValueError(
+                    f"PythonPipelineBuildStrategy does not yet support callable stages: '{stage_cfg.name}'"
+                )
 
-        # Placeholder for future processing functions
-        processing_functions = []
+            if stage_cfg.stage_impl is None:
+                raise ValueError(f"Stage '{stage_cfg.name}' must specify 'stage_impl' when using the Python framework")
 
-        pipeline = PythonPipeline(source=source, sink=sink, processing_functions=processing_functions)
+            # Resolve class and its Pydantic config schema
+            actor_class = resolve_actor_class_from_path(stage_cfg.stage_impl, PythonStage)
+            config_schema = find_pydantic_config_schema(actor_class, PythonStage)
+            config_instance = config_schema(**(stage_cfg.config or {})) if config_schema else None
+
+            # Add to pipeline according to stage type (no replicas supported)
+            stage_type_enum = StageType(stage_cfg.type)
+            if stage_type_enum == StageType.SOURCE:
+                pipeline.add_source(name=stage_cfg.name, source_actor=actor_class, config=config_instance)
+            elif stage_type_enum == StageType.SINK:
+                pipeline.add_sink(name=stage_cfg.name, sink_actor=actor_class, config=config_instance)
+            else:
+                pipeline.add_stage(name=stage_cfg.name, stage_actor=actor_class, config=config_instance)
+
         return pipeline
 
     def start(self, pipeline_handle: Any) -> None:
@@ -451,6 +464,80 @@ class PythonPipelineBuildStrategy(PipelineBuildStrategy):
                 pipeline_handle.stop()
         except Exception:
             pass
+
+    # ------------------------
+    # Internal helper methods
+    # ------------------------
+
+    def _validate_and_order_linear_stages(self, config: PipelineConfigSchema) -> List[StageConfig]:
+        """
+        Ensure the enabled stage/edge subgraph is a single linear chain and return stages in order.
+
+        Raises ValueError if the pipeline is not strictly linear.
+        """
+        # Consider only enabled stages
+        enabled_stages: Dict[str, StageConfig] = {s.name: s for s in (config.stages or []) if s.enabled}
+        if not enabled_stages:
+            raise ValueError("Python pipeline requires at least one enabled stage")
+
+        # Build degree maps using only edges that connect enabled stages
+        indegree: Dict[str, int] = {name: 0 for name in enabled_stages}
+        outdegree: Dict[str, int] = {name: 0 for name in enabled_stages}
+        adjacency: Dict[str, str] = {}
+
+        for e in config.edges or []:
+            u = getattr(e, "from_stage", None)
+            v = getattr(e, "to_stage", None)
+            if u in enabled_stages and v in enabled_stages:
+                outdegree[u] += 1
+                indegree[v] += 1
+                if u in adjacency:
+                    # Multiple outgoing edges from a node implies non-linear
+                    raise ValueError(f"Pipeline is not linear: stage '{u}' has multiple outgoing edges")
+                adjacency[u] = v
+
+        # Classify by declared type
+        sources = [s for s in enabled_stages.values() if StageType(s.type) == StageType.SOURCE]
+        sinks = [s for s in enabled_stages.values() if StageType(s.type) == StageType.SINK]
+
+        if len(sources) != 1 or len(sinks) != 1:
+            raise ValueError("Pipeline must have exactly one SOURCE and one SINK in Python mode")
+
+        # Degree constraints for linear chain
+        for name, s in enabled_stages.items():
+            st = StageType(s.type)
+            if st == StageType.SOURCE:
+                if indegree[name] != 0 or outdegree[name] != 1:
+                    raise ValueError(f"SOURCE stage '{name}' must have in-degree 0 and out-degree 1")
+            elif st == StageType.SINK:
+                if indegree[name] != 1 or outdegree[name] != 0:
+                    raise ValueError(f"SINK stage '{name}' must have in-degree 1 and out-degree 0")
+            else:
+                if indegree[name] != 1 or outdegree[name] != 1:
+                    raise ValueError(f"STAGE '{name}' must have in-degree 1 and out-degree 1")
+
+        # Edge count must be N-1 for a single chain
+        edge_count = sum(
+            1 for e in (config.edges or []) if e.from_stage in enabled_stages and e.to_stage in enabled_stages
+        )
+        node_count = len(enabled_stages)
+        if edge_count != node_count - 1:
+            raise ValueError(
+                f"Pipeline is not linear: expected {node_count - 1} edges connecting"
+                f" {node_count} stages, found {edge_count}"
+            )
+
+        # Produce ordered list by following edges from the unique source
+        start = sources[0].name
+        ordered_names: List[str] = [start]
+        while ordered_names[-1] in adjacency:
+            ordered_names.append(adjacency[ordered_names[-1]])
+
+        if len(ordered_names) != node_count:
+            raise ValueError("Pipeline is not a single connected chain of enabled stages")
+
+        # Map back to StageConfig objects in order
+        return [enabled_stages[n] for n in ordered_names]
 
 
 def _build_logging_config_from_env() -> LoggingConfig:

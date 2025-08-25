@@ -31,18 +31,6 @@ from nv_ingest.framework.orchestration.process.build_strategies import (
     PythonPipelineBuildStrategy,
 )
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
-from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config
-
-# Python framework (lightweight) imports
-from nv_ingest.framework.orchestration.python.pipeline import PythonPipeline
-from nv_ingest.framework.orchestration.python.stages.sources.message_broker_task_source import (
-    PythonMessageBrokerTaskSource,
-    PythonMessageBrokerTaskSourceConfig,
-)
-from nv_ingest.framework.orchestration.python.stages.sinks.message_broker_task_sink import (
-    PythonMessageBrokerTaskSink,
-    PythonMessageBrokerTaskSinkConfig,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -368,75 +356,6 @@ def launch_pipeline(
         return exposed, None
 
 
-def _find_stage_by_name(config: PipelineConfigSchema, name: str):
-    for st in getattr(config, "stages", []) or []:
-        if getattr(st, "name", None) == name:
-            return st
-    return None
-
-
-def launch_python_pipeline(
-    pipeline_config: PipelineConfigSchema,
-    block: bool = True,
-) -> Tuple[Union[Any, None], Optional[float]]:
-    """
-    Minimal Python framework launcher.
-
-    Assumptions:
-    - Linear pipeline. We wire source -> (optional processing functions) -> sink.
-    - Uses stage names 'source_stage' and 'broker_response' to locate endpoints for now.
-    - Skips DAG semantics and replicas; runs single-threaded loop.
-    """
-    logger.info("Launching pipeline using Python framework (minimal mode)")
-
-    # Pretty print config (for parity with Ray path)
-    try:
-        pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
-        logger.info("\n" + pretty_output)
-    except Exception:
-        pass
-
-    # Resolve endpoints by conventional names
-    source_stage_cfg = _find_stage_by_name(pipeline_config, "source_stage")
-    sink_stage_cfg = _find_stage_by_name(pipeline_config, "broker_response")
-    if source_stage_cfg is None or sink_stage_cfg is None:
-        raise ValueError(
-            "Python framework requires stages named 'source_stage' and 'broker_response' in this initial implementation"
-        )
-
-    # Build Python stage configs
-    src_cfg = PythonMessageBrokerTaskSourceConfig(**(source_stage_cfg.config or {}))
-    snk_cfg = PythonMessageBrokerTaskSinkConfig(**(sink_stage_cfg.config or {}))
-
-    # Instantiate stages (propagate YAML-driven names)
-    source = PythonMessageBrokerTaskSource(config=src_cfg, stage_name=source_stage_cfg.name)
-    sink = PythonMessageBrokerTaskSink(config=snk_cfg, stage_name=sink_stage_cfg.name)
-
-    # TODO: Add processing functions derived from intermediate python-available stages
-    processing_functions = []
-
-    pipeline = PythonPipeline(source=source, sink=sink, processing_functions=processing_functions)
-
-    if block:
-        start_abs = datetime.now()
-        try:
-            # Run indefinitely until interrupt
-            pipeline.run(max_iterations=None, poll_interval=0.1)
-        except KeyboardInterrupt:
-            logger.info("Interrupt received, shutting down Python pipeline.")
-        finally:
-            try:
-                pipeline.stop()
-            except Exception:
-                pass
-        total_elapsed = (datetime.now() - start_abs).total_seconds()
-        return None, total_elapsed
-    else:
-        # Start non-blocking and return pipeline instance
-        pipeline.start()
-        return pipeline, None
-
-
 def run_pipeline_process(
     pipeline_config: PipelineConfigSchema,
     stdout: Optional[TextIO] = None,
@@ -501,7 +420,9 @@ def run_pipeline_process(
     # If requested, start the simple broker inside this subprocess so it shares the process group
     broker_proc = None
     try:
-        if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
+        env_in_subproc = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+        _safe_log(logging.INFO, f"Subprocess broker gate: NV_INGEST_BROKER_IN_SUBPROCESS={env_in_subproc}")
+        if env_in_subproc == "1":
             try:
                 # Only launch if the config requests it via service_broker
                 if getattr(pipeline_config, "pipeline", None):
@@ -510,6 +431,12 @@ def run_pipeline_process(
                         broker_client = getattr(sb, "broker_client", {}) or {}
                         _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
                         broker_proc = start_simple_message_broker(broker_client)
+                        if broker_proc is None:
+                            _safe_log(logging.INFO, "Subprocess broker spawn skipped (port open idempotency guard)")
+                        else:
+                            _safe_log(
+                                logging.INFO, f"Subprocess SimpleMessageBroker pid={getattr(broker_proc, 'pid', None)}"
+                            )
             except Exception as e:
                 _safe_log(logging.ERROR, f"Failed to start SimpleMessageBroker in subprocess: {e}")
                 # Continue without broker; launch will fail fast if required

@@ -8,6 +8,7 @@ from typing import Any, Dict, Tuple, Optional
 
 from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -48,8 +49,8 @@ class PythonDocxExtractorStage(PythonStage):
       4. Optionally, stores additional extraction info in the message metadata.
     """
 
-    def __init__(self, config: DocxExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: DocxExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("PythonDocxExtractorStage configuration validated successfully.")
@@ -57,9 +58,10 @@ class PythonDocxExtractorStage(PythonStage):
             logger.exception(f"Error validating DOCX Extractor config: {e}")
             raise
 
-    @traceable("docx_extractor")
+    @nv_ingest_node_failure_try_except(annotation_id="docx_extractor", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "docx"})])
-    @nv_ingest_node_failure_try_except(annotation_id="docx_extractor", raise_on_failure=True)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting content from DOCX documents.

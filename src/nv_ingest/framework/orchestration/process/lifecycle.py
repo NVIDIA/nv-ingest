@@ -130,20 +130,28 @@ class PipelineLifecycleManager:
         """
         sb_cfg = getattr(config.pipeline, "service_broker", None) if getattr(config, "pipeline", None) else None
         sb_enabled = bool(getattr(sb_cfg, "enabled", False)) if sb_cfg is not None else False
+        env_in_subproc = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+        logger.info(f"Broker setup: enabled={sb_enabled}, NV_INGEST_BROKER_IN_SUBPROCESS={env_in_subproc}")
         if sb_enabled:
             # If requested to launch broker inside the subprocess, skip here
-            if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
-                logger.info("Deferring SimpleMessageBroker launch to subprocess")
+            if env_in_subproc == "1":
+                logger.info(
+                    "Deferring SimpleMessageBroker launch to subprocess "
+                    f"(env NV_INGEST_BROKER_IN_SUBPROCESS={env_in_subproc})"
+                )
                 return
-            logger.info("Starting simple message broker")
+            logger.info("Starting simple message broker in parent process")
             # Start the broker and retain a handle for cleanup.
             # Pass through any provided broker_client configuration (host, port, broker_params, etc.)
             broker_client = getattr(sb_cfg, "broker_client", {}) if sb_cfg is not None else {}
             try:
                 self._broker_process = start_simple_message_broker(broker_client)
-                # Ensure cleanup at interpreter shutdown in case caller forgets
-                atexit.register(self._terminate_broker_atexit)
-                logger.info(f"SimpleMessageBroker started (pid={getattr(self._broker_process, 'pid', None)})")
+                if self._broker_process is not None:
+                    # Ensure cleanup at interpreter shutdown in case caller forgets
+                    atexit.register(self._terminate_broker_atexit)
+                    logger.info(f"SimpleMessageBroker started (pid={getattr(self._broker_process, 'pid', None)})")
+                else:
+                    logger.info("SimpleMessageBroker spawn skipped (likely idempotency guard: port already in use).")
             except Exception as e:
                 logger.error(f"Failed to start SimpleMessageBroker: {e}")
                 raise

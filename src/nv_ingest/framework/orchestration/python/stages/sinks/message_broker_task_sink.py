@@ -13,7 +13,6 @@ from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from ..meta.python_stage_base import PythonStage
-from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
@@ -204,7 +203,6 @@ class PythonMessageBrokerTaskSink(PythonStage):
 
     @nv_ingest_node_failure_try_except(annotation_id="message_broker_task_sink", raise_on_failure=False)
     @traceable()
-    @udf_intercept_hook()
     def on_data(self, control_message: Any) -> Any:
         """
         Processes the control message and pushes the resulting JSON payloads to the broker.
