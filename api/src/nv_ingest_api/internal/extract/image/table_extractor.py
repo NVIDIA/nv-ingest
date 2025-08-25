@@ -107,8 +107,6 @@ def _run_inference(
     elif ocr_model_name == "scene_text_ensemble":
         future_ocr_kwargs.update(
             model_name=ocr_model_name,
-            max_batch_size=1,
-            force_max_batch_size=1,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
             output_names=["OUTPUT"],
             dtypes=["BYTES", "BYTES"],
