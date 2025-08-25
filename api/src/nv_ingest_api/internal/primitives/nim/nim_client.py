@@ -34,8 +34,6 @@ class NimClient:
         timeout: float = 120.0,
         max_retries: int = 5,
         max_429_retries: int = 5,
-        rate_limit_requests_per_second: Optional[int] = None,
-        rate_limit_bucket_capacity: Optional[int] = None,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -56,10 +54,6 @@ class NimClient:
             The maximum number of retries for non-429 server-side errors (default: 5).
         max_429_retries : int, optional
             The maximum number of retries specifically for 429 errors (default: 10).
-        rate_limit_requests_per_second : int, optional
-            If set, enables rate limiting to this many requests per second.
-        rate_limit_bucket_capacity : int, optional
-            The burst capacity for the rate limiter. Defaults to the rate limit.
 
         Raises
         ------
@@ -93,42 +87,6 @@ class NimClient:
                 self.headers["Authorization"] = f"Bearer {self.auth_token}"
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
-
-        self.rate_limit_enabled = rate_limit_requests_per_second is not None and rate_limit_requests_per_second > 0
-        if self.rate_limit_enabled:
-            self._rate_limit = rate_limit_requests_per_second
-            self._bucket_capacity = rate_limit_bucket_capacity or self._rate_limit
-            self._tokens = float(self._bucket_capacity)
-            self._last_token_fill_time = time.monotonic()
-            self._rate_limit_lock = threading.Lock()
-            logger.debug(
-                f"Rate limiting enabled for {model_interface.name()}: "
-                f"{self._rate_limit} req/s, burst capacity {self._bucket_capacity}"
-            )
-
-    def _acquire_token(self):
-        """
-        Acquires a token for rate limiting using a thread-safe token bucket.
-        Blocks if necessary until a token is available.
-        """
-        if not self.rate_limit_enabled:
-            return
-
-        with self._rate_limit_lock:
-            now = time.monotonic()
-            elapsed = now - self._last_token_fill_time
-            new_tokens = elapsed * self._rate_limit
-            self._tokens = min(self._bucket_capacity, self._tokens + new_tokens)
-            self._last_token_fill_time = now
-
-            if self._tokens < 1.0:
-                time_to_wait = (1.0 - self._tokens) / self._rate_limit
-                time.sleep(time_to_wait)
-                # After waiting, we can assume we have 1 token
-                # Recalculate tokens gained during sleep for accuracy
-                self._tokens += (time.monotonic() - now) * self._rate_limit
-
-            self._tokens -= 1.0
 
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
@@ -179,8 +137,6 @@ class NimClient:
         tuple
             A tuple (parsed_output, batch_data) for subsequent post-processing.
         """
-        self._acquire_token()
-
         if self.protocol == "grpc":
             logger.debug("Performing gRPC inference for a batch...")
             response = self._grpc_infer(batch_input, model_name, **kwargs)
