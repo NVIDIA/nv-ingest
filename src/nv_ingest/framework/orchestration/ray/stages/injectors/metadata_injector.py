@@ -25,6 +25,7 @@ from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class MetadataInjectionStage(RayActorStage):
         # Call the base initializer to set attributes like self._running.
         super().__init__(config, stage_name=stage_name)
         # Additional initialization can be added here if necessary.
-        self._logger.debug("MetadataInjectionStage initialized with config: %s", config)
+        self._logger.debug("MetadataInjectionStage initialized with config: %s", sanitize_for_logging(config))
 
     @nv_ingest_node_failure_try_except()
     @traceable()
