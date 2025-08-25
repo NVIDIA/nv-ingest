@@ -24,6 +24,13 @@ import os
 from typing import Any, Dict, List
 from PIL import Image
 
+try:
+    from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
+
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+
 from nv_ingest_client.client.util.processing import get_valid_filename
 
 logger = logging.getLogger(__name__)
@@ -39,6 +46,7 @@ def save_images_to_disk(
     save_raw_images: bool = False,
     count_images: bool = True,
     organize_by_type: bool = True,
+    output_format: str = "jpeg",
 ) -> Dict[str, int]:
     """
     Save base64-encoded images from ingestion results to disk as actual image files.
@@ -67,6 +75,9 @@ def save_images_to_disk(
         Whether to count and log image statistics. Default is True.
     organize_by_type : bool, optional
         Whether to organize images into subdirectories by type. Default is True.
+    output_format : str, optional
+        Output image format for saved files. Supports "png" and "jpeg". Default is "jpeg".
+        JPEG provides ~8x faster performance than PNG. Use "png" for lossless quality.
 
     Returns
     -------
@@ -138,33 +149,47 @@ def save_images_to_disk(
             if not should_save:
                 continue
 
-            # Determine image file format (default to PNG for structured content)
-            image_type = "png"  # Default format for charts, tables, etc.
-            if doc_type == "image":
-                image_metadata = metadata.get("image_metadata", {})
-                image_type = image_metadata.get("image_type", "png").lower()
+            # Determine image file format - use configured output_format
+            image_type = output_format.lower()
+            if image_type not in ["png", "jpeg", "jpg"]:
+                logger.warning(f"Unsupported output format '{output_format}', falling back to PNG")
+                image_type = "png"
+            # Normalize jpg to jpeg for internal consistency
+            elif image_type == "jpg":
+                image_type = "jpeg"
 
             # Create descriptive filename with source, page, and index information
+            # Use consistent file extension (jpg for jpeg)
+            file_ext = "jpg" if image_type == "jpeg" else image_type
+
             if organize_by_type:
                 # Organize into subdirectories by image type
                 type_dir = os.path.join(output_directory, subtype)
                 os.makedirs(type_dir, exist_ok=True)
-                image_filename = f"{clean_source_name}_p{page_number}_{doc_idx}.{image_type}"
+                image_filename = f"{clean_source_name}_p{page_number}_{doc_idx}.{file_ext}"
                 image_path = os.path.join(type_dir, image_filename)
             else:
                 # Flat directory structure with type in filename
-                image_filename = f"{clean_source_name}_{subtype}_p{page_number}_{doc_idx}.{image_type}"
+                image_filename = f"{clean_source_name}_{subtype}_p{page_number}_{doc_idx}.{file_ext}"
                 image_path = os.path.join(output_directory, image_filename)
 
             # Decode base64 content and save as image file
             try:
-                # Decode base64 image data
-                image_data = base64.b64decode(image_content)
-                image = Image.open(io.BytesIO(image_data))
+                if OPENCV_AVAILABLE:
+                    # Use OpenCV-based decoding for better performance
+                    img_array = base64_to_numpy(image_content)
 
-                # Save with appropriate format (handle JPEG naming)
-                image_ext = "jpg" if image_type == "jpeg" else image_type
-                image.save(image_path, format=image_ext.upper())
+                    # Convert numpy array back to PIL Image for saving
+                    # (base64_to_numpy returns RGB format)
+                    image = Image.fromarray(img_array)
+                else:
+                    # Fallback to PIL-based decoding if OpenCV not available
+                    image_data = base64.b64decode(image_content)
+                    image = Image.open(io.BytesIO(image_data))
+
+                # Save with appropriate PIL format
+                save_format = "JPEG" if image_type == "jpeg" else image_type.upper()
+                image.save(image_path, format=save_format)
 
                 # Update image type counters
                 image_counts[subtype] += 1
@@ -203,6 +228,7 @@ def save_images_from_response(response: Dict[str, Any], output_directory: str, *
         Directory where images will be saved.
     **kwargs
         Additional arguments passed to save_images_to_disk().
+        Includes output_format ("png" or "jpeg") and other filtering options.
 
     Returns
     -------
@@ -233,6 +259,7 @@ def save_images_from_ingestor_results(
         Directory where images will be saved.
     **kwargs
         Additional arguments passed to save_images_to_disk().
+        Includes output_format ("png" or "jpeg") and other filtering options.
 
     Returns
     -------
