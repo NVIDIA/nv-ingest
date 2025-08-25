@@ -43,7 +43,7 @@ class PythonTableExtractorStage(PythonStage):
     A Python stage that extracts table data from images.
 
     It expects an IngestControlMessage containing a DataFrame with image data containing tables. It then:
-      1. Removes the "extract_tables" task from the message.
+      1. Removes the "table_data_extract" task from the message.
       2. Calls the table extraction logic (via _inject_validated_config) using a validated configuration.
       3. Updates the message payload with the extracted table data DataFrame.
       4. Optionally, stores additional extraction info in the message metadata.
@@ -61,7 +61,7 @@ class PythonTableExtractorStage(PythonStage):
     @nv_ingest_node_failure_try_except(annotation_id="table_extractor", raise_on_failure=False)
     @traceable()
     @udf_intercept_hook()
-    @filter_by_task(required_tasks=[("extract_tables", {})])
+    @filter_by_task(required_tasks=["table_data_extract"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting table data from images.
@@ -82,8 +82,8 @@ class PythonTableExtractorStage(PythonStage):
         df_ledger = control_message.payload()
         self._logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-        # Remove the "extract_tables" task from the message to obtain task-specific configuration.
-        task_config = remove_task_by_type(control_message, "extract_tables")
+        # Remove the "table_data_extract" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(control_message, "table_data_extract")
         self._logger.debug("Extracted task config: %s", task_config)
 
         # Perform table data extraction.

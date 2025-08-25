@@ -397,7 +397,7 @@ def run_pipeline_process(
     # Install signal handlers for graceful shutdown in the subprocess
     def _handle_signal(signum, frame):
         try:
-            _safe_log(logging.INFO, f"Received signal {signum}; shutting down Ray and exiting...")
+            _safe_log(logging.INFO, f"Received signal {signum}; shutting down and exiting...")
             if ray.is_initialized():
                 ray.shutdown()
         finally:

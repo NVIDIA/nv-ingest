@@ -69,7 +69,7 @@ class PythonImageDedupStage(PythonStage):
         self._logger.debug("Extracted task config: %s", task_config)
 
         # Perform image deduplication.
-        new_df, dedup_info = deduplicate_images_internal(
+        new_df = deduplicate_images_internal(
             df_ledger=df_ledger,
             task_config=task_config,
             mutate_config=self.validated_config,

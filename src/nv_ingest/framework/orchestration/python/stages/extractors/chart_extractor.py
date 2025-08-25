@@ -43,7 +43,7 @@ class PythonChartExtractorStage(PythonStage):
     A Python stage that extracts chart data from images.
 
     It expects an IngestControlMessage containing a DataFrame with image data containing charts. It then:
-      1. Removes the "extract_charts" task from the message.
+      1. Removes the "chart_data_extract" task from the message.
       2. Calls the chart extraction logic (via _inject_validated_config) using a validated configuration.
       3. Updates the message payload with the extracted chart data DataFrame.
       4. Optionally, stores additional extraction info in the message metadata.
@@ -61,7 +61,7 @@ class PythonChartExtractorStage(PythonStage):
     @nv_ingest_node_failure_try_except(annotation_id="chart_extractor", raise_on_failure=False)
     @traceable()
     @udf_intercept_hook()
-    @filter_by_task(required_tasks=[("extract_charts", {})])
+    @filter_by_task(required_tasks=["chart_data_extract"])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting chart data from images.
@@ -82,8 +82,8 @@ class PythonChartExtractorStage(PythonStage):
         df_ledger = control_message.payload()
         self._logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-        # Remove the "extract_charts" task from the message to obtain task-specific configuration.
-        task_config = remove_task_by_type(control_message, "extract_charts")
+        # Remove the "chart_data_extract" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(control_message, "chart_data_extract")
         self._logger.debug("Extracted task config: %s", task_config)
 
         # Perform chart data extraction.
