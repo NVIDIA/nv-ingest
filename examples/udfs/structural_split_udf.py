@@ -5,12 +5,6 @@ Structural Text Splitter UDF for NV-Ingest Pipeline
 This UDF splits text content by markdown headers while preserving document hierarchy.
 All logic is self-contained with no external dependencies beyond the core API.
 
-Usage in CLI:
-nv-ingest-cli --doc file.pdf \
-  --task='extract:{"document_type": "pdf", "extract_text": "True"}' \
-  --task='udf:{"udf_function": "./examples/udfs/structural_split_udf.py:structural_split", \
-    "target_stage": "text_splitter", "run_before": true}' \
-  --output_directory=./output
 """
 
 import copy

@@ -2,11 +2,15 @@
 
 User-Defined Functions (UDFs) let you inject custom processing logic into the NV-Ingest pipeline at specific stages. This directory contains practical examples to get you started.
 
-## Structural Text Splitter Example
+## Markdown Document Splitter Example
 
-**Problem**: You have markdown documents with hierarchical structure (headers like `#`, `##`, `###`) that you want to ingest. The default text splitter doesn't preserve this structure, losing important document organization.
+**Problem**: You have **markdown documents** with hierarchical structure (headers like `#`, `##`, `###`) that you want to ingest. The default text splitter doesn't preserve this structure, losing important document organization.
 
-**Solution**: The `structural_split_udf.py` splits documents at header boundaries while preserving hierarchical metadata.
+**Solution**: The `structural_split_udf.py` splits **markdown documents** at header boundaries (`#`, `##`, `###`, etc.) while preserving hierarchical metadata.
+
+> **Works with**: Native markdown files (`.md`), text files containing markdown syntax
+> 
+> **Does not work with**: PDFs, Word docs, HTML files, or other formats that don't use markdown header syntax (`#`, `##`, `###`). These documents contain plain text without markdown formatting after extraction.
 
 ### Quick Start
 
@@ -21,9 +25,10 @@ User-Defined Functions (UDFs) let you inject custom processing logic into the NV
 
 2. **Use with CLI**
    ```bash
+   # For markdown files (.md) - process directly as text
    nv-ingest-cli \
      --doc './my_markdown_docs/' \
-     --task='extract' \
+     --task='extract:{"document_type":"text", "extract_text":true}' \
      --task='udf:{"udf_function": "./examples/udfs/structural_split_udf.py:structural_split", "target_stage": "text_splitter", "run_before": true}' \
      --task='embed' \
      --output_directory=./output
@@ -33,9 +38,10 @@ User-Defined Functions (UDFs) let you inject custom processing logic into the NV
    ```python
    from nv_ingest_client.client.interface import Ingestor
 
+   # For markdown files (.md)
    ingestor = Ingestor()
    results = ingestor.files("./my_markdown_docs/") \
-       .extract() \
+       .extract(document_type="text", extract_text=True) \
        .udf(
            udf_function="./examples/udfs/structural_split_udf.py:structural_split",
            target_stage="text_splitter", 
@@ -45,125 +51,170 @@ User-Defined Functions (UDFs) let you inject custom processing logic into the NV
        .ingest()
    ```
 
+### Verified Working Examples
+
+> **✅ Tested with**: Native markdown files (`.md`) containing markdown header syntax
+
+**CLI Command (Tested):**
+```bash
+# Test with the sample markdown file
+nv-ingest-cli \
+  --doc data/multimodal_test.md \
+  --task='extract:{"document_type":"text", "extract_text":true}' \
+  --task='udf:{"udf_function": "./examples/udfs/structural_split_udf.py:structural_split", "target_stage": "text_splitter", "run_before": true}' \
+  --output_directory=./test_output_structural_udf
+
+# Results: 12 chunks created from 1 markdown file with proper hierarchical metadata
+```
+
+**Python API Usage:**
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+# Works with markdown files containing header syntax
+ingestor = Ingestor()
+results = ingestor.files("data/multimodal_test.md") \
+    .extract(document_type="text", extract_text=True) \
+    .udf(
+        udf_function="./examples/udfs/structural_split_udf.py:structural_split",
+        target_stage="text_splitter",
+        run_before=True
+    ) \
+    .ingest()
+
+# Python API returns nested structure: [[chunks...]]
+chunks = results[0]  # Access the actual chunks
+print(f"Created {len(chunks)} chunks from 1 markdown document")
+```
+
+**Expected Output:**
+- Input: 1 markdown document  
+- Output: 12 markdown sections split by headers (`#`, `##`, `###`, etc.)
+- Enhanced metadata includes: `hierarchical_header`, `header_level`, `chunk_index`, `splitting_method`
+- **Note**: Python API results are nested - access chunks with `results[0]`
+- **Splitting Logic**: Each markdown header creates a new document chunk with that header's content
+
 ### What You Get
 
 - **Input**: 1 document with markdown content  
-- **Output**: N documents split at header boundaries
-- **Enhanced Metadata**: Each chunk includes hierarchical information like header level, chunk index, and splitting method
+- **Output**: N documents split at **markdown header boundaries**
+- **Enhanced Metadata**: Each chunk includes markdown-specific hierarchical information like header level, chunk index, and splitting method
 
 ### Implementation Details
 
-The UDF processes documents by:
-1. Filtering for text documents with `source_type: "text"`
+The UDF processes **text primitives** by:
+1. Filtering for text primitives with `document_type: "text"` (regardless of original file type)
 2. Extracting content from document metadata
-3. Splitting text at markdown header boundaries (`#`, `##`, etc.)
-4. Creating new document rows for each chunk with enriched metadata
-5. Returning the updated DataFrame with all chunks
+3. **Parsing markdown syntax** and splitting at header boundaries (`#`, `##`, `###`, etc.)
+4. Creating new document rows for each markdown section with enriched metadata
+5. Returning the updated DataFrame with all markdown chunks
+
 
 ### Customization
 
-Adapt the pattern for your needs:
+Adapt the markdown splitter for your needs:
 ```python
-# Split on custom patterns
-markdown_headers = ["#", "##", "===", "---"]
+# Use different markdown header levels
+markdown_headers = ["#", "##"]  # Only split on major headers
 
-# Process different document types  
-if row.get("document_type") == "html":
-    # Handle HTML headers
-    
-# Add custom metadata
+# Add alternative markdown syntax
+markdown_headers = ["#", "##", "===", "---"]  # Include setext headers
+
+# Add custom metadata for markdown sections
 metadata["custom_content"]["document_category"] = detect_category(content)
+metadata["custom_content"]["markdown_variant"] = "github_flavored"
 ```
 
-## LLM Content Summarizer Example
 
-**Problem**: You want to generate AI-powered summaries of your text content after ingesting PDFs or other documents. This helps with downstream processing, search relevance, and content understanding.
 
-**Solution**: The `llm_summarizer_udf.py` uses OpenAI-compatible APIs (including NVIDIA NIMs) to generate concise summaries of text chunks.
+```
 
-### Quick Start
+## LLM Content Summarizer
 
-1. **Set up environment**
-   ```bash
-   export NVIDIA_API_KEY="your-nvidia-api-key"
-   export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"
-   ```
+**Purpose**: Generate AI-powered summaries of your text content using NVIDIA's LLM APIs. The `llm_summarizer_udf.py` processes text chunks and adds comprehensive summaries to document metadata.
 
-2. **Use with CLI**
-   ```bash
-   nv-ingest-cli \
-     --doc './my_pdfs/' \
-     --task='extract' \
-     --task='split' \
-     --task='udf:{"udf_function": "./examples/udfs/llm_summarizer_udf.py:content_summarizer", "target_stage": "text_splitter", "run_after": true}' \
-     --task='embed' \
-     --output_directory=./output
-   ```
+### Setup
 
-3. **Use with Python API**
-   ```python
-   from nv_ingest_client.client.interface import Ingestor
+```bash
+export NVIDIA_API_KEY="your-nvidia-api-key"
+```
 
-   ingestor = Ingestor()
-   results = ingestor.files("./my_pdfs/") \
-       .extract() \
-       .split() \
-       .udf(
-           udf_function="./examples/udfs/llm_summarizer_udf.py:content_summarizer",
-           target_stage="text_splitter", 
-           run_after=True
-       ) \
-       .embed() \
-       .ingest()
-   ```
+### Usage
 
-### What You Get
+**CLI Example:**
+```bash
+nv-ingest-cli \
+  --doc 'my_documents/' \
+  --task='extract:{"document_type":"pdf", "extract_text":true}' \
+  --task='split' \
+  --task='udf:{"udf_function": "./examples/udfs/llm_summarizer_udf.py:content_summarizer", "target_stage": "text_splitter", "run_after": true}' \
+  --output_directory=./output
+```
 
-- **Input**: Text chunks from document splitting  
-- **Output**: Same chunks enhanced with AI-generated summaries
-- **Enhanced Metadata**: Each chunk includes LLM summary, model info, processing timestamp, and content statistics
-
-### Example Output Metadata
-
+**Python API Example:**
 ```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = Ingestor()
+results = ingestor.files("my_documents/") \
+    .extract(document_type="pdf", extract_text=True) \
+    .split() \
+    .udf(
+        udf_function="./examples/udfs/llm_summarizer_udf.py:content_summarizer",
+        target_stage="text_splitter", 
+        run_after=True
+    ) \
+    .ingest()
+
+# Access chunks: results[0] for Python API
+chunks = results[0]
+```
+
+### Viewing Outputs
+
+After processing, summaries are stored in the output metadata files. Look for the `llm_summary` section:
+
+**CLI Output Location:**
+```bash
+./output/text/your_document.pdf.metadata.json
+```
+
+**Finding Summaries in JSON:**
+```json
 {
   "metadata": {
-    "content": "Original text content...",
     "custom_content": {
       "llm_summary": {
-        "summary": "This section discusses machine learning algorithms and their applications in modern technology, focusing on neural networks and supervised learning methods.",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct",
-        "timestamp": "2024-01-01T12:00:00Z",
-        "content_length": 1234,
-        "summary_length": 156,
-        "summarization_method": "llm_api"
+        "summary": "Your AI-generated summary appears here...",
+        "model": "nvidia/llama-3.1-nemotron-70b-instruct"
       }
     }
   }
 }
 ```
 
-### Advanced Usage
-
-**Combine with Structural Splitting**:
-```bash
-nv-ingest-cli \
-  --doc './markdown_docs/' \
-  --task='extract' \
-  --task='udf:{"udf_function": "./examples/udfs/structural_split_udf.py:structural_split", "target_stage": "text_splitter", "run_before": true}' \
-  --task='split' \
-  --task='udf:{"udf_function": "./examples/udfs/llm_summarizer_udf.py:content_summarizer", "target_stage": "text_splitter", "run_after": true}' \
-  --task='embed' \
-  --output_directory=./output
+**Python API Access:**
+```python
+# Access summaries from results
+chunks = results[0]  # Get document chunks
+for chunk in chunks:
+    summary_info = chunk["metadata"]["custom_content"]["llm_summary"]
+    summary_text = summary_info["summary"]
+    print(f"Summary: {summary_text}")
 ```
 
-**Configuration Options**:
-- `LLM_SUMMARIZATION_MODEL`: Choose different models
-- `LLM_MIN_CONTENT_LENGTH`: Skip very short content (default: 100)
-- `LLM_MAX_CONTENT_LENGTH`: Limit input size (default: 8000)
-- `LLM_SUMMARIZATION_TIMEOUT`: API timeout seconds (default: 60)
+### Configuration
 
-**More Examples**: See `example_usage_llm_summarizer.py` for comprehensive usage patterns including batch processing of 20+ PDFs.
+Environment variables to customize behavior:
+
+```bash
+export NVIDIA_API_KEY="your-nvidia-api-key"                              # Required API key
+export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"  # Model choice
+export LLM_SUMMARIZATION_BASE_URL="https://integrate.api.nvidia.com/v1"  # API base URL
+export LLM_SUMMARIZATION_TIMEOUT="60"                                    # API timeout seconds
+export LLM_MIN_CONTENT_LENGTH="50"                                       # Skip content shorter than this  
+export LLM_MAX_CONTENT_LENGTH="12000"                                    # Content limit per summary
+```
 
 ## Resources
 
@@ -171,23 +222,19 @@ nv-ingest-cli \
 - **Pipeline Stages**: [User-Defined Stages](../../docs/docs/extraction/user-defined-stages.md)  
 - **Metadata Schema**: [Content Metadata](../../docs/docs/extraction/content-metadata.md)
 
-## Troubleshooting
+## Common Issues
 
-**UDF not executing?**
-- Check function signature matches exactly: `def my_udf(control_message: IngestControlMessage) -> IngestControlMessage`
-- Verify file path is accessible in container
-- Use `INGEST_DISABLE_UDF_PROCESSING=""` to ensure UDFs are enabled
+**UDF not running?**
+- Verify `NVIDIA_API_KEY` is set
+- Check UDF file path is accessible
+- Ensure function signature: `def my_udf(control_message: IngestControlMessage) -> IngestControlMessage`
 
-**LLM Summarization Issues?**
-- Verify `NVIDIA_API_KEY` is set and valid
-- Check API connectivity: `curl -H "Authorization: Bearer $NVIDIA_API_KEY" https://integrate.api.nvidia.com/v1/models`
-- Monitor logs for API timeout or rate limit errors
-- Adjust `LLM_SUMMARIZATION_TIMEOUT` for slow API responses
-- Use smaller `LLM_MAX_CONTENT_LENGTH` if getting payload errors
+**No summaries in output?**
+- Check logs for API errors
+- Verify documents have text content > 50 characters  
+- Use `document_type="pdf"` for PDF text extraction (creates text primitives for the UDF)
+- For markdown/text files, use `document_type="text"`
 
-**Performance issues?**
-- Profile with small document batches first
-- Consider running UDF on less congested pipeline stages (try `embedding_storage` instead of `text_splitter`)
-- Optimize regex patterns and DataFrame operations
-- For LLM UDFs: increase `LLM_MIN_CONTENT_LENGTH` to skip short content
-- Monitor API costs and rate limits for large document collections
+**Python API access:**
+- Results are nested: access chunks via `results[0]`
+- CLI returns chunks directly, Python API wraps in document array
