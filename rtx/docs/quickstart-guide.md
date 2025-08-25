@@ -3,6 +3,7 @@
 ## Requirements
 
 - NVIDIA GeForce RTX 40xx or above and at least 16 GB of video memory
+- 48 GB RAM
 - Install the latest [NVIDIA GPU driver](https://www.nvidia.com/en-us/drivers/) on Windows (version 570+)
 
 ## Step 1: Set up Windows Subsystem for Linux 2 - WSL2 - Distro
