@@ -319,7 +319,7 @@ services:
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
       - OCR_INFER_PROTOCOL=grpc
       - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
-      - OCR_RATE_LIMIT_RPS=${OCR_RATE_LIMIT_RPS:-8}
+      - OCR_RATE_LIMIT_RPS=${OCR_RATE_LIMIT_RPS:-12}
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- OCR_INFER_PROTOCOL=http
