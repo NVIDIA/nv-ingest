@@ -34,6 +34,13 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     -------
     multiprocessing.Process
         The process running the SimpleMessageBroker server.
+
+    Notes
+    -----
+    If the environment variable `NV_INGEST_BROKER_SKIP_IF_PORT_OPEN` is set to "1"
+    and the target port is already in use, this function will log and return None
+    instead of spawning a new process. This provides an opt-in idempotency guard
+    to avoid noisy spawn attempts when a broker is already running.
     """
 
     # Resolve host/port early for pre-flight checks
@@ -52,7 +59,14 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
         except Exception:
             return False
 
+    skip_if_open = os.environ.get("NV_INGEST_BROKER_SKIP_IF_PORT_OPEN") == "1"
     if _is_port_open(server_host, server_port):
+        if skip_if_open:
+            logger.info(
+                f"SimpleMessageBroker port already in use at {server_host}:{server_port}; "
+                f"skipping spawn due to NV_INGEST_BROKER_SKIP_IF_PORT_OPEN=1"
+            )
+            return None
         logger.warning(
             f"SimpleMessageBroker port already in use at {server_host}:{server_port}; "
             f"continuing to spawn a broker process (tests expect a Process to be returned)"

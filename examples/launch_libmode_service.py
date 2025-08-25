@@ -20,9 +20,6 @@ configure_local_logging(local_log_level)
 
 
 def main():
-    """
-    Launch the libmode pipeline service using the embedded default configuration.
-    """
     try:
         _ = run_pipeline(
             block=True,

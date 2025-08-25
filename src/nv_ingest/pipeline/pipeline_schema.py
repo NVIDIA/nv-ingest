@@ -202,7 +202,7 @@ class StageConfig(BaseModel):
     Configuration for a single pipeline stage.
 
     Describes a single component in the ingestion pipeline, including its name,
-    type, actor implementation, and specific configuration.
+    type, stage implementation, and specific configuration.
 
     Attributes
     ----------
@@ -212,12 +212,12 @@ class StageConfig(BaseModel):
         The type of the stage, which determines how it's added to the RayPipeline.
     phase: PipelinePhase
         The logical phase of the stage in the pipeline.
-    actor : Optional[str]
-        The fully qualified import path to the actor class or function that
+    stage_impl : Optional[str]
+        The fully qualified import path to the class or function that
         implements the stage's logic. Mutually exclusive with 'callable'.
     callable : Optional[str]
         The fully qualified import path to a callable function that
-        implements the stage's logic. Mutually exclusive with 'actor'.
+        implements the stage's logic. Mutually exclusive with 'stage_impl'.
     task_filters: Optional[List[Any]]
         List of task types this callable stage should filter for. Only applies to callable stages.
         Supports both simple strings (e.g., "udf") and complex filters (e.g., ["udf", {"phase": 5}]).
@@ -225,7 +225,7 @@ class StageConfig(BaseModel):
         A flag to indicate whether the stage should be included in the pipeline.
         If False, the stage and its connected edges are ignored.
     config : Dict[str, Any]
-        A dictionary of configuration parameters passed to the stage's actor.
+        A dictionary of configuration parameters passed to the stage's implementation.
     replicas : ReplicaConfig
         The replica configuration for the stage.
     runs_after: List[str]
@@ -235,7 +235,9 @@ class StageConfig(BaseModel):
     name: str = Field(..., description="Unique name for the stage.")
     type: StageType = Field(StageType.STAGE, description="Type of the stage.")
     phase: PipelinePhase = Field(..., description="The logical phase of the stage.")
-    actor: Optional[str] = Field(None, description="Full import path to the stage's actor class or function.")
+    stage_impl: Optional[str] = Field(
+        None, description="Full import path to the stage's implementation class or function."
+    )
     callable: Optional[str] = Field(None, description="Full import path to a callable function for the stage.")
     task_filters: Optional[List[Any]] = Field(
         None, description="List of task types this callable stage should filter for. Only applies to callable stages."
@@ -246,15 +248,15 @@ class StageConfig(BaseModel):
     runs_after: List[str] = Field(default_factory=list, description="List of stages this stage must run after.")
 
     @model_validator(mode="after")
-    def check_actor_or_callable(self) -> "StageConfig":
+    def check_impl_or_callable(self) -> "StageConfig":
         """
-        Validates that exactly one of 'actor' or 'callable' is specified.
+        Validates that exactly one of 'stage_impl' or 'callable' is specified.
         """
-        if self.actor is None and self.callable is None:
-            raise ValueError("Either 'actor' or 'callable' must be specified")
+        if self.stage_impl is None and self.callable is None:
+            raise ValueError("Either 'stage_impl' or 'callable' must be specified")
 
-        if self.actor is not None and self.callable is not None:
-            raise ValueError("Cannot specify both 'actor' and 'callable' - they are mutually exclusive")
+        if self.stage_impl is not None and self.callable is not None:
+            raise ValueError("Cannot specify both 'stage_impl' and 'callable' - they are mutually exclusive")
 
         return self
 
@@ -322,6 +324,63 @@ class PIDControllerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PipelineFrameworkType(str, Enum):
+    """
+    Supported execution frameworks for the pipeline.
+
+    Values
+    ------
+    RAY : Execute the pipeline using the Ray-based framework.
+    PYTHON : Execute the pipeline using the lightweight Python framework (no Ray).
+    """
+
+    RAY = "ray"
+    PYTHON = "python"
+
+
+class PipelineFrameworkConfig(BaseModel):
+    """
+    Configuration for selecting the pipeline execution framework.
+
+    Attributes
+    ----------
+    type : PipelineFrameworkType
+        The execution framework to use. Defaults to RAY for backward compatibility.
+    """
+
+    type: PipelineFrameworkType = Field(
+        default=PipelineFrameworkType.RAY,
+        description="Execution framework selector (ray | python).",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PipelineServiceBrokerConfig(BaseModel):
+    """
+    Configuration for an optional in-cluster service broker.
+
+    This replaces the deprecated `launch_simple_broker` boolean flag with a
+    structured configuration that supports launch control and client parameters.
+
+    Attributes
+    ----------
+    enabled : bool
+        Whether to launch the service broker alongside the pipeline.
+    broker_client : Dict[str, Any]
+        Client configuration for the broker (e.g., host, port, broker_params). Keys are
+        passed through to the underlying broker implementation.
+    """
+
+    enabled: bool = Field(False, description="Launch the service broker alongside the pipeline.")
+    broker_client: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client configuration for the broker (host, port, broker_params, etc.)",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PipelineRuntimeConfig(BaseModel):
     """
     Configuration for pipeline runtime behavior.
@@ -336,8 +395,13 @@ class PipelineRuntimeConfig(BaseModel):
         Global memory threshold for static scaling mode (default: 0.75).
     pid_controller : PIDControllerConfig
         PID controller configuration for dynamic scaling.
-    launch_simple_broker : bool
-        If True, launches a simple message broker for the pipeline.
+    framework : PipelineFrameworkConfig
+        Execution framework selection.
+    service_broker : Optional[PipelineServiceBrokerConfig]
+        Structured configuration for the optional pipeline service broker.
+    launch_simple_broker : Optional[bool]
+        Deprecated: legacy flag for launching the simple message broker. If provided,
+        it is mapped into service_broker.enabled for backward compatibility.
     """
 
     disable_dynamic_scaling: bool = Field(False, description="Disable dynamic scaling of stage replicas.")
@@ -350,7 +414,35 @@ class PipelineRuntimeConfig(BaseModel):
     pid_controller: PIDControllerConfig = Field(
         default_factory=PIDControllerConfig, description="PID controller configuration for dynamic scaling."
     )
-    launch_simple_broker: bool = Field(False, description="Launch a simple message broker for the pipeline.")
+    framework: PipelineFrameworkConfig = Field(
+        default_factory=PipelineFrameworkConfig,
+        description="Execution framework selection.",
+    )
+    service_broker: Optional[PipelineServiceBrokerConfig] = Field(
+        default=None,
+        description="Configuration for launching an optional in-cluster service broker.",
+    )
+    # Deprecated compatibility flag; if provided maps to service_broker.enabled
+    launch_simple_broker: Optional[bool] = Field(
+        default=None,
+        description="Deprecated: use pipeline.service_broker.enabled instead.",
+    )
+
+    @model_validator(mode="after")
+    def _apply_backward_compatibility(self) -> "PipelineRuntimeConfig":
+        """
+        Maintain backward compatibility with legacy `launch_simple_broker` flag.
+
+        If the deprecated flag is present and service_broker is not explicitly provided,
+        initialize service_broker accordingly.
+        """
+        # If service_broker provided explicitly, respect it.
+        if self.service_broker is None:
+            # Map deprecated flag if present
+            if self.launch_simple_broker is not None:
+                self.service_broker = PipelineServiceBrokerConfig(enabled=bool(self.launch_simple_broker))
+        # Ensure deprecated field is not relied upon downstream
+        return self
 
     model_config = ConfigDict(extra="forbid")
 
