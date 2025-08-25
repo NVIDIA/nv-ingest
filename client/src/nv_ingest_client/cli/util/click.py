@@ -160,36 +160,49 @@ TaskType = Union[
 
 def convert_string_booleans(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convert string boolean values to actual booleans in a dictionary.
+    Convert string boolean-like values to actual booleans in a (possibly nested) dictionary.
 
-    Handles common string representations of booleans:
-    - "true", "True", "TRUE" -> True
-    - "false", "False", "FALSE" -> False
-    - Other values remain unchanged
+    Robust handling includes, case-insensitively and with surrounding whitespace ignored:
+    - Truthy:  "true", "1", "yes", "y", "on"
+    - Falsey:  "false", "0", "no", "n", "off"
+
+    The function recurses into nested dictionaries and lists.
 
     Parameters
     ----------
     data : Dict[str, Any]
-        Dictionary that may contain string boolean values
+        Dictionary that may contain string boolean values, including nested structures.
 
     Returns
     -------
     Dict[str, Any]
-        Dictionary with string booleans converted to actual booleans
+        Dictionary with string boolean-like values converted to actual booleans.
     """
-    converted = {}
-    for key, value in data.items():
+
+    truthy = {"true", "1", "yes", "y", "on"}
+    falsey = {"false", "0", "no", "n", "off"}
+
+    def _convert(value: Any) -> Any:
+        # Strings: normalize and map if in known sets
         if isinstance(value, str):
-            lower_value = value.lower()
-            if lower_value == "true":
-                converted[key] = True
-            elif lower_value == "false":
-                converted[key] = False
-            else:
-                converted[key] = value
-        else:
-            converted[key] = value
-    return converted
+            normalized = value.strip().lower()
+            if normalized in truthy:
+                return True
+            if normalized in falsey:
+                return False
+            return value
+        # Dicts: recurse per key
+        if isinstance(value, dict):
+            return {k: _convert(v) for k, v in value.items()}
+        # Lists/Tuples: recurse per element (preserve type)
+        if isinstance(value, list):
+            return [_convert(v) for v in value]
+        if isinstance(value, tuple):
+            return tuple(_convert(v) for v in value)
+        # Other types unchanged
+        return value
+
+    return {k: _convert(v) for k, v in data.items()}
 
 
 def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:

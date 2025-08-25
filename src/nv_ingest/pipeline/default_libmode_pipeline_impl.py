@@ -23,7 +23,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0  # PRE_PROCESSING
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "simple"
@@ -45,7 +45,7 @@ stages:
   - name: "metadata_injector"
     type: "stage"
     phase: 0  # PRE_PROCESSING
-    actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
     config: {}
     replicas:
       min_replicas: 0
@@ -62,7 +62,7 @@ stages:
   - name: "pdf_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
@@ -97,7 +97,7 @@ stages:
   - name: "audio_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor:AudioExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor:AudioExtractorStage"
     config:
       audio_extraction_config:
         audio_endpoints: [
@@ -119,7 +119,7 @@ stages:
   - name: "docx_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor:DocxExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor:DocxExtractorStage"
     config:
       docx_extraction_config:
         yolox_endpoints: [
@@ -140,7 +140,7 @@ stages:
   - name: "pptx_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
         yolox_endpoints: [
@@ -161,7 +161,7 @@ stages:
   - name: "image_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor:ImageExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor:ImageExtractorStage"
     config:
       image_extraction_config:
         yolox_endpoints: [
@@ -182,7 +182,7 @@ stages:
   - name: "html_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
     config: {}
     replicas:
       min_replicas: 0
@@ -196,7 +196,7 @@ stages:
   - name: "infographic_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
     config:
       endpoint_config:
         ocr_endpoints: [
@@ -217,7 +217,7 @@ stages:
   - name: "table_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor:TableExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor:TableExtractorStage"
     config:
       endpoint_config:
         yolox_endpoints: [
@@ -244,7 +244,7 @@ stages:
   - name: "chart_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor:ChartExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor:ChartExtractorStage"
     config:
       endpoint_config:
         yolox_endpoints: [
@@ -272,7 +272,7 @@ stages:
   - name: "image_filter"
     type: "stage"
     phase: 3  # MUTATION
-    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -285,7 +285,7 @@ stages:
   - name: "image_dedup"
     type: "stage"
     phase: 3  # MUTATION
-    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -298,7 +298,7 @@ stages:
   - name: "text_splitter"
     type: "stage"
     phase: 3  # MUTATION
-    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
     config:
       chunk_size: 512
       chunk_overlap: 20
@@ -315,7 +315,7 @@ stages:
   - name: "image_caption"
     type: "stage"
     phase: 4  # TRANSFORM
-    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
       endpoint_url: $VLM_CAPTION_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
@@ -333,7 +333,7 @@ stages:
   - name: "text_embedder"
     type: "stage"
     phase: 4  # TRANSFORM
-    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
     config:
       api_key: $NGC_API_KEY|""
       embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
@@ -351,7 +351,7 @@ stages:
   - name: "image_storage"
     type: "stage"
     phase: 5  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -364,7 +364,7 @@ stages:
   - name: "embedding_storage"
     type: "stage"
     phase: 5  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -377,7 +377,7 @@ stages:
   - name: "broker_response"
     type: "stage"
     phase: 5  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
       broker_client:
         client_type: "simple"
@@ -396,7 +396,7 @@ stages:
   - name: "otel_tracer"
     type: "stage"
     phase: 6  # TELEMETRY
-    actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
       otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
     replicas:
@@ -411,7 +411,7 @@ stages:
   - name: "default_drain"
     type: "sink"
     phase: 7  # DRAIN
-    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:
       min_replicas: 1
@@ -516,4 +516,6 @@ pipeline:
       client_type: $MESSAGE_CLIENT_TYPE|"simple"
       host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
       port: $MESSAGE_CLIENT_PORT|7671
+  framework:
+    type: $INGEST_SERVICE_FRAMEWORK|"python"
 """

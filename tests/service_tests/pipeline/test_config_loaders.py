@@ -27,7 +27,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -42,7 +42,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -92,7 +92,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -107,7 +107,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       auth_token: $TEST_TOKEN|""
     replicas:
@@ -160,7 +160,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -175,7 +175,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       service_name: $SERVICE_NAME|"default-service"
       endpoint_url: $ENDPOINT_URL|'http://localhost:8000'
@@ -219,7 +219,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -234,7 +234,7 @@ stages:
   - name: "pdf_extractor"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
@@ -290,7 +290,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1
       param2: [invalid, yaml, syntax
@@ -330,7 +330,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       endpoints: [$ENDPOINT1|"service1:8001", $ENDPOINT2|"service2:8002"]
     replicas:
@@ -368,7 +368,7 @@ description: "A test pipeline configuration"
 stages:
   - name: "test_stage"
     type: "stage"
-    # Missing required phase and actor
+    # Missing required phase and stage_impl
     config:
       param1: "value1"
     replicas:
@@ -405,7 +405,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -433,7 +433,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -483,7 +483,7 @@ stages:
   - name: "test_stage"  # This is a test stage
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"  # Test parameter
     replicas:
@@ -525,7 +525,7 @@ stages:
   - name: "stage1"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       param1: "value1"
     replicas:
@@ -535,7 +535,7 @@ stages:
   - name: "stage2"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param2: "value2"
     replicas:
@@ -545,7 +545,7 @@ stages:
   - name: "stage3"
     type: "stage"
     phase: 2
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param3: "value3"
     replicas:
@@ -591,7 +591,7 @@ stages:
   - name: "complex_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       database:
         host: $DB_HOST|"localhost"
@@ -658,7 +658,7 @@ stages:
   - name: "pdf_extractor"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
@@ -718,7 +718,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       string_value: "hello"
       int_value: 42

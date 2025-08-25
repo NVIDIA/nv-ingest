@@ -202,7 +202,7 @@ class StageConfig(BaseModel):
     Configuration for a single pipeline stage.
 
     Describes a single component in the ingestion pipeline, including its name,
-    type, actor implementation, and specific configuration.
+    type, stage implementation, and specific configuration.
 
     Attributes
     ----------
@@ -212,12 +212,12 @@ class StageConfig(BaseModel):
         The type of the stage, which determines how it's added to the RayPipeline.
     phase: PipelinePhase
         The logical phase of the stage in the pipeline.
-    actor : Optional[str]
-        The fully qualified import path to the actor class or function that
+    stage_impl : Optional[str]
+        The fully qualified import path to the class or function that
         implements the stage's logic. Mutually exclusive with 'callable'.
     callable : Optional[str]
         The fully qualified import path to a callable function that
-        implements the stage's logic. Mutually exclusive with 'actor'.
+        implements the stage's logic. Mutually exclusive with 'stage_impl'.
     task_filters: Optional[List[Any]]
         List of task types this callable stage should filter for. Only applies to callable stages.
         Supports both simple strings (e.g., "udf") and complex filters (e.g., ["udf", {"phase": 5}]).
@@ -225,7 +225,7 @@ class StageConfig(BaseModel):
         A flag to indicate whether the stage should be included in the pipeline.
         If False, the stage and its connected edges are ignored.
     config : Dict[str, Any]
-        A dictionary of configuration parameters passed to the stage's actor.
+        A dictionary of configuration parameters passed to the stage's implementation.
     replicas : ReplicaConfig
         The replica configuration for the stage.
     runs_after: List[str]
@@ -235,7 +235,9 @@ class StageConfig(BaseModel):
     name: str = Field(..., description="Unique name for the stage.")
     type: StageType = Field(StageType.STAGE, description="Type of the stage.")
     phase: PipelinePhase = Field(..., description="The logical phase of the stage.")
-    actor: Optional[str] = Field(None, description="Full import path to the stage's actor class or function.")
+    stage_impl: Optional[str] = Field(
+        None, description="Full import path to the stage's implementation class or function."
+    )
     callable: Optional[str] = Field(None, description="Full import path to a callable function for the stage.")
     task_filters: Optional[List[Any]] = Field(
         None, description="List of task types this callable stage should filter for. Only applies to callable stages."
@@ -246,15 +248,15 @@ class StageConfig(BaseModel):
     runs_after: List[str] = Field(default_factory=list, description="List of stages this stage must run after.")
 
     @model_validator(mode="after")
-    def check_actor_or_callable(self) -> "StageConfig":
+    def check_impl_or_callable(self) -> "StageConfig":
         """
-        Validates that exactly one of 'actor' or 'callable' is specified.
+        Validates that exactly one of 'stage_impl' or 'callable' is specified.
         """
-        if self.actor is None and self.callable is None:
-            raise ValueError("Either 'actor' or 'callable' must be specified")
+        if self.stage_impl is None and self.callable is None:
+            raise ValueError("Either 'stage_impl' or 'callable' must be specified")
 
-        if self.actor is not None and self.callable is not None:
-            raise ValueError("Cannot specify both 'actor' and 'callable' - they are mutually exclusive")
+        if self.stage_impl is not None and self.callable is not None:
+            raise ValueError("Cannot specify both 'stage_impl' and 'callable' - they are mutually exclusive")
 
         return self
 
