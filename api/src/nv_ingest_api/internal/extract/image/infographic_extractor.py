@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -163,6 +164,7 @@ def _create_clients(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
+        rate_limit_requests_per_second=int(os.getenv("OCR_RATE_LIMIT_RPS", -1)),
     )
 
     return ocr_client
