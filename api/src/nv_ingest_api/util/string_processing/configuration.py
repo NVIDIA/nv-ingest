@@ -4,12 +4,12 @@
 
 # flake8: noqa: E541
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
 import logging
 import os
-from collections import defaultdict, deque
-from typing import Dict, List, Set
+from collections import defaultdict
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
+import sys
 
 # Optional import for graphviz
 try:
@@ -81,6 +81,16 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema, config_path: str 
     # Runtime Configuration Summary
     if config.pipeline:
         output.append("\n⚙️  RUNTIME CONFIGURATION:")
+        # Framework awareness
+        framework_cfg = getattr(config.pipeline, "framework", None)
+        framework_type = getattr(framework_cfg, "type", None)
+        if framework_type == PipelineFrameworkType.PYTHON:
+            output.append("   • Framework: Python")
+        elif framework_type == PipelineFrameworkType.RAY:
+            output.append("   • Framework: Ray")
+        else:
+            output.append("   • Framework: Not specified (default: Ray)")
+
         output.append(f"   • Dynamic Scaling: {'Disabled' if config.pipeline.disable_dynamic_scaling else 'Enabled'}")
         output.append(f"   • Dynamic Memory Threshold: {config.pipeline.dynamic_memory_threshold:.1%}")
         output.append(f"   • Static Memory Threshold: {config.pipeline.static_memory_threshold:.1%}")
@@ -169,70 +179,100 @@ def pretty_print_pipeline_config(config: PipelineConfigSchema, config_path: str 
         output.append("\n🏹 PYARROW CONFIGURATION:")
         output.append("   • PyArrow: Not available (not installed)")
 
-    # Ray Configuration Information
-    if RAY_AVAILABLE:
-        output.append("\n⚡ RAY CONFIGURATION:")
+    # Framework-specific Configuration Information
+    framework_cfg = getattr(getattr(config, "pipeline", None), "framework", None)
+    framework_type = getattr(framework_cfg, "type", None)
 
-        # Ray version and initialization status
+    # Ray (default) framework details
+    if framework_type in (None, PipelineFrameworkType.RAY):
+        output.append("\n⚡ RAY CONFIGURATION:")
+        if not RAY_AVAILABLE:
+            output.append("   • Ray: Not available (not installed)")
+        else:
+
+            # Ray version and initialization status
+            try:
+                output.append(f"   • Ray Version: {ray.__version__}")
+
+                # Check if Ray is initialized
+                if ray.is_initialized():
+                    output.append("   • Ray Status: Initialized")
+
+                    # Get cluster information if available
+                    try:
+                        cluster_resources = ray.cluster_resources()
+                        available_resources = ray.available_resources()
+
+                        total_cpus = cluster_resources.get("CPU", 0)
+                        available_cpus = available_resources.get("CPU", 0)
+                        total_memory = cluster_resources.get("memory", 0) / (1024**3)  # Convert to GB
+                        available_memory = available_resources.get("memory", 0) / (1024**3)
+
+                        output.append(f"   • Cluster CPUs: {available_cpus:.1f}/{total_cpus:.1f} available")
+                        if total_memory > 0:
+                            output.append(
+                                f"   • Cluster Memory: {available_memory:.2f}/{total_memory:.2f} GB available"
+                            )
+
+                    except Exception as e:
+                        output.append(f"   • Cluster Resources: Unable to query ({str(e)})")
+                else:
+                    output.append("   • Ray Status: Not initialized")
+
+            except Exception as e:
+                output.append(f"   • Ray Status: Error querying ({str(e)})")
+
+            # Ray environment variables - threading configuration
+            ray_env_vars = [
+                "RAY_num_grpc_threads",
+                "RAY_num_server_call_thread",
+                "RAY_worker_num_grpc_internal_threads",
+            ]
+
+            output.append("   • Threading Configuration:")
+            for var in ray_env_vars:
+                value = os.environ.get(var, "not set")
+                output.append(f"     - {var}: {value}")
+
+            # Additional Ray environment variables that might be relevant
+            other_ray_vars = [
+                "RAY_DEDUP_LOGS",
+                "RAY_LOG_TO_DRIVER",
+                "RAY_DISABLE_IMPORT_WARNING",
+                "RAY_USAGE_STATS_ENABLED",
+            ]
+
+            ray_other_set = []
+            for var in other_ray_vars:
+                value = os.environ.get(var)
+                if value is not None:
+                    ray_other_set.append(f"{var}={value}")
+
+            if ray_other_set:
+                output.append("   • Other Ray Settings:")
+                for setting in ray_other_set:
+                    output.append(f"     - {setting}")
+
+    # Python framework details
+    if framework_type == PipelineFrameworkType.PYTHON:
+        output.append("\n🐍 PYTHON FRAMEWORK CONFIGURATION:")
         try:
-            output.append(f"   • Ray Version: {ray.__version__}")
+            output.append(f"   • Python Version: {sys.version.split()[0]}")
+        except Exception:
+            pass
+        output.append("   • Execution Model: In-process (no Ray cluster)")
 
-            # Check if Ray is initialized
-            if ray.is_initialized():
-                output.append("   • Ray Status: Initialized")
-
-                # Get cluster information if available
-                try:
-                    cluster_resources = ray.cluster_resources()
-                    available_resources = ray.available_resources()
-
-                    total_cpus = cluster_resources.get("CPU", 0)
-                    available_cpus = available_resources.get("CPU", 0)
-                    total_memory = cluster_resources.get("memory", 0) / (1024**3)  # Convert to GB
-                    available_memory = available_resources.get("memory", 0) / (1024**3)
-
-                    output.append(f"   • Cluster CPUs: {available_cpus:.1f}/{total_cpus:.1f} available")
-                    if total_memory > 0:
-                        output.append(f"   • Cluster Memory: {available_memory:.2f}/{total_memory:.2f} GB available")
-
-                except Exception as e:
-                    output.append(f"   • Cluster Resources: Unable to query ({str(e)})")
-            else:
-                output.append("   • Ray Status: Not initialized")
-
-        except Exception as e:
-            output.append(f"   • Ray Status: Error querying ({str(e)})")
-
-        # Ray environment variables - threading configuration
-        ray_env_vars = ["RAY_num_grpc_threads", "RAY_num_server_call_thread", "RAY_worker_num_grpc_internal_threads"]
-
-        output.append("   • Threading Configuration:")
-        for var in ray_env_vars:
-            value = os.environ.get(var, "not set")
-            output.append(f"     - {var}: {value}")
-
-        # Additional Ray environment variables that might be relevant
-        other_ray_vars = [
-            "RAY_DEDUP_LOGS",
-            "RAY_LOG_TO_DRIVER",
-            "RAY_DISABLE_IMPORT_WARNING",
-            "RAY_USAGE_STATS_ENABLED",
-        ]
-
-        ray_other_set = []
-        for var in other_ray_vars:
-            value = os.environ.get(var)
-            if value is not None:
-                ray_other_set.append(f"{var}={value}")
-
-        if ray_other_set:
-            output.append("   • Other Ray Settings:")
-            for setting in ray_other_set:
-                output.append(f"     - {setting}")
-
-    else:
-        output.append("\n⚡ RAY CONFIGURATION:")
-        output.append("   • Ray: Not available (not installed)")
+        # Service broker details if present
+        try:
+            sb = getattr(getattr(config, "pipeline", None), "service_broker", None)
+            if sb is not None:
+                enabled = getattr(sb, "enabled", False)
+                output.append(f"   • Service Broker: {'Enabled' if enabled else 'Disabled'}")
+            env_flag = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+            if env_flag is not None:
+                output.append(f"   • NV_INGEST_BROKER_IN_SUBPROCESS={env_flag}")
+        except Exception:
+            pass
 
     # Check if detailed stage configuration should be shown
     show_detailed_stages = logger.isEnabledFor(logging.DEBUG)
