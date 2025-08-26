@@ -8,7 +8,7 @@ import socketserver
 import json
 import logging
 import threading
-from typing import Optional
+from typing import Optional, Dict
 
 from pydantic import ValidationError
 
@@ -447,7 +447,43 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         self.queues = {}
         self.queue_locks = {}  # Dictionary to hold locks for each queue
         self.lock = threading.Lock()  # Global lock to protect access to queues and locks
+        # State for in-process (direct) API two-phase operations
+        self._pending_pushes: Dict[str, Dict[str, str]] = {}
+        # maps transaction_id -> {"queue_name": str, "message": str}
+        self._inflight_pops: Dict[str, str] = {}
+        # maps transaction_id -> queue_name
         self._initialized = True  # Flag to indicate initialization is complete
+
+    def server_close(self):
+        """
+        Closes the server socket and removes this instance from the singleton registry.
+
+        This ensures that a new broker can be created on the same (host, port) after
+        this instance has been shut down.
+        """
+
+        # Remove from singleton registry if it matches the stored instance for this (host, port)
+        cls = type(self)
+        try:
+            host, port = self.server_address
+        except Exception:
+            # Fallback if server_address is not available for any reason
+            host, port = None, None
+
+        if host is not None and port is not None:
+            key = (host, port)
+            with cls._instances_lock:
+                if cls._instances.get(key) is self:
+                    del cls._instances[key]
+
+        # Proceed with normal server close
+        super().server_close()
+        # Mark instance as not initialized so it can be re-initialized if reused by mistake
+        self._initialized = False
+        # Clear any in-process state
+        with self.lock:
+            self._pending_pushes.clear()
+            self._inflight_pops.clear()
 
     def _initialize_queue(self, queue_name: str):
         """
@@ -463,3 +499,152 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             if queue_name not in self.queues:
                 self.queues[queue_name] = OrderedMessageQueue(maxsize=self.max_queue_size)
                 self.queue_locks[queue_name] = threading.Lock()
+
+    # =============================
+    # In-Process (Direct) API
+    # =============================
+    def ping_inprocess(self) -> ResponseSchema:
+        """
+        Direct in-process equivalent of PING.
+        """
+        return ResponseSchema(response_code=0, response="PONG")
+
+    def size_inprocess(self, data: SizeRequestSchema) -> ResponseSchema:
+        """
+        Direct in-process equivalent of SIZE.
+        """
+        self._initialize_queue(data.queue_name)
+        queue_lock = self.queue_locks[data.queue_name]
+        queue = self.queues[data.queue_name]
+        return self._size_of_queue(data, queue, queue_lock)
+
+    def push_inprocess(self, data: PushRequestSchema) -> ResponseSchema:
+        """
+        Direct in-process two-phase PUSH initiation.
+
+        Returns initial response with transaction_id. The caller must complete the operation by
+        invoking push_ack_inprocess(transaction_id, ack=True/False).
+        """
+        self._initialize_queue(data.queue_name)
+        queue_lock = self.queue_locks[data.queue_name]
+        queue = self.queues[data.queue_name]
+
+        with queue_lock:
+            if queue.full():
+                return ResponseSchema(response_code=1, response_reason="Queue is full")
+
+        transaction_id = str(uuid.uuid4())
+        with self.lock:
+            self._pending_pushes[transaction_id] = {"queue_name": data.queue_name, "message": data.message}
+
+        return ResponseSchema(
+            response_code=0,
+            response="Transaction initiated. Waiting for ACK.",
+            transaction_id=transaction_id,
+        )
+
+    def push_for_nv_ingest_inprocess(self, data: PushRequestSchema) -> ResponseSchema:
+        """
+        Direct in-process two-phase PUSH_FOR_NV_INGEST initiation.
+
+        Adds/overwrites 'job_id' in the JSON message with the transaction_id.
+        """
+        self._initialize_queue(data.queue_name)
+        queue_lock = self.queue_locks[data.queue_name]
+        queue = self.queues[data.queue_name]
+
+        with queue_lock:
+            if queue.full():
+                return ResponseSchema(response_code=1, response_reason="Queue is full")
+
+        # Deserialize and update message
+        try:
+            message_dict = json.loads(data.message)
+        except json.JSONDecodeError:
+            return ResponseSchema(response_code=1, response_reason="Invalid JSON message")
+
+        transaction_id = str(uuid.uuid4())
+        message_dict["job_id"] = transaction_id
+        updated_message = json.dumps(message_dict)
+
+        with self.lock:
+            self._pending_pushes[transaction_id] = {"queue_name": data.queue_name, "message": updated_message}
+
+        return ResponseSchema(
+            response_code=0,
+            response="Transaction initiated. Waiting for ACK.",
+            transaction_id=transaction_id,
+        )
+
+    def push_ack_inprocess(self, transaction_id: str, ack: bool) -> ResponseSchema:
+        """
+        Completes an in-process PUSH or PUSH_FOR_NV_INGEST after the initial phase.
+        """
+        with self.lock:
+            pending = self._pending_pushes.get(transaction_id)
+        if not pending:
+            return ResponseSchema(response_code=1, response_reason="Unknown transaction")
+
+        queue_name = pending["queue_name"]
+        message = pending["message"]
+        queue_lock = self.queue_locks[queue_name]
+        queue = self.queues[queue_name]
+
+        if not ack:
+            with self.lock:
+                self._pending_pushes.pop(transaction_id, None)
+            return ResponseSchema(response_code=1, response_reason="ACK not received.", transaction_id=transaction_id)
+
+        with queue_lock:
+            queue.push(message)
+        with self.lock:
+            self._pending_pushes.pop(transaction_id, None)
+        return ResponseSchema(response_code=0, response="Data stored.", transaction_id=transaction_id)
+
+    def pop_inprocess(self, data: PopRequestSchema) -> ResponseSchema:
+        """
+        Direct in-process two-phase POP initiation.
+
+        Returns initial response with message and transaction_id. The caller must complete the operation by
+        invoking pop_ack_inprocess(transaction_id, ack=True/False).
+        """
+        self._initialize_queue(data.queue_name)
+        queue_lock = self.queue_locks[data.queue_name]
+        queue = self.queues[data.queue_name]
+
+        with queue_lock:
+            if queue.empty():
+                return ResponseSchema(response_code=2, response_reason="Job not ready")
+
+            transaction_id = str(uuid.uuid4())
+            message = queue.pop(transaction_id)
+
+        with self.lock:
+            self._inflight_pops[transaction_id] = data.queue_name
+
+        return ResponseSchema(response_code=0, response=message, transaction_id=transaction_id)
+
+    def pop_ack_inprocess(self, transaction_id: str, ack: bool) -> ResponseSchema:
+        """
+        Completes an in-process POP after the initial phase.
+        """
+        with self.lock:
+            queue_name = self._inflight_pops.get(transaction_id)
+        if not queue_name:
+            return ResponseSchema(response_code=1, response_reason="Unknown transaction")
+
+        queue_lock = self.queue_locks[queue_name]
+        queue = self.queues[queue_name]
+
+        if not ack:
+            with queue_lock:
+                queue.return_message(transaction_id)
+            with self.lock:
+                self._inflight_pops.pop(transaction_id, None)
+            return ResponseSchema(response_code=1, response_reason="ACK not received.", transaction_id=transaction_id)
+
+        with queue_lock:
+            queue.acknowledge(transaction_id)
+        with self.lock:
+            self._inflight_pops.pop(transaction_id, None)
+        return ResponseSchema(response_code=0, response="Data processed.", transaction_id=transaction_id)

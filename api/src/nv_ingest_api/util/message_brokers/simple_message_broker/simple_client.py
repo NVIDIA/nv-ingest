@@ -2,16 +2,18 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# NOTE: This code is duplicated from the ingest service:
-# src/nv_ingest/util/message_brokers/simple_message_broker/simple_client.py
-# Eventually we should move all client wrappers for the message broker into a shared library that both the ingest
-# service and the client can use.
-
 import socket
 import json
 import time
 import logging
 from typing import Optional, Tuple, Union
+
+from nv_ingest_api.internal.schemas.message_brokers.request_schema import (
+    PushRequestSchema,
+    PopRequestSchema,
+    SizeRequestSchema,
+)
+from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
@@ -105,7 +107,11 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response from the broker.
         """
-        return self._handle_push(queue_name, message, timeout, for_nv_ingest)
+        # Prefer in-process direct interface if broker exists in this process
+        inproc_broker = self._get_inprocess_broker()
+        if inproc_broker is not None:
+            return self._handle_push_inprocess(inproc_broker, queue_name, message, timeout, for_nv_ingest)
+        return self._handle_push_socket(queue_name, message, timeout, for_nv_ingest)
 
     def fetch_message(
         self, queue_name: str, timeout: Optional[Tuple[int, Union[float, None]]] = (1200, None)
@@ -125,7 +131,10 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response from the broker.
         """
-        return self._handle_pop(queue_name, timeout)
+        inproc_broker = self._get_inprocess_broker()
+        if inproc_broker is not None:
+            return self._handle_pop_inprocess(inproc_broker, queue_name, timeout)
+        return self._handle_pop_socket(queue_name, timeout)
 
     def ping(self) -> ResponseSchema:
         """
@@ -136,6 +145,9 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response indicating the success of the ping operation.
         """
+        inproc_broker = self._get_inprocess_broker()
+        if inproc_broker is not None:
+            return inproc_broker.ping_inprocess()
         command = {"command": "PING"}
         return self._execute_simple_command(command)
 
@@ -153,10 +165,14 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response containing the queue size.
         """
+        inproc_broker = self._get_inprocess_broker()
+        if inproc_broker is not None:
+            req = SizeRequestSchema(command="SIZE", queue_name=queue_name)
+            return inproc_broker.size_inprocess(req)
         command = {"command": "SIZE", "queue_name": queue_name}
         return self._execute_simple_command(command)
 
-    def _handle_push(
+    def _handle_push_socket(
         self, queue_name: str, message: str, timeout: Optional[Tuple[int, Union[float, None]]], for_nv_ingest: bool
     ) -> ResponseSchema:
         """
@@ -246,7 +262,7 @@ class SimpleClient(MessageBrokerClientBase):
 
             time.sleep(0.5)  # Backoff delay before retry
 
-    def _handle_pop(self, queue_name: str, timeout: Optional[Tuple[int, Union[float, None]]]) -> ResponseSchema:
+    def _handle_pop_socket(self, queue_name: str, timeout: Optional[Tuple[int, Union[float, None]]]) -> ResponseSchema:
         """
         Pop a message from the queue with optional timeout.
 
@@ -329,6 +345,106 @@ class SimpleClient(MessageBrokerClientBase):
             # Exponential backoff
             time.sleep(backoff_delay)
             backoff_delay = min(backoff_delay * 2, self._max_backoff)
+
+    def _handle_push_inprocess(
+        self,
+        broker: SimpleMessageBroker,
+        queue_name: str,
+        message: str,
+        timeout: Optional[Tuple[int, Union[float, None]]],
+        for_nv_ingest: bool,
+    ) -> ResponseSchema:
+        if not queue_name or not isinstance(queue_name, str):
+            return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
+        if not message or not isinstance(message, str):
+            return ResponseSchema(response_code=1, response_reason="Invalid message.")
+
+        timeout_val = int(timeout[0]) if isinstance(timeout, tuple) else (int(timeout) if timeout is not None else None)
+        start_time = time.time()
+
+        while True:
+            elapsed = time.time() - start_time
+            if (timeout_val is not None) and (elapsed >= timeout_val):
+                return ResponseSchema(response_code=1, response_reason="PUSH operation timed out.")
+
+            try:
+                if for_nv_ingest:
+                    req = PushRequestSchema(
+                        command="PUSH_FOR_NV_INGEST", queue_name=queue_name, message=message, timeout=timeout_val
+                    )
+                    initial = broker.push_for_nv_ingest_inprocess(req)
+                else:
+                    req = PushRequestSchema(command="PUSH", queue_name=queue_name, message=message, timeout=timeout_val)
+                    initial = broker.push_inprocess(req)
+
+                if initial.response_code != 0:
+                    # Retry only for queue full/not available cases
+                    if initial.response_reason in ("Queue is full", "Queue is not available"):
+                        time.sleep(0.5)
+                        continue
+                    return initial
+
+                if not initial.transaction_id:
+                    return ResponseSchema(response_code=1, response_reason="No transaction_id in response.")
+
+                final = broker.push_ack_inprocess(initial.transaction_id, True)
+                return final
+            except Exception as e:
+                # Treat exceptions as retryable until timeout
+                logger.debug(f"In-process PUSH error: {e}")
+                time.sleep(0.5)
+
+    def _handle_pop_inprocess(
+        self,
+        broker: SimpleMessageBroker,
+        queue_name: str,
+        timeout: Optional[Tuple[int, Union[float, None]]],
+    ) -> ResponseSchema:
+        if not queue_name or not isinstance(queue_name, str):
+            return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
+
+        timeout_val = timeout[0] if isinstance(timeout, tuple) else timeout
+        start_time = time.time()
+        backoff_delay = 1
+
+        while True:
+            elapsed = time.time() - start_time
+            if timeout_val is not None and elapsed >= timeout_val:
+                return ResponseSchema(response_code=2, response_reason="Job not ready.")
+
+            try:
+                req = PopRequestSchema(command="POP", queue_name=queue_name, timeout=timeout_val)
+                initial = broker.pop_inprocess(req)
+                if initial.response_code == 2:
+                    # Job not ready; backoff and retry
+                    pass
+                elif initial.response_code != 0:
+                    return initial
+                else:
+                    if not initial.transaction_id:
+                        return ResponseSchema(response_code=1, response_reason="No transaction_id in response.")
+
+                    message = initial.response
+                    final = broker.pop_ack_inprocess(initial.transaction_id, True)
+                    if final.response_code == 0:
+                        return ResponseSchema(response_code=0, response=message, transaction_id=initial.transaction_id)
+                    else:
+                        return final
+            except Exception as e:
+                logger.debug(f"In-process POP error: {e}; will retry after backoff.")
+                pass
+
+            time.sleep(backoff_delay)
+            backoff_delay = min(backoff_delay * 2, self._max_backoff)
+
+    def _get_inprocess_broker(self) -> Optional[SimpleMessageBroker]:
+        """Return the in-process broker instance for this client's (host, port), if present."""
+        try:
+            # Access the singleton registry safely
+            with SimpleMessageBroker._instances_lock:
+                return SimpleMessageBroker._instances.get((self._host, self._port))
+        except Exception:
+            return None
 
     def _execute_simple_command(self, command: dict) -> ResponseSchema:
         """
