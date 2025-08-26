@@ -106,10 +106,15 @@ class NimClient:
                 f"{self._rate_limit} req/s, burst capacity {self._bucket_capacity}"
             )
 
-    def _acquire_token(self):
+    def _acquire_tokens(self, num_tokens: int):
         """
         Acquires a token for rate limiting using a thread-safe token bucket.
         Blocks if necessary until a token is available.
+
+        Parameters
+        ----------
+        num_tokens: int
+            The number of tokens to acquire, typically the batch size.
         """
         if not self.rate_limit_enabled:
             return
@@ -121,14 +126,14 @@ class NimClient:
             self._tokens = min(self._bucket_capacity, self._tokens + new_tokens)
             self._last_token_fill_time = now
 
-            if self._tokens < 1.0:
-                time_to_wait = (1.0 - self._tokens) / self._rate_limit
+            if self._tokens < num_tokens:
+                tokens_needed = num_tokens - self._tokens
+                time_to_wait = tokens_needed / self._rate_limit
                 time.sleep(time_to_wait)
-                # After waiting, we can assume we have 1 token
-                # Recalculate tokens gained during sleep for accuracy
+                # After waiting, recalculate the token count based on the actual time slept.
                 self._tokens += (time.monotonic() - now) * self._rate_limit
 
-            self._tokens -= 1.0
+            self._tokens -= num_tokens
 
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
@@ -179,7 +184,7 @@ class NimClient:
         tuple
             A tuple (parsed_output, batch_data) for subsequent post-processing.
         """
-        self._acquire_token()
+        self._acquire_tokens(len(batch_input))
 
         if self.protocol == "grpc":
             logger.debug("Performing gRPC inference for a batch...")
