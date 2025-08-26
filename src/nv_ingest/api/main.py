@@ -15,8 +15,28 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
 from .v1.metrics import router as MetricsApiRouter
+from .dependency import create_ingest_service
 
 logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Build once per process; app owns the instance
+    app.state.ingest_service = create_ingest_service()
+    try:
+        yield
+    finally:
+        svc = getattr(app.state, "ingest_service", None)
+        if svc is not None:
+            close = getattr(svc, "close", None)
+            if callable(close):
+                try:
+                    maybe = close()
+                    import asyncio
+                    if asyncio.iscoroutine(maybe):
+                        await maybe
+                except Exception:
+                    logger.exception("Error closing ingest service during shutdown")
 
 # nv-ingest FastAPI app declaration
 app = FastAPI(
