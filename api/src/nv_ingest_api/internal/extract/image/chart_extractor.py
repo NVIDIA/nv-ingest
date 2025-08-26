@@ -96,13 +96,23 @@ def _run_chart_inference(
         future_ocr_kwargs.update(
             model_name="paddle",
         )
-    else:
+    elif ocr_model_name == "scene_text":
         future_ocr_kwargs.update(
-            model_name="scene_text",
+            model_name=ocr_model_name,
             input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
+    elif ocr_model_name == "scene_text_ensemble":
+        future_ocr_kwargs.update(
+            model_name=ocr_model_name,
+            input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
+            output_names=["OUTPUT"],
+            dtypes=["BYTES", "BYTES"],
+            merge_level="paragraph",
+        )
+    else:
+        raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
