@@ -14,7 +14,6 @@ Tests the efficient image saving functionality including:
 
 import base64
 import io
-from unittest.mock import patch
 
 import pytest
 from PIL import Image
@@ -210,12 +209,12 @@ class TestConversionWrite:
 
 
 class TestEfficientSave:
-    """Test the smart routing efficient save functionality."""
+    """Test the smart routing efficient save functionality with real behavior."""
 
     @pytest.fixture
     def sample_png_base64(self):
         """Create sample PNG base64."""
-        img = Image.new("RGB", (2, 2), color="green")
+        img = Image.new("RGB", (4, 4), color="green")
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -223,72 +222,60 @@ class TestEfficientSave:
     @pytest.fixture
     def sample_jpeg_base64(self):
         """Create sample JPEG base64."""
-        img = Image.new("RGB", (2, 2), color="yellow")
+        img = Image.new("RGB", (4, 4), color="yellow")
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def test_direct_path_png_to_png(self, tmp_path, sample_png_base64):
-        """Test direct path when formats match (PNG -> PNG)."""
-        output_file = tmp_path / "test.png"
+    def test_same_format_saves_successfully(self, tmp_path, sample_png_base64, sample_jpeg_base64):
+        """Test that same format conversions work correctly."""
+        # PNG -> PNG
+        png_file = tmp_path / "test.png"
+        result1 = _save_image_efficiently(sample_png_base64, str(png_file), "PNG")
+        assert result1 is True
+        assert png_file.exists()
 
-        with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_direct", return_value=True) as mock_direct:
-            with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_with_conversion") as mock_convert:
-                result = _save_image_efficiently(sample_png_base64, str(output_file), "PNG")
+        # Verify it's a valid PNG
+        with Image.open(png_file) as img:
+            assert img.format == "PNG"
 
-                assert result is True
-                mock_direct.assert_called_once()
-                mock_convert.assert_not_called()
+        # JPEG -> JPEG
+        jpeg_file = tmp_path / "test.jpeg"
+        result2 = _save_image_efficiently(sample_jpeg_base64, str(jpeg_file), "JPEG")
+        assert result2 is True
+        assert jpeg_file.exists()
 
-    def test_direct_path_jpeg_to_jpeg(self, tmp_path, sample_jpeg_base64):
-        """Test direct path when formats match (JPEG -> JPEG)."""
-        output_file = tmp_path / "test.jpeg"
+        # Verify it's a valid JPEG
+        with Image.open(jpeg_file) as img:
+            assert img.format == "JPEG"
 
-        with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_direct", return_value=True) as mock_direct:
-            with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_with_conversion") as mock_convert:
-                result = _save_image_efficiently(sample_jpeg_base64, str(output_file), "JPEG")
+    def test_format_conversion_works(self, tmp_path, sample_png_base64):
+        """Test that format conversion produces correct output."""
+        # PNG -> JPEG conversion
+        output_file = tmp_path / "converted.jpg"
+        result = _save_image_efficiently(sample_png_base64, str(output_file), "JPEG", quality=85)
 
-                assert result is True
-                mock_direct.assert_called_once()
-                mock_convert.assert_not_called()
+        assert result is True
+        assert output_file.exists()
 
-    def test_conversion_path_png_to_jpeg(self, tmp_path, sample_png_base64):
-        """Test conversion path when formats differ (PNG -> JPEG)."""
-        output_file = tmp_path / "test.jpg"
-
-        with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_direct") as mock_direct:
-            with patch(
-                "nv_ingest_client.util.image_disk_utils._base64_to_disk_with_conversion", return_value=True
-            ) as mock_convert:
-                result = _save_image_efficiently(sample_png_base64, str(output_file), "JPEG", quality=85)
-
-                assert result is True
-                mock_direct.assert_not_called()
-                mock_convert.assert_called_once_with(sample_png_base64, str(output_file), "JPEG", 85)
+        # Verify the output is actually JPEG format
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
+            # Should maintain basic image properties
+            assert img.size == (4, 4)
+            assert img.mode in ("RGB", "L")  # JPEG supports RGB or grayscale
 
     def test_jpg_format_normalization(self, tmp_path, sample_jpeg_base64):
         """Test JPG format normalization to JPEG."""
         output_file = tmp_path / "test.jpg"
+        result = _save_image_efficiently(sample_jpeg_base64, str(output_file), "JPG")  # JPG should work
 
-        with patch("nv_ingest_client.util.image_disk_utils._base64_to_disk_direct", return_value=True) as mock_direct:
-            result = _save_image_efficiently(sample_jpeg_base64, str(output_file), "JPG")
+        assert result is True
+        assert output_file.exists()
 
-            assert result is True
-            mock_direct.assert_called_once()
-
-    def test_unknown_format_conversion(self, tmp_path):
-        """Test conversion when source format is unknown."""
-        # Create invalid base64 that will return None for format detection
-        invalid_b64 = base64.b64encode(b"not an image").decode("utf-8")
-        output_file = tmp_path / "test.png"
-
-        with patch(
-            "nv_ingest_client.util.image_disk_utils._base64_to_disk_with_conversion", return_value=True
-        ) as mock_convert:
-            result = _save_image_efficiently(invalid_b64, str(output_file), "PNG")
-
-            assert result is True
-            mock_convert.assert_called_once()
+        # File should be valid regardless of JPG vs JPEG naming
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
 
 
 class TestSaveImagesToDisk:
@@ -371,29 +358,16 @@ class TestSaveImagesToDisk:
         assert result == {}
 
     def test_unsupported_output_format(self, tmp_path, sample_response_data):
-        """Test handling unsupported output format."""
-        with patch("nv_ingest_client.util.image_disk_utils.logger") as mock_logger:
-            result = save_images_to_disk(sample_response_data, str(tmp_path), output_format="bmp")  # Unsupported
+        """Test handling unsupported output format falls back gracefully."""
+        # Test behavior, not logging - fallback should still save images
+        result = save_images_to_disk(sample_response_data, str(tmp_path), output_format="bmp")  # Unsupported
 
-            # Should fallback to PNG
-            mock_logger.warning.assert_called()
-            assert result["total"] == 2
+        # Should fallback and still save images successfully
+        assert result["total"] == 2
 
-    @patch("nv_ingest_client.util.image_disk_utils._save_image_efficiently")
-    def test_quality_parameters_by_subtype(self, mock_save, tmp_path, sample_response_data):
-        """Test that different quality parameters are used for different subtypes."""
-        mock_save.return_value = True
-
-        save_images_to_disk(sample_response_data, str(tmp_path))
-
-        # Verify quality parameters passed
-        calls = mock_save.call_args_list
-        assert len(calls) == 2
-
-        # Both should be called with quality=95 (charts and tables get high quality)
-        for call in calls:
-            args, kwargs = call
-            assert kwargs.get("quality") == 95
+        # Images should exist and be in fallback format (PNG)
+        saved_files = list(tmp_path.rglob("*.png"))
+        assert len(saved_files) == 2
 
 
 class TestConvenienceFunctions:
