@@ -21,19 +21,171 @@ import base64
 import io
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+import cv2
+import numpy as np
 from PIL import Image
-
-try:
-    from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
-
-    OPENCV_AVAILABLE = True
-except ImportError:
-    OPENCV_AVAILABLE = False
 
 from nv_ingest_client.client.util.processing import get_valid_filename
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_base64_image_format(base64_string: str) -> Optional[str]:
+    """
+    Detects the format of a base64-encoded image.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image string.
+
+    Returns
+    -------
+    Optional[str]
+        The detected format ("PNG", "JPEG") or None if unknown.
+    """
+    try:
+        image_bytes = base64.b64decode(base64_string)
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            return img.format.upper() if img.format else None
+    except Exception as e:
+        logger.debug(f"Error detecting image format: {e}")
+        return None
+
+
+def _base64_to_disk_direct(base64_string: str, output_path: str) -> bool:
+    """
+    Write base64 image data directly to disk without conversion.
+
+    This is the most efficient approach when no format conversion is needed.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image data.
+    output_path : str
+        Path where the image should be saved.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+    """
+    try:
+        image_bytes = base64.b64decode(base64_string)
+        with open(output_path, "wb") as f:
+            f.write(image_bytes)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to write image directly to disk: {e}")
+        return False
+
+
+def _base64_to_disk_with_conversion(
+    base64_string: str, output_path: str, target_format: str, quality: int = 95
+) -> bool:
+    """
+    Convert base64 image to target format and save to disk.
+
+    Uses OpenCV for decoding and PIL for format conversion to maintain
+    compatibility with the existing codebase expectations.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image data.
+    output_path : str
+        Path where the converted image should be saved.
+    target_format : str
+        Target format ("PNG", "JPEG").
+    quality : int, optional
+        JPEG quality (1-100). Ignored for PNG. Default is 95.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+    """
+    try:
+        # Use OpenCV to decode base64 to numpy array (faster than PIL)
+        image_bytes = base64.b64decode(base64_string)
+        buf = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+
+        if img is None:
+            raise ValueError("OpenCV failed to decode image")
+
+        # Convert BGR to RGB for PIL compatibility (OpenCV loads as BGR)
+        if img.ndim == 3 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # Convert to PIL Image for format conversion
+        pil_image = Image.fromarray(img)
+
+        # Save with appropriate format and settings
+        save_kwargs = {}
+        if target_format.upper() == "JPEG":
+            save_kwargs["quality"] = quality
+            # Ensure RGB mode for JPEG (no alpha channel)
+            if pil_image.mode in ("RGBA", "LA"):
+                # Create white background for transparency
+                background = Image.new("RGB", pil_image.size, (255, 255, 255))
+                if pil_image.mode == "LA":
+                    pil_image = pil_image.convert("RGBA")
+                background.paste(pil_image, mask=pil_image.split()[-1])
+                pil_image = background
+            elif pil_image.mode != "RGB":
+                pil_image = pil_image.convert("RGB")
+
+        pil_image.save(output_path, format=target_format.upper(), **save_kwargs)
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to convert and save image: {e}")
+        return False
+
+
+def _save_image_efficiently(base64_content: str, output_path: str, target_format: str, quality: int = 95) -> bool:
+    """
+    Save base64 image to disk using the most efficient method available.
+
+    This function automatically chooses between direct write (when no conversion
+    is needed) and conversion (when format change is required).
+
+    Parameters
+    ----------
+    base64_content : str
+        Base64-encoded image data.
+    output_path : str
+        Path where the image should be saved.
+    target_format : str
+        Target format ("PNG", "JPEG").
+    quality : int, optional
+        JPEG quality (1-100). Ignored for PNG. Default is 95.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+    """
+    # Detect source format
+    source_format = _detect_base64_image_format(base64_content)
+    target_format_upper = target_format.upper()
+
+    # Normalize JPEG format variations
+    if target_format_upper == "JPG":
+        target_format_upper = "JPEG"
+
+    # If formats match, write directly for maximum efficiency
+    if source_format and source_format == target_format_upper:
+        logger.debug(f"Direct write: {source_format} -> {target_format_upper}")
+        return _base64_to_disk_direct(base64_content, output_path)
+    else:
+        # Format conversion required
+        logger.debug(f"Format conversion: {source_format or 'Unknown'} -> {target_format_upper}")
+        return _base64_to_disk_with_conversion(base64_content, output_path, target_format_upper, quality)
 
 
 def save_images_to_disk(
@@ -173,29 +325,25 @@ def save_images_to_disk(
                 image_filename = f"{clean_source_name}_{subtype}_p{page_number}_{doc_idx}.{file_ext}"
                 image_path = os.path.join(output_directory, image_filename)
 
-            # Decode base64 content and save as image file
+            # Save image using efficient method
             try:
-                if OPENCV_AVAILABLE:
-                    # Use OpenCV-based decoding for better performance
-                    img_array = base64_to_numpy(image_content)
+                # Determine JPEG quality based on image type (higher for important content)
+                quality = 95  # High quality for charts, tables, infographics
+                if subtype == "page_image":
+                    quality = 85  # Slightly lower for page images
+                elif subtype == "image":
+                    quality = 90  # Good quality for raw images
 
-                    # Convert numpy array back to PIL Image for saving
-                    # (base64_to_numpy returns RGB format)
-                    image = Image.fromarray(img_array)
+                # Use efficient save method that avoids unnecessary conversions
+                success = _save_image_efficiently(image_content, image_path, image_type, quality=quality)
+
+                if success:
+                    # Update image type counters
+                    image_counts[subtype] += 1
+                    image_counts["total"] += 1
+                    logger.debug(f"Saved {subtype} image: {image_path}")
                 else:
-                    # Fallback to PIL-based decoding if OpenCV not available
-                    image_data = base64.b64decode(image_content)
-                    image = Image.open(io.BytesIO(image_data))
-
-                # Save with appropriate PIL format
-                save_format = "JPEG" if image_type == "jpeg" else image_type.upper()
-                image.save(image_path, format=save_format)
-
-                # Update image type counters
-                image_counts[subtype] += 1
-                image_counts["total"] += 1
-
-                logger.debug(f"Saved {subtype} image: {image_path}")
+                    logger.error(f"Failed to save {subtype} image for {clean_source_name}")
 
             except Exception as e:
                 logger.error(f"Failed to save {subtype} image for {clean_source_name}: {e}")
