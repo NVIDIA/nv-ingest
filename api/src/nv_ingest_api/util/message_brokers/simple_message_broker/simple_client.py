@@ -110,6 +110,7 @@ class SimpleClient(MessageBrokerClientBase):
         # Prefer in-process direct interface if broker exists in this process
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
+            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PUSH")
             return self._handle_push_inprocess(inproc_broker, queue_name, message, timeout, for_nv_ingest)
         return self._handle_push_socket(queue_name, message, timeout, for_nv_ingest)
 
@@ -133,6 +134,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
+            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for POP")
             return self._handle_pop_inprocess(inproc_broker, queue_name, timeout)
         return self._handle_pop_socket(queue_name, timeout)
 
@@ -147,6 +149,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
+            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PING")
             return inproc_broker.ping_inprocess()
         command = {"command": "PING"}
         return self._execute_simple_command(command)
@@ -167,6 +170,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
+            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for SIZE")
             req = SizeRequestSchema(command="SIZE", queue_name=queue_name)
             return inproc_broker.size_inprocess(req)
         command = {"command": "SIZE", "queue_name": queue_name}

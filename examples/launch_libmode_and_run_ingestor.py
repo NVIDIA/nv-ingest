@@ -68,7 +68,7 @@ def main():
         pipeline = run_pipeline(
             block=False,
             disable_dynamic_scaling=True,
-            run_in_subprocess=True,
+            run_in_subprocess=False,
             stdout=sys.stdout,
             stderr=sys.stderr,
         )

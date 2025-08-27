@@ -21,7 +21,10 @@ from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from nv_ingest.framework.orchestration.execution.options import ExecutionOptions, ExecutionResult
 from nv_ingest.framework.orchestration.process.strategies import ProcessExecutionStrategy
 from nv_ingest.framework.orchestration.process.strategies import SubprocessStrategy
-from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
+from nv_ingest.framework.orchestration.process.dependent_services import (
+    start_simple_message_broker,
+    start_simple_message_broker_inthread,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,9 @@ class PipelineLifecycleManager:
             The strategy to use for pipeline execution.
         """
         self.strategy = strategy
-        # Track broker process so we can terminate it during teardown
+        # Track broker process/thread so we can terminate it during teardown
         self._broker_process: Optional[multiprocessing.Process] = None
+        self._broker_thread_handle = None  # dict with keys: server, thread, host, port
 
     def start(self, config: PipelineConfigSchema, options: ExecutionOptions) -> ExecutionResult:
         """
@@ -140,18 +144,38 @@ class PipelineLifecycleManager:
                     f"(env NV_INGEST_BROKER_IN_SUBPROCESS={env_in_subproc})"
                 )
                 return
-            logger.info("Starting simple message broker in parent process")
-            # Start the broker and retain a handle for cleanup.
-            # Pass through any provided broker_client configuration (host, port, broker_params, etc.)
+            # Decide in-thread vs process launch.
+            # Default: in-thread when using in-process strategy; process when using subprocess strategy.
             broker_client = getattr(sb_cfg, "broker_client", {}) if sb_cfg is not None else {}
+            env_force_thread = os.environ.get("NV_INGEST_BROKER_IN_THREAD")
+            use_thread = (
+                (env_force_thread == "1")
+                or (env_force_thread is None and not isinstance(self.strategy, SubprocessStrategy))
+            ) and env_in_subproc != "1"
+
             try:
-                self._broker_process = start_simple_message_broker(broker_client)
-                if self._broker_process is not None:
-                    # Ensure cleanup at interpreter shutdown in case caller forgets
-                    atexit.register(self._terminate_broker_atexit)
-                    logger.info(f"SimpleMessageBroker started (pid={getattr(self._broker_process, 'pid', None)})")
+                if use_thread:
+                    logger.info("Starting SimpleMessageBroker in background thread (in-process)")
+                    self._broker_thread_handle = start_simple_message_broker_inthread(broker_client)
+                    if self._broker_thread_handle is not None:
+                        atexit.register(self._shutdown_broker_thread_atexit)
+                        logger.info(
+                            "SimpleMessageBroker thread started on "
+                            f"{self._broker_thread_handle.get('host')}:{self._broker_thread_handle.get('port')}"
+                        )
+                    else:
+                        logger.info("SimpleMessageBroker thread start skipped (port already in use).")
                 else:
-                    logger.info("SimpleMessageBroker spawn skipped (likely idempotency guard: port already in use).")
+                    logger.info("Starting SimpleMessageBroker in separate process")
+                    self._broker_process = start_simple_message_broker(broker_client)
+                    if self._broker_process is not None:
+                        # Ensure cleanup at interpreter shutdown in case caller forgets
+                        atexit.register(self._terminate_broker_atexit)
+                        logger.info(f"SimpleMessageBroker started (pid={getattr(self._broker_process, 'pid', None)})")
+                    else:
+                        logger.info(
+                            "SimpleMessageBroker spawn skipped (likely idempotency guard: port already in use)."
+                        )
             except Exception as e:
                 logger.error(f"Failed to start SimpleMessageBroker: {e}")
                 raise
@@ -188,10 +212,18 @@ class PipelineLifecycleManager:
             # Swallow errors at atexit to avoid noisy shutdowns
             pass
 
+    def _shutdown_broker_thread_atexit(self) -> None:
+        try:
+            self._shutdown_broker_thread()
+        except Exception:
+            pass
+
     def _terminate_broker(self) -> None:
         """Terminate the SimpleMessageBroker process if running."""
         proc = self._broker_process
         if not proc:
+            # Also try thread-based broker shutdown
+            self._shutdown_broker_thread()
             return
         try:
             if hasattr(proc, "is_alive") and not proc.is_alive():
@@ -228,3 +260,26 @@ class PipelineLifecycleManager:
         finally:
             # Clear handle to avoid repeated attempts
             self._broker_process = None
+
+    def _shutdown_broker_thread(self) -> None:
+        """Shutdown the SimpleMessageBroker server running in a background thread, if any."""
+        handle = self._broker_thread_handle
+        if not handle:
+            return
+        server = handle.get("server")
+        thread = handle.get("thread")
+        try:
+            if server is not None:
+                logger.info("Shutting down SimpleMessageBroker thread")
+                # Graceful shutdown: stop serve_forever loop and close socket
+                server.shutdown()
+                server.server_close()
+        except Exception:
+            pass
+        try:
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=2.0)
+        except Exception:
+            pass
+        finally:
+            self._broker_thread_handle = None
