@@ -4,7 +4,7 @@
 
 import logging
 import uuid
-from typing import Optional, Literal, Dict, Any, Union
+from typing import Optional, Any
 
 import ray
 import json
@@ -16,7 +16,7 @@ from datetime import datetime
 
 import pandas as pd
 from opentelemetry.trace.span import format_trace_id
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 
@@ -31,66 +31,14 @@ from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client impo
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
+from nv_ingest.framework.schemas.ray_message_broker_task_source_config import (
+    RayMessageBrokerTaskSourceConfig,
+)
+
 logger = logging.getLogger(__name__)
 
 
-class BrokerParamsRedis(BaseModel):
-    """Specific parameters for Redis broker_params."""
-
-    db: int = 0
-    use_ssl: bool = False
-
-
-class BaseBrokerClientConfig(BaseModel):
-    """Base configuration common to all broker clients."""
-
-    host: str = Field(..., description="Hostname or IP address of the message broker.")
-    port: int = Field(..., description="Port number of the message broker.")
-    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
-    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
-
-
-class RedisClientConfig(BaseBrokerClientConfig):
-    """Configuration specific to the Redis client."""
-
-    client_type: Literal["redis"] = Field(..., description="Specifies the client type as Redis.")
-    broker_params: BrokerParamsRedis = Field(
-        default_factory=BrokerParamsRedis, description="Redis-specific parameters like db and ssl."
-    )
-
-
-class SimpleClientConfig(BaseBrokerClientConfig):
-    """Configuration specific to the Simple client."""
-
-    client_type: Literal["simple"] = Field(..., description="Specifies the client type as Simple.")
-    broker_params: Optional[Dict[str, Any]] = Field(
-        default={}, description="Optional parameters for Simple client (currently unused)."
-    )
-
-
-# --- Define Updated Source Configuration ---
-
-
-class MessageBrokerTaskSourceConfig(BaseModel):
-    """
-    Configuration for the MessageBrokerTaskSourceStage.
-
-    Attributes
-    ----------
-    broker_client : Union[RedisClientConfig, SimpleClientConfig]
-        Configuration parameters for connecting to the message broker.
-        The specific schema is determined by the 'client_type' field.
-    task_queue : str
-        The name of the queue to fetch tasks from.
-    poll_interval : float, optional
-        The polling interval (in seconds) for fetching messages. Defaults to 0.1.
-    """
-
-    # Use the discriminated union for broker_client
-    broker_client: Union[RedisClientConfig, SimpleClientConfig] = Field(..., discriminator="client_type")
-    task_queue: str = Field(..., description="The name of the queue to fetch tasks from.")
-    poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
+# --- Use centralized Source Configuration ---
 
 
 @ray.remote
@@ -102,9 +50,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
 
     # Use the updated config type hint
-    def __init__(self, config: MessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
+    def __init__(self, config: RayMessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
         super().__init__(config, log_to_stdout=False, stage_name=stage_name)
-        self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
+        self.config: RayMessageBrokerTaskSourceConfig  # Add a type hint for self.config
 
         # Sanitize config before logging to avoid leaking secrets
         _sanitized = sanitize_for_logging(config)
@@ -155,14 +103,13 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             self._logger.debug("RedisClient created: %s", client)  # Consider logging non-sensitive parts if needed
             return client
         elif broker_config.client_type == "simple":
-            server_host = broker_config.host
-            server_host = "0.0.0.0"
             client = SimpleClient(
-                host=server_host,  # Using configured host
+                host=broker_config.host,
                 port=broker_config.port,
                 max_retries=broker_config.max_retries,
                 max_backoff=broker_config.max_backoff,
                 connection_timeout=broker_config.connection_timeout,
+                interface_type=broker_config.interface_type,
             )
             self._logger.debug("SimpleClient created: %s", client)
             return client

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import socket
+import os
 import json
 import time
 import logging
@@ -37,6 +38,7 @@ class SimpleClient(MessageBrokerClientBase):
         connection_timeout: int = 300,
         max_pool_size: int = 128,
         use_ssl: bool = False,
+        interface_type: Optional[str] = None,
     ):
         """
         Initialize the SimpleClient with configuration parameters.
@@ -69,6 +71,18 @@ class SimpleClient(MessageBrokerClientBase):
         self._max_pool_size = max_pool_size
         self._connection_timeout = connection_timeout
         self._use_ssl = use_ssl
+        # Interface selection: 'auto' (prefer in-process if present), 'direct' (force in-process if present),
+        # 'socket' (force sockets)
+        # Priority: explicit parameter > environment variable > 'auto'
+        self._interface_type = (interface_type or os.environ.get("MESSAGE_CLIENT_INTERFACE") or "auto").strip().lower()
+        if self._interface_type not in ("auto", "direct", "socket"):
+            self._interface_type = "direct"
+        logger.debug(
+            "SimpleClient initialized: host=%s port=%s interface_type=%s",
+            self._host,
+            self._port,
+            self._interface_type,
+        )
 
     def get_client(self):
         """
@@ -107,10 +121,10 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response from the broker.
         """
-        # Prefer in-process direct interface if broker exists in this process
+        # Determine if we should use in-process direct interface
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
-            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PUSH")
+            logger.debug("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PUSH")
             return self._handle_push_inprocess(inproc_broker, queue_name, message, timeout, for_nv_ingest)
         return self._handle_push_socket(queue_name, message, timeout, for_nv_ingest)
 
@@ -134,7 +148,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
-            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for POP")
+            logger.debug("INPROCESS: SimpleMessageBroker detected in this process; using direct API for POP")
             return self._handle_pop_inprocess(inproc_broker, queue_name, timeout)
         return self._handle_pop_socket(queue_name, timeout)
 
@@ -149,7 +163,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
-            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PING")
+            logger.debug("INPROCESS: SimpleMessageBroker detected in this process; using direct API for PING")
             return inproc_broker.ping_inprocess()
         command = {"command": "PING"}
         return self._execute_simple_command(command)
@@ -170,7 +184,7 @@ class SimpleClient(MessageBrokerClientBase):
         """
         inproc_broker = self._get_inprocess_broker()
         if inproc_broker is not None:
-            logger.info("INPROCESS: SimpleMessageBroker detected in this process; using direct API for SIZE")
+            logger.debug("INPROCESS: SimpleMessageBroker detected in this process; using direct API for SIZE")
             req = SizeRequestSchema(command="SIZE", queue_name=queue_name)
             return inproc_broker.size_inprocess(req)
         command = {"command": "SIZE", "queue_name": queue_name}
@@ -442,8 +456,12 @@ class SimpleClient(MessageBrokerClientBase):
             backoff_delay = min(backoff_delay * 2, self._max_backoff)
 
     def _get_inprocess_broker(self) -> Optional[SimpleMessageBroker]:
-        """Return the in-process broker singleton instance, if present."""
+        """Return the in-process broker singleton instance if allowed by interface policy."""
         try:
+            # If explicitly configured for sockets, bypass in-process broker
+            if getattr(self, "_interface_type", "direct") == "socket":
+                logger.debug("Bypassing in-process broker due to interface_type='socket'")
+                return None
             # Access the global singleton safely; no host/port matching required
             return getattr(SimpleMessageBroker, "_instance", None)
         except Exception:

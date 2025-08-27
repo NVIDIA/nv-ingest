@@ -32,7 +32,12 @@ def run_ingestor():
     # Using "localhost" prevents in-process detection and would attempt a socket connection
     # (not started in direct mode).
     client = NvIngestClient(
-        message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="0.0.0.0"
+        message_client_allocator=SimpleClient,
+        # message_client_hostname=os.environ.get("MESSAGE_CLIENT_HOST", "0.0.0.0"),
+        # message_client_port=int(os.environ.get("MESSAGE_CLIENT_PORT", 7671)),
+        # message_client_kwargs={
+        #    "interface_type": "socket",
+        # },
     )
 
     ingestor = (

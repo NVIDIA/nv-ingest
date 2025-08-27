@@ -27,6 +27,7 @@ stages:
     config:
       broker_client:
         client_type: "simple"
+        interface_type: $MESSAGE_CLIENT_INTERFACE|"direct"
         host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
         port: $MESSAGE_CLIENT_PORT|7671
       task_queue: "ingest_task_queue"

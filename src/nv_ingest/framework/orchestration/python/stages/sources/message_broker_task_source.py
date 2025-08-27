@@ -7,7 +7,6 @@ import threading
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
 
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
@@ -22,38 +21,12 @@ from ..meta.python_stage_base import PythonStage
 import pandas as pd
 import uuid
 
+# Centralized schemas
+from nv_ingest.framework.schemas.python_message_broker_task_source_config import (
+    PythonMessageBrokerTaskSourceConfig,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class SimpleClientConfig(BaseModel):
-    """Configuration for the Simple client."""
-
-    host: str = Field(default="0.0.0.0", description="Hostname or IP address of the message broker.")
-    port: int = Field(default=7671, description="Port number of the message broker.")
-    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
-    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
-    broker_params: Optional[Dict[str, Any]] = Field(
-        default={}, description="Optional parameters for Simple client (currently unused)."
-    )
-
-
-class PythonMessageBrokerTaskSourceConfig(BaseModel):
-    """Configuration for the PythonMessageBrokerTaskSource.
-
-    Attributes
-    ----------
-    broker_client : SimpleClientConfig
-        Configuration parameters for connecting to the Simple message broker.
-    task_queue : str
-        The name of the queue to fetch tasks from.
-    poll_interval : float, optional
-        The polling interval (in seconds) for fetching messages. Defaults to 0.1.
-    """
-
-    broker_client: SimpleClientConfig = Field(default_factory=SimpleClientConfig)
-    task_queue: str = Field(..., description="The name of the queue to fetch tasks from.")
-    poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
 
 
 class PythonMessageBrokerTaskSource(PythonStage):
@@ -120,6 +93,7 @@ class PythonMessageBrokerTaskSource(PythonStage):
             max_retries=broker_config.max_retries,
             max_backoff=broker_config.max_backoff,
             connection_timeout=broker_config.connection_timeout,
+            interface_type=getattr(broker_config, "interface_type", "auto"),
         )
 
         self._logger.info(f"SimpleClient created successfully for {broker_config.host}:{broker_config.port}")

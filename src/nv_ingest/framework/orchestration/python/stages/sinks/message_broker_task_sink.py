@@ -16,21 +16,14 @@ from ..meta.python_stage_base import PythonStage
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest.framework.schemas.broker_client_configs import SimpleClientConfig
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleClientConfig(BaseModel):
-    """Configuration for the Simple client."""
-
-    host: str = Field(default="localhost", description="Hostname or IP address of the message broker.")
-    port: int = Field(default=7671, description="Port number of the message broker.")
-    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
-    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
-    broker_params: Optional[Dict[str, Any]] = Field(
-        default={}, description="Optional parameters for Simple client (currently unused)."
-    )
+def _default_simple_client() -> SimpleClientConfig:
+    """Provide sane defaults for libmode when not explicitly configured."""
+    return SimpleClientConfig(host="0.0.0.0", port=7671)
 
 
 class PythonMessageBrokerTaskSinkConfig(BaseModel):
@@ -44,7 +37,7 @@ class PythonMessageBrokerTaskSinkConfig(BaseModel):
         The polling interval (in seconds) for processing messages. Defaults to 0.1.
     """
 
-    broker_client: SimpleClientConfig = Field(default_factory=SimpleClientConfig)
+    broker_client: SimpleClientConfig = Field(default_factory=_default_simple_client)
     poll_interval: float = Field(default=0.1, gt=0)
 
 
@@ -81,6 +74,7 @@ class PythonMessageBrokerTaskSink(PythonStage):
             max_retries=broker_config.max_retries,
             max_backoff=broker_config.max_backoff,
             connection_timeout=broker_config.connection_timeout,
+            interface_type=broker_config.interface_type,
         )
 
     @staticmethod

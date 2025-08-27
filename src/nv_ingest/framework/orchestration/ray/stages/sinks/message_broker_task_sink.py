@@ -5,7 +5,7 @@
 import sys
 import json
 import logging
-from typing import Any, Dict, List, Tuple, Literal, Optional, Union
+from typing import Any, Dict, List, Tuple, Optional, Union
 from pydantic import BaseModel, Field
 import ray
 
@@ -13,45 +13,14 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
+from nv_ingest.framework.schemas.broker_client_configs import (
+    RedisClientConfig,
+    SimpleClientConfig,
+)
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
-
-
-class BrokerParamsRedis(BaseModel):
-    """Specific parameters for Redis broker_params."""
-
-    db: int = 0
-    use_ssl: bool = False
-
-
-class BaseBrokerClientConfig(BaseModel):
-    """Base configuration common to all broker clients."""
-
-    host: str = Field(..., description="Hostname or IP address of the message broker.")
-    port: int = Field(..., description="Port number of the message broker.")
-    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
-    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
-
-
-class RedisClientConfig(BaseBrokerClientConfig):
-    """Configuration specific to the Redis client."""
-
-    client_type: Literal["redis"] = Field(..., description="Specifies the client type as Redis.")
-    broker_params: BrokerParamsRedis = Field(
-        default_factory=BrokerParamsRedis, description="Redis-specific parameters like db and ssl."
-    )
-
-
-class SimpleClientConfig(BaseBrokerClientConfig):
-    """Configuration specific to the Simple client."""
-
-    client_type: Literal["simple"] = Field(..., description="Specifies the client type as Simple.")
-    broker_params: Optional[Dict[str, Any]] = Field(
-        default={}, description="Optional parameters for Simple client (currently unused)."
-    )
 
 
 # --- Update the Main Sink Configuration ---
@@ -104,14 +73,13 @@ class MessageBrokerTaskSinkStage(RayActorStage):
                 use_ssl=broker_config.broker_params.use_ssl,  # Access nested Pydantic model
             )
         elif broker_config.client_type == "simple":
-            server_host = broker_config.host
-            server_host = "0.0.0.0"
             return SimpleClient(
-                host=server_host,  # Using the potentially overridden host
+                host=broker_config.host,
                 port=broker_config.port,
                 max_retries=broker_config.max_retries,
                 max_backoff=broker_config.max_backoff,
                 connection_timeout=broker_config.connection_timeout,
+                interface_type=broker_config.interface_type,
                 # broker_params is available via broker_config.broker_params if needed
             )
 

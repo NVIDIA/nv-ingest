@@ -18,13 +18,15 @@ if local_log_level in ("DEFAULT",):
 
 configure_local_logging(local_log_level)
 
+os.environ["MESSAGE_CLIENT_INTERFACE"] = "socket"
+
 
 def main():
     try:
         _ = run_pipeline(
             block=True,
             disable_dynamic_scaling=True,
-            run_in_subprocess=True,
+            run_in_subprocess=False,
             stderr=sys.stderr,
             stdout=sys.stdout,
         )
