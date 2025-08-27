@@ -50,6 +50,7 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     max_queue_size = broker_params.get("max_queue_size", 10000)
     server_host = broker_client.get("host", "0.0.0.0")
     server_port = broker_client.get("port", 7671)
+    interface_type = str(broker_client.get("interface_type", "auto")).strip().lower() or "auto"
 
     # Pre-flight: if something is already listening on the target port, do not spawn another broker.
     # This avoids noisy stack traces from a failing child process when tests/pipeline are run repeatedly.
@@ -73,6 +74,20 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
             f"SimpleMessageBroker port already in use at {server_host}:{server_port}; "
             f"continuing to spawn a broker process (tests expect a Process to be returned)"
         )
+
+    # If direct interface is requested, create the in-process broker singleton and do NOT start serving.
+    if interface_type == "direct":
+        try:
+            SimpleMessageBroker(server_host, server_port, max_queue_size)
+            logger.info(
+                "SimpleMessageBroker initialized for direct interface at %s:%s (no socket server started)",
+                server_host,
+                server_port,
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize SimpleMessageBroker for direct interface: {e}")
+            raise
+        return None
 
     def broker_server():
         # Optionally, set socket options here for reuse (note: binding occurs in server __init__).
@@ -120,6 +135,7 @@ def start_simple_message_broker_inthread(broker_client: dict):
     max_queue_size = broker_params.get("max_queue_size", 10000)
     server_host = broker_client.get("host", "0.0.0.0")
     server_port = broker_client.get("port", 7671)
+    interface_type = str(broker_client.get("interface_type", "auto")).strip().lower() or "auto"
 
     def _is_port_open(host: str, port: int) -> bool:
         check_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
@@ -143,6 +159,15 @@ def start_simple_message_broker_inthread(broker_client: dict):
         )
 
     server = SimpleMessageBroker(server_host, server_port, max_queue_size)
+
+    # If direct interface is requested, do NOT start a serving thread.
+    if interface_type == "direct":
+        logger.info(
+            "SimpleMessageBroker initialized for direct interface at %s:%s (no serving thread started)",
+            server_host,
+            server_port,
+        )
+        return {"server": server, "thread": None, "host": server_host, "port": server_port}
 
     def run_broker():
         try:

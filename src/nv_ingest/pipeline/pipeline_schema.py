@@ -368,15 +368,79 @@ class PipelineServiceBrokerConfig(BaseModel):
     enabled : bool
         Whether to launch the service broker alongside the pipeline.
     broker_client : Dict[str, Any]
-        Client configuration for the broker (e.g., host, port, broker_params). Keys are
-        passed through to the underlying broker implementation.
+        Client configuration for the broker (e.g., client_type, interface_type, host, port, broker_params).
+        Keys are passed through to the underlying broker implementation.
     """
 
     enabled: bool = Field(False, description="Launch the service broker alongside the pipeline.")
     broker_client: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Client configuration for the broker (host, port, broker_params, etc.)",
+        description=(
+            "Client configuration for the broker (client_type, interface_type, host, port, broker_params, etc.)"
+        ),
     )
+
+    @model_validator(mode="after")
+    def _validate_and_normalize_broker_client(self) -> "PipelineServiceBrokerConfig":
+        """
+        Enforce consistency rules for broker deployment and client interface selection.
+
+        Rules
+        -----
+        - interface_type allowed values: auto | direct | socket | rest
+        - client_type == "rest":
+            * service_broker.enabled must be False (pipeline does not launch REST broker)
+            * interface_type must be auto or rest; if auto -> normalize to rest
+        - client_type == "simple":
+            * interface_type must be auto | direct | socket
+            * direct requires service_broker.enabled == True (in-process broker)
+            * auto -> normalize to direct if enabled else socket
+        - Unknown client_type:
+            * Only allow interface_type == auto; normalize to auto (no-op)
+        """
+
+        # Defensive copy/reference
+        bc = self.broker_client or {}
+        client_type = str(bc.get("client_type", "")).strip().lower()
+        interface_type = str(bc.get("interface_type", "auto")).strip().lower() or "auto"
+
+        allowed_if_types = {"auto", "direct", "socket", "rest"}
+        if interface_type not in allowed_if_types:
+            raise ValueError(
+                f"broker_client.interface_type must be one of {sorted(allowed_if_types)}; got '{interface_type}'"
+            )
+
+        if client_type == "rest":
+            if self.enabled:
+                raise ValueError("pipeline.service_broker.enabled cannot be true when broker_client.client_type='rest'")
+            if interface_type in {"direct", "socket"}:
+                raise ValueError("broker_client.interface_type must be 'auto' or 'rest' when client_type='rest'")
+            if interface_type == "auto":
+                bc["interface_type"] = "rest"
+
+        elif client_type == "simple":
+            if interface_type not in {"auto", "direct", "socket"}:
+                raise ValueError(
+                    "broker_client.interface_type must be one of {'auto','direct','socket'} when client_type='simple'"
+                )
+            if interface_type == "direct" and not self.enabled:
+                raise ValueError(
+                    "broker_client.interface_type='direct' requires pipeline.service_broker.enabled=true"
+                    " (in-process broker)"
+                )
+            if interface_type == "auto":
+                bc["interface_type"] = "direct" if self.enabled else "socket"
+
+        else:
+            # Unknown/unspecified client; only allow 'auto' to avoid invalid hard choices
+            if interface_type != "auto":
+                raise ValueError(
+                    "broker_client.interface_type must be 'auto' when broker_client.client_type is missing or unknown"
+                )
+
+        # Persist normalization
+        self.broker_client = bc
+        return self
 
     model_config = ConfigDict(extra="forbid")
 

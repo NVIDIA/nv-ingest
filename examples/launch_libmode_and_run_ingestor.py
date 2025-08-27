@@ -28,8 +28,11 @@ def run_ingestor():
     Set up and run the ingestion process to send traffic against the pipeline.
     """
     logger.info("Setting up Ingestor client...")
+    # IMPORTANT: In libmode direct interface, the in-process SimpleMessageBroker is keyed by ("0.0.0.0", 7671).
+    # Using "localhost" prevents in-process detection and would attempt a socket connection
+    # (not started in direct mode).
     client = NvIngestClient(
-        message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="localhost"
+        message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="0.0.0.0"
     )
 
     ingestor = (

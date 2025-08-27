@@ -381,7 +381,8 @@ stages:
     config:
       broker_client:
         client_type: "simple"
-        host: "localhost"
+        interface_type: $MESSAGE_CLIENT_INTERFACE|"direct"
+        host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
         port: 7671
     replicas:
       min_replicas: 1
@@ -496,6 +497,7 @@ pipeline:
     enabled: $INGEST_SERVICE_BROKER_ENABLED|true
     broker_client:
       client_type: $MESSAGE_CLIENT_TYPE|"simple"
+      interface_type: $MESSAGE_CLIENT_INTERFACE|"direct"
       host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
       port: $MESSAGE_CLIENT_PORT|7671
   framework:
