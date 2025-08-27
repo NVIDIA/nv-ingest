@@ -18,48 +18,51 @@ Typical use cases:
 """
 
 import base64
-import io
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import cv2
 import numpy as np
-from PIL import Image
 
 from nv_ingest_client.client.util.processing import get_valid_filename
 
 logger = logging.getLogger(__name__)
 
 
-def _detect_base64_image_format(base64_string: str) -> Optional[str]:
+def _is_base64_image_format(base64_string: str, target_format: str) -> bool:
     """
-    Detects the format of a base64-encoded image.
+    Checks if base64 image is already in the target format using simple magic bytes.
 
     Parameters
     ----------
     base64_string : str
         Base64-encoded image string.
+    target_format : str
+        Target format to check ("PNG", "JPEG").
 
     Returns
     -------
-    Optional[str]
-        The detected format ("PNG", "JPEG") or None if unknown.
+    bool
+        True if image is already in target format, False otherwise.
     """
     try:
         image_bytes = base64.b64decode(base64_string)
-        with Image.open(io.BytesIO(image_bytes)) as img:
-            return img.format.upper() if img.format else None
-    except Exception as e:
-        logger.debug(f"Error detecting image format: {e}")
-        return None
+
+        # Simple magic byte checks for common formats
+        if target_format.upper() == "JPEG" and image_bytes.startswith(b"\xff\xd8\xff"):
+            return True
+        elif target_format.upper() == "PNG" and image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            return True
+
+        return False
+    except Exception:
+        return False
 
 
 def _base64_to_disk_direct(base64_string: str, output_path: str) -> bool:
     """
     Write base64 image data directly to disk without conversion.
-
-    This is the most efficient approach when no format conversion is needed.
 
     Parameters
     ----------
@@ -74,6 +77,10 @@ def _base64_to_disk_direct(base64_string: str, output_path: str) -> bool:
         True if successful, False otherwise.
     """
     try:
+        # Strip data URL prefix if present
+        if "," in base64_string:
+            base64_string = base64_string.split(",")[1]
+
         image_bytes = base64.b64decode(base64_string)
         with open(output_path, "wb") as f:
             f.write(image_bytes)
@@ -87,10 +94,7 @@ def _base64_to_disk_with_conversion(
     base64_string: str, output_path: str, target_format: str, quality: int = 95
 ) -> bool:
     """
-    Convert base64 image to target format and save to disk.
-
-    Uses OpenCV for decoding and PIL for format conversion to maintain
-    compatibility with the existing codebase expectations.
+    Convert base64 image to target format and save to disk using OpenCV.
 
     Parameters
     ----------
@@ -109,7 +113,11 @@ def _base64_to_disk_with_conversion(
         True if successful, False otherwise.
     """
     try:
-        # Use OpenCV to decode base64 to numpy array (faster than PIL)
+        # Strip data URL prefix if present
+        if "," in base64_string:
+            base64_string = base64_string.split(",")[1]
+
+        # Decode using OpenCV
         image_bytes = base64.b64decode(base64_string)
         buf = np.frombuffer(image_bytes, dtype=np.uint8)
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
@@ -117,29 +125,22 @@ def _base64_to_disk_with_conversion(
         if img is None:
             raise ValueError("OpenCV failed to decode image")
 
-        # Convert BGR to RGB for PIL compatibility (OpenCV loads as BGR)
-        if img.ndim == 3 and img.shape[2] == 3:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # Simple alpha channel handling for JPEG
+        if target_format.upper() == "JPEG" and img.ndim == 3 and img.shape[2] == 4:
+            # Convert RGBA to RGB with white background
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-        # Convert to PIL Image for format conversion
-        pil_image = Image.fromarray(img)
-
-        # Save with appropriate format and settings
-        save_kwargs = {}
+        # Save with format-specific parameters
         if target_format.upper() == "JPEG":
-            save_kwargs["quality"] = quality
-            # Ensure RGB mode for JPEG (no alpha channel)
-            if pil_image.mode in ("RGBA", "LA"):
-                # Create white background for transparency
-                background = Image.new("RGB", pil_image.size, (255, 255, 255))
-                if pil_image.mode == "LA":
-                    pil_image = pil_image.convert("RGBA")
-                background.paste(pil_image, mask=pil_image.split()[-1])
-                pil_image = background
-            elif pil_image.mode != "RGB":
-                pil_image = pil_image.convert("RGB")
+            success = cv2.imwrite(output_path, img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        elif target_format.upper() == "PNG":
+            success = cv2.imwrite(output_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+        else:
+            success = cv2.imwrite(output_path, img)
 
-        pil_image.save(output_path, format=target_format.upper(), **save_kwargs)
+        if not success:
+            raise ValueError(f"OpenCV failed to save image to {output_path}")
+
         return True
 
     except Exception as e:
@@ -170,21 +171,17 @@ def _save_image_efficiently(base64_content: str, output_path: str, target_format
     bool
         True if successful, False otherwise.
     """
-    # Detect source format
-    source_format = _detect_base64_image_format(base64_content)
     target_format_upper = target_format.upper()
-
-    # Normalize JPEG format variations
     if target_format_upper == "JPG":
         target_format_upper = "JPEG"
 
-    # If formats match, write directly for maximum efficiency
-    if source_format and source_format == target_format_upper:
-        logger.debug(f"Direct write: {source_format} -> {target_format_upper}")
+    # Try direct write first if format matches (most efficient)
+    if _is_base64_image_format(base64_content, target_format_upper):
+        logger.debug(f"OpenCV Direct write: {target_format_upper}")
         return _base64_to_disk_direct(base64_content, output_path)
     else:
         # Format conversion required
-        logger.debug(f"Format conversion: {source_format or 'Unknown'} -> {target_format_upper}")
+        logger.debug(f"OpenCV Format conversion to {target_format_upper}")
         return _base64_to_disk_with_conversion(base64_content, output_path, target_format_upper, quality)
 
 
@@ -229,7 +226,7 @@ def save_images_to_disk(
         Whether to organize images into subdirectories by type. Default is True.
     output_format : str, optional
         Output image format for saved files. Supports "png" and "jpeg". Default is "jpeg".
-        JPEG provides ~8x faster performance than PNG. Use "png" for lossless quality.
+        JPEG provides faster compression performance than PNG. Use "png" for lossless quality.
 
     Returns
     -------
@@ -304,8 +301,8 @@ def save_images_to_disk(
             # Determine image file format - use configured output_format
             image_type = output_format.lower()
             if image_type not in ["png", "jpeg", "jpg"]:
-                logger.warning(f"Unsupported output format '{output_format}', falling back to PNG")
-                image_type = "png"
+                logger.warning(f"Unsupported output format '{output_format}', falling back to JPEG")
+                image_type = "jpeg"
             # Normalize jpg to jpeg for internal consistency
             elif image_type == "jpg":
                 image_type = "jpeg"
@@ -334,7 +331,7 @@ def save_images_to_disk(
                 elif subtype == "image":
                     quality = 90  # Good quality for raw images
 
-                # Use efficient save method that avoids unnecessary conversions
+                # Save image using efficient method (direct write when possible)
                 success = _save_image_efficiently(image_content, image_path, image_type, quality=quality)
 
                 if success:

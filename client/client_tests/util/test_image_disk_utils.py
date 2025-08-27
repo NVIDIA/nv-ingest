@@ -19,7 +19,7 @@ import pytest
 from PIL import Image
 
 from nv_ingest_client.util.image_disk_utils import (
-    _detect_base64_image_format,
+    _is_base64_image_format,
     _base64_to_disk_direct,
     _base64_to_disk_with_conversion,
     _save_image_efficiently,
@@ -50,31 +50,37 @@ class TestBase64FormatDetection:
         img.save(buffer, format="JPEG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def test_detect_png_format(self, sample_png_base64):
+    def test_is_png_format(self, sample_png_base64):
         """Test PNG format detection."""
-        result = _detect_base64_image_format(sample_png_base64)
-        assert result == "PNG"
+        result = _is_base64_image_format(sample_png_base64, "PNG")
+        assert result is True
+        # Should return False for different format
+        result = _is_base64_image_format(sample_png_base64, "JPEG")
+        assert result is False
 
-    def test_detect_jpeg_format(self, sample_jpeg_base64):
+    def test_is_jpeg_format(self, sample_jpeg_base64):
         """Test JPEG format detection."""
-        result = _detect_base64_image_format(sample_jpeg_base64)
-        assert result == "JPEG"
+        result = _is_base64_image_format(sample_jpeg_base64, "JPEG")
+        assert result is True
+        # Should return False for different format
+        result = _is_base64_image_format(sample_jpeg_base64, "PNG")
+        assert result is False
 
-    def test_invalid_base64_returns_none(self):
-        """Test that invalid base64 returns None."""
-        result = _detect_base64_image_format("invalid_base64!")
-        assert result is None
+    def test_invalid_base64_returns_false(self):
+        """Test that invalid base64 returns False."""
+        result = _is_base64_image_format("invalid_base64!", "PNG")
+        assert result is False
 
-    def test_valid_base64_invalid_image_returns_none(self):
-        """Test that valid base64 but invalid image returns None."""
+    def test_valid_base64_invalid_image_returns_false(self):
+        """Test that valid base64 but invalid image returns False."""
         invalid_image_b64 = base64.b64encode(b"not an image").decode("utf-8")
-        result = _detect_base64_image_format(invalid_image_b64)
-        assert result is None
+        result = _is_base64_image_format(invalid_image_b64, "PNG")
+        assert result is False
 
-    def test_empty_string_returns_none(self):
-        """Test that empty string returns None."""
-        result = _detect_base64_image_format("")
-        assert result is None
+    def test_empty_string_returns_false(self):
+        """Test that empty string returns False."""
+        result = _is_base64_image_format("", "PNG")
+        assert result is False
 
 
 class TestDirectDiskWrite:
@@ -365,8 +371,8 @@ class TestSaveImagesToDisk:
         # Should fallback and still save images successfully
         assert result["total"] == 2
 
-        # Images should exist and be in fallback format (PNG)
-        saved_files = list(tmp_path.rglob("*.png"))
+        # Images should exist and be in fallback format (JPEG, updated from PNG)
+        saved_files = list(tmp_path.rglob("*.jpg"))
         assert len(saved_files) == 2
 
 
