@@ -216,6 +216,25 @@ export LLM_MIN_CONTENT_LENGTH="50"                                       # Skip 
 export LLM_MAX_CONTENT_LENGTH="12000"                                    # Content limit per summary
 ```
 
+### Testing
+
+All UDF examples include comprehensive unit tests located in the proper test directory (nv-ingest/api/api_tests/udfs/):
+
+```bash
+# Run all UDF tests (recommended)
+pytest api/api_tests/udfs/ -v
+
+# Run specific UDF test files
+pytest api/api_tests/udfs/test_llm_summarizer_udf.py -v
+pytest api/api_tests/udfs/test_structural_split_udf.py -v
+
+# Run specific test categories
+pytest api/api_tests/udfs/test_llm_summarizer_udf.py::TestContentSummarizer -v
+pytest api/api_tests/udfs/test_structural_split_udf.py::TestStructuralSplit -v
+```
+
+The tests demonstrate proper UDF testing patterns and can serve as examples for testing your own custom UDFs.
+
 ## Resources
 
 - **Comprehensive Guide**: [User-Defined Functions](../../docs/docs/extraction/user_defined_functions.md)
