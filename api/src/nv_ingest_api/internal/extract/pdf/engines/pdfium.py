@@ -19,6 +19,7 @@
 import concurrent.futures
 import multiprocessing as mp
 import logging
+import os
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
@@ -473,11 +474,10 @@ def pdfium_extractor(
         f"extract_infographics={extract_infographics}"
     )
 
-    # If document is large, split into 200-page chunks and process in parallel via multiprocessing
-    if page_count > 100:
-        batch_size = 100
+    batch_size = os.environ.get("INGEST_PDF_EXTRACT_MAX_PAGES_PER_BATCH", 100)
+    if page_count > batch_size:
         ranges = [(start, min(start + batch_size, page_count)) for start in range(0, page_count, batch_size)]
-        procs = 5
+        procs = os.environ.get("INGEST_MAX_PER_REPLICATION_WORKER_PROCESSES", 5)
 
         # Prepare immutable worker args
         worker_args = [
