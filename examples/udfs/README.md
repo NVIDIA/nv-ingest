@@ -1,6 +1,22 @@
 # NV-Ingest UDF Examples
 
-User-Defined Functions (UDFs) let you inject custom processing logic into the NV-Ingest pipeline at specific stages. This directory contains practical examples to get you started.
+User-Defined Functions (UDFs) let you inject custom processing logic into the NV-Ingest pipeline at specific stages. This directory demonstrates different UDF organizational patterns:
+
+## 📁 UDF Organization
+
+### Examples (`examples/udfs/`) - Learning & Reference
+- **Purpose**: Core examples for learning UDF development patterns
+- **Audience**: Developers learning to write UDFs
+- **Characteristics**: Self-contained, educational
+- **Example**: `structural_split_udf.py` - demonstrates text processing patterns for specific files
+
+### API UDFs (`api/src/udfs/`) - Production-Ready Components  
+- **Purpose**: Reusable UDFs that are part of the API library
+- **Audience**: Production deployments, advanced users
+- **Characteristics**: Robust error handling, configurable, tested for production use
+- **Example**: `llm_summarizer_udf.py` - production-grade AI summarization
+
+> **💡 Placement Guide**: Put learning examples in `examples/udfs/`, put reusable production UDFs in `api/src/udfs/`
 
 ## Markdown Document Splitter Example
 
@@ -127,11 +143,9 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 
 
 
-```
+## LLM Content Summarizer (Production Example)
 
-## LLM Content Summarizer
-
-**Purpose**: Generate AI-powered summaries of your text content using NVIDIA's LLM APIs. The `llm_summarizer_udf.py` processes text chunks and adds comprehensive summaries to document metadata.
+**Purpose**: Generate AI-powered summaries of your text content using NVIDIA's LLM APIs. This demonstrates how to structure UDFs for production use with robust error handling, configuration, and testing.
 
 ### Setup
 
@@ -147,7 +161,7 @@ nv-ingest-cli \
   --doc 'my_documents/' \
   --task='extract:{"document_type":"pdf", "extract_text":true}' \
   --task='split' \
-  --task='udf:{"udf_function": "./examples/udfs/llm_summarizer_udf.py:content_summarizer", "target_stage": "text_splitter", "run_after": true}' \
+  --task='udf:{"udf_function": "./api/src/udfs/llm_summarizer_udf.py:content_summarizer", "target_stage": "text_splitter", "run_after": true}' \
   --output_directory=./output
 ```
 
@@ -160,7 +174,7 @@ results = ingestor.files("my_documents/") \
     .extract(document_type="pdf", extract_text=True) \
     .split() \
     .udf(
-        udf_function="./examples/udfs/llm_summarizer_udf.py:content_summarizer",
+        udf_function="./api/src/udfs/llm_summarizer_udf.py:content_summarizer",
         target_stage="text_splitter", 
         run_after=True
     ) \
@@ -218,28 +232,46 @@ export LLM_MAX_CONTENT_LENGTH="12000"                                    # Conte
 
 ### Testing
 
-All UDF examples include comprehensive unit tests located in the proper test directory (nv-ingest/api/api_tests/udfs/):
+UDF tests are organized by their purpose:
 
+**Production UDF Tests** (in `api/api_tests/udfs/`):
 ```bash
-# Run all UDF tests (recommended)
-pytest api/api_tests/udfs/ -v
-
-# Run specific UDF test files
+# Test production UDFs that are part of the API
 pytest api/api_tests/udfs/test_llm_summarizer_udf.py -v
-pytest api/api_tests/udfs/test_structural_split_udf.py -v
-
-# Run specific test categories
-pytest api/api_tests/udfs/test_llm_summarizer_udf.py::TestContentSummarizer -v
-pytest api/api_tests/udfs/test_structural_split_udf.py::TestStructuralSplit -v
 ```
 
-The tests demonstrate proper UDF testing patterns and can serve as examples for testing your own custom UDFs.
+**Example UDF Tests** (in `examples/tests/`):
+```bash
+# Test example UDFs (may not be available in all installations)
+pytest examples/tests/test_structural_split_udf.py -v
+```
+
+**Run All UDF Tests:**
+```bash
+# Test both production and example UDFs
+pytest api/api_tests/udfs/ examples/tests/ -v
+```
+
+The test organization demonstrates proper separation: production UDF tests in `api/` ensure they work in all deployments, while example UDF tests in `examples/` acknowledge they may not be available everywhere.
 
 ## Resources
 
 - **Comprehensive Guide**: [User-Defined Functions](../../docs/docs/extraction/user_defined_functions.md)
 - **Pipeline Stages**: [User-Defined Stages](../../docs/docs/extraction/user-defined-stages.md)  
 - **Metadata Schema**: [Content Metadata](../../docs/docs/extraction/content-metadata.md)
+
+## UDF Development Guidelines
+
+**For Learning & Experimentation** → `examples/udfs/`
+- Simple, focused examples
+- Self-contained functionality  
+- Educational comments and documentation
+
+**For Production Use** → `api/src/udfs/`
+- Robust error handling and logging
+- Configurable via environment variables
+- Comprehensive unit tests in `api/api_tests/udfs/`
+- Can be imported as part of the API library
 
 ## Common Issues
 

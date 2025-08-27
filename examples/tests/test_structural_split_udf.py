@@ -13,7 +13,7 @@ Tests the structural_split UDF function and its helper functions.
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../examples/udfs"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../udfs"))
 
 # Standard library imports
 import pandas as pd  # noqa: E402

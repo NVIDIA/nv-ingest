@@ -9,21 +9,17 @@ Unit tests for LLM Content Summarizer UDF.
 Tests the content_summarizer UDF function and its helper functions.
 """
 
-# Add the examples/udfs directory to the path for importing the UDF
 import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../examples/udfs"))
 
 # Standard library and third-party imports
-import pandas as pd  # noqa: E402
-import pytest  # noqa: E402
-from unittest.mock import Mock, patch  # noqa: E402
-from openai.types.chat import ChatCompletion, ChatCompletionMessage  # noqa: E402
-from openai.types.chat.chat_completion import Choice  # noqa: E402
+import pandas as pd
+import pytest
+from unittest.mock import Mock, patch
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice
 
-# Import the UDF functions
-from llm_summarizer_udf import content_summarizer, _extract_content, _generate_summary, _add_summary  # noqa: E402
+# Import the UDF functions from API udfs location
+from udfs.llm_summarizer_udf import content_summarizer, _extract_content, _generate_summary, _add_summary
 
 
 class MockIngestControlMessage:

@@ -20,7 +20,7 @@ import logging
 from typing import Optional
 
 
-def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":
+def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":  # noqa: F821
     """
     UDF function that adds LLM-generated summaries to text content chunks.
 
@@ -125,7 +125,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     return control_message
 
 
-def _extract_content(row: "pd.Series", logger) -> Optional[str]:
+def _extract_content(row, logger) -> Optional[str]:
     """Extract text content from row, trying multiple locations."""
     content = ""
 
@@ -182,7 +182,7 @@ Summary:"""
         return None
 
 
-def _add_summary(df: "pd.DataFrame", idx: int, row: "pd.Series", summary: str, model_name: str, logger):
+def _add_summary(df, idx: int, row, summary: str, model_name: str, logger):
     """Add summary to metadata with safe handling."""
     try:
         # Get current metadata or create new dict - handle None case properly
