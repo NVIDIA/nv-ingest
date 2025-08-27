@@ -881,7 +881,7 @@ def create_bm25_model(
     return bm25_ef
 
 
-def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
+def stream_insert_milvus(records, client: MilvusClient, collection_name: str, batch_size: int = 5000):
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
@@ -899,9 +899,9 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
         Milvus Collection to search against
     """
     count = 0
-    for element in records:
-        client.insert(collection_name=collection_name, data=[element])
-        count += 1
+    for idx in range(0, len(records), batch_size):
+        client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
+        count += len(records[idx : idx + batch_size])
     logger.info(f"streamed {count} records")
 
 
