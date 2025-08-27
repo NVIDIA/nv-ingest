@@ -393,37 +393,21 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """
 
     allow_reuse_address = True
-    _instances = {}
-    _instances_lock = threading.Lock()
+    # True singleton instance and lock
+    _instance: Optional["SimpleMessageBroker"] = None
+    _instance_lock = threading.Lock()
 
     def __new__(cls, host: str, port: int, max_queue_size: int):
         """
-        Ensures that only one instance of SimpleMessageBroker is created per host and port combination.
+        Ensure a single global instance of SimpleMessageBroker per process.
 
-        Parameters
-        ----------
-        host : str
-            The hostname or IP address for the server.
-        port : int
-            The port number for the server.
-        max_queue_size : int
-            The maximum size of each message queue.
-
-        Returns
-        -------
-        SimpleMessageBroker
-            The singleton instance of the server.
+        The first construction determines the bound (host, port). Subsequent
+        constructions return the same instance and skip re-initialization.
         """
-
-        key = (host, port)
-        with cls._instances_lock:
-            if key not in cls._instances:
-                # Create a new instance and store it in the instances dictionary
-                instance = super(SimpleMessageBroker, cls).__new__(cls)
-                cls._instances[key] = instance
-            else:
-                instance = cls._instances[key]
-        return instance
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = super(SimpleMessageBroker, cls).__new__(cls)
+            return cls._instance
 
     def __init__(self, host: str, port: int, max_queue_size: int):
         """
@@ -456,25 +440,15 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
     def server_close(self):
         """
-        Closes the server socket and removes this instance from the singleton registry.
+        Closes the server socket and clears the singleton reference.
 
-        This ensures that a new broker can be created on the same (host, port) after
-        this instance has been shut down.
+        This ensures that a new broker can be created after this instance
+        has been shut down.
         """
-
-        # Remove from singleton registry if it matches the stored instance for this (host, port)
         cls = type(self)
-        try:
-            host, port = self.server_address
-        except Exception:
-            # Fallback if server_address is not available for any reason
-            host, port = None, None
-
-        if host is not None and port is not None:
-            key = (host, port)
-            with cls._instances_lock:
-                if cls._instances.get(key) is self:
-                    del cls._instances[key]
+        with cls._instance_lock:
+            if cls._instance is self:
+                cls._instance = None
 
         # Proceed with normal server close
         super().server_close()

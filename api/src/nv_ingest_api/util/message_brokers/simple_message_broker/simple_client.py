@@ -442,11 +442,10 @@ class SimpleClient(MessageBrokerClientBase):
             backoff_delay = min(backoff_delay * 2, self._max_backoff)
 
     def _get_inprocess_broker(self) -> Optional[SimpleMessageBroker]:
-        """Return the in-process broker instance for this client's (host, port), if present."""
+        """Return the in-process broker singleton instance, if present."""
         try:
-            # Access the singleton registry safely
-            with SimpleMessageBroker._instances_lock:
-                return SimpleMessageBroker._instances.get((self._host, self._port))
+            # Access the global singleton safely; no host/port matching required
+            return getattr(SimpleMessageBroker, "_instance", None)
         except Exception:
             return None
 

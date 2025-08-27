@@ -271,14 +271,32 @@ class PipelineLifecycleManager:
         try:
             if server is not None:
                 logger.info("Shutting down SimpleMessageBroker thread")
-                # Graceful shutdown: stop serve_forever loop and close socket
-                server.shutdown()
-                server.server_close()
+                # If a serving thread exists and is alive, request graceful shutdown.
+                # In direct interface mode, no serving thread was started, so do NOT call shutdown()
+                # because socketserver.TCPServer.shutdown() blocks waiting for serve_forever().
+                if thread is not None and thread.is_alive():
+                    try:
+                        server.shutdown()
+                    except Exception:
+                        # If shutdown fails, proceed to close the server socket anyway
+                        pass
+                    try:
+                        thread.join(timeout=2.0)
+                    except Exception:
+                        pass
+                # Always close the server socket and clear the singleton
+                try:
+                    server.server_close()
+                except Exception:
+                    pass
         except Exception:
             pass
+        # Final attempt to ensure the thread is not lingering
         try:
             if thread is not None and thread.is_alive():
-                thread.join(timeout=2.0)
+                # Log and do a last short join; after server_close(), it should exit
+                logger.warning("SimpleMessageBroker thread still alive after shutdown; waiting briefly")
+                thread.join(timeout=1.0)
         except Exception:
             pass
         finally:
