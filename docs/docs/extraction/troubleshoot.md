@@ -45,6 +45,17 @@ ulimit -u 10,000
 
 
 
+## Out-of-Memory (OOM) Error when Processing Large Datasets
+
+When processing a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error.
+This happens because, by default, nv-ingest stores all the extracted results from every document in system memory (RAM).
+If the total size of these results exceeds the available memory, the process will fail.
+
+To resolve this issue, use the `save_to_disk` method. 
+For details, refer to [Working with Large Datasets: Saving to Disk](link).
+
+
+
 ## Embedding service fails to start with an unsupported batch size error
 
 On certain hardware, for example RTX 6000, 

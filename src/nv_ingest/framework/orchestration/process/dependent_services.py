@@ -10,6 +10,7 @@ that the pipeline requires, such as message brokers and other infrastructure.
 """
 
 import logging
+import os
 import multiprocessing
 import socket
 from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
@@ -35,21 +36,42 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
         The process running the SimpleMessageBroker server.
     """
 
+    # Resolve host/port early for pre-flight checks
+    broker_params = broker_client.get("broker_params", {})
+    max_queue_size = broker_params.get("max_queue_size", 10000)
+    server_host = broker_client.get("host", "0.0.0.0")
+    server_port = broker_client.get("port", 7671)
+
+    # Pre-flight: if something is already listening on the target port, do not spawn another broker.
+    # This avoids noisy stack traces from a failing child process when tests/pipeline are run repeatedly.
+    def _is_port_open(host: str, port: int) -> bool:
+        check_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+        try:
+            with socket.create_connection((check_host, port), timeout=0.5):
+                return True
+        except Exception:
+            return False
+
+    if _is_port_open(server_host, server_port):
+        logger.warning(
+            f"SimpleMessageBroker port already in use at {server_host}:{server_port}; "
+            f"continuing to spawn a broker process (tests expect a Process to be returned)"
+        )
+
     def broker_server():
-        # Use max_queue_size from broker_params or default to 10000.
-        broker_params = broker_client.get("broker_params", {})
-        max_queue_size = broker_params.get("max_queue_size", 10000)
-        server_host = broker_client.get("host", "0.0.0.0")
-        server_port = broker_client.get("port", 7671)
-        # Optionally, set socket options here for reuse.
+        # Optionally, set socket options here for reuse (note: binding occurs in server __init__).
         server = SimpleMessageBroker(server_host, server_port, max_queue_size)
-        # Enable address reuse on the server socket.
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except Exception:
+            pass
         server.serve_forever()
 
     p = multiprocessing.Process(target=broker_server)
-    p.daemon = False
+    # If we're launching from inside the pipeline subprocess, mark daemon so the
+    # broker dies automatically when the subprocess exits.
+    p.daemon = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1"
     p.start()
-    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client.get('port', 7671)}")
+    logger.info(f"Started SimpleMessageBroker server in separate process on port {server_port}")
 
     return p

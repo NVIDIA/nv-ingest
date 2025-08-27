@@ -7,17 +7,17 @@
 # pylint: disable=line-too-long
 
 """
-Default pipeline implementation for libmode.
+Default pipeline implementation (runtime default).
 
-This module contains the default libmode pipeline configuration as a string,
-allowing the pipeline to be loaded without requiring external YAML files.
+This module embeds the exact contents of config/default_pipeline.yaml so code can
+load the default pipeline without reading the YAML file at runtime.
 """
 
-DEFAULT_LIBMODE_PIPELINE_YAML = """# Default Ingestion Pipeline Configuration for Library Mode
+DEFAULT_PIPELINE_YAML = """# Default Ingestion Pipeline Configuration
 # This file replicates the static pipeline defined in pipeline_builders.py
 
-name: "NVIngest default libmode pipeline"
-description: "This is the default ingestion pipeline for NVIngest in library mode"
+name: "NVIngest default pipeline"
+description: "This is the default ingestion pipeline for NVIngest"
 stages:
   # Source
   - name: "source_stage"
@@ -26,20 +26,19 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
-        client_type: "simple"
-        host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
-        port: $MESSAGE_CLIENT_PORT|7671
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
+        host: $MESSAGE_CLIENT_HOST|"redis"
+        port: $MESSAGE_CLIENT_PORT|6379
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
-      min_replicas: 0
+      min_replicas: 1
       max_replicas:
         strategy: "static"
         value: 1
       static_replicas:
         strategy: "static"
         value: 1
-    runs_after: []
 
   # Pre-processing
   - name: "metadata_injector"
@@ -67,23 +66,23 @@ stages:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
         yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|""
         nemoretriever_parse_endpoints: [
           $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions",
         ]
         nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
         nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
         yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
     replicas:
       min_replicas: 0
       max_replicas:
@@ -101,10 +100,10 @@ stages:
     config:
       audio_extraction_config:
         audio_endpoints: [
-          $AUDIO_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
-          $AUDIO_HTTP_ENDPOINT|""
+          $AUDIO_GRPC_ENDPOINT|"audio:50051",
+          $AUDIO_HTTP_ENDPOINT|"",
         ]
-        function_id: $AUDIO_FUNCTION_ID|"1598d209-5e27-4d3c-8079-4751568b1081"
+        function_id: $AUDIO_FUNCTION_ID|""
         audio_infer_protocol: $AUDIO_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
@@ -123,10 +122,10 @@ stages:
     config:
       docx_extraction_config:
         yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"",
         ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -144,10 +143,10 @@ stages:
     config:
       pptx_extraction_config:
         yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -165,10 +164,10 @@ stages:
     config:
       image_extraction_config:
         yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -200,8 +199,8 @@ stages:
     config:
       endpoint_config:
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
-          $OCR_HTTP_ENDPOINT|""
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
@@ -221,15 +220,15 @@ stages:
     config:
       endpoint_config:
         yolox_endpoints: [
-          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"",
-          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"table-structure:8001",
+          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|"http://table-structure:8000/v1/infer",
         ]
-        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|"http"
+        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|grpc
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
-        ocr_infer_protocol: $PADDLE_INFER_PROTOCOL|"http"
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -248,15 +247,15 @@ stages:
     config:
       endpoint_config:
         yolox_endpoints: [
-          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"",
-          $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"graphic-elements:8001",
+          $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|""
         ]
-        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|"http"
+        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|grpc
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|""
         ]
-        ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -318,7 +317,6 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
-      endpoint_url: $VLM_CAPTION_ENDPOINT|"https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
       model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
     replicas:
@@ -337,15 +335,15 @@ stages:
     config:
       api_key: $NGC_API_KEY|""
       embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
-      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"https://integrate.api.nvidia.com/v1"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
     replicas:
       min_replicas: 0
       max_replicas:
         strategy: "static"
-        value: 2
+        value: 4
       static_replicas:
         strategy: "static"
-        value: 1
+        value: 3
 
   # Storage and Output
   - name: "image_storage"
@@ -380,9 +378,10 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
       broker_client:
-        client_type: "simple"
-        host: "localhost"
-        port: 7671
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
+        host: $MESSAGE_CLIENT_HOST|localhost
+        port: $MESSAGE_CLIENT_PORT|6379
+      poll_interval: 0.1
     replicas:
       min_replicas: 1
       max_replicas:
@@ -416,7 +415,7 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:
-      min_replicas: 0
+      min_replicas: 1
       max_replicas:
         strategy: "static"
         value: 1
@@ -500,11 +499,10 @@ edges:
     queue_size: 32
 
 # Pipeline Runtime Configuration
-# These parameters control dynamic scaling and PID controller behavior
-# All values can be overridden by environment variables from env_config.py
 pipeline:
-  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|true
+  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
   dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
+  static_memory_threshold: $INGEST_STATIC_MEMORY_THRESHOLD|0.75
   pid_controller:
     kp: $INGEST_DYNAMIC_MEMORY_KP|0.2
     ki: $INGEST_DYNAMIC_MEMORY_KI|0.01
@@ -513,5 +511,5 @@ pipeline:
     penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
     error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
     rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
-  launch_simple_broker: true
+  launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|false
 """

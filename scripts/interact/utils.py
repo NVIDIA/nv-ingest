@@ -195,10 +195,6 @@ def get_gpu_name():
 def kv_event_log(key, val, log_path: str = "test_results"):
     """Log a key-value pair event with timestamp to both console and JSON file.
 
-    This function prints the event to the console with a timestamp and appends
-    the key-value pair to a JSON log file. The log file is named after the
-    calling script and stored in the specified log directory.
-
     Args:
         key: The event key/name to log.
         val: The event value to log.
@@ -211,10 +207,28 @@ def kv_event_log(key, val, log_path: str = "test_results"):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
 
-    log_file = f"{log_path}/{caller_fn.split(".")[0]}.json"
+    # Handle special cases like <stdin> or invalid filenames
+    base_name = caller_fn.split(".")[0]
+    if base_name.startswith("<") or not base_name.replace("_", "").replace("-", "").isalnum():
+        base_name = "test_events"
 
-    with open(log_file, "a") as fp:
-        fp.write(json.dumps({key: val}))
+    log_file = f"{log_path}/{base_name}.json"
+
+    # Read existing data or create new dict
+    data = {}
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r") as fp:
+                data = json.load(fp)
+        except (json.JSONDecodeError, FileNotFoundError):
+            data = {}
+
+    # Update with new key-value pair
+    data[key] = val
+
+    # Write back as simple JSON object
+    with open(log_file, "w") as fp:
+        json.dump(data, fp, indent=2)
 
 
 def unload_collection(milvus_uri: str, collection_name: str):

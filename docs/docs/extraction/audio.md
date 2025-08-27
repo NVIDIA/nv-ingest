@@ -136,6 +136,6 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 ## Related Topics
 
-- [Support Matrix](support-matrix.md).
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
