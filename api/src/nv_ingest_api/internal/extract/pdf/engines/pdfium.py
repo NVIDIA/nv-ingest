@@ -474,10 +474,17 @@ def pdfium_extractor(
         f"extract_infographics={extract_infographics}"
     )
 
-    batch_size = os.environ.get("INGEST_PDF_EXTRACT_MAX_PAGES_PER_BATCH", 100)
+    # Ensure environment values are integers
+    try:
+        batch_size = int(os.environ.get("INGEST_PDF_EXTRACT_MAX_PAGES_PER_BATCH", 100))
+    except (TypeError, ValueError):
+        batch_size = 100
     if page_count > batch_size:
         ranges = [(start, min(start + batch_size, page_count)) for start in range(0, page_count, batch_size)]
-        procs = os.environ.get("INGEST_MAX_PER_REPLICATION_WORKER_PROCESSES", 5)
+        try:
+            procs = int(os.environ.get("INGEST_MAX_PER_REPLICATION_WORKER_PROCESSES", 5))
+        except (TypeError, ValueError):
+            procs = 5
 
         # Prepare immutable worker args
         worker_args = [
@@ -497,15 +504,23 @@ def pdfium_extractor(
         all_accumulated_text: List[str] = []
 
         with mp.Pool(processes=procs) as pool:
-            for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
-                # Each result is a tuple: (items: list, accumulated_text: list)
-                if not result:
-                    continue
-                items, acc_text = result
-                if items:
-                    extracted_data.extend(items)
-                if acc_text:
-                    all_accumulated_text.extend(acc_text)
+            try:
+                for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
+                    # Each result is a tuple: (items: list, accumulated_text: list)
+                    if not result:
+                        continue
+                    items, acc_text = result
+                    if items:
+                        extracted_data.extend(items)
+                    if acc_text:
+                        all_accumulated_text.extend(acc_text)
+            except Exception as e:
+                # Terminate all workers on first failure and re-raise to flag the job as failed
+                logger.exception(f"PDFium parallel extraction failed; terminating pool: {e}")
+                pool.terminate()
+                pool.join()
+                doc.close()
+                raise
 
         # For document-level text extraction, combine text across all batches once
         if extract_text and text_depth != TextTypeEnum.PAGE and all_accumulated_text:
@@ -878,5 +893,6 @@ def _process_pdf_pages_range_worker(args_tuple):
         doc.close()
         return extracted_data, accumulated_text
     except Exception as e:
+        # Log and re-raise so the parent process can terminate the pool and mark the job as failed
         logger.exception(f"Worker failed for page range [{start_idx}, {end_idx}): {e}")
-        return [], []
+        raise
