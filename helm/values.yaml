@@ -1044,6 +1044,7 @@ envVars:
   OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
   OCR_MODEL_NAME: paddle
+  OCR_RATE_LIMIT: 3
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"

@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -153,6 +152,7 @@ def _update_infographic_metadata(
 def _create_clients(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
+    ocr_rate_limit: int,
     auth_token: str,
 ) -> NimClient:
     ocr_model_interface = OCRModelInterface()
@@ -164,7 +164,7 @@ def _create_clients(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
-        rate_limit_requests_per_second=int(os.getenv("OCR_RATE_LIMIT_RPS", -1)),
+        rate_limit_requests_per_second=ocr_rate_limit,
     )
 
     return ocr_client
@@ -244,6 +244,7 @@ def extract_infographic_data_from_image_internal(
     ocr_client = _create_clients(
         endpoint_config.ocr_endpoints,
         endpoint_config.ocr_infer_protocol,
+        endpoint_config.ocr_rate_limit,
         endpoint_config.auth_token,
     )
 
