@@ -551,7 +551,8 @@ def pdfium_extractor(
             extracted_data = []
             all_accumulated_text: List[str] = []
 
-            with mp.Pool(processes=procs) as pool:
+            ctx = mp.get_context("spawn")
+            with ctx.Pool(processes=procs) as pool:
                 try:
                     for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
                         # Each result is a tuple: (items: list, accumulated_text: list)
