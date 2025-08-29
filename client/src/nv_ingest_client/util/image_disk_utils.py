@@ -30,6 +30,42 @@ from nv_ingest_client.client.util.processing import get_valid_filename
 logger = logging.getLogger(__name__)
 
 
+def _detect_base64_image_format(base64_string: str) -> str:
+    """
+    Detect the format of a base64-encoded image using magic bytes.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image string.
+
+    Returns
+    -------
+    str
+        Detected format ("PNG", "JPEG", "UNKNOWN").
+    """
+    try:
+        # Strip data URL prefix if present
+        if "," in base64_string:
+            base64_string = base64_string.split(",")[1]
+
+        image_bytes = base64.b64decode(base64_string)
+
+        # Check magic bytes for common formats
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            return "JPEG"
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "PNG"
+        elif image_bytes.startswith(b"GIF87a") or image_bytes.startswith(b"GIF89a"):
+            return "GIF"
+        elif image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+            return "WEBP"
+        else:
+            return "UNKNOWN"
+    except Exception:
+        return "UNKNOWN"
+
+
 def _is_base64_image_format(base64_string: str, target_format: str) -> bool:
     """
     Checks if base64 image is already in the target format using simple magic bytes.
@@ -46,18 +82,8 @@ def _is_base64_image_format(base64_string: str, target_format: str) -> bool:
     bool
         True if image is already in target format, False otherwise.
     """
-    try:
-        image_bytes = base64.b64decode(base64_string)
-
-        # Simple magic byte checks for common formats
-        if target_format.upper() == "JPEG" and image_bytes.startswith(b"\xff\xd8\xff"):
-            return True
-        elif target_format.upper() == "PNG" and image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
-            return True
-
-        return False
-    except Exception:
-        return False
+    detected_format = _detect_base64_image_format(base64_string)
+    return detected_format.upper() == target_format.upper()
 
 
 def _base64_to_disk_direct(base64_string: str, output_path: str) -> bool:
@@ -162,9 +188,9 @@ def _save_image_efficiently(base64_content: str, output_path: str, target_format
     output_path : str
         Path where the image should be saved.
     target_format : str
-        Target format ("PNG", "JPEG").
+        Target format ("PNG", "JPEG", "AUTO"). Use "AUTO" to preserve original format.
     quality : int, optional
-        JPEG quality (1-100). Ignored for PNG. Default is 95.
+        JPEG quality (1-100). Ignored for PNG and AUTO modes. Default is 95.
 
     Returns
     -------
@@ -175,13 +201,18 @@ def _save_image_efficiently(base64_content: str, output_path: str, target_format
     if target_format_upper == "JPG":
         target_format_upper = "JPEG"
 
+    # Handle AUTO mode - preserve original format (always fastest)
+    if target_format_upper == "AUTO":
+        logger.debug("Direct write: preserving original format (AUTO mode)")
+        return _base64_to_disk_direct(base64_content, output_path)
+
     # Try direct write first if format matches (most efficient)
     if _is_base64_image_format(base64_content, target_format_upper):
-        logger.debug(f"OpenCV Direct write: {target_format_upper}")
+        logger.debug(f"Direct write: {target_format_upper}")
         return _base64_to_disk_direct(base64_content, output_path)
     else:
         # Format conversion required
-        logger.debug(f"OpenCV Format conversion to {target_format_upper}")
+        logger.debug(f"Format conversion to {target_format_upper}")
         return _base64_to_disk_with_conversion(base64_content, output_path, target_format_upper, quality)
 
 
@@ -195,7 +226,7 @@ def save_images_to_disk(
     save_raw_images: bool = False,
     count_images: bool = True,
     organize_by_type: bool = True,
-    output_format: str = "jpeg",
+    output_format: str = "auto",
 ) -> Dict[str, int]:
     """
     Save base64-encoded images from ingestion results to disk as actual image files.
@@ -225,8 +256,11 @@ def save_images_to_disk(
     organize_by_type : bool, optional
         Whether to organize images into subdirectories by type. Default is True.
     output_format : str, optional
-        Output image format for saved files. Supports "png" and "jpeg". Default is "jpeg".
-        JPEG provides faster compression performance than PNG. Use "png" for lossless quality.
+        Output image format for saved files. Default is "auto".
+        - "auto": Preserve original format (fastest, no conversion)
+        - "jpeg": Convert to JPEG (smaller files, good compression)
+        - "png": Convert to PNG (lossless quality)
+        Use "auto" for maximum speed by avoiding format conversion.
 
     Returns
     -------
@@ -300,7 +334,20 @@ def save_images_to_disk(
 
             # Determine image file format - use configured output_format
             image_type = output_format.lower()
-            if image_type not in ["png", "jpeg", "jpg"]:
+
+            # Handle AUTO mode - detect original format and preserve it
+            if image_type == "auto":
+                detected_format = _detect_base64_image_format(image_content)
+                if detected_format in ["PNG", "JPEG", "GIF", "WEBP"]:
+                    image_type = detected_format.lower()
+                    # Normalize jpeg to be consistent
+                    if image_type == "jpeg":
+                        pass  # Keep as jpeg
+                else:
+                    # Fall back to JPEG for unknown formats
+                    logger.warning("Unknown format detected in AUTO mode, falling back to JPEG")
+                    image_type = "jpeg"
+            elif image_type not in ["png", "jpeg", "jpg"]:
                 logger.warning(f"Unsupported output format '{output_format}', falling back to JPEG")
                 image_type = "jpeg"
             # Normalize jpg to jpeg for internal consistency
@@ -308,8 +355,15 @@ def save_images_to_disk(
                 image_type = "jpeg"
 
             # Create descriptive filename with source, page, and index information
-            # Use consistent file extension (jpg for jpeg)
-            file_ext = "jpg" if image_type == "jpeg" else image_type
+            # Use appropriate file extensions
+            if image_type == "jpeg":
+                file_ext = "jpg"
+            elif image_type == "webp":
+                file_ext = "webp"
+            elif image_type == "gif":
+                file_ext = "gif"
+            else:
+                file_ext = image_type  # png, etc.
 
             if organize_by_type:
                 # Organize into subdirectories by image type
@@ -373,7 +427,7 @@ def save_images_from_response(response: Dict[str, Any], output_directory: str, *
         Directory where images will be saved.
     **kwargs
         Additional arguments passed to save_images_to_disk().
-        Includes output_format ("png" or "jpeg") and other filtering options.
+        Includes output_format ("auto", "png", or "jpeg") and other filtering options.
 
     Returns
     -------
@@ -404,7 +458,7 @@ def save_images_from_ingestor_results(
         Directory where images will be saved.
     **kwargs
         Additional arguments passed to save_images_to_disk().
-        Includes output_format ("png" or "jpeg") and other filtering options.
+        Includes output_format ("auto", "png", or "jpeg") and other filtering options.
 
     Returns
     -------
