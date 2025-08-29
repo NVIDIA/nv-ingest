@@ -430,12 +430,39 @@ def pdfium_extractor(
     logger.debug("Extracting PDF with pdfium backend.")
     source_id = row_data["source_id"]
 
-    # Read the PDF stream into bytes once so it can be sent to worker processes
+    # Determine input to PdfDocument and optional bytes for worker processes
+    pdf_input_for_pdfium = pdf_stream
+    pdf_bytes_for_workers: Optional[bytes] = None
     try:
-        pdf_bytes = pdf_stream.read() if hasattr(pdf_stream, "read") else pdf_stream
+        if hasattr(pdf_stream, "read"):
+            # Stream-like: keep passing the original stream to Pdfium (tests expect identity)
+            try:
+                if hasattr(pdf_stream, "seek"):
+                    pdf_stream.seek(0)
+            except Exception:
+                pass
+            # If it's a BytesIO-like, we can obtain bytes for workers without altering the stream
+            if hasattr(pdf_stream, "getvalue"):
+                try:
+                    pdf_bytes_for_workers = pdf_stream.getvalue()
+                except Exception:
+                    pdf_bytes_for_workers = None
+        elif isinstance(pdf_stream, (bytes, bytearray, memoryview)):
+            # Bytes-like input: pass bytes to Pdfium and use same for workers
+            pdf_input_for_pdfium = bytes(pdf_stream)
+            pdf_bytes_for_workers = pdf_input_for_pdfium
+        else:
+            # Path-like input: let Pdfium open it; workers cannot use mp without bytes
+            pdf_input_for_pdfium = pdf_stream
+            pdf_bytes_for_workers = None
     except Exception:
-        # Fallback to original stream in case of unexpected types
-        pdf_bytes = pdf_stream
+        # Fallback: pass through original object
+        pdf_input_for_pdfium = pdf_stream
+        pdf_bytes_for_workers = None
+
+    # Validate that when we do have bytes they are non-empty to avoid Pdfium 'Data format error'
+    if isinstance(pdf_input_for_pdfium, (bytes, bytearray, memoryview)) and len(pdf_input_for_pdfium) == 0:
+        raise ValueError("Empty PDF content provided to pdfium_extractor().")
 
     # Build base metadata used for document-level operations (and by single-process path)
     if hasattr(row_data, "index"):
@@ -450,7 +477,21 @@ def pdfium_extractor(
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     # Open once to get metadata and page_count
-    doc = libpdfium.PdfDocument(pdf_bytes)
+    try:
+        doc = libpdfium.PdfDocument(pdf_input_for_pdfium)
+    except Exception as e:
+        # Provide clearer diagnostics for common cases (empty/invalid bytes)
+        try:
+            byte_len = (
+                len(pdf_input_for_pdfium) if isinstance(pdf_input_for_pdfium, (bytes, bytearray, memoryview)) else None
+            )
+        except Exception:
+            byte_len = None
+        logger.exception(
+            f"Failed to open PDF for source_id={source_id}. "
+            f"bytes_len={byte_len}, type={type(pdf_input_for_pdfium).__name__}: {e}"
+        )
+        raise
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
 
@@ -486,61 +527,68 @@ def pdfium_extractor(
         except (TypeError, ValueError):
             procs = 5
 
-        # Prepare immutable worker args
-        worker_args = [
-            (
-                pdf_bytes,
-                extractor_config,
-                row_data,
-                metadata_column,
-                start,
-                end,
-                execution_trace_log,
+        # If we don't have bytes to share with workers, fall back to single-process path
+        if pdf_bytes_for_workers is None:
+            logger.debug(
+                "Multiprocessing disabled for this input (no bytes buffer available for workers). "
+                "Falling back to single-process extraction."
             )
-            for (start, end) in ranges
-        ]
+        else:
+            # Prepare immutable worker args
+            worker_args = [
+                (
+                    pdf_bytes_for_workers,
+                    extractor_config,
+                    row_data,
+                    metadata_column,
+                    start,
+                    end,
+                    execution_trace_log,
+                )
+                for (start, end) in ranges
+            ]
 
-        extracted_data = []
-        all_accumulated_text: List[str] = []
+            extracted_data = []
+            all_accumulated_text: List[str] = []
 
-        with mp.Pool(processes=procs) as pool:
-            try:
-                for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
-                    # Each result is a tuple: (items: list, accumulated_text: list)
-                    if not result:
-                        continue
-                    items, acc_text = result
-                    if items:
-                        extracted_data.extend(items)
-                    if acc_text:
-                        all_accumulated_text.extend(acc_text)
-            except Exception as e:
-                # Terminate all workers on first failure and re-raise to flag the job as failed
-                logger.exception(f"PDFium parallel extraction failed; terminating pool: {e}")
-                pool.terminate()
-                pool.join()
-                doc.close()
-                raise
+            with mp.Pool(processes=procs) as pool:
+                try:
+                    for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
+                        # Each result is a tuple: (items: list, accumulated_text: list)
+                        if not result:
+                            continue
+                        items, acc_text = result
+                        if items:
+                            extracted_data.extend(items)
+                        if acc_text:
+                            all_accumulated_text.extend(acc_text)
+                except Exception as e:
+                    # Terminate all workers on first failure and re-raise to flag the job as failed
+                    logger.exception(f"PDFium parallel extraction failed; terminating pool: {e}")
+                    pool.terminate()
+                    pool.join()
+                    doc.close()
+                    raise
 
-        # For document-level text extraction, combine text across all batches once
-        if extract_text and text_depth != TextTypeEnum.PAGE and all_accumulated_text:
-            doc_text_meta = construct_text_metadata(
-                all_accumulated_text,
-                pdf_metadata.keywords,
-                -1,
-                -1,
-                -1,
-                -1,
-                page_count,
-                TextTypeEnum.DOCUMENT,
-                source_metadata,
-                base_unified_metadata,
-            )
-            extracted_data.append(doc_text_meta)
+            # For document-level text extraction, combine text across all batches once
+            if extract_text and text_depth != TextTypeEnum.PAGE and all_accumulated_text:
+                doc_text_meta = construct_text_metadata(
+                    all_accumulated_text,
+                    pdf_metadata.keywords,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    page_count,
+                    TextTypeEnum.DOCUMENT,
+                    source_metadata,
+                    base_unified_metadata,
+                )
+                extracted_data.append(doc_text_meta)
 
-        doc.close()
-        logger.debug(f"Extracted {len(extracted_data)} items from PDF (batched).")
-        return extracted_data
+            doc.close()
+            logger.debug(f"Extracted {len(extracted_data)} items from PDF (batched).")
+            return extracted_data
 
     # Small documents: fall back to original single-process path
     # Decide if text extraction should be done at the PAGE or DOCUMENT level
@@ -753,7 +801,22 @@ def _process_pdf_pages_range_worker(args_tuple):
         partition_id = base_source_metadata.get("partition_id", -1)
         access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-        doc = libpdfium.PdfDocument(pdf_bytes)
+        # Validate worker input for empty bytes to avoid Pdfium 'Data format error'
+        if isinstance(pdf_bytes, (bytes, bytearray, memoryview)) and len(pdf_bytes) == 0:
+            raise ValueError("Empty PDF content provided to worker _process_pdf_pages_range_worker().")
+
+        try:
+            doc = libpdfium.PdfDocument(pdf_bytes)
+        except Exception as e:
+            try:
+                byte_len = len(pdf_bytes) if isinstance(pdf_bytes, (bytes, bytearray, memoryview)) else None
+            except Exception:
+                byte_len = None
+            logger.exception(
+                f"Worker failed to open PDF for range [{start_idx}, {end_idx}). "
+                f"bytes_len={byte_len}, type={type(pdf_bytes).__name__}: {e}"
+            )
+            raise
         pdf_metadata = extract_pdf_metadata(doc, source_id)
         page_count = pdf_metadata.page_count
 
