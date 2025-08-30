@@ -17,6 +17,7 @@ def create_inference_client(
     infer_protocol: Optional[str] = None,
     timeout: float = 120.0,
     max_retries: int = 5,
+    **kwargs,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -53,4 +54,4 @@ def create_inference_client(
     if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout, max_retries)
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout, max_retries, **kwargs)

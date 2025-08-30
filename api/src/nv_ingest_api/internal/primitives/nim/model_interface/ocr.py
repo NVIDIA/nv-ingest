@@ -51,6 +51,55 @@ class OCRModelInterface(ModelInterface):
         """
         return "OCR"
 
+    def unpack_data_to_items(self, data: Dict[str, Any]) -> List[np.ndarray]:
+        """
+        Takes the user-facing input dictionary and unpacks it into a list
+        of individual, processable items (a list of images as numpy arrays).
+
+        This is used by the synchronous `infer` method when dynamic batching is enabled
+        to create a list of requests to submit.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data containing either:
+             - 'base64_image': a single base64-encoded image, or
+             - 'base64_images': a list of base64-encoded images.
+
+        Returns
+        -------
+        List[np.ndarray]
+            A list of single data items (decoded NumPy arrays).
+
+        Raises
+        ------
+        KeyError
+            If neither 'base64_image' nor 'base64_images' is found in `data`.
+        ValueError
+            If 'base64_images' is present but is not a list.
+        """
+        if "base64_images" in data:
+            base64_list = data["base64_images"]
+            if not isinstance(base64_list, list):
+                raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
+
+            items = []
+            for b64 in base64_list:
+                img = base64_to_numpy(b64)
+                h, w, _ = img.shape
+                items.append((img, (h, w)))
+            return items
+
+        elif "base64_image" in data:
+            # Handle the single-image fallback case
+            img = base64_to_numpy(data["base64_image"])
+            h, w, _ = img.shape
+            return [(img, (h, w))]
+
+        else:
+            # Raise the same error as prepare_data_for_inference for consistency
+            raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
+
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Decode one or more base64-encoded images into NumPy arrays, storing them
@@ -99,6 +148,37 @@ class OCRModelInterface(ModelInterface):
 
         return data
 
+    def coalesce_requests_to_batch(
+        self, requests: List[np.ndarray], protocol: str, **kwargs
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
+        """
+        Takes a list of individual data items (NumPy image arrays) and combines them
+        into a single formatted batch ready for inference.
+
+        This method mirrors the logic of `format_input` but operates on an already-formed
+        batch from the dynamic batcher, so it does not perform any chunking.
+
+        Parameters
+        ----------
+        requests : List[np.ndarray]
+            A list of single data items, which are NumPy arrays representing images.
+        protocol : str
+            The inference protocol, either "grpc" or "http".
+        **kwargs : Any
+            Additional keyword arguments, such as `model_name` and `merge_level`.
+
+        Returns
+        -------
+        Tuple[List[Any], List[Dict[str, Any]]]
+            A tuple containing two lists, each with a single element:
+            - The first list contains the single formatted batch.
+            - The second list contains the single scratch-pad dictionary for that batch.
+        """
+        if not requests:
+            return None, {}
+
+        return self._format_single_batch(requests, protocol, **kwargs)
+
     def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
         Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
@@ -128,21 +208,32 @@ class OCRModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified.
         """
-
-        images = data["image_arrays"]
-
-        dims: List[Dict[str, Any]] = []
-        data["image_dims"] = dims
-
         # Helper function to split a list into chunks of size up to chunk_size.
         def chunk_list(lst, chunk_size):
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
-        if "image_arrays" not in data or "image_dims" not in data:
+        if ("image_arrays" not in data) or ("image_dims" not in data):
             raise KeyError("Expected 'image_arrays' and 'image_dims' in data. Call prepare_data_for_inference first.")
 
         images = data["image_arrays"]
         dims = data["image_dims"]
+
+        formatted_batches = []
+        formatted_batch_data = []
+
+        image_chunks = chunk_list(images, max_batch_size)
+        for chunk in image_chunks:
+            final_batch, batch_data = self._format_single_batch(chunk, protocol, **kwargs)
+            formatted_batches.append(final_batch)
+            formatted_batch_data.append(batch_data)
+
+        all_dims = [item for d in formatted_batch_data for item in d.get("image_dims", [])]
+        data["image_dims"] = all_dims
+
+        return formatted_batches, formatted_batch_data
+
+    def _format_single_batch(self, batch_images: List[np.array], protocol: str, **kwargs) -> Tuple[Any, Dict[str, Any]]:
+        dims: List[Dict[str, Any]] = []
 
         model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
         merge_level = kwargs.get("merge_level", "paragraph")
@@ -151,10 +242,14 @@ class OCRModelInterface(ModelInterface):
             logger.debug("Formatting input for gRPC OCR model (batched).")
             processed: List[np.ndarray] = []
 
-            max_length = max(max(img.shape[:2]) for img in images)
-            max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
+            max_height = max(img.shape[0] for img in batch_images)
+            max_width = max(img.shape[1] for img in batch_images)
+            # Cap dimensions to a reasonable limit to prevent extreme memory usage.
+            max_height = min(max_height, 1024)
+            max_width = min(max_width, 1024)
+            max_length = max(max_height, max_width)
 
-            for img in images:
+            for img in batch_images:
                 if model_name == DEFAULT_OCR_MODEL_NAME:
                     arr, _dims = preprocess_image_for_paddle(img)
                 elif model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME:
@@ -181,57 +276,44 @@ class OCRModelInterface(ModelInterface):
 
                 processed.append(arr)
 
-            batches = []
-            batch_data_list = []
-            for proc_chunk, orig_chunk, dims_chunk in zip(
-                chunk_list(processed, max_batch_size),
-                chunk_list(images, max_batch_size),
-                chunk_list(dims, max_batch_size),
-            ):
-                batched_input = np.concatenate(proc_chunk, axis=0)
+            batched_input = np.concatenate(processed, axis=0)
 
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    batches.append(batched_input)
-                else:
-                    merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
-                    batches.append([batched_input, merge_levels])
+            if model_name == DEFAULT_OCR_MODEL_NAME:
+                batches.append(batched_input)
+            else:
+                batch_size = batched_input.shape[0]
 
-                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
-            return batches, batch_data_list
+                merge_levels_list = [[merge_level] for _ in range(batch_size)]
+                merge_levels = np.array(merge_levels_list, dtype="object")
+
+                final_batch = [batched_input, merge_levels]
+
+            batch_data = {"image_arrays": batch_images, "image_dims": dims}
+
+            return final_batch, batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP OCR model (batched).")
-            if "base64_images" in data:
-                base64_list = data["base64_images"]
-            else:
-                base64_list = [data["base64_image"]]
 
             input_list: List[Dict[str, Any]] = []
-            for b64, img in zip(base64_list, images):
+            for b64, img in zip(base64_list, batch_images):
                 image_url = f"data:image/png;base64,{b64}"
                 image_obj = {"type": "image_url", "url": image_url}
                 input_list.append(image_obj)
                 _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
                 dims.append(_dims)
 
-            batches = []
-            batch_data_list = []
-            for input_chunk, orig_chunk, dims_chunk in zip(
-                chunk_list(input_list, max_batch_size),
-                chunk_list(images, max_batch_size),
-                chunk_list(dims, max_batch_size),
-            ):
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    payload = {"input": input_chunk}
-                else:
-                    payload = {
-                        "input": input_chunk,
-                        "merge_levels": [merge_level] * len(input_chunk),
-                    }
-                batches.append(payload)
-                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            if model_name == DEFAULT_OCR_MODEL_NAME:
+                payload = {"input": input_list}
+            else:
+                payload = {
+                    "input": input_list,
+                    "merge_levels": [merge_level] * len(input_list),
+                }
 
-            return batches, batch_data_list
+            batch_data = {"image_arrays": batch_images, "image_dims": dims}
+
+            return payload, batch_data
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
