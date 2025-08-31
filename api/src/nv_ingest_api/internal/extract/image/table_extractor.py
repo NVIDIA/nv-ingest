@@ -313,6 +313,8 @@ def extract_table_data_from_image_internal(
             model_interface=yolox_model_interface,
             auth_token=auth_token,
             infer_protocol=yolox_protocol,
+            enable_dynamic_batching=True,
+            dynamic_batch_memory_budget_mb=32,
         ) as yolox_client, create_inference_client(
             endpoints=ocr_endpoints,
             model_interface=ocr_model_interface,

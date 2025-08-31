@@ -19,7 +19,6 @@ from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graph
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
-from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -313,6 +312,8 @@ def extract_chart_data_from_image_internal(
             model_interface=yolox_model_interface,
             auth_token=auth_token,
             infer_protocol=yolox_protocol,
+            enable_dynamic_batching=True,
+            dynamic_batch_memory_budget_mb=32,
         ) as yolox_client, create_inference_client(
             endpoints=ocr_endpoints,
             model_interface=ocr_model_interface,
