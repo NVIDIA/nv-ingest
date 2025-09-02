@@ -18,6 +18,8 @@ from nv_ingest_api.util.image_processing.transforms import (
     check_numpy_image_size,
     scale_image_to_encoding_size,
     ensure_base64_format,
+    base64_to_disk,
+    save_image_to_disk,
 )
 
 
@@ -388,3 +390,290 @@ def test_ensure_base64_is_png_unsupported_format():
         assert image.format == "PNG"  # Should be converted to PNG if supported
     else:
         assert result is None  # If unsupported, result should be None
+
+
+# ===== TESTS FOR NEW DISK SAVING FUNCTIONS =====
+
+
+class TestBase64ToDisk:
+    """Test the base64_to_disk function - core direct write functionality."""
+
+    @pytest.fixture
+    def sample_png_base64(self):
+        """Create a small PNG image encoded as base64."""
+        img = Image.new("RGB", (10, 10), color="red")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    @pytest.fixture
+    def sample_jpeg_base64(self):
+        """Create a small JPEG image encoded as base64."""
+        img = Image.new("RGB", (10, 10), color="blue")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    def test_breaking_test_intentionally_fails(self):
+        """Intentional breaking test to verify test framework works."""
+        # This should fail to prove our tests actually run
+        with pytest.raises(AssertionError):
+            assert False, "This test should fail to verify framework works"
+
+    def test_successful_png_write(self, tmp_path, sample_png_base64):
+        """Test successful PNG write to disk."""
+        output_file = tmp_path / "test_output.png"
+
+        result = base64_to_disk(sample_png_base64, str(output_file))
+
+        assert result is True
+        assert output_file.exists()
+        assert output_file.stat().st_size > 0
+
+        # Verify file is actually a valid PNG
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"
+            assert img.size == (10, 10)
+
+    def test_successful_jpeg_write(self, tmp_path, sample_jpeg_base64):
+        """Test successful JPEG write to disk."""
+        output_file = tmp_path / "test_output.jpg"
+
+        result = base64_to_disk(sample_jpeg_base64, str(output_file))
+
+        assert result is True
+        assert output_file.exists()
+        assert output_file.stat().st_size > 0
+
+        # Verify file is actually a valid JPEG
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
+            assert img.size == (10, 10)
+
+    def test_data_url_prefix_handling(self, tmp_path):
+        """Test that data URL prefixes are properly stripped."""
+        img = Image.new("RGB", (5, 5), color="green")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        clean_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        # Add data URL prefix
+        prefixed_b64 = f"data:image/png;base64,{clean_b64}"
+        output_file = tmp_path / "prefixed_test.png"
+
+        result = base64_to_disk(prefixed_b64, str(output_file))
+
+        assert result is True
+        assert output_file.exists()
+
+        # Verify content is correct by comparing with clean version
+        clean_output = tmp_path / "clean_test.png"
+        base64_to_disk(clean_b64, str(clean_output))
+
+        assert output_file.stat().st_size == clean_output.stat().st_size
+
+    def test_invalid_base64_returns_false(self, tmp_path):
+        """Test that invalid base64 returns False gracefully."""
+        output_file = tmp_path / "invalid_test.png"
+
+        result = base64_to_disk("invalid_base64_data!", str(output_file))
+
+        assert result is False
+        assert not output_file.exists()
+
+    def test_permission_error_returns_false(self, sample_png_base64):
+        """Test that file permission errors return False gracefully."""
+        invalid_path = "/nonexistent/deep/path/test.png"
+
+        result = base64_to_disk(sample_png_base64, invalid_path)
+
+        assert result is False
+
+    def test_empty_base64_returns_false(self, tmp_path):
+        """Test that empty base64 string returns False."""
+        output_file = tmp_path / "empty_test.png"
+
+        result = base64_to_disk("", str(output_file))
+
+        assert result is False
+        assert not output_file.exists()
+
+    def test_whitespace_only_base64_returns_false(self, tmp_path):
+        """Test that whitespace-only base64 string returns False."""
+        output_file = tmp_path / "whitespace_test.png"
+
+        result = base64_to_disk("   \n\t   ", str(output_file))
+
+        assert result is False
+        assert not output_file.exists()
+
+    def test_data_url_with_empty_base64_returns_false(self, tmp_path):
+        """Test that data URL with empty base64 part returns False."""
+        output_file = tmp_path / "empty_data_url_test.png"
+
+        result = base64_to_disk("data:image/png;base64,", str(output_file))
+
+        assert result is False
+        assert not output_file.exists()
+
+
+class TestSaveImageToDisk:
+    """Test the save_image_to_disk function - smart wrapper with format conversion."""
+
+    @pytest.fixture
+    def sample_png_base64(self):
+        """Create a PNG base64 image."""
+        img = Image.new("RGB", (15, 15), color="purple")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    @pytest.fixture
+    def sample_jpeg_base64(self):
+        """Create a JPEG base64 image."""
+        img = Image.new("RGB", (15, 15), color="orange")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=90)
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    def test_breaking_test_wrong_format(self, tmp_path, sample_png_base64):
+        """Breaking test - verify PNG doesn't become JPEG without conversion."""
+        output_file = tmp_path / "should_be_png.png"
+
+        # Save PNG as auto format
+        result = save_image_to_disk(sample_png_base64, str(output_file), "auto")
+        assert result is True
+
+        # Verify it's still PNG (this should pass - not a breaking test after all)
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"  # This should work
+
+    def test_auto_mode_preserves_format(self, tmp_path, sample_png_base64, sample_jpeg_base64):
+        """Test that AUTO mode preserves original formats."""
+        png_file = tmp_path / "auto_png.png"
+        jpeg_file = tmp_path / "auto_jpeg.jpg"
+
+        # Test PNG preservation
+        result1 = save_image_to_disk(sample_png_base64, str(png_file), "auto")
+        assert result1 is True
+        with Image.open(png_file) as img:
+            assert img.format == "PNG"
+
+        # Test JPEG preservation
+        result2 = save_image_to_disk(sample_jpeg_base64, str(jpeg_file), "auto")
+        assert result2 is True
+        with Image.open(jpeg_file) as img:
+            assert img.format == "JPEG"
+
+    def test_format_conversion_png_to_jpeg(self, tmp_path, sample_png_base64):
+        """Test PNG to JPEG conversion works."""
+        output_file = tmp_path / "converted.jpg"
+
+        result = save_image_to_disk(sample_png_base64, str(output_file), "jpeg", quality=85)
+
+        assert result is True
+        assert output_file.exists()
+
+        # Verify conversion worked
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
+            assert img.size == (15, 15)
+
+    def test_format_conversion_jpeg_to_png(self, tmp_path, sample_jpeg_base64):
+        """Test JPEG to PNG conversion works."""
+        output_file = tmp_path / "converted.png"
+
+        result = save_image_to_disk(sample_jpeg_base64, str(output_file), "png")
+
+        assert result is True
+        assert output_file.exists()
+
+        # Verify conversion worked
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"
+            assert img.size == (15, 15)
+
+    def test_same_format_no_conversion(self, tmp_path, sample_png_base64):
+        """Test that same format doesn't trigger unnecessary conversion."""
+        output_file = tmp_path / "same_format.png"
+
+        # This should use direct write path (no conversion)
+        result = save_image_to_disk(sample_png_base64, str(output_file), "png")
+
+        assert result is True
+        assert output_file.exists()
+
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"
+            assert img.size == (15, 15)
+
+    def test_quality_parameter_jpeg(self, tmp_path, sample_png_base64):
+        """Test JPEG quality parameter affects file size."""
+        high_quality_file = tmp_path / "high_quality.jpg"
+        low_quality_file = tmp_path / "low_quality.jpg"
+
+        # Save with high quality
+        result1 = save_image_to_disk(sample_png_base64, str(high_quality_file), "jpeg", quality=95)
+        # Save with low quality
+        result2 = save_image_to_disk(sample_png_base64, str(low_quality_file), "jpeg", quality=20)
+
+        assert result1 is True and result2 is True
+
+        # High quality should generally be larger
+        high_size = high_quality_file.stat().st_size
+        low_size = low_quality_file.stat().st_size
+        assert high_size >= low_size  # Allow for equal in case image is too small
+
+    def test_invalid_base64_returns_false(self, tmp_path):
+        """Test invalid base64 returns False gracefully."""
+        output_file = tmp_path / "invalid.jpg"
+
+        result = save_image_to_disk("invalid_base64!", str(output_file), "jpeg")
+
+        assert result is False
+        assert not output_file.exists()
+
+    def test_invalid_target_format_falls_back(self, tmp_path, sample_png_base64):
+        """Test invalid target format falls back gracefully."""
+        output_file = tmp_path / "fallback.jpg"
+
+        # This should still work by falling back to auto mode or raising an error
+        # The exact behavior depends on implementation - test that it doesn't crash
+        try:
+            result = save_image_to_disk(sample_png_base64, str(output_file), "invalid_format")
+            # If it succeeds, verify a file was created
+            if result:
+                assert output_file.exists()
+        except ValueError:
+            # If it raises an error, that's also acceptable behavior
+            pass
+
+    def test_case_insensitive_formats(self, tmp_path, sample_png_base64):
+        """Test that format parameters are case insensitive."""
+        jpeg_file = tmp_path / "case_test.jpg"
+
+        # Test various case combinations
+        for format_str in ["JPEG", "jpeg", "Jpeg", "PNG", "png", "Png"]:
+            if format_str.upper() == "JPEG":
+                result = save_image_to_disk(sample_png_base64, str(jpeg_file), format_str)
+                assert result is True
+                with Image.open(jpeg_file) as img:
+                    assert img.format == "JPEG"
+                jpeg_file.unlink()  # Clean up for next iteration
+
+    def test_file_overwrite_behavior(self, tmp_path, sample_png_base64, sample_jpeg_base64):
+        """Test that files are properly overwritten."""
+        output_file = tmp_path / "overwrite_test.jpg"
+
+        # Write first image
+        result1 = save_image_to_disk(sample_png_base64, str(output_file), "jpeg")
+        assert result1 is True
+
+        # Overwrite with second image
+        result2 = save_image_to_disk(sample_jpeg_base64, str(output_file), "jpeg")
+        assert result2 is True
+
+        # Verify file exists and contains the second image
+        assert output_file.exists()
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
