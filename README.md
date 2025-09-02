@@ -47,7 +47,7 @@ NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
@@ -172,10 +172,16 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-# Return both successes and failures so you can inspect partial errors without stopping uploads
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
 results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
@@ -189,7 +195,7 @@ You can see the extracted text that represents the content of the ingested test 
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text
@@ -289,13 +295,6 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
-> [!IMPORTANT]
-> About `return_failures`
->
-> - `ingestor.ingest(..., return_failures=False)` (default): returns only successful results. Any failed jobs are omitted from the return value and are logged. If you have configured `.vdb_upload(...)` and any failures are present, `ingest()` will raise a `RuntimeError` and will NOT upload. This preserves the previous all-or-nothing bulk upload behavior.
-> - `ingestor.ingest(..., return_failures=True)`: returns a tuple `(results, failures)`. If `.vdb_upload(...)` is configured and some jobs failed, `ingest()` will still proceed to upload only the successful results to your vector database and will not raise. You can then inspect `failures` to decide whether to retry or remediate.
->
-> This makes `return_failures=True` ideal for large batches where you want successful chunks/pages to be committed while still collecting detailed diagnostics for anything that didn’t complete.
 
 
 ## GitHub Repository Structure

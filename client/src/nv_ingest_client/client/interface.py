@@ -27,6 +27,16 @@ from typing import Union
 from urllib.parse import urlparse
 
 import fsspec
+from nv_ingest_api.internal.enums.common import PipelinePhase
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.util.introspection.function_inspect import infer_udf_function_name
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.client.util.processing import get_valid_filename
 from nv_ingest_client.client.util.processing import save_document_results_to_jsonl
@@ -38,16 +48,9 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
-from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -436,7 +439,7 @@ class Ingestor:
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
-        # Lock for thread-safe appends to final_results_payload_list by I/O tasks
+        # Lock for thread-safe appending to final_results_payload_list by I/O tasks
         results_lock = threading.Lock() if self._output_config else None
 
         io_executor: Optional[ThreadPoolExecutor] = None
@@ -698,8 +701,23 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(DedupTaskSchema, kwargs, "dedup", json.dumps(kwargs))
-        dedup_task = DedupTask(**task_options.model_dump())
+        # Extract content_type and build params dict for API schema
+        content_type = kwargs.pop("content_type", "text")  # Default to "text" if not specified
+        params = kwargs  # Remaining parameters go into params dict
+
+        # Validate with API schema
+        api_options = {
+            "content_type": content_type,
+            "params": params,
+        }
+        task_options = check_schema(IngestTaskDedupSchema, api_options, "dedup", json.dumps(api_options))
+
+        # Extract individual parameters from API schema for DedupTask constructor
+        dedup_params = {
+            "content_type": task_options.content_type,
+            "filter": task_options.params.filter,
+        }
+        dedup_task = DedupTask(**dedup_params)
         self._job_specs.add_task(dedup_task)
 
         return self
@@ -719,8 +737,14 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(EmbedTaskSchema, kwargs, "embed", json.dumps(kwargs))
-        embed_task = EmbedTask(**task_options.model_dump())
+        # Filter out deprecated parameters before API schema validation
+        # The EmbedTask constructor handles these deprecated parameters with warnings
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ["text", "tables"]}
+
+        _ = check_schema(IngestTaskEmbedSchema, filtered_kwargs, "embed", json.dumps(filtered_kwargs))
+
+        # Pass original kwargs to EmbedTask constructor so it can handle deprecated parameters
+        embed_task = EmbedTask(**kwargs)
         self._job_specs.add_task(embed_task)
 
         return self
@@ -767,9 +791,52 @@ class Ingestor:
                 extract_page_as_image=extract_page_as_image,
                 **kwargs,
             )
-            task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))
 
-            extract_task = ExtractTask(**task_options.model_dump())
+            # Extract method from task_options for API schema
+            method = task_options.pop("extract_method", None)
+            if method is None:
+                # Let ExtractTask constructor handle default method selection
+                method = "pdfium"  # Default fallback
+
+            # Build params dict for API schema
+            params = {k: v for k, v in task_options.items() if k != "document_type"}
+
+            # Map document type to API schema expected values
+            # Handle common file extension to DocumentTypeEnum mapping
+            document_type_mapping = {
+                "txt": "text",
+                "md": "text",
+                "sh": "text",
+                "json": "text",
+                "jpg": "jpeg",
+                "jpeg": "jpeg",
+                "png": "png",
+                "pdf": "pdf",
+                "docx": "docx",
+                "pptx": "pptx",
+                "html": "html",
+                "bmp": "bmp",
+                "tiff": "tiff",
+                "svg": "svg",
+                "mp3": "mp3",
+                "wav": "wav",
+            }
+
+            # Use mapped document type for API schema validation
+            api_document_type = document_type_mapping.get(document_type.lower(), document_type)
+
+            # Validate with API schema
+            api_task_options = {
+                "document_type": api_document_type,
+                "method": method,
+                "params": params,
+            }
+
+            check_schema(IngestTaskExtractSchema, api_task_options, "extract", json.dumps(api_task_options))
+
+            # Create ExtractTask with mapped document type for API schema compatibility
+            extract_task_params = {"document_type": api_document_type, "extract_method": method, **params}
+            extract_task = ExtractTask(**extract_task_params)
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
@@ -789,8 +856,27 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(FilterTaskSchema, kwargs, "filter", json.dumps(kwargs))
-        filter_task = FilterTask(**task_options.model_dump())
+        # Restructure parameters to match API schema structure
+        params_fields = {"min_size", "max_aspect_ratio", "min_aspect_ratio", "filter"}
+        params = {k: v for k, v in kwargs.items() if k in params_fields}
+        top_level = {k: v for k, v in kwargs.items() if k not in params_fields}
+
+        # Build API schema structure
+        api_kwargs = top_level.copy()
+        if params:
+            api_kwargs["params"] = params
+
+        task_options = check_schema(IngestTaskFilterSchema, api_kwargs, "filter", json.dumps(api_kwargs))
+
+        # Extract individual parameters from API schema for FilterTask constructor
+        filter_params = {
+            "content_type": task_options.content_type,
+            "min_size": task_options.params.min_size,
+            "max_aspect_ratio": task_options.params.max_aspect_ratio,
+            "min_aspect_ratio": task_options.params.min_aspect_ratio,
+            "filter": task_options.params.filter,
+        }
+        filter_task = FilterTask(**filter_params)
         self._job_specs.add_task(filter_task)
 
         return self
@@ -810,7 +896,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(SplitTaskSchema, kwargs, "split", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskSplitSchema, kwargs, "split", json.dumps(kwargs))
         extract_task = SplitTask(**task_options.model_dump())
         self._job_specs.add_task(extract_task)
 
@@ -831,8 +917,24 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreTaskSchema, kwargs, "store", json.dumps(kwargs))
-        store_task = StoreTask(**task_options.model_dump())
+        # Handle parameter name mapping: store_method -> method for API schema
+        if "store_method" in kwargs:
+            kwargs["method"] = kwargs.pop("store_method")
+
+        # Provide default method if not specified (matching client StoreTask behavior)
+        if "method" not in kwargs:
+            kwargs["method"] = "minio"
+
+        task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
+
+        # Map API schema fields back to StoreTask constructor parameters
+        store_params = {
+            "structured": task_options.structured,
+            "images": task_options.images,
+            "store_method": task_options.method,  # Map method back to store_method
+            "params": task_options.params,
+        }
+        store_task = StoreTask(**store_params)
         self._job_specs.add_task(store_task)
 
         return self
@@ -840,21 +942,94 @@ class Ingestor:
     @ensure_job_specs
     def store_embed(self, **kwargs: Any) -> "Ingestor":
         """
-        Adds a StoreTask to the batch job specification.
+        Adds a StoreEmbedTask to the batch job specification.
 
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the StoreTask.
+            Parameters specific to the StoreEmbedTask.
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskStoreEmbedSchema, kwargs, "store_embedding", json.dumps(kwargs))
         store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
+
+        return self
+
+    def udf(
+        self,
+        udf_function: str,
+        udf_function_name: Optional[str] = None,
+        phase: Optional[Union[PipelinePhase, int, str]] = None,
+        target_stage: Optional[str] = None,
+        run_before: bool = False,
+        run_after: bool = False,
+    ) -> "Ingestor":
+        """
+        Adds a UDFTask to the batch job specification.
+
+        Parameters
+        ----------
+        udf_function : str
+            UDF specification. Supports three formats:
+            1. Inline function: 'def my_func(control_message): ...'
+            2. Import path: 'my_module.my_function'
+            3. File path: '/path/to/file.py:function_name'
+        udf_function_name : str, optional
+            Name of the function to execute from the UDF specification.
+            If not provided, attempts to infer from udf_function.
+        phase : Union[PipelinePhase, int, str], optional
+            Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
+            or numbers (1-4). Cannot be used with target_stage.
+        target_stage : str, optional
+            Specific stage name to target for UDF execution. Cannot be used with phase.
+        run_before : bool, optional
+            If True and target_stage is specified, run UDF before the target stage. Default: False.
+        run_after : bool, optional
+            If True and target_stage is specified, run UDF after the target stage. Default: False.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+
+        Raises
+        ------
+        ValueError
+            If udf_function_name cannot be inferred and is not provided explicitly,
+            or if both phase and target_stage are specified, or if neither is specified.
+        """
+        # Validate mutual exclusivity of phase and target_stage
+        if phase is not None and target_stage is not None:
+            raise ValueError("Cannot specify both 'phase' and 'target_stage'. Please specify only one.")
+        elif phase is None and target_stage is None:
+            # Default to response phase for backward compatibility
+            phase = PipelinePhase.RESPONSE
+
+        # Try to infer udf_function_name if not provided
+        if udf_function_name is None:
+            udf_function_name = infer_udf_function_name(udf_function)
+            if udf_function_name is None:
+                raise ValueError(
+                    f"Could not infer UDF function name from '{udf_function}'. "
+                    "Please specify 'udf_function_name' explicitly."
+                )
+            logger.info(f"Inferred UDF function name: {udf_function_name}")
+
+        # Use UDFTask constructor with explicit parameters
+        udf_task = UDFTask(
+            udf_function=udf_function,
+            udf_function_name=udf_function_name,
+            phase=phase,
+            target_stage=target_stage,
+            run_before=run_before,
+            run_after=run_after,
+        )
+        self._job_specs.add_task(udf_task)
 
         return self
 
@@ -986,8 +1161,16 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(CaptionTaskSchema, kwargs, "caption", json.dumps(kwargs))
-        caption_task = CaptionTask(**task_options.model_dump())
+        task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
+
+        # Extract individual parameters from API schema for CaptionTask constructor
+        caption_params = {
+            "api_key": task_options.api_key,
+            "endpoint_url": task_options.endpoint_url,
+            "prompt": task_options.prompt,
+            "model_name": task_options.model_name,
+        }
+        caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
 
         return self

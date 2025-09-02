@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
@@ -259,7 +258,7 @@ class ResourceConstraintManager:
         else:
             self.core_based_replica_limit = None  # Treat as unlimited if detection failed
 
-        logger.info(
+        logger.debug(
             f"[ConstraintMgr] Initialized. MaxReplicas={max_replicas}, "
             f"EffectiveCoreLimit={self.available_cores:.2f} "  # Log the potentially fractional value
             f"(Method: {self.core_detection_details.get('detection_method')}), "

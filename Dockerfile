@@ -110,6 +110,8 @@ RUN rm -rf src
 FROM nv_ingest_install AS rest-api
 
 RUN pip install python-multipart
+COPY src/microservice_entrypoint.py ./
+COPY config/default_pipeline.yaml ./config/
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint-rest-api.sh /workspace/docker/entrypoint-rest-api.sh
