@@ -392,7 +392,7 @@ def test_ensure_base64_is_png_unsupported_format():
         assert result is None  # If unsupported, result should be None
 
 
-# ===== TESTS FOR NEW DISK SAVING FUNCTIONS =====
+# Tests for image disk writing functions
 
 
 class TestBase64ToDisk:
@@ -414,11 +414,11 @@ class TestBase64ToDisk:
         img.save(buffer, format="JPEG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def test_breaking_test_intentionally_fails(self):
-        """Intentional breaking test to verify test framework works."""
-        # This should fail to prove our tests actually run
+    def test_assertion_framework_validation(self):
+        """Validate that test assertions work correctly."""
+        # Verify pytest assertion handling works as expected
         with pytest.raises(AssertionError):
-            assert False, "This test should fail to verify framework works"
+            assert False, "Expected assertion failure for test framework validation"
 
     def test_successful_png_write(self, tmp_path, sample_png_base64):
         """Test successful PNG write to disk."""
@@ -536,17 +536,17 @@ class TestSaveImageToDisk:
         img.save(buffer, format="JPEG", quality=90)
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def test_breaking_test_wrong_format(self, tmp_path, sample_png_base64):
-        """Breaking test - verify PNG doesn't become JPEG without conversion."""
-        output_file = tmp_path / "should_be_png.png"
+    def test_auto_format_preservation(self, tmp_path, sample_png_base64):
+        """Test that AUTO format preserves original PNG format."""
+        output_file = tmp_path / "preserved_format.png"
 
-        # Save PNG as auto format
+        # Save PNG with auto format (should preserve original)
         result = save_image_to_disk(sample_png_base64, str(output_file), "auto")
         assert result is True
 
-        # Verify it's still PNG (this should pass - not a breaking test after all)
+        # Verify original PNG format is preserved
         with Image.open(output_file) as img:
-            assert img.format == "PNG"  # This should work
+            assert img.format == "PNG"
 
     def test_auto_mode_preserves_format(self, tmp_path, sample_png_base64, sample_jpeg_base64):
         """Test that AUTO mode preserves original formats."""

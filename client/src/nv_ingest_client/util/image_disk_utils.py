@@ -140,12 +140,12 @@ def save_images_to_disk(
             if not should_save:
                 continue
 
-            # Simplify format handling - let API handle the complexity
+            # Process output format and determine file extension
             target_format = output_format.lower()
 
-            # Determine file extension for naming
+            # Determine file extension for naming - API handles format conversion
             if target_format == "auto":
-                file_ext = "jpg"  # Default extension, API preserves actual format
+                file_ext = "jpg"  # Default extension when preserving original format
             elif target_format in ["jpeg", "jpg"]:
                 file_ext = "jpg"
                 target_format = "jpeg"  # Normalize for API call
@@ -167,9 +167,8 @@ def save_images_to_disk(
                 image_filename = f"{clean_source_name}_{subtype}_p{page_number}_{doc_idx}.{file_ext}"
                 image_path = os.path.join(output_directory, image_filename)
 
-            # Save image using API function (handles format conversion efficiently)
+            # Save image using centralized API function
             try:
-                # Let API handle quality defaults - upstream inference already determined quality
                 success = save_image_to_disk(image_content, image_path, target_format)
 
                 if success:

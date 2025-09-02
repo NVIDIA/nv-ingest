@@ -18,17 +18,13 @@ import io
 import pytest
 from PIL import Image
 
-# Only import public client interface functions
-# Internal functions moved to API and should be tested there
+# Test client-side utilities that provide convenient wrappers
+# around core API functionality for image disk operations
 from nv_ingest_client.util.image_disk_utils import (
     save_images_to_disk,
     save_images_from_response,
     save_images_from_ingestor_results,
 )
-
-
-# Internal function tests removed - these functions are now in the API
-# and should be tested in the API test suite
 
 
 class TestSaveImagesToDisk:

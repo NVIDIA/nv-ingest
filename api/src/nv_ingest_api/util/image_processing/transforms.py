@@ -675,8 +675,9 @@ def base64_to_disk(base64_string: str, output_path: str) -> bool:
     """
     Write base64-encoded image data directly to disk without conversion.
 
-    This function performs a simple base64 decode and write operation,
-    preserving the original image format. No PIL/OpenCV round trips.
+    This function performs efficient base64 decoding and direct file writing,
+    preserving the original image format without unnecessary decode/encode cycles.
+    Used as the foundation for higher-level image saving operations.
 
     Parameters
     ----------
@@ -725,9 +726,10 @@ def save_image_to_disk(base64_content: str, output_path: str, target_format: str
     """
     Save base64 image to disk with optional format conversion.
 
-    This function combines smart format conversion with efficient disk writing.
-    Uses ensure_base64_format() for conversion when needed, then writes directly
-    to avoid unnecessary encoding/decoding round trips.
+    This function provides a high-level interface for saving images that combines
+    format conversion capabilities with efficient disk writing. It automatically
+    chooses between direct writing (when no conversion needed) and format conversion
+    to optimize performance while maintaining flexibility.
 
     Parameters
     ----------
