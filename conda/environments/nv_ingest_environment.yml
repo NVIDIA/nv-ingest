@@ -21,7 +21,7 @@ dependencies:
   - opentelemetry-api>=1.27.0
   - opentelemetry-exporter-otlp>=1.27.0
   - opentelemetry-sdk>=1.27.0
-  - protobuf=5.28.3
+  - protobuf=5.29.3
   - pydantic>2.0.0
   - pydantic-settings>2.0.0
   - pypdfium2>=4.30.0
@@ -33,6 +33,7 @@ dependencies:
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
+  - ray-all>=2.49.0
   - redis-py>=5.2.1
   - requests>=2.28.2
   - scikit-learn>=1.6.0
@@ -54,4 +55,3 @@ dependencies:
       - nvidia-riva-client==2.20.0
       - unstructured-client
       - markitdown
-      - ray[all]>=2.49.0
