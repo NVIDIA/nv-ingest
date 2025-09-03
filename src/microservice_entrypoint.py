@@ -20,9 +20,9 @@ if _env_log_level.upper() == "DEFAULT":
 @click.option(
     "--pipeline-config-path",
     type=str,
-    default="config/default_pipeline.yaml",
+    default=None,
     envvar="NV_INGEST_PIPELINE_CONFIG_PATH",
-    help="Path to the YAML configuration file for the ingestion pipeline.",
+    help="Path to the YAML configuration file for the ingestion pipeline. If not provided, uses embedded default.",
 )
 @click.option(
     "--log-level",
@@ -54,12 +54,18 @@ def cli(
     try:
         # Ensure logger is available even if the above branch is skipped (defensive)
         logger = logging.getLogger(__name__)
-        logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
+        if pipeline_config_path:
+            logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
+        else:
+            logger.info("No pipeline-config-path provided; using embedded default pipeline configuration")
         # Import modules that may configure logging only after logging is set up
-        from nv_ingest.pipeline.config.loaders import load_pipeline_config
+        from nv_ingest.pipeline.config.loaders import load_pipeline_config, load_default_pipeline_config
         from nv_ingest_api.util.string_processing.configuration import dump_pipeline_to_graphviz
 
-        pipeline_config = load_pipeline_config(pipeline_config_path)
+        if pipeline_config_path:
+            pipeline_config = load_pipeline_config(pipeline_config_path)
+        else:
+            pipeline_config = load_default_pipeline_config()
         logger.info("Pipeline configuration loaded and validated.")
 
         # Generate visualization

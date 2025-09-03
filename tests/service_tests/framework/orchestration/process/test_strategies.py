@@ -140,6 +140,7 @@ class TestSubprocessStrategy:
         mock_process = Mock()
         mock_process.start.return_value = None
         mock_process.join.return_value = None
+        mock_process.exitcode = 0
 
         mock_ctx = Mock()
         mock_ctx.Process.return_value = mock_process

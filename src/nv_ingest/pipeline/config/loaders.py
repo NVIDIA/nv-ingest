@@ -14,7 +14,8 @@ import yaml
 from typing import Optional
 
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
-from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
+from nv_ingest.pipeline.default_libmode_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
+from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_PIPELINE_YAML
 from nv_ingest.framework.orchestration.execution.options import PipelineRuntimeOverrides
 from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
 
@@ -61,6 +62,35 @@ def load_pipeline_config(config_path: str) -> PipelineConfigSchema:
         raise ValueError(error_message) from e
 
     # Pydantic validates the clean, substituted data against the schema
+    return PipelineConfigSchema(**processed_config)
+
+
+def load_default_pipeline_config() -> PipelineConfigSchema:
+    """
+    Load and validate the embedded default (non-libmode) pipeline configuration.
+
+    Returns
+    -------
+    PipelineConfigSchema
+        Validated default pipeline configuration.
+
+    Raises
+    ------
+    ValueError
+        If the default YAML cannot be parsed or validated.
+    """
+    logger.info("Loading embedded default pipeline configuration")
+
+    substituted_content = substitute_env_vars_in_yaml_content(DEFAULT_PIPELINE_YAML)
+
+    try:
+        processed_config = yaml.safe_load(substituted_content)
+    except yaml.YAMLError as e:
+        error_message = (
+            f"Failed to parse embedded default pipeline YAML after environment variable substitution. Error: {e}"
+        )
+        raise ValueError(error_message) from e
+
     return PipelineConfigSchema(**processed_config)
 
 
@@ -195,4 +225,5 @@ def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], lib
     if libmode:
         return load_default_libmode_config()
     else:
-        raise ValueError("pipeline_config must be provided when libmode is False")
+        # For non-libmode, fall back to embedded default pipeline implementation
+        return load_default_pipeline_config()
