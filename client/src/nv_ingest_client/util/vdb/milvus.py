@@ -915,11 +915,25 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
     index_names = utility.list_indexes(collection_name)
+    indexed_rows = 0
     for index_name in index_names:
         indexed_rows = 0
         while indexed_rows < num_elements:
-            indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
-            time.sleep(1)
+            pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
+            for i in range(20):
+                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                time.sleep(1)
+                if new_indexed_rows == num_elements:
+                    indexed_rows = new_indexed_rows
+                    break
+                # check if indexed_rows is staying the same, too many times means something is wrong
+                if new_indexed_rows == indexed_rows:
+                    pos_movement = -1
+                # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
+                if pos_movement == 0:
+                    raise ValueError("Rows are not getting indexed as expected")
+                indexed_rows = new_indexed_rows
+    return indexed_rows
 
 
 def write_to_nvingest_collection(
@@ -1043,7 +1057,8 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
-        # This only works for streaming inserts
+        # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
+        # know how long this should take, it is num_elements dependent.
         wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
