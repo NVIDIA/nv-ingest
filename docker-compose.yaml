@@ -272,7 +272,7 @@ services:
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
-      - INGEST_LOG_LEVEL=DEFAULT
+      - INGEST_LOG_LEVEL=INFO
       - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
@@ -340,7 +340,7 @@ services:
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
       # 3. COMPONENTS_TO_READY_CHECK=YOLOX_HTTP_ENDPOINT, OCR_HTTP_ENDPOINT
       #    comma separated list of HTTP environment variables for specific services to check for ready
-      - COMPONENTS_TO_READY_CHECK=ALL
+      - COMPONENTS_TO_READY_CHECK=
     healthcheck:
       test: curl --fail http://nv-ingest-rest-api:7670/v1/health/ready || exit 1
       interval: 10s
