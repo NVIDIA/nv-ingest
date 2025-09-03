@@ -48,6 +48,7 @@ milvus = [
 minio = [
     "minio>=7.2.15",
 ]
+teradata = [teradatagenai >=20.00.00.04]
 
 
 [project.urls]
