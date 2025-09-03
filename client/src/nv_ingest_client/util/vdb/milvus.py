@@ -42,6 +42,7 @@ from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
 
+
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
@@ -905,6 +906,22 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     logger.info(f"streamed {count} records")
 
 
+def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient):
+    """
+    This function waits for the index to be built. It checks
+    the indexed_rows of the index and waits for it to be equal
+    to the number of records. This only works for streaming inserts,
+    bulk inserts are not supported by this function
+    (refer to MilvusClient.refresh_load for bulk inserts).
+    """
+    index_names = utility.list_indexes(collection_name)
+    for index_name in index_names:
+        indexed_rows = 0
+        while indexed_rows < num_elements:
+            indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+            time.sleep(1)
+
+
 def write_to_nvingest_collection(
     records,
     collection_name: str,
@@ -1026,6 +1043,8 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
+        # This only works for streaming inserts
+        wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         if not minio_client.bucket_exists(bucket_name):
