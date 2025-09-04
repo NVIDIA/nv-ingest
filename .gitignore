@@ -231,3 +231,5 @@ scripts/private_local/*
 # Test results should go to artifacts directory managed by run.py
 test_results/
 scripts/tests/artifacts/
+
+.cursor

@@ -22,9 +22,26 @@ import os
 from typing import Any, Dict, List
 
 from nv_ingest_client.client.util.processing import get_valid_filename
-from nv_ingest_api.util.image_processing.transforms import save_image_to_disk
+from nv_ingest_api.util.image_processing.transforms import save_image_to_disk, _detect_base64_image_format
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_extension_from_content(image_content: str) -> str:
+    """
+    Get file extension by detecting original image format.
+    Falls back to .jpeg if detection fails or format is unknown.
+    """
+    try:
+        original_format = _detect_base64_image_format(image_content)
+        if original_format == "PNG":
+            return "png"
+        elif original_format in ["JPEG", "JPG"]:
+            return "jpeg"
+        else:
+            return "jpeg"  # Default for unknown formats
+    except Exception:
+        return "jpeg"  # Default if detection fails
 
 
 def save_images_to_disk(
@@ -75,6 +92,11 @@ def save_images_to_disk(
     Dict[str, int]
         Dictionary with counts of images saved by type.
 
+    Raises
+    ------
+    ValueError
+        If output_format is not supported.
+
     Examples
     --------
     >>> from nv_ingest_client.util.image_disk_utils import save_images_to_disk
@@ -93,6 +115,13 @@ def save_images_to_disk(
     if not response_data:
         logger.warning("No response data provided")
         return {}
+
+    # Validate format upfront to fail fast
+    normalized_format = output_format.lower()
+    if normalized_format not in ["auto", "png", "jpeg", "jpg"]:
+        raise ValueError(
+            f"Unsupported output format: '{output_format}'. Supported formats: 'auto', 'png', 'jpeg', 'jpg'"
+        )
 
     # Initialize counters
     image_counts = {"chart": 0, "table": 0, "infographic": 0, "page_image": 0, "image": 0, "total": 0}
@@ -140,21 +169,17 @@ def save_images_to_disk(
             if not should_save:
                 continue
 
-            # Process output format and determine file extension
-            target_format = output_format.lower()
-
-            # Determine file extension for naming - API handles format conversion
-            if target_format == "auto":
-                file_ext = "jpg"  # Default extension when preserving original format
-            elif target_format in ["jpeg", "jpg"]:
-                file_ext = "jpg"
-                target_format = "jpeg"  # Normalize for API call
-            elif target_format == "png":
-                file_ext = "png"
-            else:
-                logger.warning(f"Unsupported output format '{output_format}', falling back to auto")
-                target_format = "auto"
-                file_ext = "jpg"
+            # Determine file extension and target format (format already validated upfront)
+            if normalized_format in ["jpeg", "jpg"]:
+                file_ext, target_format = "jpeg", "jpeg"
+            elif normalized_format == "png":
+                file_ext, target_format = "png", "png"
+            else:  # normalized_format == "auto" - detect once and use result
+                detected_ext = _detect_extension_from_content(image_content)
+                if detected_ext == "png":
+                    file_ext, target_format = "png", "png"
+                else:  # detected_ext == "jpeg"
+                    file_ext, target_format = "jpeg", "jpeg"
 
             if organize_by_type:
                 # Organize into subdirectories by image type

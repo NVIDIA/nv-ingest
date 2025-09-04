@@ -162,7 +162,7 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     base64_image : str
         Base64-encoded image string.
     target_format : str, optional
-        The target image format. Supported formats are "PNG" and "JPEG". Defaults to "PNG".
+        The target image format. Supported formats are "PNG", "JPEG"/"JPG". Defaults to "PNG".
     **kwargs
         Additional keyword arguments passed to the format-specific encoding function.
         For JPEG: quality (int, default=100) - JPEG quality (1-100).
@@ -176,9 +176,10 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     Raises
     ------
     ValueError
-        If there is an error during format conversion.
+        If there is an error during format conversion or if an unsupported format is provided.
     """
-    target_format = target_format.upper()
+    # Quick format normalization
+    target_format = target_format.upper().strip()
     if target_format == "JPG":
         target_format = "JPEG"
 
@@ -566,11 +567,14 @@ def numpy_to_base64(array: np.ndarray, format: str = "PNG", **kwargs) -> str:
     # Centralized preprocessing of the numpy array
     processed_array = _preprocess_numpy_array(array)
 
-    format = format.upper()
+    # Quick format normalization
+    format = format.upper().strip()
+    if format == "JPG":
+        format = "JPEG"
 
     if format == "PNG":
         return numpy_to_base64_png(processed_array)
-    elif format == "JPEG" or format == "JPG":
+    elif format == "JPEG":
         quality = kwargs.get("quality", 100)
         return numpy_to_base64_jpeg(processed_array, quality=quality)
     else:
@@ -693,7 +697,7 @@ def base64_to_disk(base64_string: str, output_path: str) -> bool:
 
     Examples
     --------
-    >>> success = base64_to_disk(image_b64, "/path/to/output.jpg")
+    >>> success = base64_to_disk(image_b64, "/path/to/output.jpeg")
     >>> if success:
     ...     print("Image saved successfully")
     """
@@ -753,14 +757,19 @@ def save_image_to_disk(base64_content: str, output_path: str, target_format: str
     Examples
     --------
     >>> # Preserve original format (fastest)
-    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpg", "auto")
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "auto")
     >>>
     >>> # Convert to JPEG with specific quality
-    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpg", "JPEG", quality=85)
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "JPEG", quality=85)
     """
     try:
+        # Quick format normalization
+        target_format = target_format.lower().strip()
+        if target_format in ["jpg"]:
+            target_format = "jpeg"
+
         # Handle format conversion if needed
-        if target_format.lower() == "auto":
+        if target_format == "auto":
             # Preserve original format - no conversion needed
             formatted_b64 = base64_content
         else:

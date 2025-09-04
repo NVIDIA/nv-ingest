@@ -77,17 +77,22 @@ class TestSaveImagesToDisk:
         assert len(table_files) == 1
 
     def test_save_flat_structure(self, tmp_path, sample_response_data):
-        """Test saving images in flat directory structure."""
+        """Test saving images in flat directory structure with JPEG format."""
         result = save_images_to_disk(sample_response_data, str(tmp_path), organize_by_type=False, output_format="jpeg")
 
         assert result["total"] == 2
 
-        # Check files exist in root
-        image_files = list(tmp_path.glob("*.jpg"))
-        assert len(image_files) == 2
+        # Check that JPEG files were created
+        jpeg_files = list(tmp_path.glob("*.jpeg"))
+        assert len(jpeg_files) == 2, f"Expected 2 JPEG files, found: {[f.name for f in jpeg_files]}"
+
+        # Verify actual image format (not just extension)
+        for img_file in jpeg_files:
+            with Image.open(img_file) as img:
+                assert img.format == "JPEG", f"File {img_file.name} is {img.format}, expected JPEG"
 
         # Check filenames contain subtype
-        filenames = [f.name for f in image_files]
+        filenames = [f.name for f in jpeg_files]
         assert any("chart" in name for name in filenames)
         assert any("table" in name for name in filenames)
 
@@ -107,16 +112,76 @@ class TestSaveImagesToDisk:
         assert result == {}
 
     def test_unsupported_output_format(self, tmp_path, sample_response_data):
-        """Test handling unsupported output format falls back gracefully."""
-        # Test behavior, not logging - fallback should still save images
-        result = save_images_to_disk(sample_response_data, str(tmp_path), output_format="bmp")  # Unsupported
+        """Test handling unsupported output format raises ValueError."""
+        # Unsupported formats should now raise an error instead of falling back gracefully
+        with pytest.raises(ValueError, match="Unsupported output format: 'bmp'"):
+            save_images_to_disk(sample_response_data, str(tmp_path), output_format="bmp")
 
-        # Should fallback and still save images successfully
+    def test_auto_format_preserves_original_png_vs_jpeg(self, tmp_path):
+        """
+        Test the reviewer's specific concern: auto format should preserve PNG vs JPEG correctly.
+
+        This test verifies that:
+        - PNG base64 + target_format="auto" → PNG file with .png extension
+        - JPEG base64 + target_format="auto" → JPEG file with .jpeg extension
+        """
+        # Create PNG base64 image
+        png_img = Image.new("RGB", (15, 15), color="green")
+        png_buffer = io.BytesIO()
+        png_img.save(png_buffer, format="PNG")
+        png_b64 = base64.b64encode(png_buffer.getvalue()).decode("utf-8")
+
+        # Create JPEG base64 image
+        jpeg_img = Image.new("RGB", (15, 15), color="blue")
+        jpeg_buffer = io.BytesIO()
+        jpeg_img.save(jpeg_buffer, format="JPEG", quality=90)
+        jpeg_b64 = base64.b64encode(jpeg_buffer.getvalue()).decode("utf-8")
+
+        # Test data with mixed PNG and JPEG inputs
+        mixed_data = [
+            {
+                "document_type": "structured",
+                "metadata": {
+                    "content": png_b64,  # PNG input
+                    "source_metadata": {"source_id": "png_doc.pdf"},
+                    "content_metadata": {"subtype": "chart", "page_number": 1},
+                },
+            },
+            {
+                "document_type": "structured",
+                "metadata": {
+                    "content": jpeg_b64,  # JPEG input
+                    "source_metadata": {"source_id": "jpeg_doc.pdf"},
+                    "content_metadata": {"subtype": "table", "page_number": 1},
+                },
+            },
+        ]
+
+        # Save with auto format - should preserve original formats
+        result = save_images_to_disk(mixed_data, str(tmp_path), organize_by_type=False, output_format="auto")
+
         assert result["total"] == 2
 
-        # Images should exist and be in fallback format (JPEG, updated from PNG)
-        saved_files = list(tmp_path.rglob("*.jpg"))
-        assert len(saved_files) == 2
+        # Find saved image files by expected types
+        png_files = [f for f in tmp_path.glob("*.png") if "png_doc" in f.name]
+        jpeg_files = [f for f in tmp_path.glob("*.jpeg") if "jpeg_doc" in f.name]
+
+        all_images = png_files + jpeg_files
+        assert len(all_images) == 2, f"Expected 2 images (1 PNG + 1 JPEG), found: {[f.name for f in all_images]}"
+
+        assert len(png_files) == 1, f"Expected 1 PNG source file, found: {[f.name for f in png_files]}"
+        assert len(jpeg_files) == 1, f"Expected 1 JPEG source file, found: {[f.name for f in jpeg_files]}"
+
+        # Critical test: Verify actual image formats are preserved
+        with Image.open(png_files[0]) as img:
+            assert img.format == "PNG", f"PNG input should remain PNG, got {img.format}"
+
+        with Image.open(jpeg_files[0]) as img:
+            assert img.format == "JPEG", f"JPEG input should remain JPEG, got {img.format}"
+
+        # Verify file extensions match formats
+        assert png_files[0].suffix == ".png", f"PNG file should have .png extension, got {png_files[0].suffix}"
+        assert jpeg_files[0].suffix == ".jpeg", f"JPEG file should have .jpeg extension, got {jpeg_files[0].suffix}"
 
 
 class TestConvenienceFunctions:

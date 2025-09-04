@@ -414,12 +414,6 @@ class TestBase64ToDisk:
         img.save(buffer, format="JPEG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    def test_assertion_framework_validation(self):
-        """Validate that test assertions work correctly."""
-        # Verify pytest assertion handling works as expected
-        with pytest.raises(AssertionError):
-            assert False, "Expected assertion failure for test framework validation"
-
     def test_successful_png_write(self, tmp_path, sample_png_base64):
         """Test successful PNG write to disk."""
         output_file = tmp_path / "test_output.png"
@@ -437,7 +431,7 @@ class TestBase64ToDisk:
 
     def test_successful_jpeg_write(self, tmp_path, sample_jpeg_base64):
         """Test successful JPEG write to disk."""
-        output_file = tmp_path / "test_output.jpg"
+        output_file = tmp_path / "test_output.jpeg"
 
         result = base64_to_disk(sample_jpeg_base64, str(output_file))
 
@@ -551,7 +545,7 @@ class TestSaveImageToDisk:
     def test_auto_mode_preserves_format(self, tmp_path, sample_png_base64, sample_jpeg_base64):
         """Test that AUTO mode preserves original formats."""
         png_file = tmp_path / "auto_png.png"
-        jpeg_file = tmp_path / "auto_jpeg.jpg"
+        jpeg_file = tmp_path / "auto_jpeg.jpeg"
 
         # Test PNG preservation
         result1 = save_image_to_disk(sample_png_base64, str(png_file), "auto")
@@ -567,7 +561,7 @@ class TestSaveImageToDisk:
 
     def test_format_conversion_png_to_jpeg(self, tmp_path, sample_png_base64):
         """Test PNG to JPEG conversion works."""
-        output_file = tmp_path / "converted.jpg"
+        output_file = tmp_path / "converted.jpeg"
 
         result = save_image_to_disk(sample_png_base64, str(output_file), "jpeg", quality=85)
 
@@ -609,8 +603,8 @@ class TestSaveImageToDisk:
 
     def test_quality_parameter_jpeg(self, tmp_path, sample_png_base64):
         """Test JPEG quality parameter affects file size."""
-        high_quality_file = tmp_path / "high_quality.jpg"
-        low_quality_file = tmp_path / "low_quality.jpg"
+        high_quality_file = tmp_path / "high_quality.jpeg"
+        low_quality_file = tmp_path / "low_quality.jpeg"
 
         # Save with high quality
         result1 = save_image_to_disk(sample_png_base64, str(high_quality_file), "jpeg", quality=95)
@@ -626,31 +620,26 @@ class TestSaveImageToDisk:
 
     def test_invalid_base64_returns_false(self, tmp_path):
         """Test invalid base64 returns False gracefully."""
-        output_file = tmp_path / "invalid.jpg"
+        output_file = tmp_path / "invalid.jpeg"
 
         result = save_image_to_disk("invalid_base64!", str(output_file), "jpeg")
 
         assert result is False
         assert not output_file.exists()
 
-    def test_invalid_target_format_falls_back(self, tmp_path, sample_png_base64):
-        """Test invalid target format falls back gracefully."""
-        output_file = tmp_path / "fallback.jpg"
+    def test_invalid_target_format_returns_false(self, tmp_path, sample_png_base64):
+        """Test invalid target format returns False (error caught internally)."""
+        output_file = tmp_path / "error_test.jpeg"
 
-        # This should still work by falling back to auto mode or raising an error
-        # The exact behavior depends on implementation - test that it doesn't crash
-        try:
-            result = save_image_to_disk(sample_png_base64, str(output_file), "invalid_format")
-            # If it succeeds, verify a file was created
-            if result:
-                assert output_file.exists()
-        except ValueError:
-            # If it raises an error, that's also acceptable behavior
-            pass
+        # Invalid formats should return False as save_image_to_disk catches exceptions internally
+        result = save_image_to_disk(sample_png_base64, str(output_file), "invalid_format")
+
+        assert result is False
+        assert not output_file.exists()
 
     def test_case_insensitive_formats(self, tmp_path, sample_png_base64):
         """Test that format parameters are case insensitive."""
-        jpeg_file = tmp_path / "case_test.jpg"
+        jpeg_file = tmp_path / "case_test.jpeg"
 
         # Test various case combinations
         for format_str in ["JPEG", "jpeg", "Jpeg", "PNG", "png", "Png"]:
@@ -663,7 +652,7 @@ class TestSaveImageToDisk:
 
     def test_file_overwrite_behavior(self, tmp_path, sample_png_base64, sample_jpeg_base64):
         """Test that files are properly overwritten."""
-        output_file = tmp_path / "overwrite_test.jpg"
+        output_file = tmp_path / "overwrite_test.jpeg"
 
         # Write first image
         result1 = save_image_to_disk(sample_png_base64, str(output_file), "jpeg")
@@ -677,3 +666,63 @@ class TestSaveImageToDisk:
         assert output_file.exists()
         with Image.open(output_file) as img:
             assert img.format == "JPEG"
+
+
+class TestAutoFormatPreservation:
+    """Test that auto format correctly preserves original image formats."""
+
+    @pytest.fixture
+    def png_base64(self):
+        """Create a PNG base64 image."""
+        img = Image.new("RGB", (20, 20), color="red")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    @pytest.fixture
+    def jpeg_base64(self):
+        """Create a JPEG base64 image."""
+        img = Image.new("RGB", (20, 20), color="blue")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=90)
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    def test_auto_format_preserves_png(self, tmp_path, png_base64):
+        """Test that PNG images with auto format remain PNG."""
+        output_file = tmp_path / "test_auto_png.png"
+
+        result = save_image_to_disk(png_base64, str(output_file), "auto")
+
+        assert result is True
+        assert output_file.exists()
+
+        # Verify the saved image is still PNG
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"
+            assert img.size == (20, 20)
+
+    def test_auto_format_preserves_jpeg(self, tmp_path, jpeg_base64):
+        """Test that JPEG images with auto format remain JPEG."""
+        output_file = tmp_path / "test_auto_jpeg.jpeg"
+
+        result = save_image_to_disk(jpeg_base64, str(output_file), "auto")
+
+        assert result is True
+        assert output_file.exists()
+
+        # Verify the saved image is still JPEG
+        with Image.open(output_file) as img:
+            assert img.format == "JPEG"
+            assert img.size == (20, 20)
+
+    def test_case_insensitive_auto_format(self, tmp_path, png_base64):
+        """Test that AUTO (uppercase) works the same as auto."""
+        output_file = tmp_path / "test_auto_case.png"
+
+        result = save_image_to_disk(png_base64, str(output_file), "AUTO")
+
+        assert result is True
+        assert output_file.exists()
+
+        with Image.open(output_file) as img:
+            assert img.format == "PNG"
