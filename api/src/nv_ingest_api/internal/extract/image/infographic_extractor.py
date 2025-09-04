@@ -294,6 +294,3 @@ def extract_infographic_data_from_image_internal(
         err_msg = "Error occurred while extracting infographic data."
         logger.exception(err_msg)
         raise
-
-    finally:
-        ocr_client.close()
