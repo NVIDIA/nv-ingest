@@ -13,8 +13,11 @@ from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
-from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +69,7 @@ class ChartExtractorStage(RayActorStage):
 
         # Remove the "chart_data_extract" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "chart_data_extract")
-        logger.debug("ChartExtractorStage: Task config extracted: %s", task_config)
+        logger.debug("ChartExtractorStage: Task config extracted: %s", sanitize_for_logging(task_config))
 
         # Perform chart data extraction.
         execution_trace_log = {}
