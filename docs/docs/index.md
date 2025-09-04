@@ -32,12 +32,13 @@ NVIDIA NeMo Retriever comes with enterprise-ready features, including the follow
 
 The following are some applications that use NVIDIA Nemo Retriever:
 
-- [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
-- [Build an Enterprise RAG pipeline](https://build.nvidia.com/nvidia/build-an-enterprise-rag-pipeline/blueprintcard) (NVIDIA AI Blueprint)
-- [Building Code Documentation Agents with CrewAI](https://github.com/crewAIInc/nvidia-demo) (CrewAI Demo)
-- [Digital Human for Customer Service](https://github.com/NVIDIA-AI-Blueprints/digital-human) (NVIDIA AI Blueprint)
 - [Document Research Assistant for Blog Creation](https://github.com/run-llama/llama_index/blob/main/docs/docs/examples/agent/nvidia_document_research_assistant_for_blog_creation.ipynb) (LlamaIndex Jupyter Notebook)
+- [Digital Human for Customer Service](https://github.com/NVIDIA-AI-Blueprints/digital-human) (NVIDIA AI Blueprint)
+- [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
+- [Building Code Documentation Agents with CrewAI](https://github.com/crewAIInc/nvidia-demo) (CrewAI Demo)
 - [Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) (NVIDIA AI Blueprint)
+
+<!-- [Build an Enterprise RAG Pipeline](https://github.com/NVIDIA-AI-Blueprints/rag/tree/v2.0.0) -->
 
 
 
