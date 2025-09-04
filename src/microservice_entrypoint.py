@@ -78,7 +78,15 @@ def cli(
         logger.error(f"Error parsing or validating YAML configuration: {e}")
         raise
 
-    logger.debug(f"Ingest Configuration:\n{json.dumps(pipeline_config.model_dump(), indent=2)}")
+    try:
+        # Import here to avoid any import-time logging side effects
+        from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+
+        sanitized_cfg = sanitize_for_logging(pipeline_config)
+        logger.debug("Ingest Configuration:\n%s", json.dumps(sanitized_cfg, indent=2))
+    except Exception:
+        # As a fail-safe, never block execution due to logging. Log minimal info.
+        logger.debug("Ingest Configuration: <unavailable: sanitization_failed>")
 
     # Import and execute pipeline runner only after logging is configured
     from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline

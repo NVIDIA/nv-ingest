@@ -32,6 +32,7 @@ from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 from nv_ingest_client.util.system import ensure_directory_with_permissions
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 try:
     NV_INGEST_VERSION = version("nv_ingest")
@@ -237,7 +238,9 @@ def main(
 
     try:
         configure_logging(logger, log_level)
-        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(ctx.params, indent=2, default=repr)}")
+        # Sanitize CLI params before logging to avoid leaking secrets
+        _sanitized_params = sanitize_for_logging(dict(ctx.params))
+        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(_sanitized_params, indent=2, default=repr)}")
 
         docs = list(doc)
         if dataset:
@@ -260,7 +263,16 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
+            # Sanitize client kwargs (JSON string) before logging
+            try:
+                _client_kwargs_obj = json.loads(client_kwargs)
+            except Exception:
+                _client_kwargs_obj = {"raw": client_kwargs}
+            _sanitized_client_kwargs = sanitize_for_logging(_client_kwargs_obj)
+            logging.debug(
+                f"Creating message client: {client_host} and port: {client_port} -> "
+                f"{json.dumps(_sanitized_client_kwargs, indent=2, default=repr)}"
+            )
 
             if client_type == "rest":
                 client_allocator = RestClient
