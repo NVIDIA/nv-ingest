@@ -81,6 +81,8 @@ class ImageStorageStage(RayActorStage):
 
         params: Dict[str, Any] = task_config.get("params", {})
         params["content_types"] = content_types
+        # CRITICAL: Pass method to storage internal function
+        params["method"] = task_config.get("method")
 
         logger.debug(f"Processing storage task with parameters: {params}")
 

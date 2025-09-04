@@ -42,6 +42,160 @@ def _ensure_bucket_exists(client: Minio, bucket_name: str) -> None:
         logger.debug("Bucket %s already exists", bucket_name)
 
 
+def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    """
+    Upload images using fsspec for various storage backends (S3, GCS, Azure, local file).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame containing rows with content and associated metadata.
+    params : Dict[str, Any]
+        Configuration parameters including backend type and credentials.
+        Expected keys:
+            - "backend": Storage backend type (s3, gcs, azure, file)
+            - "content_types": Dict mapping document types to booleans.
+            - Backend-specific parameters (key, secret, bucket, path, etc.)
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame with metadata reflecting uploaded URLs.
+    """
+    import fsspec
+
+    # Validate required configuration
+    content_types = params.get("content_types")
+    if not isinstance(content_types, dict):
+        raise ValueError("Invalid configuration: 'content_types' must be provided as a dictionary in params")
+
+    method = params.get("method")
+    if not method:
+        raise ValueError("Storage method must be specified for fsspec storage")
+
+    # Extract method-specific parameters, filtering out nv-ingest specific ones
+    excluded_params = ["content_types", "method", "collection_name", "bucket", "bucket_name", "path", "region"]
+    fs_params = {k: v for k, v in params.items() if k not in excluded_params and v is not None}
+
+    # Initialize fsspec filesystem
+    try:
+        fs = fsspec.filesystem(method, **fs_params)
+    except Exception as e:
+        logger.error(
+            "Failed to create fsspec filesystem for method %s with params %s: %s", method, list(fs_params.keys()), e
+        )
+        raise ValueError(f"Failed to initialize {method} filesystem: {e}") from e
+
+    # Determine storage path/bucket
+    storage_path = params.get("bucket", params.get("bucket_name", params.get("path", "")))
+
+    # Process each row and upload images
+    for idx, row in df.iterrows():
+        try:
+            doc_type = row.get("document_type")
+            if doc_type not in content_types:
+                continue
+
+            metadata = row.get("metadata")
+            if not isinstance(metadata, dict):
+                logger.error("Row %s: 'metadata' is not a dictionary", idx)
+                continue
+
+            # Validate required metadata fields (same as MinIO)
+            if "content" not in metadata:
+                logger.error("Row %s: missing 'content' in metadata", idx)
+                continue
+
+            if "source_metadata" not in metadata or not isinstance(metadata["source_metadata"], dict):
+                logger.error("Row %s: missing or invalid 'source_metadata' in metadata", idx)
+                continue
+
+            source_metadata = metadata["source_metadata"]
+            if "source_id" not in source_metadata:
+                logger.error("Row %s: missing 'source_id' in source_metadata", idx)
+                continue
+
+            # Decode the content from base64
+            content = base64.b64decode(metadata["content"].encode())
+            source_id = source_metadata["source_id"]
+
+            # Determine image type (same as MinIO)
+            image_type = "png"
+            if doc_type == ContentTypeEnum.IMAGE:
+                image_metadata = metadata.get("image_metadata", {})
+                image_type = image_metadata.get("image_type", "png")
+
+            # Construct clean destination file path
+            # Extract dataset and filename from full path like "/raid/jioffe/bo20/1037700.pdf"
+            import os
+
+            path_parts = source_id.strip("/").split("/")
+            if len(path_parts) >= 2:
+                # Use last 2 parts: dataset/filename (e.g., "bo20/1037700.pdf")
+                clean_path = "/".join(path_parts[-2:])
+            else:
+                # Fallback to just the filename
+                clean_path = os.path.basename(source_id)
+
+            # Create destination path without URL encoding (cleaner S3 object keys)
+            destination_file = f"{clean_path}/{idx}.{image_type}"
+
+            if storage_path:
+                full_path = f"{storage_path}/{destination_file}"
+            else:
+                full_path = destination_file
+
+            # Ensure directory exists for file systems that need it
+            if method == "file":
+                import os
+
+                dir_path = os.path.dirname(full_path)
+                if dir_path and not fs.exists(dir_path):
+                    fs.makedirs(dir_path, exist_ok=True)
+
+            # Upload using fsspec - use proper API that works across all filesystem types
+            with fs.open(full_path, "wb") as f:
+                f.write(content)
+
+            # Generate public URL using fsspec
+            try:
+                public_url = fs.url(full_path)
+            except (AttributeError, NotImplementedError):
+                # Fallback for methods that don't support url() method
+                if method == "file":
+                    public_url = f"file://{full_path}"
+                elif method == "s3":
+                    endpoint = params.get("endpoint_url", "")
+                    if endpoint:
+                        public_url = f"{endpoint.rstrip('/')}/{full_path}"
+                    else:
+                        public_url = f"https://{storage_path}.s3.amazonaws.com/{destination_file}"
+                else:
+                    public_url = f"{method}://{full_path}"
+
+            source_metadata["source_location"] = public_url
+
+            # Update metadata same as MinIO
+            if doc_type == ContentTypeEnum.IMAGE:
+                logger.debug("Storing image data via fsspec (%s) for row %s", method, idx)
+                image_metadata = metadata.get("image_metadata", {})
+                image_metadata["uploaded_image_url"] = public_url
+                metadata["image_metadata"] = image_metadata
+            elif doc_type == ContentTypeEnum.STRUCTURED:
+                logger.debug("Storing structured image data via fsspec (%s) for row %s", method, idx)
+                table_metadata = metadata.get("table_metadata", {})
+                table_metadata["uploaded_image_url"] = public_url
+                metadata["table_metadata"] = table_metadata
+
+            df.at[idx, "metadata"] = metadata
+
+        except Exception as e:
+            logger.exception("Failed to process row %s with fsspec method %s: %s", idx, method, e)
+            # Continue processing remaining rows
+
+    return df
+
+
 def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     """
     Identifies content within a DataFrame and uploads it to MinIO, updating the metadata with the uploaded URL.
@@ -227,7 +381,16 @@ def store_images_to_minio_internal(
         logger.debug("No storage objects matching %s found in the DataFrame.", content_types)
         return df_storage_ledger
 
-    result, execution_trace_log = _upload_images_to_minio(df_storage_ledger, task_config), {}
+    # Route to appropriate storage method
+    method = task_config.get("method")
+    if method == "minio":
+        # Use existing MinIO implementation for backward compatibility
+        result, execution_trace_log = _upload_images_to_minio(df_storage_ledger, task_config), {}
+    elif method in ["s3", "gcs", "azure", "file"]:
+        # Use fsspec for new storage methods
+        result, execution_trace_log = _upload_images_fsspec(df_storage_ledger, task_config), {}
+    else:
+        raise ValueError(f"Unsupported storage method: {method}")
     _ = execution_trace_log
 
     return result
