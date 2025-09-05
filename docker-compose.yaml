@@ -247,7 +247,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
+    image: nvcr.io/nvstaging/nim/nv-ingest:25.9.0-RC2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
@@ -285,6 +285,10 @@ services:
       - RAY_num_grpc_threads=1
       - RAY_num_server_call_thread=1
       - RAY_worker_num_grpc_internal_threads=1
+      # AWS S3 fsspec credentials
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       # - INGEST_DYNAMIC_MEMORY_KP=0.2
@@ -399,7 +403,7 @@ services:
     volumes:
       - ./config/prometheus.yaml:/etc/prometheus/prometheus-config.yaml
     ports:
-      - "9090:9090"
+      - "9099:9090"
 
   grafana:
     container_name: grafana-service

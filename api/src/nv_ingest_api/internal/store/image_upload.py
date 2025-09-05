@@ -6,8 +6,7 @@ import base64
 import logging
 import os
 from io import BytesIO
-from typing import Any, List, Optional
-from typing import Dict
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import pandas as pd
@@ -22,6 +21,10 @@ logger = logging.getLogger(__name__)
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_READ_ADDRESS = os.environ.get("MINIO_PUBLIC_ADDRESS", "http://minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
+
+# Parameters excluded from fsspec filesystem initialization
+# These are nv-ingest specific configuration that shouldn't be passed to fsspec
+_FSSPEC_EXCLUDED_PARAMS = ["content_types", "method", "collection_name", "bucket", "bucket_name", "path", "region"]
 
 
 def _ensure_bucket_exists(client: Minio, bucket_name: str) -> None:
@@ -42,6 +45,51 @@ def _ensure_bucket_exists(client: Minio, bucket_name: str) -> None:
         logger.debug("Bucket %s already exists", bucket_name)
 
 
+def _validate_row_metadata(idx: int, row: pd.Series, content_types: Dict) -> Optional[Tuple[str, Dict, Dict, str]]:
+    """
+    Validate row metadata and extract required fields for image upload.
+
+    Parameters
+    ----------
+    idx : int
+        Row index for error logging
+    row : pd.Series
+        DataFrame row containing document_type and metadata
+    content_types : Dict
+        Dictionary mapping document types to booleans
+
+    Returns
+    -------
+    Optional[Tuple[str, Dict, Dict, str]]
+        Tuple of (doc_type, metadata, source_metadata, source_id) if valid, None if invalid
+    """
+    doc_type = row.get("document_type")
+    if doc_type not in content_types:
+        return None
+
+    metadata = row.get("metadata")
+    if not isinstance(metadata, dict):
+        logger.error("Row %s: 'metadata' is not a dictionary", idx)
+        return None
+
+    # Validate required metadata fields
+    if "content" not in metadata:
+        logger.error("Row %s: missing 'content' in metadata", idx)
+        return None
+
+    if "source_metadata" not in metadata or not isinstance(metadata["source_metadata"], dict):
+        logger.error("Row %s: missing or invalid 'source_metadata' in metadata", idx)
+        return None
+
+    source_metadata = metadata["source_metadata"]
+    if "source_id" not in source_metadata:
+        logger.error("Row %s: missing 'source_id' in source_metadata", idx)
+        return None
+
+    source_id = source_metadata["source_id"]
+    return doc_type, metadata, source_metadata, source_id
+
+
 def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     """
     Upload images using fsspec for various storage backends (S3, GCS, Azure, local file).
@@ -51,9 +99,9 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
     df : pd.DataFrame
         The DataFrame containing rows with content and associated metadata.
     params : Dict[str, Any]
-        Configuration parameters including backend type and credentials.
+        Configuration parameters including method type and credentials.
         Expected keys:
-            - "backend": Storage backend type (s3, gcs, azure, file)
+            - "method": Storage method type (s3, gcs, azure, file)
             - "content_types": Dict mapping document types to booleans.
             - Backend-specific parameters (key, secret, bucket, path, etc.)
 
@@ -61,6 +109,11 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
     -------
     pd.DataFrame
         Updated DataFrame with metadata reflecting uploaded URLs.
+
+    Raises
+    ------
+    ValueError
+        If required configuration parameters are missing or invalid.
     """
     import fsspec
 
@@ -74,8 +127,7 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
         raise ValueError("Storage method must be specified for fsspec storage")
 
     # Extract method-specific parameters, filtering out nv-ingest specific ones
-    excluded_params = ["content_types", "method", "collection_name", "bucket", "bucket_name", "path", "region"]
-    fs_params = {k: v for k, v in params.items() if k not in excluded_params and v is not None}
+    fs_params = {k: v for k, v in params.items() if k not in _FSSPEC_EXCLUDED_PARAMS and v is not None}
 
     # Initialize fsspec filesystem
     try:
@@ -92,52 +144,25 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
     # Process each row and upload images
     for idx, row in df.iterrows():
         try:
-            doc_type = row.get("document_type")
-            if doc_type not in content_types:
+            # Validate row metadata using shared validation function
+            validation_result = _validate_row_metadata(idx, row, content_types)
+            if validation_result is None:
                 continue
 
-            metadata = row.get("metadata")
-            if not isinstance(metadata, dict):
-                logger.error("Row %s: 'metadata' is not a dictionary", idx)
-                continue
-
-            # Validate required metadata fields (same as MinIO)
-            if "content" not in metadata:
-                logger.error("Row %s: missing 'content' in metadata", idx)
-                continue
-
-            if "source_metadata" not in metadata or not isinstance(metadata["source_metadata"], dict):
-                logger.error("Row %s: missing or invalid 'source_metadata' in metadata", idx)
-                continue
-
-            source_metadata = metadata["source_metadata"]
-            if "source_id" not in source_metadata:
-                logger.error("Row %s: missing 'source_id' in source_metadata", idx)
-                continue
+            doc_type, metadata, source_metadata, source_id = validation_result
 
             # Decode the content from base64
             content = base64.b64decode(metadata["content"].encode())
-            source_id = source_metadata["source_id"]
 
-            # Determine image type (same as MinIO)
+            # Determine image type (inline simple logic)
             image_type = "png"
             if doc_type == ContentTypeEnum.IMAGE:
                 image_metadata = metadata.get("image_metadata", {})
                 image_type = image_metadata.get("image_type", "png")
 
-            # Construct clean destination file path
-            # Extract dataset and filename from full path like "/raid/jioffe/bo20/1037700.pdf"
-            import os
-
-            path_parts = source_id.strip("/").split("/")
-            if len(path_parts) >= 2:
-                # Use last 2 parts: dataset/filename (e.g., "bo20/1037700.pdf")
-                clean_path = "/".join(path_parts[-2:])
-            else:
-                # Fallback to just the filename
-                clean_path = os.path.basename(source_id)
-
-            # Create destination path without URL encoding (cleaner S3 object keys)
+            # Construct clean destination file path (fix duplicate paths)
+            # Use just filename - storage_path already provides context
+            clean_path = os.path.basename(source_id)
             destination_file = f"{clean_path}/{idx}.{image_type}"
 
             if storage_path:
@@ -147,8 +172,6 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
 
             # Ensure directory exists for file systems that need it
             if method == "file":
-                import os
-
                 dir_path = os.path.dirname(full_path)
                 if dir_path and not fs.exists(dir_path):
                     fs.makedirs(dir_path, exist_ok=True)
@@ -173,16 +196,16 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
                 else:
                     public_url = f"{method}://{full_path}"
 
+            # Update metadata (inline simple logic)
             source_metadata["source_location"] = public_url
 
-            # Update metadata same as MinIO
             if doc_type == ContentTypeEnum.IMAGE:
-                logger.debug("Storing image data via fsspec (%s) for row %s", method, idx)
+                logger.debug("Stored image data via fsspec (%s) for row %s: %s", method, idx, public_url)
                 image_metadata = metadata.get("image_metadata", {})
                 image_metadata["uploaded_image_url"] = public_url
                 metadata["image_metadata"] = image_metadata
             elif doc_type == ContentTypeEnum.STRUCTURED:
-                logger.debug("Storing structured image data via fsspec (%s) for row %s", method, idx)
+                logger.debug("Stored structured image data via fsspec (%s) for row %s: %s", method, idx, public_url)
                 table_metadata = metadata.get("table_metadata", {})
                 table_metadata["uploaded_image_url"] = public_url
                 metadata["table_metadata"] = table_metadata
@@ -257,40 +280,23 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
     # Process each row and attempt to upload images
     for idx, row in df.iterrows():
         try:
-            doc_type = row.get("document_type")
-            if doc_type not in content_types:
+            # Validate row metadata using shared validation function
+            validation_result = _validate_row_metadata(idx, row, content_types)
+            if validation_result is None:
                 continue
 
-            metadata = row.get("metadata")
-            if not isinstance(metadata, dict):
-                logger.error("Row %s: 'metadata' is not a dictionary", idx)
-                continue
-
-            # Validate required metadata fields
-            if "content" not in metadata:
-                logger.error("Row %s: missing 'content' in metadata", idx)
-                continue
-
-            if "source_metadata" not in metadata or not isinstance(metadata["source_metadata"], dict):
-                logger.error("Row %s: missing or invalid 'source_metadata' in metadata", idx)
-                continue
-
-            source_metadata = metadata["source_metadata"]
-            if "source_id" not in source_metadata:
-                logger.error("Row %s: missing 'source_id' in source_metadata", idx)
-                continue
+            doc_type, metadata, source_metadata, source_id = validation_result
 
             # Decode the content from base64
             content = base64.b64decode(metadata["content"].encode())
-            source_id = source_metadata["source_id"]
 
-            # Determine image type (default to 'png')
+            # Determine image type (inline simple logic)
             image_type = "png"
             if doc_type == ContentTypeEnum.IMAGE:
                 image_metadata = metadata.get("image_metadata", {})
                 image_type = image_metadata.get("image_type", "png")
 
-            # Construct destination file path
+            # Construct destination file path with URL encoding for MinIO
             encoded_source_id = quote(source_id, safe="")
             encoded_image_type = quote(image_type, safe="")
             destination_file = f"{encoded_source_id}/{idx}.{encoded_image_type}"
@@ -306,15 +312,17 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
 
             # Construct the public URL
             public_url = f"{_DEFAULT_READ_ADDRESS}/{bucket_name}/{destination_file}"
+
+            # Update metadata (inline simple logic)
             source_metadata["source_location"] = public_url
 
             if doc_type == ContentTypeEnum.IMAGE:
-                logger.debug("Storing image data to Minio for row %s", idx)
+                logger.debug("Stored image data to MinIO for row %s: %s", idx, public_url)
                 image_metadata = metadata.get("image_metadata", {})
                 image_metadata["uploaded_image_url"] = public_url
                 metadata["image_metadata"] = image_metadata
             elif doc_type == ContentTypeEnum.STRUCTURED:
-                logger.debug("Storing structured image data to Minio for row %s", idx)
+                logger.debug("Stored structured image data to MinIO for row %s: %s", idx, public_url)
                 table_metadata = metadata.get("table_metadata", {})
                 table_metadata["uploaded_image_url"] = public_url
                 metadata["table_metadata"] = table_metadata
