@@ -259,6 +259,9 @@ services:
         MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
+      # AWS credentials for S3 fsspec storage - automatically mounts ~/.aws/credentials and ~/.aws/config
+      # Users can setup credentials with: aws configure, aws sso login, or manual credential files
+      - ~/.aws:/root/.aws:ro
     ports:
       # HTTP API
       - "7670:7670"
@@ -285,10 +288,6 @@ services:
       - RAY_num_grpc_threads=1
       - RAY_num_server_call_thread=1
       - RAY_worker_num_grpc_internal_threads=1
-      # AWS S3 fsspec credentials
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       # - INGEST_DYNAMIC_MEMORY_KP=0.2

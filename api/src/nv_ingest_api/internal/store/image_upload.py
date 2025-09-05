@@ -24,7 +24,24 @@ _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
 
 # Parameters excluded from fsspec filesystem initialization
 # These are nv-ingest specific configuration that shouldn't be passed to fsspec
-_FSSPEC_EXCLUDED_PARAMS = ["content_types", "method", "collection_name", "bucket", "bucket_name", "path", "region"]
+_FSSPEC_EXCLUDED_PARAMS = [
+    "content_types",
+    "method",
+    "collection_name",
+    "bucket_name",
+    "path",
+    "bucket",
+    "region",
+    "path_prefix",
+]
+
+# AWS S3 credential parameters that fsspec accepts (ONLY credentials, no config)
+_S3_CREDENTIAL_PARAMS = ["key", "secret", "token", "anon", "profile"]
+
+# Map storage method to its credential parameters
+_METHOD_CREDENTIAL_PARAMS = {
+    "s3": _S3_CREDENTIAL_PARAMS,
+}
 
 
 def _ensure_bucket_exists(client: Minio, bucket_name: str) -> None:
@@ -101,9 +118,26 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
     params : Dict[str, Any]
         Configuration parameters including method type and credentials.
         Expected keys:
-            - "method": Storage method type (s3, gcs, azure, file)
+            - "method": Storage method type (currently supports: s3)
             - "content_types": Dict mapping document types to booleans.
-            - Backend-specific parameters (key, secret, bucket, path, etc.)
+            - "bucket": S3 bucket name (required for S3)
+            - "region": S3 region (optional, uses default if not specified)
+            - "path_prefix": Optional folder prefix for organizing files within the bucket
+            - Credential parameters: "key", "secret", "token" (optional - uses automatic detection if not provided)
+
+    File Structure & Organization
+    -----------------------------
+    Without path_prefix:
+        bucket/document1.pdf/0.png
+        bucket/document1.pdf/1.png
+        bucket/document2.pdf/0.png
+
+    With path_prefix="experiments/test-run-001":
+        bucket/experiments/test-run-001/document1.pdf/0.png
+        bucket/experiments/test-run-001/document1.pdf/1.png
+        bucket/experiments/test-run-001/document2.pdf/0.png
+
+    i.e.  "datasets/{dataset_name}/run-{id}"   # Dataset-based organization
 
     Returns
     -------
@@ -126,12 +160,37 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
     if not method:
         raise ValueError("Storage method must be specified for fsspec storage")
 
-    # Extract method-specific parameters, filtering out nv-ingest specific ones
-    fs_params = {k: v for k, v in params.items() if k not in _FSSPEC_EXCLUDED_PARAMS and v is not None}
+    # Get credential parameters for this storage method
+    allowed_credential_params = _METHOD_CREDENTIAL_PARAMS.get(method, [])
+
+    # Only pass explicitly provided credential parameters to fsspec
+    # This allows fsspec's automatic credential detection to work when no explicit creds are provided
+    fs_params = {}
+    provided_creds = []
+
+    for param_name, param_value in params.items():
+        # Skip nv-ingest specific parameters
+        if param_name in _FSSPEC_EXCLUDED_PARAMS:
+            continue
+
+        # Only include credential parameters that are explicitly provided (not None/empty)
+        if param_name in allowed_credential_params and param_value is not None and param_value != "":
+            fs_params[param_name] = param_value
+            provided_creds.append(param_name)
+
+    # Log credential resolution method for debugging
+    if provided_creds:
+        logger.info("Using explicit credentials for %s storage: %s", method, provided_creds)
+    else:
+        logger.info(
+            "No explicit credentials provided for %s storage - using automatic credential detection",
+            method,
+        )
 
     # Initialize fsspec filesystem
     try:
         fs = fsspec.filesystem(method, **fs_params)
+        logger.debug("Successfully initialized %s filesystem with fsspec", method)
     except Exception as e:
         logger.error(
             "Failed to create fsspec filesystem for method %s with params %s: %s", method, list(fs_params.keys()), e
@@ -140,6 +199,11 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
 
     # Determine storage path/bucket
     storage_path = params.get("bucket", params.get("bucket_name", params.get("path", "")))
+
+    # Get configurable path prefix for organizing files in folders
+    path_prefix = params.get("path_prefix", "")
+    if path_prefix and not path_prefix.endswith("/"):
+        path_prefix = path_prefix + "/"
 
     # Process each row and upload images
     for idx, row in df.iterrows():
@@ -160,10 +224,10 @@ def _upload_images_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFr
                 image_metadata = metadata.get("image_metadata", {})
                 image_type = image_metadata.get("image_type", "png")
 
-            # Construct clean destination file path (fix duplicate paths)
-            # Use just filename - storage_path already provides context
+            # Construct destination file path with configurable folder structure
+            # Structure: bucket/[path_prefix/]source_filename/index.image_type
             clean_path = os.path.basename(source_id)
-            destination_file = f"{clean_path}/{idx}.{image_type}"
+            destination_file = f"{path_prefix}{clean_path}/{idx}.{image_type}"
 
             if storage_path:
                 full_path = f"{storage_path}/{destination_file}"
