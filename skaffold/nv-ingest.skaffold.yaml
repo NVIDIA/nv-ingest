@@ -14,7 +14,7 @@ build:
     inputDigest: {}
   artifacts:
     # any reference to this image name in our manifests will be replaced by our newly build artifact
-    - image: nv-ingest-ms-runtime
+    - image: nv-ingest-rest-api
       # docker build context
       context: ./
       # docker builder details
@@ -81,7 +81,7 @@ portForward:
     address: 0.0.0.0
     localPort: 8000
   - resourceType: Service
-    resourceName: nv-ingest-ms-runtime
+    resourceName: nv-ingest-rest-api
     port: 7670
     address: 0.0.0.0
     localPort: 7670

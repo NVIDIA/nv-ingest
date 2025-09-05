@@ -13,8 +13,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from .v1.health import router as HealthApiRouter
-from .v1.ingest import router as IngestApiRouter
-from .v1.metrics import router as MetricsApiRouter
+from .v1.ingest import router as V1IngestApiRouter
+from .v1.metrics import router as V1MetricsApiRouter
+
+from .v2.ingestion import router as V2IngestApiRouter
+from .v2.configuration import router as V2ConfigurationApiRouter
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +33,15 @@ app = FastAPI(
     docs_url="/docs",
 )
 
-app.include_router(IngestApiRouter, prefix="/v1")
+# V1 API Routers
+app.include_router(V1IngestApiRouter, prefix="/v1")
 app.include_router(HealthApiRouter, prefix="/v1/health")
-app.include_router(MetricsApiRouter, prefix="/v1")
+app.include_router(V1MetricsApiRouter, prefix="/v1")
+
+# V2 API Routers
+app.include_router(V2IngestApiRouter, prefix="/v2")
+app.include_router(V2ConfigurationApiRouter, prefix="/v2")
+
 
 # Set up the tracer provider and add a processor for exporting traces
 resource = Resource(attributes={"service.name": "nv-ingest"})

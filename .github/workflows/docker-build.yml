@@ -1,4 +1,4 @@
-name: Build NV-Ingest Runtime Image
+name: Build nv-ingest-rest-api & nv-ingest-worker images
 
 # Trigger for pull requests and pushing to main
 on:
@@ -29,13 +29,17 @@ jobs:
       # Build the Docker image using the Dockerfile
       # Github does not allowing access secrets on pull requests. Therefore for this action we use the open source ubuntu
       # base image and not the one hosted in nvcr.io
-      - name: Build Docker image
+      - name: Build nv-ingest-rest-api image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
+          docker build --target rest-api --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250619 -t nv-ingest-rest-api:latest .
+
+      - name: Build nv-ingest-worker image
+        run: |
+          docker build --target worker --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250619 -t nv-ingest-worker:latest .
 
       - name: Run Pytest inside Docker container
         run: |
-          docker run nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
+          docker run nv-ingest-worker:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

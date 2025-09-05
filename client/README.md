@@ -196,7 +196,7 @@ efficiently. Below are the public methods available:
 - **Example**:
   ```python
   client = NvIngestClient(
-    message_client_hostname="localhost", # Host where nv-ingest-ms-runtime is running
+    message_client_hostname="localhost", # Host where nv-ingest-rest-api is running
     message_client_port=7670 # REST port, defaults to 7670
   )
   ```
