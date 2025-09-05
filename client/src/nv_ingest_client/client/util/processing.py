@@ -1,3 +1,4 @@
+import gzip
 import io
 import json
 import logging
@@ -6,6 +7,7 @@ import re
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 try:
@@ -33,6 +35,7 @@ def save_document_results_to_jsonl(
     jsonl_output_filepath: str,
     original_source_name_for_log: str,
     ensure_parent_dir_exists: bool = True,
+    compression: Optional[str] = None,
 ) -> Tuple[int, Dict[str, str]]:
     """
     Saves a list of extraction items (for a single source document) to a JSON Lines file.
@@ -50,6 +53,13 @@ def save_document_results_to_jsonl(
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
 
+        if compression == "gzip":
+            open_func = gzip.open
+        elif compression is None:
+            open_func = open
+        else:
+            raise ValueError(f"Unsupported compression type: {compression}")
+
         with io.BytesIO() as buffer:
             for extraction_item in doc_response_data:
                 if USING_ORJSON:
@@ -60,7 +70,7 @@ def save_document_results_to_jsonl(
 
         count_items_written = len(doc_response_data)
 
-        with open(jsonl_output_filepath, "wb") as f_jsonl:
+        with open_func(jsonl_output_filepath, "wb") as f_jsonl:
             f_jsonl.write(full_byte_content)
 
         logger.info(
