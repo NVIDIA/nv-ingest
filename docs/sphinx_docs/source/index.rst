@@ -116,3 +116,13 @@ To query the ingested results from the milvus database, use :func:`~nv_ingest_cl
         hybrid=sparse,
         top_k=1,
     )
+
+
+.. toctree::
+    :maxdepth: 2
+    :caption: NV-Ingest Packages
+
+    nv-ingest-api/modules.rst
+    nv-ingest-client/modules.rst
+    nv-ingest/modules.rst
+    
