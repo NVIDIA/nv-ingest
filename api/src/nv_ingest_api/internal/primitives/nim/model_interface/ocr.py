@@ -26,8 +26,11 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
     preprocess_image_for_paddle,
 )
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
+NEMORETRIEVER_OCR_EA_MODEL_NAME = "scene_text"
+NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +144,7 @@ class OCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
-        model_name = kwargs.get("model_name", "paddle")
+        model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
         merge_level = kwargs.get("merge_level", "paragraph")
 
         if protocol == "grpc":
@@ -149,21 +152,33 @@ class OCRModelInterface(ModelInterface):
             processed: List[np.ndarray] = []
 
             max_length = max(max(img.shape[:2]) for img in images)
+            max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
 
             for img in images:
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     arr, _dims = preprocess_image_for_paddle(img)
-                else:
+                elif model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME:
                     arr, _dims = preprocess_image_for_ocr(
                         img,
                         target_height=max_length,
                         target_width=max_length,
                         pad_how="bottom_right",
                     )
+                elif model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+                    arr = img
+                    _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
+                else:
+                    raise ValueError(f"Unknown model name: {model_name}")
 
                 dims.append(_dims)
-                arr = arr.astype(np.float32)
-                arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
+
+                if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+                    arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
+                else:
+                    arr = arr.astype(np.float32)
+
+                arr = np.expand_dims(arr, axis=0)
+
                 processed.append(arr)
 
             batches = []
@@ -175,7 +190,7 @@ class OCRModelInterface(ModelInterface):
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
 
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     batches.append(batched_input)
                 else:
                     merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
@@ -206,7 +221,7 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                if model_name == "paddle":
+                if model_name == DEFAULT_OCR_MODEL_NAME:
                     payload = {"input": input_chunk}
                 else:
                     payload = {
@@ -226,7 +241,7 @@ class OCRModelInterface(ModelInterface):
         response: Any,
         protocol: str,
         data: Optional[Dict[str, Any]] = None,
-        model_name: str = "paddle",
+        model_name: str = DEFAULT_OCR_MODEL_NAME,
         **kwargs: Any,
     ) -> Any:
         """
@@ -367,7 +382,7 @@ class OCRModelInterface(ModelInterface):
         self,
         response: np.ndarray,
         dimensions: List[Dict[str, Any]],
-        model_name: str = "paddle",
+        model_name: str = DEFAULT_OCR_MODEL_NAME,
     ) -> List[Tuple[str, str]]:
         """
         Parse a gRPC response for one or more images. The response can have two possible shapes:
@@ -402,12 +417,14 @@ class OCRModelInterface(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
+        if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+            response = response.transpose((1, 0))
+
         # If we have shape (3,), convert to (3, 1)
         if response.ndim == 1 and response.shape == (3,):
             response = response.reshape(3, 1)
         elif response.ndim != 2 or response.shape[0] != 3:
             raise ValueError(f"Unexpected response shape: {response.shape}. Expecting (3,) or (3, n).")
-
         batch_size = response.shape[1]
         results: List[Tuple[str, str]] = []
 
@@ -425,11 +442,17 @@ class OCRModelInterface(ModelInterface):
             conf_scores = json.loads(confs_bytestr.decode("utf8"))
 
             # Some gRPC responses nest single-item lists; flatten them if needed
-            if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
+            if (
+                (isinstance(bounding_boxes, list) and len(bounding_boxes) == 1 and isinstance(bounding_boxes[0], list))
+                and (
+                    isinstance(text_predictions, list)
+                    and len(text_predictions) == 1
+                    and isinstance(text_predictions[0], list)
+                )
+                and (isinstance(conf_scores, list) and len(conf_scores) == 1 and isinstance(conf_scores[0], list))
+            ):
                 bounding_boxes = bounding_boxes[0]
-            if isinstance(text_predictions, list) and len(text_predictions) == 1:
                 text_predictions = text_predictions[0]
-            if isinstance(conf_scores, list) and len(conf_scores) == 1:
                 conf_scores = conf_scores[0]
 
             # 4) Postprocess
@@ -439,7 +462,7 @@ class OCRModelInterface(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=True if model_name == "paddle" else False,
+                scale_coordinates=False if model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME else True,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])

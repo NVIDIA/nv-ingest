@@ -18,6 +18,7 @@ from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import Imag
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ class ImageDedupStage(RayActorStage):
 
             # Remove the "dedup" task from the message to obtain task-specific configuration.
             task_config = remove_task_by_type(control_message, "dedup")
-            logger.debug("Extracted task config: %s", task_config)
+            logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
             # Perform image deduplication.
             new_df = deduplicate_images_internal(

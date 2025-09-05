@@ -16,6 +16,7 @@ from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
@@ -68,7 +69,7 @@ class EmbeddingStorageStage(RayActorStage):
 
         # Remove the "store_embedding" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "store_embedding")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Perform embedding storage.
         new_df = store_text_embeddings_internal(

@@ -15,7 +15,10 @@ from nv_ingest_api.internal.primitives.tracing.tagging import set_trace_timestam
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
-from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +90,7 @@ class PDFExtractorStage(RayActorStage):
 
         # Remove the "extract" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "extract")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Perform PDF extraction.
         execution_trace_log = {}

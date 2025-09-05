@@ -17,16 +17,17 @@ The main class in the nv-ingest API is `Ingestor`.
 The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
 The following table describes methods of the `Ingestor` class.
 
-| Method       | Description                       |
-|--------------|-----------------------------------|
-| `caption`    | Extract captions from images within the document. |
-| `embed`      | Generate embeddings from extracted content. |
-| `extract`    | Add an extraction task (text, tables, charts, infographics). |
-| `files`      | Add document paths for processing. |
-| `ingest`     | Submit jobs and retrieve results synchronously. |
-| `load`       | Ensure files are locally accessible (downloads if needed). |
-| `split`      | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `vdb_upload` | Pushes extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+| Method         | Description                       |
+|----------------|-----------------------------------|
+| `caption`      | Extract captions from images within the document. |
+| `embed`        | Generate embeddings from extracted content. |
+| `extract`      | Add an extraction task (text, tables, charts, infographics). |
+| `files`        | Add document paths for processing. |
+| `ingest`       | Submit jobs and retrieve results synchronously. |
+| `load`         | Ensure files are locally accessible (downloads if needed). |
+| `save_to_disk` | Save ingestion results to disk instead of memory. |
+| `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
+| `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
 
 
@@ -164,6 +165,93 @@ Use the following code to specify a custom document type for extraction.
 
 ```python
 ingestor = ingestor.extract(document_type="pdf")
+```
+
+
+
+## Work with Large Datasets: Save to Disk
+
+By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+The `save_to_disk` method configures the extraction pipeline to write the output for each document to a separate JSONL file on disk.
+
+
+### Basic Usage: Save to a Directory
+
+To save results to disk, simply chain the `save_to_disk` method to your ingestion task.
+By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects, 
+which are memory-efficient proxies that read from the result files on disk.
+
+In the following example, the results are saved to a directory named `my_ingest_results`. 
+You are responsible for managing the created files.
+
+```python
+ingestor = Ingestor().files("large_dataset/*.pdf")
+
+# Use save_to_disk to configure the ingestor to save results to a specific directory.
+# Set cleanup=False to ensure that the directory is not deleted by any automatic process.
+ingestor.save_to_disk(output_directory="./my_ingest_results", cleanup=False)  # Offload results to disk to prevent OOM errors
+
+# 'results' is a list of LazyLoadedList objects that point to the new jsonl files.
+results = ingestor.extract().ingest()
+
+print("Ingestion results saved in ./my_ingest_results")
+# You can now iterate over the results or inspect the files directly.
+```
+
+### Managing Disk Space with Automatic Cleanup
+
+When you use `save_to_disk`, NeMo Retriever extraction creates intermediate files. 
+For workflows where these files are temporary, NeMo Retriever extraction provides two automatic cleanup mechanisms.
+
+- **Directory Cleanup with Context Manager** — While not required for general use, the Ingestor can be used as a context manager (`with` statement). This enables the automatic cleanup of the entire output directory when `save_to_disk(cleanup=True)` is set (which is the default).
+
+- **File Purge After VDB Upload** – The `vdb_upload` method includes a `purge_results_after_upload: bool = True` parameter (the default). After a successful VDB upload, this feature deletes the individual `.jsonl` files that were just uploaded.
+
+You can also configure the output directory by using the `NV_INGEST_CLIENT_SAVE_TO_DISK_OUTPUT_DIRECTORY` environment variable.
+
+
+#### Example (Fully Automatic Cleanup)
+
+Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed. 
+The entire process is temporary, and no files are left on disk.
+The following example includes automatic file purge. 
+
+```python
+# After the 'with' block finishes, 
+# the temporary directory and all its contents are automatically deleted.
+
+with (
+    Ingestor()
+    .files("/path/to/large_dataset/*.pdf")
+    .extract()
+    .embed()
+    .save_to_disk()  # cleanup=True is the default, enables directory deletion on exit
+    .vdb_upload()  # purge_results_after_upload=True is the default, deletes files after upload
+) as ingestor:
+    results = ingestor.ingest()
+
+```
+
+
+#### Example (Preserve Results on Disk)
+
+In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features. 
+The following example disables automatic file purge. 
+
+```python
+# After the 'with' block finishes, 
+# the './permanent_results' directory and all jsonl files are preserved for inspection or other uses.
+
+with (
+    Ingestor()
+    .files("/path/to/large_dataset/*.pdf")
+    .extract()
+    .embed()
+    .save_to_disk(output_directory="./permanent_results", cleanup=False)  # Specify a directory and disable directory-level cleanup
+    .vdb_upload(purge_results_after_upload=False)  # Disable automatic file purge after the VDB upload
+) as ingestor:
+    results = ingestor.ingest()
 ```
 
 

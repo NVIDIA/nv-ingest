@@ -15,6 +15,7 @@ from nv_ingest_api.internal.transform.embed_text import transform_create_text_em
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
@@ -62,7 +63,10 @@ class TextEmbeddingTransformStage(RayActorStage):
 
         # Remove the "embed" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "embed")
-        self._logger.debug("TextEmbeddingTransformStage: Task configuration extracted: %s", pprint.pformat(task_config))
+        self._logger.debug(
+            "TextEmbeddingTransformStage: Task configuration extracted: %s",
+            pprint.pformat(sanitize_for_logging(task_config)),
+        )
 
         # Call the text embedding extraction function.
         new_df, execution_trace_log = transform_create_text_embeddings_internal(
