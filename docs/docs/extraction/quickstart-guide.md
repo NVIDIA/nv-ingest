@@ -67,7 +67,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
-   ### Using Hardware-Specific Override Files
+   !!! tip
 
    For optimal performance on specific hardware, you can use `docker-compose` override files.
    Override files adjust settings, such as memory allocation, for different GPU architectures.
