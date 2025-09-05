@@ -334,6 +334,7 @@ def create_nvingest_index_params(
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )
+
         else:
             index_params.add_index(
                 field_name="vector",
