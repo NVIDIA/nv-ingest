@@ -70,7 +70,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
    ### Using Hardware-Specific Override Files
 
    For optimal performance on specific hardware, you can use `docker-compose` override files.
-   These files adjust settings like memory allocation to better suit different GPU architectures.
+   Override files adjust settings, such as memory allocation, for different GPU architectures.
    
    To use an override file, include it in your `docker compose up` command using a second `-f` flag after the base `docker-compose.yaml` file.
    The settings in the second file will override the defaults in the first.
