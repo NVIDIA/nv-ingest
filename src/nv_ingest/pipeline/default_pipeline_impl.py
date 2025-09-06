@@ -203,6 +203,7 @@ stages:
           $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        ocr_rate_limit: $OCR_RATE_LIMIT|3
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -229,6 +230,7 @@ stages:
           $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        ocr_rate_limit: $OCR_RATE_LIMIT|3
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0
@@ -256,6 +258,7 @@ stages:
           $OCR_HTTP_ENDPOINT|""
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        ocr_rate_limit: $OCR_RATE_LIMIT|3
         auth_token: $NGC_API_KEY|""
     replicas:
       min_replicas: 0

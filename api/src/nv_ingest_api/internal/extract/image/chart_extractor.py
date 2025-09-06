@@ -221,6 +221,7 @@ def _create_clients(
     yolox_protocol: str,
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
+    ocr_rate_limit: int,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
     yolox_model_interface = YoloxGraphicElementsModelInterface()
@@ -240,6 +241,7 @@ def _create_clients(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
+        rate_limit_requests_per_second=ocr_rate_limit,
     )
 
     return yolox_client, ocr_client
@@ -290,6 +292,7 @@ def extract_chart_data_from_image_internal(
         endpoint_config.yolox_infer_protocol,
         endpoint_config.ocr_endpoints,
         endpoint_config.ocr_infer_protocol,
+        endpoint_config.ocr_rate_limit,
         endpoint_config.auth_token,
     )
 
