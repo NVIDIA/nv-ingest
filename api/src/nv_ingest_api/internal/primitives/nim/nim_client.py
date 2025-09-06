@@ -91,7 +91,10 @@ class NimClient:
                 raise ValueError("HTTP endpoint must be provided for HTTP protocol")
             logger.debug(f"Creating HTTP client with {self._http_endpoint}")
             self.endpoint_url = generate_url(self._http_endpoint)
-            self.headers = {"accept": "application/json", "content-type": "application/json"}
+            self.headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+            }
             if self.auth_token:
                 self.headers["Authorization"] = f"Bearer {self.auth_token}"
         else:
@@ -109,7 +112,7 @@ class NimClient:
             self._request_queue = queue.Queue()
             self._stop_event = threading.Event()
             self._batcher_thread = threading.Thread(target=self._batcher_loop, daemon=True)
-            logger.info(
+            logger.debug(
                 f"Dynamic batching enabled with max_batch_size={self._batch_size} "
                 f"and timeout={self._batch_timeout}s"
             )
@@ -198,7 +201,11 @@ class NimClient:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
         parsed_output = self.model_interface.parse_output(
-            response, protocol=self.protocol, data=batch_data, model_name=model_name, **kwargs
+            response,
+            protocol=self.protocol,
+            data=batch_data,
+            model_name=model_name,
+            **kwargs,
         )
         return parsed_output, batch_data
 
@@ -228,12 +235,12 @@ class NimClient:
         if self.dynamic_batching_enabled:
             # DYNAMIC BATCHING PATH
             try:
-                items_with_dims = self.model_interface.unpack_data_to_items(data)
+                data = self.model_interface.prepare_data_for_inference(data)
 
-                if not items_with_dims:
-                    return []
-
-                futures = [self.submit(item, model_name, dims, **kwargs) for item, dims in items_with_dims]
+                futures = []
+                for base64_image, image_array in zip(data["base64_images"], data["images"]):
+                    dims = image_array.shape[:2]
+                    futures.append(self.submit(base64_image, model_name, dims, **kwargs))
 
                 results = [future.result() for future in futures]
 
@@ -280,7 +287,11 @@ class NimClient:
                 future_to_idx = {}
                 for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
                     future = executor.submit(
-                        self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
+                        self._process_batch,
+                        batch,
+                        batch_data=batch_data,
+                        model_name=model_name,
+                        **kwargs,
                     )
                     future_to_idx[future] = idx
 
@@ -346,7 +357,10 @@ class NimClient:
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
 
         response = self.client.infer(
-            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
+            model_name=model_name,
+            parameters=parameters,
+            inputs=input_tensors,
+            outputs=outputs,
         )
 
         logger.debug(f"gRPC inference response: {response}")
@@ -385,7 +399,10 @@ class NimClient:
         while attempt < self.max_retries:
             try:
                 response = requests.post(
-                    self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
+                    self.endpoint_url,
+                    json=formatted_input,
+                    headers=self.headers,
+                    timeout=self.timeout,
                 )
                 status_code = response.status_code
 
@@ -525,9 +542,12 @@ class NimClient:
 
         try:
             # 1. Coalesce individual data items into a single batch input
-            #    This is a CRITICAL step that requires a new method in your ModelInterface
             batch_input, batch_data = self.model_interface.coalesce_requests_to_batch(
-                [req.data for req in requests], protocol=self.protocol, model_name=model_name, **kwargs
+                [req.data for req in requests],
+                [req.dims for req in requests],
+                protocol=self.protocol,
+                model_name=model_name,
+                **kwargs,
             )
 
             # 2. Perform inference using the existing _process_batch logic

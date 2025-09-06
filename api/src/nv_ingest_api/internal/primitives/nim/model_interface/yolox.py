@@ -19,7 +19,9 @@ import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 import tritonclient.grpc as grpcclient
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import (
+    multiprocessing_cache,
+)
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
@@ -118,7 +120,9 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.final_score = final_score
         self.class_labels = class_labels
 
-    def unpack_data_to_items(self, data: Dict[str, Any]) -> List[Tuple[str, Tuple[int, int]]]:
+    def unpack_data_to_items(
+        self, data: Dict[str, Any], model_name: str, **kwargs
+    ) -> List[Tuple[str, Tuple[int, int]]]:
         """
         Unpacks user data into a list of (base64_string, (height, width)) tuples.
 
@@ -168,7 +172,13 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         return data
 
-    def coalesce_requests_to_batch(self, requests: List[str], protocol: str, **kwargs) -> Tuple[Any, Dict[str, Any]]:
+    def coalesce_requests_to_batch(
+        self,
+        requests: List[str],
+        original_image_shapes: List[Tuple[int, int]],
+        protocol: str,
+        **kwargs,
+    ) -> Tuple[Any, Dict[str, Any]]:
         """
         Takes a list of individual base64 strings, decodes them, and combines them
         into a single formatted batch ready for inference.
@@ -209,7 +219,12 @@ class YoloxModelInterfaceBase(ModelInterface):
             for b64_string in requests:
                 # Scale the image if necessary (this logic is from the original format_input).
                 scaled_image_b64, _ = scale_image_to_encoding_size(b64_string, max_base64_size=self.nim_max_image_size)
-                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
+                content_list.append(
+                    {
+                        "type": "image_url",
+                        "url": f"data:image/png;base64,{scaled_image_b64}",
+                    }
+                )
 
             payload = {"input": content_list}
             return payload, batch_data
@@ -306,7 +321,12 @@ class YoloxModelInterfaceBase(ModelInterface):
                 if new_size != original_size:
                     logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
+                content_list.append(
+                    {
+                        "type": "image_url",
+                        "url": f"data:image/png;base64,{scaled_image_b64}",
+                    }
+                )
 
             # Chunk the payload content, the original images, and their shapes.
             content_chunks = chunk_list(content_list, max_batch_size)
@@ -324,7 +344,13 @@ class YoloxModelInterfaceBase(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+    def parse_output(
+        self,
+        response: Any,
+        protocol: str,
+        data: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> Any:
         """
         Parse the output from the model's inference response.
 
@@ -1187,7 +1213,9 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
     # Remove other included
     if len(bbox_dict.get("other", [])):
         other = find_boxes_inside(
-            np.concatenate(list([v for v in bbox_dict.values() if len(v)])), bbox_dict["other"], threshold=0.7
+            np.concatenate(list([v for v in bbox_dict.values() if len(v)])),
+            bbox_dict["other"],
+            threshold=0.7,
         )
         del bbox_dict["other"]
         if len(other):

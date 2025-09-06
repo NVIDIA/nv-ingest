@@ -17,7 +17,8 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExt
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import LegacyOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -83,12 +84,10 @@ def _run_chart_inference(
         dtypes=["BYTES", "FP32"],
         output_names=["OUTPUT"],
         trace_info=trace_info,
-        max_batch_size=8,
     )
     future_ocr_kwargs = dict(
         data=data_ocr,
         stage_name="chart_extraction",
-        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
@@ -133,7 +132,10 @@ def _run_chart_inference(
 
 
 def _validate_chart_inference_results(
-    yolox_results: Any, ocr_results: Any, valid_arrays: List[Any], valid_images: List[str]
+    yolox_results: Any,
+    ocr_results: Any,
+    valid_arrays: List[Any],
+    valid_images: List[str],
 ) -> Tuple[List[Any], List[Any]]:
     """
     Ensure inference results are lists and have expected lengths.
@@ -298,7 +300,9 @@ def extract_chart_data_from_image_internal(
 
         # 3) Call our bulk _update_metadata to get all results.
         yolox_model_interface = YoloxGraphicElementsModelInterface()
-        ocr_model_interface = OCRModelInterface()
+        ocr_model_interface = (
+            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else LegacyOCRModelInterface()
+        )
         yolox_endpoints = endpoint_config.yolox_endpoints
         yolox_protocol = endpoint_config.yolox_infer_protocol
         ocr_endpoints = endpoint_config.ocr_endpoints
@@ -312,14 +316,14 @@ def extract_chart_data_from_image_internal(
             model_interface=yolox_model_interface,
             auth_token=auth_token,
             infer_protocol=yolox_protocol,
-            enable_dynamic_batching=True,
-            dynamic_batch_memory_budget_mb=32,
+            # enable_dynamic_batching=True,
+            # dynamic_batch_memory_budget_mb=32,
         ) as yolox_client, create_inference_client(
             endpoints=ocr_endpoints,
             model_interface=ocr_model_interface,
             auth_token=auth_token,
             infer_protocol=ocr_protocol,
-            enable_dynamic_batching=True if ocr_model_name == "scene_text_ensemble" else False,
+            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
             dynamic_batch_memory_budget_mb=32,
         ) as ocr_client:
             bulk_results = _update_chart_metadata(

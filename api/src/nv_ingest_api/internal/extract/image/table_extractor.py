@@ -15,7 +15,8 @@ import pandas as pd
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import LegacyOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
@@ -30,7 +31,9 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _filter_valid_images(base64_images: List[str]) -> Tuple[List[str], List[np.ndarray], List[int]]:
+def _filter_valid_images(
+    base64_images: List[str],
+) -> Tuple[List[str], List[np.ndarray], List[int]]:
     """
     Filter base64-encoded images by their dimensions.
 
@@ -78,7 +81,6 @@ def _run_inference(
             data=data_yolox,
             model_name="yolox_ensemble",
             stage_name="table_extraction",
-            max_batch_size=8,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],
             dtypes=["BYTES", "FP32"],
             output_names=["OUTPUT"],
@@ -88,7 +90,6 @@ def _run_inference(
     future_ocr_kwargs = dict(
         data=data_ocr,
         stage_name="table_extraction",
-        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
@@ -215,7 +216,12 @@ def _update_table_metadata(
     # Combine results with the original order.
     for idx, (yolox_res, ocr_res) in enumerate(zip(yolox_results, ocr_results)):
         original_index = valid_indices[idx]
-        results[original_index] = (base64_images[original_index], yolox_res, ocr_res[0], ocr_res[1])
+        results[original_index] = (
+            base64_images[original_index],
+            yolox_res,
+            ocr_res[0],
+            ocr_res[1],
+        )
 
     return results
 
@@ -299,7 +305,9 @@ def extract_table_data_from_image_internal(
         enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
 
         yolox_model_interface = YoloxTableStructureModelInterface()
-        ocr_model_interface = OCRModelInterface()
+        ocr_model_interface = (
+            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else LegacyOCRModelInterface()
+        )
         yolox_endpoints = endpoint_config.yolox_endpoints
         yolox_protocol = endpoint_config.yolox_infer_protocol
         ocr_endpoints = endpoint_config.ocr_endpoints
@@ -313,14 +321,14 @@ def extract_table_data_from_image_internal(
             model_interface=yolox_model_interface,
             auth_token=auth_token,
             infer_protocol=yolox_protocol,
-            enable_dynamic_batching=True,
-            dynamic_batch_memory_budget_mb=32,
+            # enable_dynamic_batching=True,
+            # dynamic_batch_memory_budget_mb=32,
         ) as yolox_client, create_inference_client(
             endpoints=ocr_endpoints,
             model_interface=ocr_model_interface,
             auth_token=auth_token,
             infer_protocol=ocr_protocol,
-            enable_dynamic_batching=True if ocr_model_name == "scene_text_ensemble" else False,
+            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
             dynamic_batch_memory_budget_mb=32,
         ) as ocr_client:
             bulk_results = _update_table_metadata(
