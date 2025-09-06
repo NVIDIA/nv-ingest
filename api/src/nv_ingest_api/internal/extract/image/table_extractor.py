@@ -15,12 +15,12 @@ import pandas as pd
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import LegacyOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import convert_ocr_response_to_psuedo_markdown
-from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxTableStructureModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -31,7 +31,9 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _filter_valid_images(base64_images: List[str]) -> Tuple[List[str], List[np.ndarray], List[int]]:
+def _filter_valid_images(
+    base64_images: List[str],
+) -> Tuple[List[str], List[np.ndarray], List[int]]:
     """
     Filter base64-encoded images by their dimensions.
 
@@ -79,7 +81,6 @@ def _run_inference(
             data=data_yolox,
             model_name="yolox_ensemble",
             stage_name="table_extraction",
-            max_batch_size=8,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],
             dtypes=["BYTES", "FP32"],
             output_names=["OUTPUT"],
@@ -89,7 +90,6 @@ def _run_inference(
     future_ocr_kwargs = dict(
         data=data_ocr,
         stage_name="table_extraction",
-        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
@@ -216,38 +216,14 @@ def _update_table_metadata(
     # Combine results with the original order.
     for idx, (yolox_res, ocr_res) in enumerate(zip(yolox_results, ocr_results)):
         original_index = valid_indices[idx]
-        results[original_index] = (base64_images[original_index], yolox_res, ocr_res[0], ocr_res[1])
+        results[original_index] = (
+            base64_images[original_index],
+            yolox_res,
+            ocr_res[0],
+            ocr_res[1],
+        )
 
     return results
-
-
-def _create_clients(
-    yolox_endpoints: Tuple[str, str],
-    yolox_protocol: str,
-    ocr_endpoints: Tuple[str, str],
-    ocr_protocol: str,
-    auth_token: str,
-) -> Tuple[NimClient, NimClient]:
-    yolox_model_interface = YoloxTableStructureModelInterface()
-    ocr_model_interface = OCRModelInterface()
-
-    logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")
-
-    yolox_client = create_inference_client(
-        endpoints=yolox_endpoints,
-        model_interface=yolox_model_interface,
-        auth_token=auth_token,
-        infer_protocol=yolox_protocol,
-    )
-
-    ocr_client = create_inference_client(
-        endpoints=ocr_endpoints,
-        model_interface=ocr_model_interface,
-        auth_token=auth_token,
-        infer_protocol=ocr_protocol,
-    )
-
-    return yolox_client, ocr_client
 
 
 def extract_table_data_from_image_internal(
@@ -287,13 +263,6 @@ def extract_table_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    yolox_client, ocr_client = _create_clients(
-        endpoint_config.yolox_endpoints,
-        endpoint_config.yolox_infer_protocol,
-        endpoint_config.ocr_endpoints,
-        endpoint_config.ocr_infer_protocol,
-        endpoint_config.auth_token,
-    )
 
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
@@ -335,15 +304,42 @@ def extract_table_data_from_image_internal(
         )
         enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
 
-        bulk_results = _update_table_metadata(
-            base64_images=base64_images,
-            yolox_client=yolox_client,
-            ocr_client=ocr_client,
-            ocr_model_name=ocr_model_name,
-            worker_pool_size=endpoint_config.workers_per_progress_engine,
-            enable_yolox=enable_yolox,
-            trace_info=execution_trace_log,
+        yolox_model_interface = YoloxTableStructureModelInterface()
+        ocr_model_interface = (
+            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else LegacyOCRModelInterface()
         )
+        yolox_endpoints = endpoint_config.yolox_endpoints
+        yolox_protocol = endpoint_config.yolox_infer_protocol
+        ocr_endpoints = endpoint_config.ocr_endpoints
+        ocr_protocol = endpoint_config.ocr_infer_protocol
+        auth_token = endpoint_config.auth_token
+
+        logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")
+
+        with create_inference_client(
+            endpoints=yolox_endpoints,
+            model_interface=yolox_model_interface,
+            auth_token=auth_token,
+            infer_protocol=yolox_protocol,
+            # enable_dynamic_batching=True,
+            # dynamic_batch_memory_budget_mb=32,
+        ) as yolox_client, create_inference_client(
+            endpoints=ocr_endpoints,
+            model_interface=ocr_model_interface,
+            auth_token=auth_token,
+            infer_protocol=ocr_protocol,
+            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
+            dynamic_batch_memory_budget_mb=32,
+        ) as ocr_client:
+            bulk_results = _update_table_metadata(
+                base64_images=base64_images,
+                yolox_client=yolox_client,
+                ocr_client=ocr_client,
+                ocr_model_name=ocr_model_name,
+                worker_pool_size=endpoint_config.workers_per_progress_engine,
+                enable_yolox=enable_yolox,
+                trace_info=execution_trace_log,
+            )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
         for row_id, idx in enumerate(valid_indices):
@@ -369,6 +365,3 @@ def extract_table_data_from_image_internal(
     except Exception:
         logger.exception("Error occurred while extracting table data.", exc_info=True)
         raise
-    finally:
-        yolox_client.close()
-        ocr_client.close()
