@@ -247,7 +247,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvstaging/nim/nv-ingest:25.9.0-RC2
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
@@ -402,7 +402,7 @@ services:
     volumes:
       - ./config/prometheus.yaml:/etc/prometheus/prometheus-config.yaml
     ports:
-      - "9099:9090"
+      - "9090:9090"
 
   grafana:
     container_name: grafana-service
