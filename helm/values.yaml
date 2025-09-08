@@ -44,9 +44,22 @@ podSecurityContext:
 
 ## @param extraVolumes [object] Adds arbitrary additional volumes to the deployment set definition
 extraVolumes: {}
+## @descriptionStart
+## For S3/AWS fsspec storage, mount AWS credentials as a volume:
+## extraVolumes:
+##   aws-credentials:
+##     secret:
+##       secretName: aws-credential-files
+## @descriptionEnd
 
 ## @param extraVolumeMounts [object] Specify volume mounts to the main container from `extraVolumes`
 extraVolumeMounts: {}
+## @descriptionStart
+## extraVolumeMounts:
+##   aws-credentials:
+##     mountPath: /root/.aws
+##     readOnly: true
+## @descriptionEnd
 
 ## @section Image Pull Secrets
 ## @param imagePullSecrets[].name List of secret names needed for the main container and any init containers
@@ -962,6 +975,7 @@ prometheus:
     enabled: false
   alertmanager:
     enabled: false
+
 
 ## @section Environment Variables
 ## @descriptionStart
