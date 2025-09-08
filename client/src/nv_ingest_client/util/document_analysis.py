@@ -21,13 +21,13 @@ logger = logging.getLogger(__name__)
 
 def analyze_document_chunks(
     results: Union[List[List[Dict[str, Any]]], List[Dict[str, Any]]]
-) -> Dict[str, Dict[str, int]]:
+) -> Dict[str, Dict[str, Dict[str, int]]]:
     """
-    Analyze ingestor results to count elements by type for each document.
+    Analyze ingestor results to count elements by type and page for each document.
 
-    This function processes results from nv-ingest ingestion and provides a per-document
-    breakdown of extracted content types, enabling customers to understand document
-    composition for optimization and planning purposes.
+    This function processes results from nv-ingest ingestion and provides a per-document,
+    per-page breakdown of extracted content types, enabling customers to understand document
+    composition and page-level distribution for optimization and planning purposes.
 
     Parameters
     ----------
@@ -38,16 +38,22 @@ def analyze_document_chunks(
 
     Returns
     -------
-    Dict[str, Dict[str, int]]
-        Dictionary mapping document names to element type counts with structure:
+    Dict[str, Dict[str, Dict[str, int]]]
+        Dictionary mapping document names to page-level element type counts with structure:
         {
             "document1.pdf": {
-                "text": 10,
-                "charts": 2,
-                "tables": 1,
-                "unstructured_images": 0,
-                "infographics": 0,
-                "page_images": 0
+                "total": {
+                    "text": 7, "charts": 1, "tables": 1,
+                    "unstructured_images": 0, "infographics": 0, "page_images": 0
+                },
+                "1": {
+                    "text": 3, "charts": 1, "tables": 0,
+                    "unstructured_images": 0, "infographics": 0, "page_images": 0
+                },
+                "2": {
+                    "text": 4, "charts": 0, "tables": 1,
+                    "unstructured_images": 0, "infographics": 0, "page_images": 0
+                }
             },
             "document2.pdf": {...}
         }
@@ -66,12 +72,22 @@ def analyze_document_chunks(
     >>> # After running ingestion
     >>> results, failures = ingestor.ingest(show_progress=True, return_failures=True)
     >>>
-    >>> # Analyze document composition
+    >>> # Analyze document composition by page
     >>> breakdown = analyze_document_chunks(results)
     >>>
-    >>> for doc_name, counts in breakdown.items():
-    ...     total = sum(counts.values())
-    ...     print(f"{doc_name}: {total} elements ({counts['text']} text, {counts['charts']} charts)")
+    >>> for doc_name, pages in breakdown.items():
+    ...     total_counts = pages["total"]
+    ...     total_elements = sum(total_counts.values())
+    ...     page_count = len(pages) - 1  # Subtract 1 for "total" key
+    ...     print(f"{doc_name}: {total_elements} elements across {page_count} pages")
+    ...     print(f"  total: {total_elements} elements ({total_counts['text']} text, {total_counts['charts']} charts)")
+    ...     for page_name, counts in pages.items():
+    ...         if page_name != "total":  # Skip total when listing pages
+    ...             page_total = sum(counts.values())
+    ...             print(
+                f"  page {page_name}: {page_total} elements "
+                f"({counts['text']} text, {counts['charts']} charts)"
+            )
     """
 
     if not results:
@@ -81,8 +97,8 @@ def analyze_document_chunks(
     # Normalize input format to handle both List[List[Dict]] and List[Dict] structures
     normalized_results = _normalize_results_format(results)
 
-    # Group elements by document name
-    document_elements = defaultdict(list)
+    # Group elements by document name and page number
+    document_page_elements = defaultdict(lambda: defaultdict(list))
 
     for doc_results in normalized_results:
         # Handle LazyLoadedList and other iterable types
@@ -90,28 +106,38 @@ def analyze_document_chunks(
 
         for element in elements:
             doc_name = _extract_document_name(element)
-            document_elements[doc_name].append(element)
+            page_key = _extract_page_key(element)
+            document_page_elements[doc_name][page_key].append(element)
 
-    # Count element types per document
-    document_counts = {}
+    # Count element types per page within each document and calculate totals
+    document_page_counts = {}
 
-    for doc_name, elements in document_elements.items():
-        counts = _initialize_element_counts()
+    for doc_name, pages in document_page_elements.items():
+        document_page_counts[doc_name] = {}
+        total_counts = _initialize_element_counts()
 
-        for element in elements:
-            element_type = _categorize_element(element)
-            counts[element_type] += 1
+        for page_key, elements in pages.items():
+            counts = _initialize_element_counts()
 
-        document_counts[doc_name] = counts
+            for element in elements:
+                element_type = _categorize_element(element)
+                counts[element_type] += 1
+                total_counts[element_type] += 1  # Add to document total
 
-    if document_counts:
-        total_docs = len(document_counts)
-        total_elements = sum(sum(counts.values()) for counts in document_counts.values())
-        logger.info(f"Analyzed {total_elements} elements across {total_docs} documents")
+            document_page_counts[doc_name][page_key] = counts
+
+        # Add the total counts for this document
+        document_page_counts[doc_name]["total"] = total_counts
+
+    if document_page_counts:
+        total_docs = len(document_page_counts)
+        total_pages = sum(len(pages) - 1 for pages in document_page_counts.values())  # Subtract 1 for "total" key
+        total_elements = sum(sum(page_counts["total"].values()) for page_counts in document_page_counts.values())
+        logger.info(f"Analyzed {total_elements} elements across {total_pages} pages in {total_docs} documents")
     else:
         logger.warning("No valid documents found for analysis")
 
-    return document_counts
+    return document_page_counts
 
 
 def _normalize_results_format(results: Union[List[List[Dict]], List[Dict]]) -> List[List[Dict]]:
@@ -197,6 +223,32 @@ def _extract_document_name(element: Dict[str, Any]) -> str:
     # nv-ingest guarantees this structure exists
     source_id = element["metadata"]["source_metadata"]["source_id"]
     return os.path.basename(source_id)
+
+
+def _extract_page_key(element: Dict[str, Any]) -> str:
+    """
+    Extract page key from element metadata for consistent page naming.
+
+    Parameters
+    ----------
+    element : Dict[str, Any]
+        Element dictionary containing metadata
+
+    Returns
+    -------
+    str
+        Page number as string (e.g., "1", "2", or "unknown")
+    """
+
+    try:
+        page_number = element["metadata"]["content_metadata"]["page_number"]
+        if page_number is not None and page_number >= 0:
+            return str(page_number)
+        else:
+            return "unknown"
+    except (KeyError, TypeError):
+        logger.warning("Missing or invalid page_number in element metadata")
+        return "unknown"
 
 
 def _categorize_element(element: Dict[str, Any]) -> str:

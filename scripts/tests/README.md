@@ -2,6 +2,13 @@
 
 A configurable, dataset-agnostic testing framework for end-to-end validation of nv-ingest pipelines. This framework is designed to be modular, transparent, and easy to extend for different datasets and test scenarios.
 
+## ✨ **Recent Improvements**
+- **Dataset-agnostic testing** - One `e2e` case works with any dataset via `DATASET_DIR`
+- **Simplified infrastructure** - Default attach mode, optional `--managed` flag
+- **Document analysis** - Per-document element breakdowns with `--doc-analysis`
+- **Smart artifacts** - Dataset-named directories (e.g., `dc20_20240908_2139/`)
+- **Essential config only** - Removed infrastructure noise, focus on test scenarios
+
 ## Quick Start
 
 ### Prerequisites
@@ -21,7 +28,7 @@ cp env.example .env
 # Edit DATASET_DIR=/path/to/your/dataset
 
 # 4. Run the test (from scripts/tests directory)
-python run.py dc20_e2e
+python run.py                    # Uses default e2e case with attach mode
 ```
 
 **Important**: All test commands should be run from the `scripts/tests/` directory. The framework expects to find configuration files and test cases relative to this location.
@@ -35,7 +42,7 @@ The framework is fully configurable via environment variables. All parameters ca
 #### Required Configuration
 ```bash
 # Dataset path - MUST be set for each test
-DATASET_DIR=/datasets/bo20
+DATASET_DIR=/datasets/dc20
 ```
 
 #### Test Configuration
@@ -85,28 +92,50 @@ EMBEDDING_NIM_MODEL_NAME=        # Override embedding model (auto-detected)
 
 | Name | Description | Validates | Dataset | Status |
 |------|-------------|-----------|---------|--------|
-| dc20_e2e | Digital Corpora E2E | Extract → Embed → VDB Upload → Retrieval | `/datasets/bo20` | ✅ Active |
+| e2e | Dataset-Agnostic E2E | Extract → Embed → VDB Upload → Retrieval | Any via DATASET_DIR | ✅ Primary |
+| dc20_e2e | Legacy DC20 E2E | Extract → Embed → VDB Upload → Retrieval | `/datasets/dc20` | ✅ Backwards Compatible |
 
-### Example Test Configurations
+### Example Usage
 
-#### Text-Only Processing (Audio Datasets)
+#### Basic Usage (Any Dataset)
+```bash
+# Test dc20 dataset
+DATASET_DIR=/raid/jioffe/dc20 python run.py
+
+# Test dc767 dataset  
+DATASET_DIR=/raid/jioffe/dc767 python run.py
+
+# With document analysis breakdown
+python run.py --doc-analysis
+
+# With managed infrastructure (starts/stops Docker)
+python run.py --managed
+```
+
+#### Example Test Configurations
+
+**Text-Only Processing:**
 ```bash
 # In .env file:
 DATASET_DIR=/datasets/audio
-TEST_NAME=audio_test
 EXTRACT_TABLES=false
 EXTRACT_CHARTS=false
 EXTRACT_IMAGES=false
 EXTRACT_INFOGRAPHICS=false
 ```
 
-#### Full Multiformat Extraction
+**Full Multimodal:**
 ```bash
 # In .env file:
 DATASET_DIR=/datasets/multiformat
-TEST_NAME=multiformat_test
 EXTRACT_IMAGES=true
-TABLE_OUTPUT_FORMAT=html
+ENABLE_CAPTION=true
+```
+
+**Chunking for RAG:**
+```bash
+# In .env file:
+ENABLE_SPLIT=true
 ```
 
 ## Architecture
@@ -133,35 +162,56 @@ TABLE_OUTPUT_FORMAT=html
 
 ### Execution Modes
 
-#### Managed Mode (Default)
+#### Attach Mode (Default)
 ```bash
 # From scripts/tests/ directory:
-python run.py dc20_e2e
+python run.py
+```
+- Assumes services are already running (typical development)
+- Runs test case only
+- Faster for iterative testing
+
+#### Managed Mode
+```bash
+# From scripts/tests/ directory:
+python run.py --managed
 ```
 - Starts Docker services automatically
 - Waits for service readiness
 - Runs test case
 - Collects artifacts
-- Optionally tears down services
-
-#### Attach Mode
-```bash
-# From scripts/tests/ directory:
-python run.py --infra attach dc20_e2e
-```
-- Assumes services are already running
-- Runs test case only
-- User manages service lifecycle
+- Optionally tears down services (`--keep-up` to preserve)
 
 ### Artifacts and Logging
 
-All test outputs are collected in timestamped directories:
+All test outputs are collected in dataset-named timestamped directories:
 ```
-scripts/tests/artifacts/20240813_171507/
+scripts/tests/artifacts/dc20_20240908_2139/
 ├── summary.json          # Test metadata and results
 ├── stdout.txt           # Complete test output
-└── dc20_e2e.json       # Structured metrics and events
+└── e2e.json             # Structured metrics and events
 ```
+
+### Document Analysis
+
+The framework includes powerful per-document analysis capabilities:
+
+```bash
+# Enable document-level breakdown
+python run.py --doc-analysis
+```
+
+**Sample Output:**
+```
+Document Analysis:
+  document1.pdf: 44 elements (text: 15, tables: 13, charts: 15, images: 0, infographics: 1)
+  document2.pdf: 14 elements (text: 9, tables: 0, charts: 4, images: 0, infographics: 1)
+```
+
+This feature provides:
+- **Element counts** by type for each document
+- **Page-level granularity** for capacity planning
+- **Performance insights** for optimization
 
 ### Programmatic Access
 
@@ -169,17 +219,23 @@ For automated tools and CI/CD integration:
 
 ```python
 from scripts.interact import load_test_artifacts
+from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Load and validate test results
-artifacts = load_test_artifacts('artifacts/20240813_171507')
+artifacts = load_test_artifacts('artifacts/dc20_20240908_2139')
 
 # Check test success
 success = artifacts.summary.return_code == 0
 
-# Extract metrics (example for DC20 test)
-if 'dc20_e2e.json' in artifacts.test_results:
-    events = artifacts.test_results['dc20_e2e.json']
-    ingestion_time = next(e['value'] for e in events if e['metric_name'] == 'ingestion_time_s')
+# Document analysis programmatically
+results, failures = ingestor.ingest(return_failures=True)
+breakdown = analyze_document_chunks(results)
+
+# Access page-level data for optimization
+for doc_name, pages in breakdown.items():
+    total_counts = pages["total"]
+    page_count = len(pages) - 1  # Subtract "total" key
+    print(f"{doc_name}: {sum(total_counts.values())} elements, {page_count} pages")
 ```
 
 Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
