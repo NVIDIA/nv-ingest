@@ -16,6 +16,7 @@ from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExt
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class TableExtractorStage(RayActorStage):
 
         # Remove the "table_data_extract" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "table_data_extract")
-        logger.debug("Extracted task configuration: %s", task_config)
+        logger.debug("Extracted task configuration: %s", sanitize_for_logging(task_config))
 
         # Perform table data extraction.
         execution_trace_log = {}

@@ -16,6 +16,7 @@ from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtra
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
@@ -68,7 +69,7 @@ class DocxExtractorStage(RayActorStage):
 
         # Remove the "docx-extract" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "extract")
-        self._logger.debug("Extracted task config: %s", task_config)
+        self._logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Perform DOCX content extraction.
         new_df, extraction_info = extract_primitives_from_docx_internal(
