@@ -32,16 +32,22 @@ def _detect_extension_from_content(image_content: str) -> str:
     Get file extension by detecting original image format.
     Falls back to .jpeg if detection fails or format is unknown.
     """
+    DEFAULT_EXT = "jpg"  # must be either "jpg" or "png"
     try:
-        original_format = _detect_base64_image_format(image_content)
-        if original_format == "PNG":
-            return "png"
-        elif original_format in ["JPEG", "JPG"]:
-            return "jpeg"
-        else:
-            return "jpeg"  # Default for unknown formats
+        fmt = _detect_base64_image_format(image_content).upper()
     except Exception:
-        return "jpeg"  # Default if detection fails
+        logger.warning("Image format detection failed; falling back to default '%s'.", DEFAULT_EXT)
+        return DEFAULT_EXT
+    ext_map = {
+        "JPEG": "jpg",
+        "JPG": "jpg",
+        "PNG": "png",
+    }
+    ext = ext_map.get(fmt, None)
+    if ext:
+        return ext
+    logger.warning("Unsupported image format '%s'; falling back to default '%s'.", fmt, DEFAULT_EXT)
+    return DEFAULT_EXT
 
 
 def save_images_to_disk(
