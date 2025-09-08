@@ -100,19 +100,12 @@ def _update_infographic_metadata(
 
     infer_kwargs = dict(
         stage_name="infographic_extraction",
-        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
         infer_kwargs.update(
             model_name="paddle",
-        )
-    elif ocr_model_name == "scene_text":
-        infer_kwargs.update(
-            model_name=ocr_model_name,
-            input_names=["input", "merge_levels"],
-            dtypes=["FP32", "BYTES"],
-            merge_level="paragraph",
+            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
     elif ocr_model_name == "scene_text_ensemble":
         infer_kwargs.update(

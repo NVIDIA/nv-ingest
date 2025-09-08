@@ -28,7 +28,6 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
-NEMORETRIEVER_OCR_EA_MODEL_NAME = "scene_text"
 NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
@@ -262,7 +261,7 @@ class OCRModelInterfaceBase(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=(False if model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME else True),
+                scale_coordinates=True,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])
@@ -457,31 +456,13 @@ class LegacyOCRModelInterface(OCRModelInterfaceBase):
         images = data["images"]
         dims = data["image_dims"]
 
-        model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
-        merge_level = kwargs.get("merge_level", "paragraph")
-
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC OCR model (batched).")
             processed: List[np.ndarray] = []
 
-            max_length = max(max(img.shape[:2]) for img in images)
-            max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
-
             for img in images:
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    arr, _dims = preprocess_image_for_paddle(img)
-                elif model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME:
-                    arr, _dims = preprocess_image_for_ocr(
-                        img,
-                        target_height=max_length,
-                        target_width=max_length,
-                        pad_how="bottom_right",
-                    )
-                else:
-                    raise ValueError(f"Unknown model name: {model_name}")
-
+                arr, _dims = preprocess_image_for_paddle(img)
                 dims.append(_dims)
-
                 arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)
                 processed.append(arr)
@@ -494,13 +475,7 @@ class LegacyOCRModelInterface(OCRModelInterfaceBase):
                 chunk_list(dims, max_batch_size),
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
-
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    batches.append(batched_input)
-                else:
-                    merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
-                    batches.append([batched_input, merge_levels])
-
+                batches.append(batched_input)
                 batch_data_list.append({"images": orig_chunk, "image_dims": dims_chunk})
             return batches, batch_data_list
 
@@ -526,13 +501,7 @@ class LegacyOCRModelInterface(OCRModelInterfaceBase):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    payload = {"input": input_chunk}
-                else:
-                    payload = {
-                        "input": input_chunk,
-                        "merge_levels": [merge_level] * len(input_chunk),
-                    }
+                payload = {"input": input_chunk}
                 batches.append(payload)
                 batch_data_list.append({"images": orig_chunk, "image_dims": dims_chunk})
 

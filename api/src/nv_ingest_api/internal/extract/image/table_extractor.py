@@ -95,13 +95,7 @@ def _run_inference(
     if ocr_model_name == "paddle":
         future_ocr_kwargs.update(
             model_name="paddle",
-        )
-    elif ocr_model_name == "scene_text":
-        future_ocr_kwargs.update(
-            model_name=ocr_model_name,
-            input_names=["input", "merge_levels"],
-            dtypes=["FP32", "BYTES"],
-            merge_level="word",
+            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
     elif ocr_model_name == "scene_text_ensemble":
         future_ocr_kwargs.update(
