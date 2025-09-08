@@ -114,7 +114,7 @@ nemoretriever-page-elements-v2:
   deployed: true
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.4.0"
+    tag: "1.5.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -177,7 +177,7 @@ nemoretriever-graphic-elements-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-    tag: "1.4.0"
+    tag: "1.5.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -241,7 +241,7 @@ nemoretriever-table-structure-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-    tag: "1.4.0"
+    tag: "1.5.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -408,7 +408,7 @@ nemoretriever-ocr:
   customArgs: []
   image:
     repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-    tag: "1.0.0"
+    tag: "1.1.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -474,7 +474,7 @@ paddleocr-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/baidu/paddleocr
-    tag: "1.4.0"
+    tag: "1.5.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -539,7 +539,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.9.0"
+    tag: "1.10.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -604,7 +604,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: "1.9.0"
+    tag: "1.10.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -729,7 +729,7 @@ llama-32-nv-rerankqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-    tag: "1.7.0"
+    tag: "1.8.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
