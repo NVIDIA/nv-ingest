@@ -68,10 +68,9 @@ Again, replace <your-ngc-key> with your actual NGC key.
 3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
 
     - The `--profile audio` flag ensures that audio-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
-    - The `--build` flag ensures that any changes to the container images are applied before starting.
 
     ```shell
-    docker compose --profile retrieval --profile audio up --build
+    docker compose --profile retrieval --profile audio up
     ```
 
 4. After the services are running, you can interact with nv-ingest by using Python.
