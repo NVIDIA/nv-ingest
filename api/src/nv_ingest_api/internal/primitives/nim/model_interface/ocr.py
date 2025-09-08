@@ -678,11 +678,11 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
         def chunk_list(lst, chunk_size):
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
-        if ("images" not in data) or ("image_dims" not in data):
-            raise KeyError("Expected 'images' and 'image_dims' in data. Call prepare_data_for_inference first.")
+        if "images" not in data:
+            raise KeyError("Expected 'images' in data. Call prepare_data_for_inference first.")
 
-        images = data["images"]
-        dims = data["image_dims"]
+        images = data["base64_images"]
+        dims = [img.shape[:2] for img in data["images"]]
 
         formatted_batches = []
         formatted_batch_data = []
@@ -701,14 +701,13 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
 
     def _format_single_batch(
         self,
-        batch_images: List[np.array],
+        batch_images: List[str],
         batch_dims: List[Tuple[int, int]],
         protocol: str,
         **kwargs,
     ) -> Tuple[Any, Dict[str, Any]]:
         dims: List[Dict[str, Any]] = []
 
-        model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
         merge_level = kwargs.get("merge_level", "paragraph")
 
         if protocol == "grpc":
@@ -731,7 +730,7 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
             merge_levels = np.array(merge_levels_list, dtype="object")
 
             final_batch = [batched_input, merge_levels]
-            batch_data = {"images": batch_images, "image_dims": dims}
+            batch_data = {"image_dims": dims}
 
             return final_batch, batch_data
 
@@ -739,22 +738,19 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
             logger.debug("Formatting input for HTTP OCR model (batched).")
 
             input_list: List[Dict[str, Any]] = []
-            for b64, img in zip(base64_list, batch_images):
+            for b64, shape in zip(batch_images, batch_dims):
                 image_url = f"data:image/png;base64,{b64}"
                 image_obj = {"type": "image_url", "url": image_url}
                 input_list.append(image_obj)
-                _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
+                _dims = {"new_width": shape[1], "new_height": shape[0]}
                 dims.append(_dims)
 
-            if model_name == DEFAULT_OCR_MODEL_NAME:
-                payload = {"input": input_list}
-            else:
-                payload = {
-                    "input": input_list,
-                    "merge_levels": [merge_level] * len(input_list),
-                }
+            payload = {
+                "input": input_list,
+                "merge_levels": [merge_level] * len(input_list),
+            }
 
-            batch_data = {"images": batch_images, "image_dims": dims}
+            batch_data = {"image_dims": dims}
 
             return payload, batch_data
 
