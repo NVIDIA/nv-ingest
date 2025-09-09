@@ -45,7 +45,7 @@ dependencies:
   - uvicorn
   - pip
   - pip:
-      - llama-index-embeddings-nvidia
+      - llama-index-embeddings-nvidia==0.4.2
       - milvus-lite==2.4.12
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - prometheus-client
