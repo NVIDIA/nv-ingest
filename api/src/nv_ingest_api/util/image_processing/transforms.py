@@ -162,7 +162,7 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     base64_image : str
         Base64-encoded image string.
     target_format : str, optional
-        The target image format. Supported formats are "PNG" and "JPEG". Defaults to "PNG".
+        The target image format. Supported formats are "PNG", "JPEG"/"JPG". Defaults to "PNG".
     **kwargs
         Additional keyword arguments passed to the format-specific encoding function.
         For JPEG: quality (int, default=100) - JPEG quality (1-100).
@@ -176,9 +176,10 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     Raises
     ------
     ValueError
-        If there is an error during format conversion.
+        If there is an error during format conversion or if an unsupported format is provided.
     """
-    target_format = target_format.upper()
+    # Quick format normalization
+    target_format = target_format.upper().strip()
     if target_format == "JPG":
         target_format = "JPEG"
 
@@ -566,11 +567,14 @@ def numpy_to_base64(array: np.ndarray, format: str = "PNG", **kwargs) -> str:
     # Centralized preprocessing of the numpy array
     processed_array = _preprocess_numpy_array(array)
 
-    format = format.upper()
+    # Quick format normalization
+    format = format.upper().strip()
+    if format == "JPG":
+        format = "JPEG"
 
     if format == "PNG":
         return numpy_to_base64_png(processed_array)
-    elif format == "JPEG" or format == "JPG":
+    elif format == "JPEG":
         quality = kwargs.get("quality", 100)
         return numpy_to_base64_jpeg(processed_array, quality=quality)
     else:
@@ -669,3 +673,112 @@ def scale_numpy_image(
         img_arr = np.array(image)
     # Ensure we return a copy
     return img_arr.copy()
+
+
+def base64_to_disk(base64_string: str, output_path: str) -> bool:
+    """
+    Write base64-encoded image data directly to disk without conversion.
+
+    This function performs efficient base64 decoding and direct file writing,
+    preserving the original image format without unnecessary decode/encode cycles.
+    Used as the foundation for higher-level image saving operations.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image data. May include data URL prefix.
+    output_path : str
+        Path where the image should be saved.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+
+    Examples
+    --------
+    >>> success = base64_to_disk(image_b64, "/path/to/output.jpeg")
+    >>> if success:
+    ...     print("Image saved successfully")
+    """
+    try:
+        # Validate input
+        if not base64_string or not base64_string.strip():
+            return False
+
+        # Strip data URL prefix if present (e.g., "data:image/jpeg;base64,")
+        if "," in base64_string:
+            base64_string = base64_string.split(",")[1]
+
+        # Decode and write directly using bytetools (consistent with rest of codebase)
+        image_bytes = bytetools.bytesfrombase64(base64_string)
+
+        # Validate we actually have image data
+        if not image_bytes:
+            return False
+
+        with open(output_path, "wb") as f:
+            f.write(image_bytes)
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to write base64 image to disk: {e}")
+        return False
+
+
+def save_image_to_disk(base64_content: str, output_path: str, target_format: str = "auto", **kwargs) -> bool:
+    """
+    Save base64 image to disk with optional format conversion.
+
+    This function provides a high-level interface for saving images that combines
+    format conversion capabilities with efficient disk writing. It automatically
+    chooses between direct writing (when no conversion needed) and format conversion
+    to optimize performance while maintaining flexibility.
+
+    Parameters
+    ----------
+    base64_content : str
+        Base64-encoded image data.
+    output_path : str
+        Path where the image should be saved.
+    target_format : str, optional
+        Target format ("PNG", "JPEG", "auto"). Default is "auto" (preserve original).
+        Use "auto" to preserve the original format for maximum speed.
+    **kwargs
+        Additional arguments passed to ensure_base64_format() for conversion.
+        For JPEG: quality (int, default=100) - JPEG quality (1-100).
+        For PNG: compression (int, default=3) - PNG compression level (0-9).
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+
+    Examples
+    --------
+    >>> # Preserve original format (fastest)
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "auto")
+    >>>
+    >>> # Convert to JPEG with specific quality
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "JPEG", quality=85)
+    """
+    try:
+        # Quick format normalization
+        target_format = target_format.lower().strip()
+        if target_format in ["jpg"]:
+            target_format = "jpeg"
+
+        # Handle format conversion if needed
+        if target_format == "auto":
+            # Preserve original format - no conversion needed
+            formatted_b64 = base64_content
+        else:
+            # Use API's smart format conversion
+            formatted_b64 = ensure_base64_format(base64_content, target_format, **kwargs)
+
+        # Direct write - no round trips
+        return base64_to_disk(formatted_b64, output_path)
+
+    except Exception as e:
+        logger.error(f"Failed to save image to disk: {e}")
+        return False

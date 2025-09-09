@@ -47,12 +47,12 @@ ulimit -u 10,000
 
 ## Out-of-Memory (OOM) Error when Processing Large Datasets
 
-When processing a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error.
-This happens because, by default, nv-ingest stores all the extracted results from every document in system memory (RAM).
-If the total size of these results exceeds the available memory, the process will fail.
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+This happens because, by default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+If the total size of the results exceeds the available memory, the process fails.
 
 To resolve this issue, use the `save_to_disk` method. 
-For details, refer to [Working with Large Datasets: Saving to Disk](link).
+For details, refer to [Working with Large Datasets: Saving to Disk](nv-ingest-python-api.md#work-with-large-datasets-save-to-disk).
 
 
 

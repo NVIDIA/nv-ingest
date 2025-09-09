@@ -42,6 +42,7 @@ from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
 
+
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
@@ -881,7 +882,7 @@ def create_bm25_model(
     return bm25_ef
 
 
-def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
+def stream_insert_milvus(records, client: MilvusClient, collection_name: str, batch_size: int = 5000):
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
@@ -899,10 +900,40 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
         Milvus Collection to search against
     """
     count = 0
-    for element in records:
-        client.insert(collection_name=collection_name, data=[element])
-        count += 1
+    for idx in range(0, len(records), batch_size):
+        client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
+        count += len(records[idx : idx + batch_size])
     logger.info(f"streamed {count} records")
+
+
+def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient):
+    """
+    This function waits for the index to be built. It checks
+    the indexed_rows of the index and waits for it to be equal
+    to the number of records. This only works for streaming inserts,
+    bulk inserts are not supported by this function
+    (refer to MilvusClient.refresh_load for bulk inserts).
+    """
+    index_names = utility.list_indexes(collection_name)
+    indexed_rows = 0
+    for index_name in index_names:
+        indexed_rows = 0
+        while indexed_rows < num_elements:
+            pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
+            for i in range(20):
+                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                time.sleep(1)
+                if new_indexed_rows == num_elements:
+                    indexed_rows = new_indexed_rows
+                    break
+                # check if indexed_rows is staying the same, too many times means something is wrong
+                if new_indexed_rows == indexed_rows:
+                    pos_movement = -1
+                # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
+                if pos_movement == 0:
+                    raise ValueError("Rows are not getting indexed as expected")
+                indexed_rows = new_indexed_rows
+    return indexed_rows
 
 
 def write_to_nvingest_collection(
@@ -1026,6 +1057,9 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
+        # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
+        # know how long this should take, it is num_elements dependent.
+        wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         if not minio_client.bucket_exists(bucket_name):
