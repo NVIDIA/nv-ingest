@@ -27,13 +27,14 @@ class StoreTask(Task):
 
     _Type_Content_Type = Literal["image",]
 
-    _Type_Store_Method = Literal["minio",]
+    _Type_Store_Method = Literal["minio", "s3", "gcs", "azure", "file"]
 
     def __init__(
         self,
         structured: bool = True,
         images: bool = False,
-        store_method: _Type_Store_Method = None,
+        method: _Type_Store_Method = None,
+        store_method: _Type_Store_Method = None,  # Backward compatibility
         params: dict = None,
         **extra_params,
     ) -> None:
@@ -49,9 +50,12 @@ class StoreTask(Task):
         # Merge extra_params into params for API schema compatibility
         merged_params = {**params, **extra_params}
 
+        # Handle method parameter with backward compatibility
+        final_method = method or store_method or _DEFAULT_STORE_METHOD
+
         # Use the API schema for validation
         validated_data = IngestTaskStoreSchema(
-            structured=structured, images=images, method=store_method or _DEFAULT_STORE_METHOD, params=merged_params
+            structured=structured, images=images, method=final_method, params=merged_params
         )
 
         self._structured = validated_data.structured

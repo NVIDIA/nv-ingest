@@ -931,7 +931,7 @@ class Ingestor:
         store_params = {
             "structured": task_options.structured,
             "images": task_options.images,
-            "store_method": task_options.method,  # Map method back to store_method
+            "method": task_options.method,
             "params": task_options.params,
         }
         store_task = StoreTask(**store_params)

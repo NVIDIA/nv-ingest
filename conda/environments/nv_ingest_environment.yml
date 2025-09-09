@@ -55,3 +55,5 @@ dependencies:
       - nvidia-riva-client==2.20.0
       - unstructured-client
       - markitdown
+      - s3fs>=2025.9.0 # AWS S3 fsspec support
+      - boto3>=1.39.11 # AWS S3 fsspec support

@@ -259,6 +259,9 @@ services:
         MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
+      # AWS credentials for S3 fsspec storage - automatically mounts ~/.aws/credentials and ~/.aws/config
+      # Users can setup credentials with: aws configure, aws sso login, or manual credential files
+      - ~/.aws:/root/.aws:ro
     ports:
       # HTTP API
       - "7670:7670"
