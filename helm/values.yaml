@@ -45,20 +45,17 @@ podSecurityContext:
 ## @param extraVolumes [object] Adds arbitrary additional volumes to the deployment set definition
 extraVolumes: {}
 ## @descriptionStart
-## For S3/AWS fsspec storage, mount AWS credentials as a volume:
-## extraVolumes:
-##   aws-credentials:
-##     secret:
-##       secretName: aws-credential-files
+## For additional storage volumes or custom configurations, use extraVolumes.
+## Note: For S3/AWS fsspec storage, AWS credentials are now handled via Kubernetes secrets
+## and environment variables (see awsSecret configuration section) rather than volume mounts.
 ## @descriptionEnd
 
 ## @param extraVolumeMounts [object] Specify volume mounts to the main container from `extraVolumes`
 extraVolumeMounts: {}
 ## @descriptionStart
-## extraVolumeMounts:
-##   aws-credentials:
-##     mountPath: /root/.aws
-##     readOnly: true
+## For additional volume mounts from extraVolumes, use extraVolumeMounts.
+## Note: AWS credentials for S3 storage are configured via secrets and environment variables,
+## not volume mounts. See the awsSecret configuration section for details.
 ## @descriptionEnd
 
 ## @section Image Pull Secrets
@@ -979,7 +976,9 @@ prometheus:
 
 ## @section Environment Variables
 ## @descriptionStart
-## Define environment variables as key/value dictionary pairs
+## Define environment variables as key/value dictionary pairs.
+## Note: AWS credentials for S3 storage are automatically injected as environment variables
+## when awsSecret.create is enabled, and do not need to be defined here.
 ## @descriptionEnd
 ## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
 ## @param envVars.ARROW_DEFAULT_MEMORY_POOL [default: "system"] Memory pool configuration for Apache Arrow
@@ -995,7 +994,7 @@ prometheus:
 ## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
-## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
+## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to. For S3 storage, configure awsSecret and use S3 bucket name here
 ## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
 ## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
 ## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
@@ -1038,6 +1037,12 @@ envVars:
   MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
+
+  # AWS S3 Configuration - these will be set via secretRef in the deployment when awsSecret.create is true
+  # AWS_ACCESS_KEY_ID: set via secret reference
+  # AWS_SECRET_ACCESS_KEY: set via secret reference
+  # AWS_DEFAULT_REGION: set via secret reference
+  # AWS_SESSION_TOKEN: set via secret reference (optional)
 
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
@@ -1310,6 +1315,22 @@ ngcImagePullSecret:
 
   username: '$oauthtoken'
   password: ""
+
+## @param awsSecret.create Specifies whether to create the AWS credentials secret
+## @param awsSecret.name [default: "aws-credentials"] The name of the AWS credentials secret
+## @param awsSecret.accessKeyId The AWS access key ID
+## @param awsSecret.secretAccessKey The AWS secret access key
+## @param awsSecret.defaultRegion [default: ""] The AWS default region (optional)
+## @param awsSecret.sessionToken [default: ""] The AWS session token for temporary credentials (optional)
+awsSecret:
+  create: false
+  name: "aws-credentials"
+  # If set to false, the chart expects a secret with the name configured above
+  # to exist in the namespace if AWS S3 storage is needed.
+  accessKeyId: ""
+  secretAccessKey: ""
+  defaultRegion: ""
+  sessionToken: ""
 
 ## @section Container Configuration
 ## @param nemo.userID [default: "1000"] User ID for the NEMO container
