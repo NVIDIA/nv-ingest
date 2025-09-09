@@ -49,6 +49,7 @@ class TableExtractorConfigSchema(BaseModel):
 
     ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     ocr_infer_protocol: str = ""
+    ocr_rate_limit: int = -1
 
     nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
