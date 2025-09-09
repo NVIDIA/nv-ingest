@@ -145,6 +145,28 @@ def _update_infographic_metadata(
     return results
 
 
+def _create_ocr_client(
+    ocr_endpoints: Tuple[str, str],
+    ocr_protocol: str,
+    ocr_model_name: str,
+    ocr_dynamic_batch_memory_budget_mb: int,
+    auth_token: str,
+) -> NimClient:
+    ocr_model_interface = (
+        NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
+    )
+
+    with create_inference_client(
+        endpoints=ocr_endpoints,
+        model_interface=ocr_model_interface,
+        auth_token=auth_token,
+        infer_protocol=ocr_protocol,
+        enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
+        dynamic_batch_memory_budget_mb=32,
+    ) as ocr_client:
+        yield ocr_client
+
+
 def _meets_infographic_criteria(row: pd.Series) -> bool:
     """
     Determines if a DataFrame row meets the criteria for infographic extraction.
@@ -234,22 +256,11 @@ def extract_infographic_data_from_image_internal(
         base64_images = [df_extraction_ledger.at[idx, "metadata"]["content"] for idx in valid_indices]
 
         # Call bulk update to extract infographic data.
-        ocr_model_interface = (
-            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
-        )
-        ocr_endpoints = endpoint_config.ocr_endpoints
-        ocr_protocol = endpoint_config.ocr_infer_protocol
-        auth_token = endpoint_config.auth_token
-
-        logger.debug(f"Inference protocols: ocr={ocr_protocol}")
-
-        with create_inference_client(
-            endpoints=ocr_endpoints,
-            model_interface=ocr_model_interface,
-            auth_token=auth_token,
-            infer_protocol=ocr_protocol,
-            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
-            dynamic_batch_memory_budget_mb=32,
+        with _create_ocr_client(
+            endpoint_config.ocr_endpoints,
+            endpoint_config.ocr_infer_protocol,
+            ocr_model_name,
+            endpoint_config.auth_token,
         ) as ocr_client:
             bulk_results = _update_infographic_metadata(
                 base64_images=base64_images,

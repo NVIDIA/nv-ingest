@@ -59,7 +59,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
     def test_name(self):
         """Test the name method."""
-        self.assertEqual(self.model_interface.name(), "OCR")
+        self.assertEqual(self.model_interface.name(), "PaddleOCR")
 
     def test_prepare_data_for_inference_single_image(self):
         """Test prepare_data_for_inference method with a single image."""
@@ -70,9 +70,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         self.mock_base64_to_numpy.assert_called_once_with(self.sample_base64)
 
         # Check that image_arrays was added to the result
-        self.assertIn("image_arrays", result)
-        self.assertEqual(len(result["image_arrays"]), 1)
-        self.assertTrue(isinstance(result["image_arrays"][0], np.ndarray))
+        self.assertIn("images", result)
+        self.assertEqual(len(result["images"]), 1)
+        self.assertTrue(isinstance(result["images"][0], np.ndarray))
 
     def test_prepare_data_for_inference_multiple_images(self):
         """Test prepare_data_for_inference method with multiple images."""
@@ -83,9 +83,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         self.assertEqual(self.mock_base64_to_numpy.call_count, len(self.sample_base64_list))
 
         # Check that image_arrays was added to the result
-        self.assertIn("image_arrays", result)
-        self.assertEqual(len(result["image_arrays"]), len(self.sample_base64_list))
-        for img in result["image_arrays"]:
+        self.assertIn("images", result)
+        self.assertEqual(len(result["images"]), len(self.sample_base64_list))
+        for img in result["images"]:
             self.assertTrue(isinstance(img, np.ndarray))
 
     def test_prepare_data_for_inference_missing_data(self):
@@ -108,7 +108,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         """Test format_input method with gRPC protocol and a single image."""
         # Set up test data with image_arrays and empty image_dims
         img_array = np.zeros((100, 200, 3), dtype=np.uint8)
-        test_data = {"image_arrays": [img_array], "image_dims": []}
+        test_data = {"images": [img_array], "image_dims": []}
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="grpc", max_batch_size=1)
 
@@ -130,7 +130,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         """Test format_input method with gRPC protocol and multiple images."""
         # Set up test data with multiple image arrays and empty image_dims
         img_arrays = [np.zeros((100, 200, 3), dtype=np.uint8) for _ in range(3)]
-        test_data = {"image_arrays": img_arrays, "image_dims": []}
+        test_data = {"images": img_arrays, "image_dims": []}
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="grpc", max_batch_size=2)
 
@@ -149,9 +149,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         # Set up test data with image_arrays, empty image_dims, and base64_image
         img_array = np.zeros((100, 200, 3), dtype=np.uint8)
         test_data = {
-            "image_arrays": [img_array],
+            "images": [img_array],
             "image_dims": [],
-            "base64_image": self.sample_base64,
+            "base64_images": self.sample_base64,
         }
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="http", max_batch_size=1)
@@ -178,7 +178,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         # Set up test data with multiple image arrays, empty image_dims, and base64_images
         img_arrays = [np.zeros((100, 200, 3), dtype=np.uint8) for _ in range(3)]
         test_data = {
-            "image_arrays": img_arrays,
+            "images": img_arrays,
             "image_dims": [],
             "base64_images": self.sample_base64_list,
         }
@@ -208,12 +208,12 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             self.model_interface.format_input(test_data, protocol="http", max_batch_size=1)
 
-        self.assertTrue("'image_arrays'" in str(context.exception))
+        self.assertTrue("'images'" in str(context.exception))
 
     def test_format_input_invalid_protocol(self):
         """Test format_input method with an invalid protocol."""
         test_data = {
-            "image_arrays": [np.zeros((100, 200, 3), dtype=np.uint8)],
+            "images": [np.zeros((100, 200, 3), dtype=np.uint8)],
             "image_dims": [],
         }
         with self.assertRaises(ValueError) as context:

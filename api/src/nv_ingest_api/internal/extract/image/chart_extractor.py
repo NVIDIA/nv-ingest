@@ -20,6 +20,7 @@ from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_gr
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -211,6 +212,44 @@ def _update_chart_metadata(
     return _merge_chart_results(base64_images, valid_indices, yolox_results, ocr_results, results)
 
 
+def _create_yolox_client(
+    yolox_endpoints: Tuple[str, str],
+    yolox_protocol: str,
+    auth_token: str,
+) -> NimClient:
+    yolox_model_interface = YoloxGraphicElementsModelInterface()
+
+    with create_inference_client(
+        endpoints=yolox_endpoints,
+        model_interface=yolox_model_interface,
+        auth_token=auth_token,
+        infer_protocol=yolox_protocol,
+    ) as yolox_client:
+        yield yolox_client
+
+
+def _create_ocr_client(
+    ocr_endpoints: Tuple[str, str],
+    ocr_protocol: str,
+    ocr_model_name: str,
+    ocr_dynamic_batch_memory_budget_mb: int,
+    auth_token: str,
+) -> NimClient:
+    ocr_model_interface = (
+        NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
+    )
+
+    with create_inference_client(
+        endpoints=ocr_endpoints,
+        model_interface=ocr_model_interface,
+        auth_token=auth_token,
+        infer_protocol=ocr_protocol,
+        enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
+        dynamic_batch_memory_budget_mb=32,
+    ) as ocr_client:
+        yield ocr_client
+
+
 def extract_chart_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Union[IngestTaskChartExtraction, Dict[str, Any]],
@@ -293,32 +332,15 @@ def extract_chart_data_from_image_internal(
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
         # 3) Call our bulk _update_metadata to get all results.
-        yolox_model_interface = YoloxGraphicElementsModelInterface()
-        ocr_model_interface = (
-            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
-        )
-        yolox_endpoints = endpoint_config.yolox_endpoints
-        yolox_protocol = endpoint_config.yolox_infer_protocol
-        ocr_endpoints = endpoint_config.ocr_endpoints
-        ocr_protocol = endpoint_config.ocr_infer_protocol
-        auth_token = endpoint_config.auth_token
-
-        logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")
-
-        with create_inference_client(
-            endpoints=yolox_endpoints,
-            model_interface=yolox_model_interface,
-            auth_token=auth_token,
-            infer_protocol=yolox_protocol,
-            # enable_dynamic_batching=True,
-            # dynamic_batch_memory_budget_mb=32,
-        ) as yolox_client, create_inference_client(
-            endpoints=ocr_endpoints,
-            model_interface=ocr_model_interface,
-            auth_token=auth_token,
-            infer_protocol=ocr_protocol,
-            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
-            dynamic_batch_memory_budget_mb=32,
+        with _create_yolox_client(
+            endpoint_config.yolox_endpoints,
+            endpoint_config.yolox_infer_protocol,
+            endpoint_config.auth_token,
+        ) as yolox_client, _create_ocr_client(
+            endpoint_config.ocr_endpoints,
+            endpoint_config.ocr_infer_protocol,
+            ocr_model_name,
+            endpoint_config.auth_token,
         ) as ocr_client:
             bulk_results = _update_chart_metadata(
                 base64_images=base64_images,

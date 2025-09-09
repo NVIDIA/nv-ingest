@@ -18,6 +18,7 @@ from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import convert_ocr_response_to_psuedo_markdown
@@ -220,6 +221,44 @@ def _update_table_metadata(
     return results
 
 
+def _create_yolox_client(
+    yolox_endpoints: Tuple[str, str],
+    yolox_protocol: str,
+    auth_token: str,
+) -> NimClient:
+    yolox_model_interface = YoloxTableStructureModelInterface()
+
+    with create_inference_client(
+        endpoints=yolox_endpoints,
+        model_interface=yolox_model_interface,
+        auth_token=auth_token,
+        infer_protocol=yolox_protocol,
+    ) as yolox_client:
+        yield yolox_client
+
+
+def _create_ocr_client(
+    ocr_endpoints: Tuple[str, str],
+    ocr_protocol: str,
+    ocr_model_name: str,
+    ocr_dynamic_batch_memory_budget_mb: int,
+    auth_token: str,
+) -> NimClient:
+    ocr_model_interface = (
+        NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
+    )
+
+    with create_inference_client(
+        endpoints=ocr_endpoints,
+        model_interface=ocr_model_interface,
+        auth_token=auth_token,
+        infer_protocol=ocr_protocol,
+        enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
+        dynamic_batch_memory_budget_mb=32,
+    ) as ocr_client:
+        yield ocr_client
+
+
 def extract_table_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Union[IngestTaskTableExtraction, Dict[str, Any]],
@@ -298,32 +337,15 @@ def extract_table_data_from_image_internal(
         )
         enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
 
-        yolox_model_interface = YoloxTableStructureModelInterface()
-        ocr_model_interface = (
-            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
-        )
-        yolox_endpoints = endpoint_config.yolox_endpoints
-        yolox_protocol = endpoint_config.yolox_infer_protocol
-        ocr_endpoints = endpoint_config.ocr_endpoints
-        ocr_protocol = endpoint_config.ocr_infer_protocol
-        auth_token = endpoint_config.auth_token
-
-        logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")
-
-        with create_inference_client(
-            endpoints=yolox_endpoints,
-            model_interface=yolox_model_interface,
-            auth_token=auth_token,
-            infer_protocol=yolox_protocol,
-            # enable_dynamic_batching=True,
-            # dynamic_batch_memory_budget_mb=32,
-        ) as yolox_client, create_inference_client(
-            endpoints=ocr_endpoints,
-            model_interface=ocr_model_interface,
-            auth_token=auth_token,
-            infer_protocol=ocr_protocol,
-            enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
-            dynamic_batch_memory_budget_mb=32,
+        with _create_yolox_client(
+            endpoint_config.yolox_endpoints,
+            endpoint_config.yolox_infer_protocol,
+            endpoint_config.auth_token,
+        ) as yolox_client, _create_ocr_client(
+            endpoint_config.ocr_endpoints,
+            endpoint_config.ocr_infer_protocol,
+            ocr_model_name,
+            endpoint_config.auth_token,
         ) as ocr_client:
             bulk_results = _update_table_metadata(
                 base64_images=base64_images,
