@@ -12,10 +12,25 @@ from nv_ingest.api.v2.ingest import router as v2_router
 
 
 @pytest.fixture
-def app():
-    """Create test FastAPI app with V2 router"""
+def mock_ingest_service():
+    """Mock the ingest service dependency"""
+    mock_service = AsyncMock()
+    mock_service.submit_job = AsyncMock(return_value=None)
+    mock_service.set_job_state = AsyncMock(return_value=None)
+    return mock_service
+
+
+@pytest.fixture
+def app(mock_ingest_service):
+    """Create test FastAPI app with V2 router and dependency override"""
+    from nv_ingest.api.v2.ingest import _get_ingest_service
+
     app = FastAPI()
     app.include_router(v2_router)
+
+    # Override the dependency properly
+    app.dependency_overrides[_get_ingest_service] = lambda: mock_ingest_service
+
     return app
 
 
@@ -26,17 +41,8 @@ def client(app):
 
 
 @pytest.fixture
-def mock_ingest_service():
-    """Mock the ingest service dependency"""
-    mock_service = AsyncMock()
-    mock_service.submit_job = AsyncMock(return_value=None)
-    mock_service.set_job_state = AsyncMock(return_value=None)
-    return mock_service
-
-
-@pytest.fixture
 def valid_job_spec():
-    """Valid JobSpec JSON for testing - matches JobSpec.to_dict() structure"""
+    """Valid JobSpec JSON for testing - matches comprehensive schema requirements"""
     return {
         "job_payload": {
             "source_name": ["test_doc.pdf"],
@@ -49,13 +55,13 @@ def valid_job_spec():
             {
                 "type": "extract",
                 "task_properties": {
-                    "method": "pdfium",  # Required field that was missing
+                    "method": "pdfium",
                     "document_type": "pdf",
                     "params": {"extract_text": True, "extract_images": True, "extract_tables": True},
                 },
             }
         ],
-        "tracing_options": {},
+        "tracing_options": {"trace": True, "ts_send": 1234567890},  # Required by comprehensive schema
     }
 
 
@@ -116,50 +122,77 @@ class TestV2SubmitJobHappyPath:
 
 
 class TestV2ValidationSuperiority:
-    """Test 2: Proves V2 handles validation better than V1"""
+    """Test V2 handles validation better than V1"""
 
     def test_submit_job_v2_invalid_json_returns_400(self, client, mock_ingest_service):
-        """
-        Test that V2 API gracefully handles invalid JSON with proper error response.
-
-        Proves: V2 returns HTTP 400 with helpful error messages for invalid JSON.
-        Value over V1: V1 would crash with 500 error, V2 gracefully validates and responds.
-        """
-        # Prepare request with invalid JSON
+        """Test that V2 returns 400 for invalid JSON instead of crashing with 500"""
+        # Invalid JSON that should be caught
         request_data = {
-            "job_spec_json": "{ invalid json structure missing quotes }",  # ❌ Invalid JSON
+            "job_spec_json": "{ invalid json structure missing quotes }",
             "tracing_options": {"trace": True},
         }
 
-        # Mock the dependency injection
-        with patch("nv_ingest.api.v2.ingest._get_ingest_service", return_value=mock_ingest_service):
-            # Mock OpenTelemetry trace
-            with patch("nv_ingest.api.v2.ingest.trace") as mock_trace:
-                # Create valid 32-character hex trace_id
-                test_trace_id = 0x1234567890ABCDEF1234567890ABCDEF
-                mock_span = MagicMock()
-                mock_span.get_span_context.return_value.trace_id = test_trace_id
-                mock_trace.get_current_span.return_value = mock_span
-                mock_tracer = MagicMock()
-                mock_tracer.start_as_current_span.return_value.__enter__ = lambda x: mock_span
-                mock_tracer.start_as_current_span.return_value.__exit__ = lambda x, y, z, w: None
-                mock_trace.get_tracer.return_value = mock_tracer
+        response = client.post("/v2/submit_job", json=request_data)
 
-                # Make request to V2 endpoint
-                response = client.post("/v2/submit_job", json=request_data)
-
-        # Verify graceful error handling
-        assert response.status_code == 400  # Not 500!
+        # Core requirement: graceful error handling with 400, not 500
+        assert response.status_code == 400
         error_data = response.json()
-
-        # Verify helpful error message (not generic "Internal Server Error")
         assert "detail" in error_data
-        assert "Invalid JSON" in error_data["detail"] or "json" in error_data["detail"].lower()
+        assert "json" in error_data["detail"].lower()
 
-        # Verify service was NOT called (validation stopped it early)
+        # Should not call service for invalid input
         mock_ingest_service.submit_job.assert_not_called()
         mock_ingest_service.set_job_state.assert_not_called()
 
-        # This demonstrates the key improvement:
-        # V1 would have crashed with 500 when json.loads() failed
-        # V2 catches the error and returns proper 400 with helpful message
+
+class TestV2FetchJobEndpoint:
+    """Test that V2 fetch_job endpoint provides adequate V1 replacement"""
+
+    def test_fetch_job_v2_success(self, client, mock_ingest_service):
+        """Test successful job fetch with typed response"""
+        job_id = "test-job-123"
+
+        # Mock successful flow
+        mock_ingest_service.get_job_state.return_value = "SUBMITTED"
+        mock_ingest_service.fetch_job.return_value = [{"content": "test content"}]
+        mock_ingest_service.get_fetch_mode.return_value = "NON_DESTRUCTIVE"
+
+        response = client.get(f"/v2/fetch_job/{job_id}")
+
+        # Core requirement: returns 200 with structured response
+        assert response.status_code == 200
+        data = response.json()
+        assert data["job_id"] == job_id
+        assert data["status"] == "completed"
+        assert "results" in data
+
+        # Verify V1-compatible service calls
+        mock_ingest_service.get_job_state.assert_called_once_with(job_id)
+        mock_ingest_service.fetch_job.assert_called_once_with(job_id)
+
+    def test_fetch_job_v2_not_found(self, client, mock_ingest_service):
+        """Test 404 handling for missing jobs"""
+        job_id = "missing-job"
+        mock_ingest_service.get_job_state.return_value = None
+
+        response = client.get(f"/v2/fetch_job/{job_id}")
+
+        # Core requirement: proper 404 handling
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+        mock_ingest_service.get_job_state.assert_called_once_with(job_id)
+        mock_ingest_service.fetch_job.assert_not_called()
+
+    def test_fetch_job_v2_processing_timeout(self, client, mock_ingest_service):
+        """Test 202 handling for processing jobs that timeout"""
+        job_id = "processing-job"
+        mock_ingest_service.get_job_state.return_value = "PROCESSING"
+        mock_ingest_service.fetch_job.side_effect = TimeoutError()
+
+        response = client.get(f"/v2/fetch_job/{job_id}")
+
+        # Core requirement: proper processing state handling
+        assert response.status_code == 202
+        assert "processing" in response.json()["detail"].lower()
+        mock_ingest_service.get_job_state.assert_called_once_with(job_id)
+        mock_ingest_service.fetch_job.assert_called_once_with(job_id)
