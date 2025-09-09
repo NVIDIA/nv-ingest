@@ -15,7 +15,7 @@ import pandas as pd
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import LegacyOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
@@ -300,7 +300,7 @@ def extract_table_data_from_image_internal(
 
         yolox_model_interface = YoloxTableStructureModelInterface()
         ocr_model_interface = (
-            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else LegacyOCRModelInterface()
+            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
         )
         yolox_endpoints = endpoint_config.yolox_endpoints
         yolox_protocol = endpoint_config.yolox_infer_protocol

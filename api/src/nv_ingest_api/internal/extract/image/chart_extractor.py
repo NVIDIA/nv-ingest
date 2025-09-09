@@ -17,7 +17,7 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExt
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import LegacyOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
@@ -295,7 +295,7 @@ def extract_chart_data_from_image_internal(
         # 3) Call our bulk _update_metadata to get all results.
         yolox_model_interface = YoloxGraphicElementsModelInterface()
         ocr_model_interface = (
-            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else LegacyOCRModelInterface()
+            NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
         )
         yolox_endpoints = endpoint_config.yolox_endpoints
         yolox_protocol = endpoint_config.yolox_infer_protocol

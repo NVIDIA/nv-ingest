@@ -16,15 +16,8 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import (
-    multiprocessing_cache,
-)
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
-    preprocess_image_for_ocr,
-)
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
-    preprocess_image_for_paddle,
-)
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
@@ -347,7 +340,7 @@ class OCRModelInterfaceBase(ModelInterface):
         return bboxes, texts, confs
 
 
-class LegacyOCRModelInterface(OCRModelInterfaceBase):
+class PaddleOCRModelInterface(OCRModelInterfaceBase):
     """
     An interface for handling inference with a legacy OCR model, supporting both gRPC and HTTP protocols.
     """
@@ -361,7 +354,7 @@ class LegacyOCRModelInterface(OCRModelInterfaceBase):
         str
             The name of the model interface.
         """
-        return "LegacyOCR"
+        return "PaddleOCR"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

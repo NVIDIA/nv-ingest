@@ -10,16 +10,16 @@ import numpy as np
 
 # Import using the specified pattern
 import nv_ingest_api.internal.primitives.nim.model_interface.ocr as model_interface_module
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 
 MODULE_UNDER_TEST = f"{model_interface_module.__name__}"
 
 
-class TestOCRModelInterface(unittest.TestCase):
+class TestPaddleOCRModelInterface(unittest.TestCase):
 
     def setUp(self):
         # Create an instance of the model interface
-        self.model_interface = OCRModelInterface()
+        self.model_interface = PaddleOCRModelInterface()
 
         # Mock the logger to prevent actual logging during tests
         self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
@@ -488,7 +488,7 @@ class TestOCRModelInterface(unittest.TestCase):
             }
         ]
 
-        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+        bboxes, texts, scores = PaddleOCRModelInterface._postprocess_ocr_response(
             bounding_boxes, text_predictions, conf_scores, dims, img_index=0
         )
 
@@ -513,7 +513,7 @@ class TestOCRModelInterface(unittest.TestCase):
         conf_scores = [0.9, 0.8]
         dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20}]
 
-        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+        bboxes, texts, scores = PaddleOCRModelInterface._postprocess_ocr_response(
             bounding_boxes, text_predictions, conf_scores, dims, img_index=0
         )
 
@@ -530,7 +530,7 @@ class TestOCRModelInterface(unittest.TestCase):
         conf_scores = [0.9]
 
         with self.assertRaises(ValueError) as context:
-            OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, None)
+            PaddleOCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, None)
 
         self.assertTrue("No image_dims provided" in str(context.exception))
 
@@ -543,7 +543,7 @@ class TestOCRModelInterface(unittest.TestCase):
 
         # Mock the logger to check warning
         with patch(f"{MODULE_UNDER_TEST}.logger") as mock_logger:
-            bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+            bboxes, texts, scores = PaddleOCRModelInterface._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
                 conf_scores,
