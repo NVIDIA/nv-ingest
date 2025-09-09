@@ -17,7 +17,9 @@
 # limitations under the License.
 
 import concurrent.futures
+import multiprocessing as mp
 import logging
+import os
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
@@ -90,10 +92,10 @@ def _extract_page_elements_using_image_ensemble(
         for page in pages:
             image_page_indices.append(page[0])
             original_images.append(page[1])
-            if len(pages[0]) > 2:
+            if len(page) > 2:
                 padding_offset = page[2]
             else:
-                padding_offset = 0
+                padding_offset = (0, 0)
             padding_offsets.append(padding_offset)
 
         # Prepare the data payload with all images.
@@ -108,13 +110,29 @@ def _extract_page_elements_using_image_ensemble(
             dtypes=["BYTES", "FP32"],
             output_names=["OUTPUT"],
             trace_info=execution_trace_log,
-            stage_name="pdf_extraction",
+            stage_name="pdf_content_extractor",
         )
+
+        # Sanity check to surface silent truncation issues
+        if len(inference_results) != len(original_images):
+            logger.error(
+                "Mismatch between inference results and input images: %d vs %d",
+                len(inference_results),
+                len(original_images),
+            )
 
         # Process results: iterate over each image's inference output.
         for annotation_dict, page_index, original_image, padding_offset in zip(
             inference_results, image_page_indices, original_images, padding_offsets
         ):
+            if isinstance(annotation_dict, dict):
+                logger.debug(
+                    "YOLOX annotations for page %d: tables=%d charts=%d infographics=%d",
+                    page_index,
+                    len(annotation_dict.get("table", [])),
+                    len(annotation_dict.get("chart", [])),
+                    len(annotation_dict.get("infographic", [])),
+                )
             _extract_page_element_images(
                 annotation_dict,
                 original_image,
@@ -428,7 +446,41 @@ def pdfium_extractor(
     logger.debug("Extracting PDF with pdfium backend.")
     source_id = row_data["source_id"]
 
-    # Retrieve unified metadata robustly (supporting pandas Series or dict)
+    # Determine input to PdfDocument and optional bytes for worker processes
+    pdf_input_for_pdfium = pdf_stream
+    pdf_bytes_for_workers: Optional[bytes] = None
+    try:
+        if hasattr(pdf_stream, "read"):
+            # Stream-like: keep passing the original stream to Pdfium (tests expect identity)
+            try:
+                if hasattr(pdf_stream, "seek"):
+                    pdf_stream.seek(0)
+            except Exception:
+                pass
+            # If it's a BytesIO-like, we can obtain bytes for workers without altering the stream
+            if hasattr(pdf_stream, "getvalue"):
+                try:
+                    pdf_bytes_for_workers = pdf_stream.getvalue()
+                except Exception:
+                    pdf_bytes_for_workers = None
+        elif isinstance(pdf_stream, (bytes, bytearray, memoryview)):
+            # Bytes-like input: pass bytes to Pdfium and use same for workers
+            pdf_input_for_pdfium = bytes(pdf_stream)
+            pdf_bytes_for_workers = pdf_input_for_pdfium
+        else:
+            # Path-like input: let Pdfium open it; workers cannot use mp without bytes
+            pdf_input_for_pdfium = pdf_stream
+            pdf_bytes_for_workers = None
+    except Exception:
+        # Fallback: pass through original object
+        pdf_input_for_pdfium = pdf_stream
+        pdf_bytes_for_workers = None
+
+    # Validate that when we do have bytes they are non-empty to avoid Pdfium 'Data format error'
+    if isinstance(pdf_input_for_pdfium, (bytes, bytearray, memoryview)) and len(pdf_input_for_pdfium) == 0:
+        raise ValueError("Empty PDF content provided to pdfium_extractor().")
+
+    # Build base metadata used for document-level operations (and by single-process path)
     if hasattr(row_data, "index"):
         base_unified_metadata = row_data[metadata_column] if metadata_column in row_data.index else {}
     else:
@@ -440,7 +492,22 @@ def pdfium_extractor(
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-    doc = libpdfium.PdfDocument(pdf_stream)
+    # Open once to get metadata and page_count
+    try:
+        doc = libpdfium.PdfDocument(pdf_input_for_pdfium)
+    except Exception as e:
+        # Provide clearer diagnostics for common cases (empty/invalid bytes)
+        try:
+            byte_len = (
+                len(pdf_input_for_pdfium) if isinstance(pdf_input_for_pdfium, (bytes, bytearray, memoryview)) else None
+            )
+        except Exception:
+            byte_len = None
+        logger.exception(
+            f"Failed to open PDF for source_id={source_id}. "
+            f"bytes_len={byte_len}, type={type(pdf_input_for_pdfium).__name__}: {e}"
+        )
+        raise
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
 
@@ -464,6 +531,163 @@ def pdfium_extractor(
         f"extract_infographics={extract_infographics}"
     )
 
+    # Ensure environment values are integers
+    try:
+        batch_size = int(os.environ.get("INGEST_PDF_EXTRACT_MAX_PAGES_PER_BATCH", 100))
+    except (TypeError, ValueError):
+        batch_size = 100
+    if page_count > batch_size:
+        ranges = [(start, min(start + batch_size, page_count)) for start in range(0, page_count, batch_size)]
+        try:
+            procs = int(os.environ.get("INGEST_MAX_PER_REPLICATION_WORKER_PROCESSES", 5))
+        except (TypeError, ValueError):
+            procs = 5
+
+        # If we don't have bytes to share with workers, fall back to single-process path
+        if pdf_bytes_for_workers is None:
+            logger.debug(
+                "Multiprocessing disabled for this input (no bytes buffer available for workers). "
+                "Falling back to single-process extraction."
+            )
+        else:
+            # Prepare immutable worker args
+            worker_args = [
+                (
+                    pdf_bytes_for_workers,
+                    extractor_config,
+                    row_data,
+                    metadata_column,
+                    start,
+                    end,
+                    execution_trace_log,
+                    # Explicit flags from function call to ensure parity with single-process behavior
+                    extract_text,
+                    extract_images,
+                    extract_page_as_image,
+                    extract_infographics,
+                    extract_tables,
+                    extract_charts,
+                )
+                for (start, end) in ranges
+            ]
+
+            extracted_data = []
+            all_accumulated_text: List[str] = []
+            all_pages_for_tables: List[Tuple[int, np.ndarray, Tuple[int, int]]] = []
+            total_images_from_workers = 0
+            total_pages_prepared_for_elements = 0
+
+            with mp.Pool(processes=procs) as pool:
+                try:
+                    for result in pool.imap_unordered(_process_pdf_pages_range_worker, worker_args):
+                        # Each result is a tuple: (items, accumulated_text, pages_for_tables, diag)
+                        if not result:
+                            continue
+                        items, acc_text, worker_pages_for_tables, diag = result
+                        if items:
+                            extracted_data.extend(items)
+                        if acc_text:
+                            all_accumulated_text.extend(acc_text)
+                        if worker_pages_for_tables:
+                            all_pages_for_tables.extend(worker_pages_for_tables)
+                        if isinstance(diag, dict):
+                            total_images_from_workers += int(diag.get("images_emitted", 0))
+                            total_pages_prepared_for_elements += int(diag.get("elements_pages_prepared", 0))
+                except Exception as e:
+                    # Terminate all workers on first failure and re-raise to flag the job as failed
+                    logger.exception(f"PDFium parallel extraction failed; terminating pool: {e}")
+                    pool.terminate()
+                    pool.join()
+                    doc.close()
+                    raise
+
+            # For document-level text extraction, combine text across all batches once
+            if extract_text and text_depth != TextTypeEnum.PAGE and all_accumulated_text:
+                doc_text_meta = construct_text_metadata(
+                    all_accumulated_text,
+                    pdf_metadata.keywords,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    page_count,
+                    TextTypeEnum.DOCUMENT,
+                    source_metadata,
+                    base_unified_metadata,
+                )
+                extracted_data.append(doc_text_meta)
+
+            # Verification logs: ensure flags resulted in usage in workers
+            if extract_images:
+                logger.debug(
+                    "[MP verify] extract_images=True; images_emitted_by_workers=%d",
+                    total_images_from_workers,
+                )
+            if extract_tables or extract_charts or extract_infographics:
+                logger.debug(
+                    "[MP verify] element_flags (tables=%s, charts=%s, infographics=%s); pages_prepared_for_elements=%d",
+                    extract_tables,
+                    extract_charts,
+                    extract_infographics,
+                    total_pages_prepared_for_elements,
+                )
+
+            # Now perform page element extraction in the parent, identically to the single-process path
+            if (extract_tables or extract_charts or extract_infographics) and all_pages_for_tables:
+                futures = []
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=pdfium_config.workers_per_progress_engine
+                ) as executor:
+                    # Batch by YOLOX_MAX_BATCH_SIZE just like the single-process path
+                    batch: List[Tuple[int, np.ndarray, Tuple[int, int]]] = []
+                    for item in all_pages_for_tables:
+                        batch.append(item)
+                        if len(batch) >= YOLOX_MAX_BATCH_SIZE:
+                            futures.append(
+                                executor.submit(
+                                    _extract_page_elements,
+                                    batch[:],
+                                    page_count,
+                                    source_metadata,
+                                    base_unified_metadata,
+                                    extract_tables,
+                                    extract_charts,
+                                    extract_infographics,
+                                    table_output_format,
+                                    pdfium_config.yolox_endpoints,
+                                    pdfium_config.yolox_infer_protocol,
+                                    pdfium_config.auth_token,
+                                    execution_trace_log=execution_trace_log,
+                                )
+                            )
+                            batch.clear()
+                    if batch:
+                        futures.append(
+                            executor.submit(
+                                _extract_page_elements,
+                                batch[:],
+                                page_count,
+                                source_metadata,
+                                base_unified_metadata,
+                                extract_tables,
+                                extract_charts,
+                                extract_infographics,
+                                table_output_format,
+                                pdfium_config.yolox_endpoints,
+                                pdfium_config.yolox_infer_protocol,
+                                pdfium_config.auth_token,
+                                execution_trace_log=execution_trace_log,
+                            )
+                        )
+                    for fut in concurrent.futures.as_completed(futures):
+                        table_chart_items = fut.result()
+                        extracted_data.extend(table_chart_items)
+
+            doc.close()
+            logger.debug(f"Extracted {len(extracted_data)} items from PDF (batched).")
+            return extracted_data
+
+    # Small documents: fall back to original single-process path
     # Decide if text extraction should be done at the PAGE or DOCUMENT level
     if text_depth != TextTypeEnum.PAGE:
         text_depth = TextTypeEnum.DOCUMENT
@@ -612,3 +836,180 @@ def pdfium_extractor(
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
     return extracted_data
+
+
+def _process_pdf_pages_range_worker(args_tuple):
+    """
+    Worker entry point to process a specific page range of a PDF using the same logic
+    as pdfium_extractor, but limited to [start_idx, end_idx). Returns a tuple:
+    (items: list, accumulated_text: list) so that the parent can build document-level text once.
+    """
+    (
+        pdf_bytes,
+        extractor_config,
+        row_data,
+        metadata_column,
+        start_idx,
+        end_idx,
+        execution_trace_log,
+        extract_text,
+        extract_images,
+        extract_page_as_image,
+        extract_infographics,
+        extract_tables,
+        extract_charts,
+    ) = args_tuple
+
+    try:
+        # Re-parse config in the worker (ensures identical behavior)
+        text_depth_str = extractor_config.get("text_depth", "page")
+        try:
+            text_depth = TextTypeEnum[text_depth_str.upper()]
+        except KeyError:
+            text_depth = TextTypeEnum.PAGE
+
+        extract_images_method = extractor_config.get("extract_images_method", "group")
+        extract_images_params = extractor_config.get("extract_images_params", {})
+
+        # Flags are provided explicitly by parent to ensure parity with function-call booleans
+
+        # Metadata
+        source_id = row_data["source_id"]
+        if hasattr(row_data, "index"):
+            base_unified_metadata = row_data[metadata_column] if metadata_column in row_data.index else {}
+        else:
+            base_unified_metadata = row_data.get(metadata_column, {})
+
+        base_source_metadata = base_unified_metadata.get("source_metadata", {})
+        source_location = base_source_metadata.get("source_location", "")
+        collection_id = base_source_metadata.get("collection_id", "")
+        partition_id = base_source_metadata.get("partition_id", -1)
+        access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
+
+        # Validate worker input for empty bytes to avoid Pdfium 'Data format error'
+        if isinstance(pdf_bytes, (bytes, bytearray, memoryview)) and len(pdf_bytes) == 0:
+            raise ValueError("Empty PDF content provided to worker _process_pdf_pages_range_worker().")
+
+        try:
+            doc = libpdfium.PdfDocument(pdf_bytes)
+        except Exception as e:
+            try:
+                byte_len = len(pdf_bytes) if isinstance(pdf_bytes, (bytes, bytearray, memoryview)) else None
+            except Exception:
+                byte_len = None
+            logger.exception(
+                f"Worker failed to open PDF for range [{start_idx}, {end_idx}). "
+                f"bytes_len={byte_len}, type={type(pdf_bytes).__name__}: {e}"
+            )
+            raise
+        pdf_metadata = extract_pdf_metadata(doc, source_id)
+        page_count = pdf_metadata.page_count
+
+        source_metadata = {
+            "source_name": pdf_metadata.filename,
+            "source_id": source_id,
+            "source_location": source_location,
+            "source_type": pdf_metadata.source_type,
+            "collection_id": collection_id,
+            "date_created": pdf_metadata.date_created,
+            "last_modified": pdf_metadata.last_modified,
+            "summary": "",
+            "partition_id": partition_id,
+            "access_level": access_level,
+        }
+
+        # Enforce document-level aggregation to be done by parent
+        if text_depth != TextTypeEnum.PAGE:
+            local_text_depth = TextTypeEnum.DOCUMENT
+        else:
+            local_text_depth = TextTypeEnum.PAGE
+
+        extracted_data = []
+        accumulated_text: List[str] = []
+
+        pages_for_tables = []
+        images_emitted_count = 0
+
+        # Process pages sequentially within the worker, collecting per-page outputs
+        for page_idx in range(start_idx, end_idx):
+            page = doc.get_page(page_idx)
+            page_width, page_height = page.get_size()
+
+            if extract_text:
+                page_text = _extract_page_text(page)
+                if local_text_depth == TextTypeEnum.PAGE:
+                    text_meta = construct_text_metadata(
+                        [page_text],
+                        pdf_metadata.keywords,
+                        page_idx,
+                        -1,
+                        -1,
+                        -1,
+                        page_count,
+                        local_text_depth,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
+                    extracted_data.append(text_meta)
+                else:
+                    accumulated_text.append(page_text)
+
+            if extract_images:
+                image_data = _extract_page_images(
+                    extract_images_method,
+                    page,
+                    page_idx,
+                    page_width,
+                    page_height,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    **extract_images_params,
+                )
+                extracted_data.extend(image_data)
+
+            if extract_page_as_image:
+                page_text = _extract_page_text(page)
+                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
+                image_meta = construct_image_metadata_from_base64(
+                    base64_image,
+                    page_idx,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
+                )
+                extracted_data.append(image_meta)
+
+            if extract_tables or extract_charts or extract_infographics:
+                image, padding_offsets = pdfium_pages_to_numpy(
+                    [page],
+                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                    trace_info=execution_trace_log,
+                )
+                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+
+            page.close()
+
+        doc.close()
+        diag = {
+            "images_flag": extract_images,
+            "images_emitted": images_emitted_count,
+            "elements_flags": {
+                "tables": extract_tables,
+                "charts": extract_charts,
+                "infographics": extract_infographics,
+            },
+            "elements_pages_prepared": len(pages_for_tables),
+            "pages_processed": int(end_idx - start_idx),
+        }
+        return extracted_data, accumulated_text, pages_for_tables, diag
+    except Exception as e:
+        # Log and re-raise so the parent process can terminate the pool and mark the job as failed
+        logger.exception(f"Worker failed for page range [{start_idx}, {end_idx}): {e}")
+        raise
