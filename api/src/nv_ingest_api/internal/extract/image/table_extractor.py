@@ -4,6 +4,7 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import Any, Union
 from typing import Dict
 from typing import List
@@ -221,6 +222,7 @@ def _update_table_metadata(
     return results
 
 
+@contextmanager
 def _create_yolox_client(
     yolox_endpoints: Tuple[str, str],
     yolox_protocol: str,
@@ -237,11 +239,11 @@ def _create_yolox_client(
         yield yolox_client
 
 
+@contextmanager
 def _create_ocr_client(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
     ocr_model_name: str,
-    ocr_dynamic_batch_memory_budget_mb: int,
     auth_token: str,
 ) -> NimClient:
     ocr_model_interface = (

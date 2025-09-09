@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from contextlib import contextmanager
 from typing import Any
 from typing import Dict
 from typing import List
@@ -145,11 +146,11 @@ def _update_infographic_metadata(
     return results
 
 
+@contextmanager
 def _create_ocr_client(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
     ocr_model_name: str,
-    ocr_dynamic_batch_memory_budget_mb: int,
     auth_token: str,
 ) -> NimClient:
     ocr_model_interface = (
