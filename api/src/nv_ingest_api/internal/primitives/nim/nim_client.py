@@ -40,7 +40,6 @@ class NimClient:
         max_retries: int = 5,
         max_429_retries: int = 5,
         enable_dynamic_batching: bool = False,
-        dynamic_batch_size: int = 32,
         dynamic_batch_timeout: float = 0.1,  # 100 milliseconds
         dynamic_batch_memory_budget_mb: Optional[float] = None,
     ):
@@ -102,7 +101,6 @@ class NimClient:
 
         self.dynamic_batching_enabled = enable_dynamic_batching
         if self.dynamic_batching_enabled:
-            self._batch_size = dynamic_batch_size
             self._batch_timeout = dynamic_batch_timeout
             if dynamic_batch_memory_budget_mb is not None:
                 self._batch_memory_budget_bytes = dynamic_batch_memory_budget_mb * 1024 * 1024
@@ -112,10 +110,6 @@ class NimClient:
             self._request_queue = queue.Queue()
             self._stop_event = threading.Event()
             self._batcher_thread = threading.Thread(target=self._batcher_loop, daemon=True)
-            logger.debug(
-                f"Dynamic batching enabled with max_batch_size={self._batch_size} "
-                f"and timeout={self._batch_timeout}s"
-            )
 
     def __enter__(self):
         """
@@ -232,6 +226,17 @@ class NimClient:
         Any
             The processed inference results, coalesced in the same order as the input images.
         """
+        # 1. Retrieve or default to the model's maximum batch size.
+        batch_size = self._fetch_max_batch_size(model_name)
+        max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
+        force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
+        max_batch_size = (
+            max(1, min(batch_size, max_requested_batch_size))
+            if not force_requested_batch_size
+            else max_requested_batch_size
+        )
+        self._batch_size = max_batch_size
+
         if self.dynamic_batching_enabled:
             # DYNAMIC BATCHING PATH
             try:
@@ -255,16 +260,6 @@ class NimClient:
 
         # OFFLINE BATCHING PATH
         try:
-            # 1. Retrieve or default to the model's maximum batch size.
-            batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
-            max_batch_size = (
-                max(1, min(batch_size, max_requested_batch_size))
-                if not force_requested_batch_size
-                else max_requested_batch_size
-            )
-
             # 2. Prepare data for inference.
             data = self.model_interface.prepare_data_for_inference(data)
 
