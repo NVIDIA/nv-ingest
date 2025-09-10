@@ -187,7 +187,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """The maximum dimensions of the bounding box of the image, in the format (x_max,y_max)."""
 
     uploaded_image_url: str = ""
-    """Mirrors source_metadata.source_location"""
+    """A mirror of source_metadata.source_location"""
 
     width: int = 0
     """Width of the image"""
