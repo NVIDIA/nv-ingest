@@ -221,7 +221,7 @@ class TableMetadataSchema(BaseModelNoExt):
 
     table_format: TableFormatEnum
     """
-    Structured (dataframe / lists of rows and columns), or serialized as markdown,
+    The format of the table.  One of Structured (dataframe / lists of rows and columns), or serialized as markdown,
     html, latex, simple (cells separated as spaces).
     """
 
