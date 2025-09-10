@@ -165,7 +165,7 @@ class TextMetadataSchema(BaseModelNoExt):
 
 class ImageMetadataSchema(BaseModelNoExt):
     """
-    Schema for extracted image content.
+    The schema for the extracted image content.
     """
 
     image_type: Union[DocumentTypeEnum, str]
