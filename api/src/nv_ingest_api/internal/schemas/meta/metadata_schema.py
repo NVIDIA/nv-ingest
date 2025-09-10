@@ -155,7 +155,7 @@ class TextMetadataSchema(BaseModelNoExt):
     """The language of the content."""
 
     text_location: tuple = (0, 0, 0, 0)
-    """The bounding box (x1,y1,x2,y2) of the text."""
+    """The bounding box of the text, in the format (x1,y1,x2,y2)."""
 
     text_location_max_dimensions: tuple = (0, 0, 0, 0)
     """Max dimensions (x_max,y_max) of the bounding box of the text"""
