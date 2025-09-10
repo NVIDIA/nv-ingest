@@ -231,7 +231,7 @@ class TableMetadataSchema(BaseModelNoExt):
     table_content_format: Union[TableFormatEnum, str] = ""
 
     table_location: tuple = (0, 0, 0, 0)
-    """The bounding box (x1,y1,x2,y2) of the table."""
+    """The bounding box of the table, in the format (x1,y1,x2,y2)."""
 
     table_location_max_dimensions: tuple = (0, 0)
     """The max dimensions (x_max,y_max) of the bounding box of the table."""
