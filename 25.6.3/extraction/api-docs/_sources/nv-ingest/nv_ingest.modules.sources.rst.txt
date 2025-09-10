@@ -1,0 +1,21 @@
+nv\_ingest.modules.sources package
+==================================
+
+Submodules
+----------
+
+nv\_ingest.modules.sources.message\_broker\_task\_source module
+---------------------------------------------------------------
+
+.. automodule:: nv_ingest.modules.sources.message_broker_task_source
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.modules.sources
+   :members:
+   :show-inheritance:
+   :undoc-members:

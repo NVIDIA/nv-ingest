@@ -1,0 +1,18 @@
+nv\_ingest\_api package
+=======================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.primitives
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api
+   :members:
+   :show-inheritance:
+   :undoc-members:
