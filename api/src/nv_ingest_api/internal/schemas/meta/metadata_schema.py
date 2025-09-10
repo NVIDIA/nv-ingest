@@ -158,7 +158,7 @@ class TextMetadataSchema(BaseModelNoExt):
     """The bounding box of the text, in the format (x1,y1,x2,y2)."""
 
     text_location_max_dimensions: tuple = (0, 0, 0, 0)
-    """Max dimensions (x_max,y_max) of the bounding box of the text"""
+    """The maximum dimensions of the bounding box of the text, in the format (x_max,y_max)."""
 
     custom_content: Optional[Dict[str, Any]] = None
 
