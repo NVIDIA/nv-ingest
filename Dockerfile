@@ -5,6 +5,7 @@
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
 ARG BASE_IMG_TAG=jammy-20250619
+ARG AUDIO_EXTRACTION_DEPS=False
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
@@ -34,6 +35,7 @@ RUN apt-get update && apt-get install -y \
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
+
 
 # Add conda to the PATH
 ENV PATH=/opt/conda/bin:$PATH
@@ -68,6 +70,10 @@ ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 WORKDIR /workspace
 
 FROM base AS nv_ingest_install
+
+ARG AUDIO_EXTRACTION_DEPS
+ENV INSTALL_AUDIO_EXTRACTION_DEPS=${AUDIO_EXTRACTION_DEPS}
+
 # Copy the module code
 COPY ci ci
 
