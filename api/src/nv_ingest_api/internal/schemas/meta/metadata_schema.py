@@ -149,7 +149,7 @@ class TextMetadataSchema(BaseModelNoExt):
     """An abbreviated summary of the content."""
 
     keywords: Union[str, List[str], Dict] = ""
-    """Keywords, Named Entities, or other phrases."""
+    """Keywords, named entities, or other phrases."""
 
     language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
     """The language of the content."""
