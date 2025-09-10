@@ -181,7 +181,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """Extracted text from a structured chart"""
 
     image_location: tuple = (0, 0, 0, 0)
-    """The bounding box (x1,y1,x2,y2) of the image."""
+    """The bounding box of the image, in the format (x1,y1,x2,y2)."""
 
     image_location_max_dimensions: tuple = (0, 0)
     """Max dimensions (x_max,y_max) of the bounding box of the image"""
