@@ -132,7 +132,7 @@ class ContentMetadataSchema(BaseModelNoExt):
     """The timestamp of the start of a piece of audio content."""
 
     end_time: int = -1
-    """The timestamp a piece of audio content ends at"""
+    """The timestamp of the end of a piece of audio content."""
 
     custom_content: Optional[Dict[str, Any]] = None
 
