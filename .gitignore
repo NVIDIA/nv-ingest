@@ -232,4 +232,5 @@ scripts/private_local/*
 test_results/
 scripts/tests/artifacts/
 
+# Ignore cursor rules
 .cursor
