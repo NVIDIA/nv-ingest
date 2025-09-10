@@ -139,7 +139,7 @@ class ContentMetadataSchema(BaseModelNoExt):
 
 class TextMetadataSchema(BaseModelNoExt):
     """
-    Schema for extracted text content.
+    The schema for the extracted text content.
     """
 
     text_type: TextTypeEnum
