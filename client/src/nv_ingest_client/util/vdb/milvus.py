@@ -884,6 +884,7 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     for idx in range(0, len(records), batch_size):
         client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
         count += len(records[idx : idx + batch_size])
+    client.flush(collection_name)
     logger.info(f"streamed {count} records")
 
 
@@ -904,6 +905,9 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
             for i in range(20):
                 new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
+                logger.info(
+                    f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
+                )
                 if new_indexed_rows == num_elements:
                     indexed_rows = new_indexed_rows
                     break
