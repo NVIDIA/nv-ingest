@@ -190,7 +190,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """A mirror of source_metadata.source_location"""
 
     width: int = 0
-    """Width of the image"""
+    """The width of the image."""
 
     height: int = 0
     """Height of the image"""
