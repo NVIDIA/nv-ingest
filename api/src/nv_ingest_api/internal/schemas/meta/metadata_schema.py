@@ -193,7 +193,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """The width of the image."""
 
     height: int = 0
-    """Height of the image"""
+    """The height of the image."""
 
     custom_content: Optional[Dict[str, Any]] = None
 
