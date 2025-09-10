@@ -213,7 +213,7 @@ class ImageMetadataSchema(BaseModelNoExt):
 
 class TableMetadataSchema(BaseModelNoExt):
     """
-    Schema for extracted table content.
+    The schema for the extracted table content.
     """
 
     caption: str = ""
