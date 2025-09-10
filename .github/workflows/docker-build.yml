@@ -14,7 +14,6 @@ on:
 jobs:
   build:
     runs-on: linux-large-disk
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
