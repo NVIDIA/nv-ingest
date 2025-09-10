@@ -25,7 +25,7 @@ if (
     or subprocess.run(["ffmpeg", "-version"], capture_output=True).returncode != 0
 ):
     logger.error(
-        "Unable to load the Dataloader,ffmpeg was not installed, "
+        "Unable to load the Dataloader, ffmpeg was not installed, "
         "please install it using `pip install ffmpeg-python` and `apt-get install ffmpeg`"
     )
 else:
@@ -122,7 +122,7 @@ class MediaInterface(LoaderInterface):
         probe = None
         sample_rate = None
         try:
-            file_size = path_file.stat().st_size
+            file_size = path_file.stat().st_size  # in bytes
             if file_handle:
                 probe = _probe("pipe:", format=path_file.suffix, file_handle=file_handle)
             else:
@@ -234,7 +234,7 @@ class MediaInterface(LoaderInterface):
         split_type: SplitType, type of split to perform, either size, time, or frame
         """
         if split_type == SplitType.SIZE:
-            return math.ceil(file_size / (split_interval * 1e6))
+            return math.ceil(file_size / split_interval)
         elif split_type == SplitType.TIME:
             return math.ceil(duration / split_interval)
         elif split_type == SplitType.FRAME:

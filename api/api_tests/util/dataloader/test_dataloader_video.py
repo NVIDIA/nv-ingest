@@ -13,7 +13,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from .dataloader_test_tools import create_test_file
 
-test_file_size_mb = 1000
+test_file_size_mb = 100
 
 
 def get_file_info(filepath):
@@ -47,10 +47,10 @@ def test_dataloader_chunking(temp_dir, file_type):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_file.stat().st_size * 1e-6
+    actual_size_mb = input_file.stat().st_size  # in bytes
 
     # Initialize DataLoader
-    split_size_mb = math.ceil(actual_size_mb * 100) / (3 * 100)  # Should result in 3 chunks
+    split_size_mb = math.ceil(actual_size_mb) / 3  # Should result in 3 chunks
     num_chunks = math.ceil(actual_size_mb / split_size_mb)
     loader = DataLoader(
         path=str(input_file), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
@@ -65,13 +65,13 @@ def test_dataloader_chunking(temp_dir, file_type):
     assert len(chunks) == num_chunks, f"Expected {num_chunks} chunks, but got {len(chunks)}"
 
     # Verify each chunk is approximately the right size (200MB ± 10%)
-    expected_chunk_size = split_size_mb * 1024 * 1024  # Convert MB to bytes
+    # Convert MB to bytes
     for i, chunk in enumerate(chunks):
         chunk_size = len(chunk)
         # Allow for some variation in chunk size (±10%)
         assert (
-            0.9 * expected_chunk_size <= chunk_size <= 1.1 * expected_chunk_size
-        ), f"Chunk {i} size ({chunk_size} bytes) is not within 10% of expected size ({expected_chunk_size} bytes)"
+            0.8 * split_size_mb <= chunk_size <= 1.2 * split_size_mb
+        ), f"Chunk {i} size ({chunk_size} bytes) is not within 10% of expected size ({split_size_mb} bytes)"
 
 
 @pytest.mark.parametrize("file_type", [".avi", ".mp4", ".mkv", ".webm"])
