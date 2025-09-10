@@ -129,7 +129,7 @@ class ContentMetadataSchema(BaseModelNoExt):
     """The type of the content for structured data types, such as table or chart."""
 
     start_time: int = -1
-    """The timestamp a piece of audio content starts at"""
+    """The timestamp of the start of a piece of audio content."""
 
     end_time: int = -1
     """The timestamp a piece of audio content ends at"""
