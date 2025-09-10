@@ -44,7 +44,7 @@ def test_dataloader_wav_chunking(temp_dir):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_wav.stat().st_size * 1e-6
+    actual_size_mb = input_wav.stat().st_size
 
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
@@ -61,7 +61,7 @@ def test_dataloader_wav_chunking(temp_dir):
     assert len(chunks) == 3, f"Expected 3 chunks, but got {len(chunks)}"
 
     # Verify each chunk is approximately the right size (200MB ± 10%)
-    expected_chunk_size = split_size_mb * 1024 * 1024  # Convert MB to bytes
+    expected_chunk_size = split_size_mb  # Convert MB to bytes
     for i, chunk in enumerate(chunks):
         chunk_size = len(chunk)
         # Allow for some variation in chunk size (±10%)
@@ -80,7 +80,7 @@ def test_dataloader_wav_content(temp_dir):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_wav.stat().st_size / (1024 * 1024)
+    actual_size_mb = input_wav.stat().st_size
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
@@ -114,7 +114,7 @@ def test_dataloader_mp3_chunking(temp_dir):
 
     # Verify the input file was created and is roughly the right size
     assert input_mp3.exists(), "Input MP3 file was not created"
-    actual_size_mb = input_mp3.stat().st_size / (1024 * 1024)
+    actual_size_mb = input_mp3.stat().st_size
 
     # Create output directory for chunks
     chunks_dir = temp_dir / "chunks"
@@ -135,7 +135,7 @@ def test_dataloader_mp3_chunking(temp_dir):
     assert len(chunks) == 3, f"Expected 3 chunks, but got {len(chunks)}"
 
     # Verify each chunk is approximately the right size (200MB ± 10%)
-    expected_chunk_size = split_size_mb * 1024 * 1024
+    expected_chunk_size = split_size_mb
     for i, chunk in enumerate(chunks):
         chunk_size = len(chunk)
         assert (
@@ -156,7 +156,7 @@ def test_dataloader_mp3_content(temp_dir):
     # Create output directory for chunks
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
-    actual_size_mb = input_mp3.stat().st_size * 1e-6
+    actual_size_mb = input_mp3.stat().st_size
 
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
@@ -192,7 +192,7 @@ def test_dataloader_getitem(temp_dir):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_wav.stat().st_size * 1e-6
+    actual_size_mb = input_wav.stat().st_size
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
