@@ -175,7 +175,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """The type of the content for structured data types, such as bar chart, pie chart, and others."""
 
     caption: str = ""
-    """Any caption or subheading associated with Image"""
+    """A caption or subheading associated with the image"""
 
     text: str = ""
     """Extracted text from a structured chart"""
