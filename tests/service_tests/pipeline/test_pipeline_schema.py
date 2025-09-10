@@ -74,11 +74,11 @@ def test_stage_config_minimal_valid():
     """Tests that a minimal valid StageConfig is parsed correctly with defaults."""
     config = StageConfig(
         name="test_stage",
-        actor="my.actor.path",
+        stage_impl="my.actor.path",
         phase=PipelinePhase.EXTRACTION,
     )
     assert config.name == "test_stage"
-    assert config.actor == "my.actor.path"
+    assert config.stage_impl == "my.actor.path"
     assert config.phase == PipelinePhase.EXTRACTION
     assert config.type == "stage"
     assert config.enabled is True
@@ -93,7 +93,7 @@ def test_stage_config_full_valid():
         name="full_stage",
         type="sink",
         phase=PipelinePhase.RESPONSE,
-        actor="my.actor.path.sink",
+        stage_impl="my.actor.path.sink",
         enabled=False,
         config={"key": "value"},
         replicas={"cpu_count_max": 4},
@@ -102,7 +102,7 @@ def test_stage_config_full_valid():
     assert config.name == "full_stage"
     assert config.type == "sink"
     assert config.phase == PipelinePhase.RESPONSE
-    assert config.actor == "my.actor.path.sink"
+    assert config.stage_impl == "my.actor.path.sink"
     assert config.enabled is False
     assert config.config == {"key": "value"}
     assert config.replicas.cpu_count_max == 4
@@ -112,29 +112,29 @@ def test_stage_config_full_valid():
 def test_stage_config_invalid_type_fails():
     """Tests that validation fails for an invalid stage type."""
     with pytest.raises(ValidationError):
-        StageConfig(name="s", actor="a", phase=0, type="invalid_type")
+        StageConfig(name="s", stage_impl="a", phase=0, type="invalid_type")
 
 
 def test_stage_config_invalid_phase_fails():
     """Tests that validation fails for an invalid phase value."""
     with pytest.raises(ValidationError):
-        StageConfig(name="s", actor="a", phase=99)
+        StageConfig(name="s", stage_impl="a", phase=99)
 
 
 def test_stage_config_missing_required_fails():
     """Tests that validation fails if required fields are missing."""
     with pytest.raises(ValidationError):  # missing name
-        StageConfig(actor="a", phase=0)
-    with pytest.raises(ValidationError):  # missing actor
+        StageConfig(stage_impl="a", phase=0)
+    with pytest.raises(ValidationError):  # missing stage_impl/callable
         StageConfig(name="s", phase=0)
     with pytest.raises(ValidationError):  # missing phase
-        StageConfig(name="s", actor="a")
+        StageConfig(name="s", stage_impl="a")
 
 
 def test_stage_config_extra_fields_fails():
     """Tests that validation fails if extra fields are provided."""
     with pytest.raises(ValidationError):
-        StageConfig(name="s", actor="a", phase=0, extra_field="value")
+        StageConfig(name="s", stage_impl="a", phase=0, extra_field="value")
 
 
 # Tests for EdgeConfig
@@ -186,8 +186,8 @@ def test_pipeline_config_valid():
         "name": "test_pipeline",
         "description": "A test pipeline",
         "stages": [
-            {"name": "a", "actor": "actor.a", "phase": 0},
-            {"name": "b", "actor": "actor.b", "phase": 1},
+            {"name": "a", "stage_impl": "actor.a", "phase": 0},
+            {"name": "b", "stage_impl": "actor.b", "phase": 1},
         ],
         "edges": [{"from": "a", "to": "b"}],
     }
@@ -207,7 +207,7 @@ def test_pipeline_config_missing_stages_fails():
 def test_pipeline_config_missing_edges_fails():
     """Tests that validation fails if 'edges' field is missing."""
     with pytest.raises(ValidationError):
-        PipelineConfigSchema(stages=[{"name": "a", "actor": "actor.a", "phase": 0}])
+        PipelineConfigSchema(stages=[{"name": "a", "stage_impl": "actor.a", "phase": 0}])
 
 
 def test_pipeline_config_empty_stages_fails():
@@ -219,7 +219,7 @@ def test_pipeline_config_empty_stages_fails():
 def test_pipeline_config_empty_edges_fails():
     """Tests that validation fails if 'edges' list is empty."""
     with pytest.raises(ValidationError):
-        PipelineConfigSchema(stages=[{"name": "a", "actor": "actor.a", "phase": 0}], edges=[])
+        PipelineConfigSchema(stages=[{"name": "a", "stage_impl": "actor.a", "phase": 0}], edges=[])
 
 
 def test_pipeline_config_extra_fields_fails():

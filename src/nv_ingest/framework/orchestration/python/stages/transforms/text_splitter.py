@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+import logging
+from typing import Any, Optional
+
+from nv_ingest.framework.orchestration.python.stages.meta.python_stage_base import PythonStage
+from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal
+from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class PythonTextSplitterStage(PythonStage):
+    """
+    A Python stage that splits documents into smaller parts based on specified criteria.
+
+    This stage extracts the DataFrame payload from an IngestControlMessage, removes the "split"
+    task (if present) to obtain the task configuration, and then calls the internal text splitting
+    and tokenization logic. The updated DataFrame is then set back into the message.
+    """
+
+    def __init__(self, config: TextSplitterSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
+        # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
+        self.validated_config: TextSplitterSchema = config
+        logger.info("PythonTextSplitterStage initialized with config: %s", config)
+
+    @nv_ingest_node_failure_try_except(annotation_id="text_splitter", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=["split"])
+    def on_data(self, message: Any) -> Any:
+        """
+        Process an incoming IngestControlMessage by splitting and tokenizing its text.
+
+        Parameters
+        ----------
+        message : IngestControlMessage
+            The incoming message containing the payload DataFrame.
+
+        Returns
+        -------
+        IngestControlMessage
+            The updated message with its payload transformed.
+        """
+        self._logger.debug("PythonTextSplitterStage.on_data: Starting text splitting process.")
+
+        # Extract the DataFrame payload.
+        df_payload = message.payload()
+        self._logger.debug("Extracted payload with %d rows.", len(df_payload))
+
+        # Remove the "split" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(message, "split")
+        self._logger.debug("Extracted task config: %s", task_config)
+
+        # Transform the DataFrame (split text and tokenize).
+        df_updated = transform_text_split_and_tokenize_internal(
+            df_transform_ledger=df_payload,
+            task_config=task_config,
+            transform_config=self.validated_config,
+            execution_trace_log=None,
+        )
+        self._logger.info(
+            "TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated)
+        )
+
+        # Update the message payload.
+        message.payload(df_updated)
+
+        # Update statistics
+        self.stats["processed"] += 1
+
+        self._logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
+        return message

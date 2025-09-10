@@ -33,7 +33,7 @@ class PDFiumConfigSchema(BaseModel):
     Raises
     ------
     ValueError
-        If both gRPC and HTTP services are empty for any endpoint.
+        If both gRPC and HTTP services are empty for any endpoint when they are required.
 
     Config
     ------
