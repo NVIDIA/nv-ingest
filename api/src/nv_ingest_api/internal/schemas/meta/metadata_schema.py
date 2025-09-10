@@ -252,7 +252,7 @@ class ChartMetadataSchema(BaseModelNoExt):
 
     table_format: TableFormatEnum
     """
-    Structured (dataframe / lists of rows and columns), or serialized as markdown,
+    The format of the table.  One of Structured (dataframe / lists of rows and columns), or serialized as markdown,
     html, latex, simple (cells separated as spaces).
     """
 
@@ -262,10 +262,10 @@ class ChartMetadataSchema(BaseModelNoExt):
     table_content_format: Union[TableFormatEnum, str] = ""
 
     table_location: tuple = (0, 0, 0, 0)
-    """The bounding box (x1,y1,x2,y2) of the chart."""
+    """The bounding box of the chart, in the format (x1,y1,x2,y2)."""
 
     table_location_max_dimensions: tuple = (0, 0)
-    """The max dimensions (x_max,y_max) of the bounding box of the chart."""
+    """The maximum dimensions of the bounding box of the chart, in the format (x_max,y_max)."""
 
     uploaded_image_uri: str = ""
     """A mirror of source_metadata.source_location."""
@@ -275,14 +275,14 @@ class ChartMetadataSchema(BaseModelNoExt):
 
 class AudioMetadataSchema(BaseModelNoExt):
     """
-    Schema for extracted audio content.
+    The schema for extracted audio content.
     """
 
     audio_transcript: str = ""
-    """Transcript of the audio content"""
+    """A transcript of the audio content."""
 
     audio_type: str = ""
-    """Type or format of the audio (e.g., mp3, wav)."""
+    """The type or format of the audio, such as mp3, wav."""
 
     custom_content: Optional[Dict[str, Any]] = None
 
@@ -307,17 +307,17 @@ class InfoMessageMetadataSchema(BaseModelNoExt):
 # Main metadata schema
 class MetadataSchema(BaseModelNoExt):
     """
-    Primary container schema for extraction results.
+    The primary container schema for extraction results.
     """
 
     content: str = ""
     """The actual textual content extracted from the source."""
 
     content_url: str = ""
-    """URL pointing to the location of the content, if applicable."""
+    """A URL that points to the location of the content, if applicable."""
 
     embedding: Optional[List[float]] = None
-    """Optional numerical vector representation (embedding) of the content."""
+    """An optional numerical vector representation (embedding) of the content."""
 
     source_metadata: Optional[SourceMetadataSchema] = None
     """Metadata about the original source of the content."""
@@ -341,7 +341,7 @@ class MetadataSchema(BaseModelNoExt):
     """Specific metadata for chart content. Automatically set to None if content_metadata.type is not STRUCTURED."""
 
     error_metadata: Optional[ErrorMetadataSchema] = None
-    """Metadata describing any errors encountered during processing."""
+    """Metadata that describes any errors encountered during processing."""
 
     info_message_metadata: Optional[InfoMessageMetadataSchema] = None
     """Informational messages related to the processing."""
