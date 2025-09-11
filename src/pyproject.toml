@@ -55,7 +55,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "uvicorn",
     "pip",
-    "llama-index-embeddings-nvidia",
+    "llama-index-embeddings-nvidia==0.4.2",
     "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
     "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",
