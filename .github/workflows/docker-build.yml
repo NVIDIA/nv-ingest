@@ -30,7 +30,7 @@ jobs:
       # base image and not the one hosted in nvcr.io
       - name: Build Docker image
         run: |
-          docker build --no-cache --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 --build-arg INSTALL_AUDIO_EXTRACTION_DEPS=true -t nv-ingest:latest .
+          docker build --no-cache --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
 
       - name: Run Pytest inside Docker container
         run: |
