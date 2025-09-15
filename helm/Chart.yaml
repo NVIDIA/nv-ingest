@@ -90,7 +90,7 @@ dependencies:
 
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
-    version: 5.0.2
+    version: 4.1.11
     condition: milvusDeployed
 
   - name: redis
@@ -102,12 +102,12 @@ dependencies:
 
   - name: zipkin
     repository: https://zipkin.io/zipkin-helm
-    version: 0.1.2
+    version: 0.4.0
     condition: zipkinDeployed
 
   - name: opentelemetry-collector
     repository: https://open-telemetry.github.io/opentelemetry-helm-charts
-    version: 0.78.1
+    version: 0.133.0
     condition: otelDeployed
 
   - name: prometheus

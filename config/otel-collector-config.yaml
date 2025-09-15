@@ -44,6 +44,9 @@ service:
   telemetry:
     logs:
       level: "debug"
+    metrics:
+      level: "basic"
+      # listen_address: "0.0.0.0:8888"  # optional if you want to override default
   pipelines:
     traces:
       receivers: [otlp]
