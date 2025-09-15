@@ -457,7 +457,7 @@ services:
     restart: always
     container_name: milvus-standalone
     image: milvusdb/milvus:v2.5.3-gpu
-    command: [ "milvus", "run", "standalone" ]
+    command: [ "bash", "-c", "sed -i 's/bucketName: a-bucket/bucketName: ${MINIO_BUCKET:-nv-ingest}/' /milvus/configs/milvus.yaml && milvus run standalone" ]
     hostname: milvus
     security_opt:
       - seccomp:unconfined
