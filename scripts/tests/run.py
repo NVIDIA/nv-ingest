@@ -57,9 +57,17 @@ def readiness_wait(timeout_s: int) -> bool:
     return False
 
 
-def create_artifacts_dir(base: str | None) -> str:
+def create_artifacts_dir(base: str | None, dataset_name: str | None = None) -> str:
     root = base or os.path.join(os.path.dirname(__file__), "artifacts")
-    path = os.path.join(root, now_timestr())
+
+    # Create directory name with dataset info if available
+    timestamp = now_timestr()
+    if dataset_name:
+        dirname = f"{dataset_name}_{timestamp}"
+    else:
+        dirname = timestamp
+
+    path = os.path.join(root, dirname)
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -80,13 +88,15 @@ def load_env_file(env_file: str | None):
                 os.environ.setdefault(k.strip(), v.strip())
 
 
-def run_case_dc20(stdout_path: str) -> int:
-    """Run the dc20 case as a subprocess to keep runner simple and capture output."""
-    case_path = os.path.join(os.path.dirname(__file__), "cases", "dc20_e2e.py")
+def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> int:
+    """Run a test case as a subprocess to keep runner simple and capture output."""
+    case_path = os.path.join(os.path.dirname(__file__), "cases", f"{case_name}.py")
 
     # Set LOG_PATH to artifacts directory for kv_event_log
     env = os.environ.copy()
     env["LOG_PATH"] = os.path.dirname(stdout_path)
+    if doc_analysis:
+        env["DOC_ANALYSIS"] = "true"
 
     proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True, env=env)
     # Echo to console and also save to file
@@ -103,8 +113,8 @@ def run_case_dc20(stdout_path: str) -> int:
 
 
 @click.command()
-@click.option("--case", default="dc20_e2e", help="case name to run")
-@click.option("--infra", type=click.Choice(["managed", "attach"]), default="managed", help="Infrastructure mode")
+@click.option("--case", default="e2e", help="case name to run")
+@click.option("--managed", is_flag=True, help="Use managed infrastructure (starts/stops Docker services)")
 @click.option(
     "--profiles",
     default=lambda: os.environ.get("PROFILES", "retrieval,table-structure"),
@@ -120,7 +130,8 @@ def run_case_dc20(stdout_path: str) -> int:
 @click.option("--env-file", default=None, help="Environment file to load")
 @click.option("--no-build", is_flag=True, help="Skip building Docker images")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test")
-def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_build, keep_up):
+@click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
+def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no_build, keep_up, doc_analysis):
 
     # Resolve env file: explicit flag wins; otherwise try .env then env.example in this folder
     if env_file:
@@ -131,7 +142,18 @@ def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_b
         if os.path.exists(candidate_env):
             load_env_file(candidate_env)
 
-    out_dir = create_artifacts_dir(artifacts_dir)
+    # Use TEST_NAME for artifacts (consistent with collection naming), fallback to dataset dir
+    test_name = os.environ.get("TEST_NAME")
+    if test_name:
+        artifact_name = test_name
+    else:
+        dataset_dir = os.environ.get("DATASET_DIR", "")
+        if dataset_dir:
+            artifact_name = os.path.basename(dataset_dir.rstrip("/"))
+        else:
+            artifact_name = None
+
+    out_dir = create_artifacts_dir(artifacts_dir, artifact_name)
     stdout_path = os.path.join(out_dir, "stdout.txt")
     summary_path = os.path.join(out_dir, "summary.json")
 
@@ -139,7 +161,7 @@ def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_b
 
     rc = 1
     try:
-        if infra == "managed":
+        if managed:
             compose_cmd = [
                 "docker",
                 "compose",
@@ -167,8 +189,8 @@ def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_b
                 return 1
 
         # Run case
-        if case == "dc20_e2e":
-            rc = run_case_dc20(stdout_path)
+        if case in ["dc20_e2e", "e2e"]:
+            rc = run_case(case, stdout_path, doc_analysis)
         else:
             print(f"Unknown case: {case}")
             rc = 2
@@ -178,7 +200,7 @@ def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_b
             json.dump(
                 {
                     "case": case,
-                    "infra": infra,
+                    "infra": "managed" if managed else "attach",
                     "profiles": profiles,
                     "stdout": os.path.basename(stdout_path),
                     "return_code": rc,
@@ -189,7 +211,7 @@ def main(case, infra, profiles, readiness_timeout, artifacts_dir, env_file, no_b
 
         return rc
     finally:
-        if infra == "managed" and not keep_up:
+        if managed and not keep_up:
             stop_services()
 
 
