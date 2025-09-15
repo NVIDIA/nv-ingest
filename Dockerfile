@@ -35,7 +35,6 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
 
-
 # Add conda to the PATH
 ENV PATH=/opt/conda/bin:$PATH
 
@@ -69,7 +68,6 @@ ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 WORKDIR /workspace
 
 FROM base AS nv_ingest_install
-
 # Copy the module code
 COPY ci ci
 
