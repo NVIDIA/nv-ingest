@@ -856,11 +856,17 @@ milvus:
   cluster:
     enabled: false
   etcd:
+    image:
+      repository: "milvusdb/etcd"
+      tag: "3.5.22-r1"
     replicaCount: 1
     persistence:
       storageClass: null
   minio:
+    enabled: true
     mode: standalone
+    image:
+      tag: "RELEASE.2025-09-07T16-13-09Z"
     bucketName: nv-ingest
     persistence:
       size: 50Gi
@@ -923,7 +929,7 @@ redisDeployed: true
 
 redis:
   image:
-    tag: 7.4.3-debian-12-r0
+    tag: "8-alpine3.22"
   auth:
     enabled: false
   replica:
@@ -1077,6 +1083,8 @@ otelDeployed: true
 ## @skip opentelemetry-collector
 ## @extra opentelemetry-collector [default: sane {}] Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml
 opentelemetry-collector:
+  image:
+    tag: "0.133.0"
   mode: deployment
   config:
     receivers:

@@ -90,7 +90,7 @@ dependencies:
 
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
-    version: 4.1.11
+    version: 5.0.2
     condition: milvusDeployed
 
   - name: redis
