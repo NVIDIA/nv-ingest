@@ -2,6 +2,9 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.uv]
+managed = true
+
 [project]
 name = "nv-ingest-client"
 description = "Python client for the nv-ingest service"
