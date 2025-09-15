@@ -90,10 +90,7 @@ class NimClient:
                 raise ValueError("HTTP endpoint must be provided for HTTP protocol")
             logger.debug(f"Creating HTTP client with {self._http_endpoint}")
             self.endpoint_url = generate_url(self._http_endpoint)
-            self.headers = {
-                "accept": "application/json",
-                "content-type": "application/json",
-            }
+            self.headers = {"accept": "application/json", "content-type": "application/json"}
             if self.auth_token:
                 self.headers["Authorization"] = f"Bearer {self.auth_token}"
         else:
@@ -195,11 +192,7 @@ class NimClient:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
         parsed_output = self.model_interface.parse_output(
-            response,
-            protocol=self.protocol,
-            data=batch_data,
-            model_name=model_name,
-            **kwargs,
+            response, protocol=self.protocol, data=batch_data, model_name=model_name, **kwargs
         )
         return parsed_output, batch_data
 
@@ -282,11 +275,7 @@ class NimClient:
                 future_to_idx = {}
                 for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
                     future = executor.submit(
-                        self._process_batch,
-                        batch,
-                        batch_data=batch_data,
-                        model_name=model_name,
-                        **kwargs,
+                        self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
                     )
                     future_to_idx[future] = idx
 
@@ -352,10 +341,7 @@ class NimClient:
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
 
         response = self.client.infer(
-            model_name=model_name,
-            parameters=parameters,
-            inputs=input_tensors,
-            outputs=outputs,
+            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
         )
 
         logger.debug(f"gRPC inference response: {response}")
@@ -394,10 +380,7 @@ class NimClient:
         while attempt < self.max_retries:
             try:
                 response = requests.post(
-                    self.endpoint_url,
-                    json=formatted_input,
-                    headers=self.headers,
-                    timeout=self.timeout,
+                    self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
                 )
                 status_code = response.status_code
 
@@ -604,3 +587,6 @@ class NimClient:
             self._request_queue.put(None)
             if self._batcher_thread.is_alive():
                 self._batcher_thread.join()
+
+        if self.client:
+            self.client.close()

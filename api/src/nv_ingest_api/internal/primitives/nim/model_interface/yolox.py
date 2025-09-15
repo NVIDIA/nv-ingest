@@ -19,11 +19,8 @@ import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 import tritonclient.grpc as grpcclient
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import (
-    multiprocessing_cache,
-)
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
-from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
@@ -120,33 +117,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.final_score = final_score
         self.class_labels = class_labels
 
-    def unpack_data_to_items(
-        self, data: Dict[str, Any], model_name: str, **kwargs
-    ) -> List[Tuple[str, Tuple[int, int]]]:
-        """
-        Unpacks user data into a list of (base64_string, (height, width)) tuples.
-
-        This prepares the data for the dynamic batcher's request queue, keeping the
-        items on the queue lightweight (strings instead of full numpy arrays).
-        """
-        if "images" not in data or not isinstance(data["images"], list):
-            raise KeyError("Input data must be a dictionary containing an 'images' key with a list of numpy arrays.")
-
-        items = []
-        for img_array in data["images"]:
-            if not isinstance(img_array, np.ndarray):
-                raise ValueError("All elements in the 'images' list must be numpy.ndarray objects.")
-
-            # Get dimensions before encoding
-            h, w = img_array.shape[:2]
-
-            # Convert to base64 string for the queue
-            b64_string = numpy_to_base64(img_array, format=YOLOX_PAGE_IMAGE_FORMAT)
-
-            items.append((b64_string, (h, w)))
-
-        return items
-
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Prepare input data for inference by resizing images and storing their original shapes.
@@ -171,66 +141,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         data["original_image_shapes"] = [image.shape for image in original_images]
 
         return data
-
-    def coalesce_requests_to_batch(
-        self,
-        requests: List[str],
-        original_image_shapes: List[Tuple[int, int]],
-        protocol: str,
-        **kwargs,
-    ) -> Tuple[Any, Dict[str, Any]]:
-        """
-        Takes a list of individual base64 strings, decodes them, and combines them
-        into a single formatted batch ready for inference.
-
-        This method contains the core batch creation logic from the original `format_input`
-        method but operates on a single, pre-formed batch from the queue.
-        """
-        if not requests:
-            return None, {}
-
-        # First, decode all base64 strings in the batch back to numpy arrays.
-        # This is the "just-in-time" decoding that saves memory.
-        images = [base64_to_numpy(b64) for b64 in requests]
-        original_image_shapes = [img.shape for img in images]
-
-        # This dictionary will be returned to hold scratch-pad data for post-processing.
-        batch_data = {"images": images, "original_image_shapes": original_image_shapes}
-
-        if protocol == "grpc":
-            # The gRPC path for Yolox NIM expects base64 strings as input.
-            # The `requests` variable already contains these.
-            input_array = np.array(requests, dtype=np.object_)
-            current_batch_size = input_array.shape[0]
-
-            # Create the corresponding thresholds tensor
-            single_threshold_pair = [self.conf_threshold, self.iou_threshold]
-            thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
-
-            # The final batch is a list of the two input tensors
-            final_batch = [input_array, thresholds]
-
-            return final_batch, batch_data
-
-        elif protocol == "http":
-            content_list: List[Dict[str, Any]] = []
-
-            # The HTTP path requires scaling and formatting into a JSON payload.
-            for b64_string in requests:
-                # Scale the image if necessary (this logic is from the original format_input).
-                scaled_image_b64, _ = scale_image_to_encoding_size(b64_string, max_base64_size=self.nim_max_image_size)
-                content_list.append(
-                    {
-                        "type": "image_url",
-                        "url": f"data:image/png;base64,{scaled_image_b64}",
-                    }
-                )
-
-            payload = {"input": content_list}
-            return payload, batch_data
-
-        else:
-            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
     def format_input(
         self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
@@ -321,12 +231,7 @@ class YoloxModelInterfaceBase(ModelInterface):
                 if new_size != original_size:
                     logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                content_list.append(
-                    {
-                        "type": "image_url",
-                        "url": f"data:image/png;base64,{scaled_image_b64}",
-                    }
-                )
+                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
 
             # Chunk the payload content, the original images, and their shapes.
             content_chunks = chunk_list(content_list, max_batch_size)
@@ -344,13 +249,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(
-        self,
-        response: Any,
-        protocol: str,
-        data: Optional[Dict[str, Any]] = None,
-        **kwargs,
-    ) -> Any:
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
         Parse the output from the model's inference response.
 
@@ -1213,9 +1112,7 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
     # Remove other included
     if len(bbox_dict.get("other", [])):
         other = find_boxes_inside(
-            np.concatenate(list([v for v in bbox_dict.values() if len(v)])),
-            bbox_dict["other"],
-            threshold=0.7,
+            np.concatenate(list([v for v in bbox_dict.values() if len(v)])), bbox_dict["other"], threshold=0.7
         )
         del bbox_dict["other"]
         if len(other):
