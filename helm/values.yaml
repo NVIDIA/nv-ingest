@@ -852,7 +852,7 @@ milvus:
   image:
     all:
       repository: milvusdb/milvus
-      tag: v2.5.3-gpu
+      tag: v2.5.17-gpu
   cluster:
     enabled: false
   etcd:
