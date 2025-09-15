@@ -138,7 +138,7 @@ class NimClient:
             model_name = "yolox"
 
         if model_name == "scene_text_ensemble":
-            model_name == "scene_text_pre"
+            model_name = "scene_text_pre"
 
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
