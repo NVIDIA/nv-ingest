@@ -871,7 +871,7 @@ milvus:
     persistence:
       size: 50Gi
       storageClass: null
-  pulsar:
+  pulsarv3:
     enabled: false
   standalone:
     resources:
@@ -929,7 +929,7 @@ redisDeployed: true
 
 redis:
   image:
-    tag: "8-alpine3.22"
+    tag: "8.2.1-debian-12-r0"
   auth:
     enabled: false
   replica:
