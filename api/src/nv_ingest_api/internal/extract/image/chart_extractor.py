@@ -86,6 +86,7 @@ def _run_chart_inference(
         dtypes=["BYTES", "FP32"],
         output_names=["OUTPUT"],
         trace_info=trace_info,
+        max_batch_size=8,
     )
     future_ocr_kwargs = dict(
         data=data_ocr,
