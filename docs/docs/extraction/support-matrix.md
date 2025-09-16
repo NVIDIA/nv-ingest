@@ -43,7 +43,7 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 
 | GPU Option                                    | RTX Pro 6000  | B200          | H100        | A100        | A10G   | L40S   |
 |-----------------------------------------------|---------------|---------------|-------------|-------------|--------|--------|
-| Family                                        | PCIe          | SXM           | SXM or PCIe | SXM or PCIe | —      | —      |
+| Family                                        | PCIe          | SXM           | SXM         | SXM         | —      | —      |
 | Memory                                        | 96GB          | 192GB         | 80GB        | 80GB        | 24GB   | 48GB   |
 | Core Features Total GPUs                      | 1             | 1             | 1           | 1           | 1      | 1      |
 | Core Features Total Disk Space                | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB | ~150GB |
