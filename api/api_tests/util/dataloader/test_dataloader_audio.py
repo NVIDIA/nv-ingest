@@ -15,6 +15,10 @@ from .dataloader_test_tools import create_test_wav, create_test_mp3
 test_file_size_mb = 100
 
 
+if not DataLoader or not MediaInterface:
+    pytest.skip("DataLoader or MediaInterface is not available", allow_module_level=True)
+
+
 def get_audio_info(filepath):
     """Get audio file information using ffprobe."""
     result = subprocess.run(

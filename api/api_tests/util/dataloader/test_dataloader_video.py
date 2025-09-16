@@ -15,6 +15,9 @@ from .dataloader_test_tools import create_test_file
 
 test_file_size_mb = 100
 
+if not DataLoader or not MediaInterface:
+    pytest.skip("DataLoader or MediaInterface is not available", allow_module_level=True)
+
 
 def get_file_info(filepath):
     """Get file information using ffprobe."""
