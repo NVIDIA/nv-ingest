@@ -15,7 +15,7 @@ Before you begin using [NeMo Retriever extraction](overview.md), ensure the foll
 
 !!! note
 
-    You install Python later. NV-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+    You install Python later.
 
 
 ## Related Topics
