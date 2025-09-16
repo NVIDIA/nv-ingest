@@ -157,7 +157,7 @@ class TextMetadataSchema(BaseModelNoExt):
     text_location: tuple = (0, 0, 0, 0)
     """The bounding box of the text, in the format (x1,y1,x2,y2)."""
 
-    text_location_max_dimensions: tuple = (0, 0, 0, 0)
+    text_location_max_dimensions: tuple = (0, 0)
     """The maximum dimensions of the bounding box of the text, in the format (x_max,y_max)."""
 
     custom_content: Optional[Dict[str, Any]] = None
@@ -175,10 +175,10 @@ class ImageMetadataSchema(BaseModelNoExt):
     """The type of the content for structured data types, such as bar chart, pie chart, and others."""
 
     caption: str = ""
-    """A caption or subheading associated with the image"""
+    """A caption or subheading associated with the image."""
 
     text: str = ""
-    """Extracted text from a structured chart"""
+    """Extracted text from a structured chart."""
 
     image_location: tuple = (0, 0, 0, 0)
     """The bounding box of the image, in the format (x1,y1,x2,y2)."""
@@ -187,7 +187,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     """The maximum dimensions of the bounding box of the image, in the format (x_max,y_max)."""
 
     uploaded_image_url: str = ""
-    """A mirror of source_metadata.source_location"""
+    """A mirror of source_metadata.source_location."""
 
     width: int = 0
     """The width of the image."""
