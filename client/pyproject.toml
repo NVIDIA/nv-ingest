@@ -26,6 +26,7 @@ dependencies = [
     "fsspec>=2025.2.0",
     "httpx>=0.28.1",
     "llama-index-embeddings-nvidia==0.1.5",
+    "nv-ingest-api==25.9.0",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "requests>=2.28.2",

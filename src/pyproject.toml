@@ -36,6 +36,7 @@ dependencies = [
     "opentelemetry-api>=1.27.0",
     "opentelemetry-exporter-otlp>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
+    "nv-ingest-api==25.9.0",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "pypdfium2==4.30.0",
