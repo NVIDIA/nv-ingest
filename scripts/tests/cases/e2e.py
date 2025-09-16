@@ -37,8 +37,14 @@ def _get_env(name: str, default: str | None = None) -> str | None:
 
 
 def _default_collection_name() -> str:
-    # Make collection name configurable via TEST_NAME env var, default to dc20
-    test_name = _get_env("TEST_NAME", "dc20")
+    # Derive test name from dataset directory or use explicit TEST_NAME
+    dataset_dir = _get_env("DATASET_DIR", "")
+    if dataset_dir:
+        dataset_name = os.path.basename(dataset_dir.rstrip("/"))
+    else:
+        dataset_name = "e2e"
+
+    test_name = _get_env("TEST_NAME", dataset_name)
     return f"{test_name}_{_now_timestr()}"
 
 
@@ -47,7 +53,7 @@ def main() -> int:
     data_dir = _get_env("DATASET_DIR")
     if not data_dir:
         print("ERROR: DATASET_DIR environment variable is required")
-        print("Example: DATASET_DIR=/datasets/bo20 python dc20_e2e.py")
+        print("Example: DATASET_DIR=/datasets/bo20 python e2e.py")
         return 2
 
     if not os.path.isdir(data_dir):
@@ -63,14 +69,18 @@ def main() -> int:
     sparse = _get_env("SPARSE", "true").lower() == "true"
     gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
 
-    # Extraction configuration from environment variables
+    # Extraction configuration (core testing variables)
     extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
     extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
     extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
     extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
+    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
     text_depth = _get_env("TEXT_DEPTH", "page")
     table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
-    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+
+    # Optional pipeline steps (for special testing scenarios)
+    enable_caption = _get_env("ENABLE_CAPTION", "false").lower() == "true"
+    enable_split = _get_env("ENABLE_SPLIT", "false").lower() == "true"
 
     # Logging configuration
     log_path = _get_env("LOG_PATH", "test_results")
@@ -81,17 +91,21 @@ def main() -> int:
     print("=== Configuration ===")
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
-    print(f"Spill: {spill_dir}")
     print(f"Hostname: {hostname}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    if enable_caption:
+        print("Caption: enabled")
+    if enable_split:
+        print("Split: enabled")
     print("====================")
 
     ingestion_start = time.time()
 
+    # Build ingestor pipeline (simplified)
     ingestor = (
         Ingestor(message_client_hostname=hostname, message_client_port=7670)
         .files(data_dir)
@@ -104,7 +118,18 @@ def main() -> int:
             table_output_format=table_output_format,
             extract_infographics=extract_infographics,
         )
-        .embed(model_name=model_name)
+    )
+
+    # Optional pipeline steps
+    if enable_caption:
+        ingestor = ingestor.caption()
+
+    if enable_split:
+        ingestor = ingestor.split()
+
+    # Embed and upload (core pipeline)
+    ingestor = (
+        ingestor.embed(model_name=model_name)
         .vdb_upload(
             collection_name=collection_name,
             dense_dim=dense_dim,
@@ -167,7 +192,8 @@ def main() -> int:
     kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
-    test_name = _get_env("TEST_NAME", "dc20")
+    dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
+    test_name = _get_env("TEST_NAME", dataset_name)
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
