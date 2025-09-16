@@ -17,8 +17,6 @@ import numpy as np
 import pandas as pd
 import requests
 from minio import Minio
-from minio.commonconfig import CopySource
-from minio.deleteobjects import DeleteObject
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 from nv_ingest_client.util.transport import infer_microservice
 from nv_ingest_client.util.util import ClientConfigSchema
@@ -42,10 +40,10 @@ from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
 
+
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
-MINIO_DEFAULT_BUCKET_NAME = "a-bucket"
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -170,10 +168,15 @@ def grab_meta_collection_info(
     embedding_model: str = None,
     embedding_dim: int = None,
     client: MilvusClient = None,
+    milvus_uri: str = None,
+    username: str = None,
+    password: str = None,
 ):
     timestamp = timestamp or ""
     embedding_model = embedding_model or ""
     embedding_dim = embedding_dim or ""
+    if milvus_uri:
+        client = MilvusClient(milvus_uri, token=f"{username}:{password}")
     results = client.query_iterator(
         collection_name=meta_collection_name,
         output_fields=[
@@ -745,7 +748,7 @@ def bulk_insert_milvus(
     minio_endpoint: str = "localhost:9000",
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "nv-ingest",
+    bucket_name: str = None,
     username: str = None,
     password: str = None,
 ):
@@ -769,29 +772,16 @@ def bulk_insert_milvus(
     password : str, optional
         Milvus password.
     """
-    minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
-
-    connections.connect(uri=milvus_uri, username=username, password=password)
+    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
     t_bulk_start = time.time()
     task_ids = []
-    uploaded_files = []
-    for files in writer.batch_files:
-        for f in files:
-            # Hack: do_bulk_insert only reads from the default bucket ('a-bucket'),
-            # so we first copy objects from the source bucket into 'a-bucket' before inserting.
-            try:
-                minio_client.copy_object(MINIO_DEFAULT_BUCKET_NAME, f, CopySource(bucket_name, f))
-                uploaded_files.append(f)
-            except Exception as e:
-                logger.error(f"Error copying {f} from {bucket_name} to {MINIO_DEFAULT_BUCKET_NAME}: {e}")
 
-        task_id = utility.do_bulk_insert(
-            collection_name=collection_name,
-            files=files,
-            consistency_level=CONSISTENCY,
-        )
-        task_ids.append(task_id)
-    # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
+    task_id = utility.do_bulk_insert(
+        collection_name=collection_name,
+        files=[file for files in writer.batch_files for file in files],
+        consistency_level=CONSISTENCY,
+    )
+
     while len(task_ids) > 0:
         time.sleep(1)
         for task_id in task_ids:
@@ -806,9 +796,6 @@ def bulk_insert_milvus(
                 logger.error(f"Task: {task_id}")
                 logger.error(f"Failed reason: {task.failed_reason}")
                 task_ids.remove(task_id)
-
-    # Cleanup: remove the copied files to undo the temporary workaround before bulk insert.
-    minio_client.remove_objects(MINIO_DEFAULT_BUCKET_NAME, [DeleteObject(f) for f in uploaded_files])
 
     t_bulk_end = time.time()
     logger.info(f"Bulk {collection_name} upload took {t_bulk_end - t_bulk_start} s")
@@ -876,7 +863,7 @@ def create_bm25_model(
     return bm25_ef
 
 
-def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
+def stream_insert_milvus(records, client: MilvusClient, collection_name: str, batch_size: int = 5000):
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
@@ -894,10 +881,44 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
         Milvus Collection to search against
     """
     count = 0
-    for element in records:
-        client.insert(collection_name=collection_name, data=[element])
-        count += 1
+    for idx in range(0, len(records), batch_size):
+        client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
+        count += len(records[idx : idx + batch_size])
+    client.flush(collection_name)
     logger.info(f"streamed {count} records")
+
+
+def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient):
+    """
+    This function waits for the index to be built. It checks
+    the indexed_rows of the index and waits for it to be equal
+    to the number of records. This only works for streaming inserts,
+    bulk inserts are not supported by this function
+    (refer to MilvusClient.refresh_load for bulk inserts).
+    """
+    index_names = utility.list_indexes(collection_name)
+    indexed_rows = 0
+    for index_name in index_names:
+        indexed_rows = 0
+        while indexed_rows < num_elements:
+            pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
+            for i in range(20):
+                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                time.sleep(1)
+                logger.info(
+                    f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
+                )
+                if new_indexed_rows == num_elements:
+                    indexed_rows = new_indexed_rows
+                    break
+                # check if indexed_rows is staying the same, too many times means something is wrong
+                if new_indexed_rows == indexed_rows:
+                    pos_movement = -1
+                # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
+                if pos_movement == 0:
+                    raise ValueError("Rows are not getting indexed as expected")
+                indexed_rows = new_indexed_rows
+    return indexed_rows
 
 
 def write_to_nvingest_collection(
@@ -915,7 +936,7 @@ def write_to_nvingest_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "nv-ingest",
+    bucket_name: str = None,
     threshold: int = 1000,
     meta_dataframe=None,
     meta_source_field=None,
@@ -1021,8 +1042,12 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
+        # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
+        # know how long this should take, it is num_elements dependent.
+        wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
+        bucket_name = bucket_name if bucket_name else ClientConfigSchema().minio_bucket_name
         if not minio_client.bucket_exists(bucket_name):
             minio_client.make_bucket(bucket_name)
 
@@ -1613,7 +1638,7 @@ def embed_index_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "nv-ingest",
+    bucket_name: str = None,
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
@@ -1653,7 +1678,7 @@ def embed_index_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
+        bucket_name (str, optional): The name of the MinIO bucket.
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
@@ -1769,7 +1794,7 @@ def reindex_collection(
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
-    bucket_name: str = "nv-ingest",
+    bucket_name: str = None,
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
@@ -1810,7 +1835,7 @@ def reindex_collection(
         compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
         access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
         secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
+        bucket_name (str, optional): The name of the MinIO bucket.
         meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
             containing metadata. Defaults to None.
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
@@ -1918,7 +1943,7 @@ class Milvus(VDB):
         compute_bm25_stats: bool = True,
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
-        bucket_name: str = "nv-ingest",
+        bucket_name: str = None,
         meta_dataframe: Union[str, pd.DataFrame] = None,
         meta_source_field: str = None,
         meta_fields: list[str] = None,
@@ -1949,7 +1974,7 @@ class Milvus(VDB):
             compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
             access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
             secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "nv-ingest".
+            bucket_name (str, optional): The name of the MinIO bucket.
             meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
                 containing metadata. Defaults to None.
             meta_source_field (str, optional): The field in the metadata that serves as the source identifier.

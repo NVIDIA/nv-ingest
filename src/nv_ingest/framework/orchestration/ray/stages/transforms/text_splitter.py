@@ -16,6 +16,7 @@ from nv_ingest_api.internal.transform.split_text import transform_text_split_and
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
@@ -36,7 +37,7 @@ class TextSplitterStage(RayActorStage):
         super().__init__(config, stage_name=stage_name)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
-        logger.debug("TextSplitterStage initialized with config: %s", config)
+        logger.info("TextSplitterStage initialized with config: %s", sanitize_for_logging(config))
 
     @nv_ingest_node_failure_try_except()
     @traceable()
@@ -63,7 +64,7 @@ class TextSplitterStage(RayActorStage):
 
         # Remove the "split" task to obtain task-specific configuration.
         task_config = remove_task_by_type(message, "split")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Transform the DataFrame (split text and tokenize).
         df_updated = transform_text_split_and_tokenize_internal(
@@ -107,7 +108,7 @@ def text_splitter_fn(control_message: IngestControlMessage, stage_config: TextSp
 
     # Remove the "split" task to obtain task-specific configuration.
     task_config = remove_task_by_type(control_message, "split")
-    logger.debug("Extracted task config: %s", task_config)
+    logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
     # Transform the DataFrame (split text and tokenize).
     df_updated = transform_text_split_and_tokenize_internal(

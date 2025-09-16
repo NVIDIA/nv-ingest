@@ -73,7 +73,7 @@ class IngestTaskStoreSchema(BaseModelNoExt):
 
 # Captioning: All fields are optional and override default parameters.
 class IngestTaskCaptionSchema(BaseModelNoExt):
-    api_key: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
     model_name: Optional[str] = None
@@ -105,7 +105,7 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 class IngestTaskEmbedSchema(BaseModelNoExt):
     endpoint_url: Optional[str] = None
     model_name: Optional[str] = None
-    api_key: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
     filter_errors: bool = False
     text_elements_modality: Optional[str] = None
     image_elements_modality: Optional[str] = None
@@ -121,13 +121,13 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
 
 
 class IngestTaskAudioExtraction(BaseModelNoExt):
-    auth_token: Optional[str] = None
+    auth_token: Optional[str] = Field(default=None, repr=False)
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
     function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
-    ssl_cert: Optional[str] = None
+    ssl_cert: Optional[str] = Field(default=None, repr=False)
     segment_audio: Optional[bool] = None
 
 

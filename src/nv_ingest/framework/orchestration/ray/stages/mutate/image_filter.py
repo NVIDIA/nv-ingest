@@ -17,6 +17,7 @@ from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema impo
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class ImageFilterStage(RayActorStage):
 
         # Remove the "filter" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "filter")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         task_params: Dict[str, Any] = task_config.get("params", {})
 

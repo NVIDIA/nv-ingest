@@ -2,6 +2,9 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.uv]
+managed = true
+
 [project]
 name = "nv-ingest-client"
 description = "Python client for the nv-ingest service"
@@ -34,7 +37,6 @@ dependencies = [
 milvus = [
     "pymilvus==2.5.10",
     "pymilvus[bulk_writer,model]",
-    "langchain-milvus>=0.1.10",
 ]
 minio = [
     "minio>=7.2.15",

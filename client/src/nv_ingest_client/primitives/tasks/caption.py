@@ -9,8 +9,8 @@
 import logging
 from typing import Dict
 
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
 
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
 from .task_base import Task
 
 logger = logging.getLogger(__name__)

@@ -11,6 +11,7 @@ Strategy pattern for clean separation of execution concerns.
 """
 
 import atexit
+import os
 import logging
 import multiprocessing
 import time
@@ -25,6 +26,8 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
 from nv_ingest.framework.orchestration.process.execution import (
     launch_pipeline,
     run_pipeline_process,
+)
+from nv_ingest.framework.orchestration.process.termination import (
     kill_pipeline_process_group,
 )
 
@@ -140,16 +143,45 @@ class SubprocessStrategy(ProcessExecutionStrategy):
             daemon=False,
         )
 
-        process.start()
+        # Hint to the lifecycle manager to skip starting the broker in the parent
+        prev_val = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+        os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"] = "1"
+        try:
+            process.start()
+        finally:
+            # Restore original env to avoid affecting other code paths
+            if prev_val is None:
+                try:
+                    del os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"]
+                except KeyError:
+                    pass
+            else:
+                os.environ["NV_INGEST_BROKER_IN_SUBPROCESS"] = prev_val
         interface = RayPipelineSubprocessInterface(process)
 
         if options.block:
-            # Block until subprocess completes
+            # Block until subprocess completes, handling Ctrl+C to ensure teardown
             start_time = time.time()
             logger.info("Waiting for subprocess pipeline to complete...")
-            process.join()
-            logger.info("Pipeline subprocess completed.")
+            try:
+                process.join()
+            except KeyboardInterrupt:
+                logger.info("KeyboardInterrupt in parent; terminating subprocess group...")
+                try:
+                    pid = int(process.pid)
+                    kill_pipeline_process_group(pid)
+                finally:
+                    # Best-effort wait for process to exit
+                    try:
+                        process.join(timeout=5.0)
+                    except Exception:
+                        pass
+            finally:
+                logger.info("Pipeline subprocess completed or terminated.")
             elapsed_time = time.time() - start_time
+            # If process ended with failure, surface it
+            if hasattr(process, "exitcode") and process.exitcode not in (0, None):
+                raise RuntimeError(f"Pipeline subprocess exited with code {process.exitcode}")
             return ExecutionResult(interface=None, elapsed_time=elapsed_time)
         else:
             # Return interface for non-blocking execution
