@@ -332,7 +332,7 @@ class MetadataSchema(BaseModelNoExt):
     """Specific metadata for text content. Automatically set to None if content_metadata.type is not TEXT."""
 
     image_metadata: Optional[ImageMetadataSchema] = None
-    """None	Specific metadata for image content. Automatically set to None if content_metadata.type is not IMAGE."""
+    """Specific metadata for image content. Automatically set to None if content_metadata.type is not IMAGE."""
 
     table_metadata: Optional[TableMetadataSchema] = None
     """Specific metadata for tabular content. Automatically set to None if content_metadata.type is not STRUCTURED."""
