@@ -52,6 +52,7 @@ helm upgrade \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set paddleocr-nim.deployed=true \
     --set nemoretriever-ocr.deployed=false \
+    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
     --set image.tag="25.3.0"
 ```
@@ -59,7 +60,8 @@ helm upgrade \
 > [!NOTE]
 > For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
 > Currently, the NemoRetriever OCR v1 container is in early access preview.
-> To use nemoretriever-ocr-v1, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
+> To use nemoretriever-ocr-v1, in the above code change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`,
+> and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
 > For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
