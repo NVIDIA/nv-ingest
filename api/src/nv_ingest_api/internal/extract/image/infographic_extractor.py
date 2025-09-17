@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from contextlib import contextmanager
 from typing import Any
 from typing import Dict
 from typing import List
@@ -146,7 +145,6 @@ def _update_infographic_metadata(
     return results
 
 
-@contextmanager
 def _create_ocr_client(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
@@ -157,15 +155,16 @@ def _create_ocr_client(
         NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
     )
 
-    with create_inference_client(
+    ocr_client = create_inference_client(
         endpoints=ocr_endpoints,
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
         enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
         dynamic_batch_memory_budget_mb=32,
-    ) as ocr_client:
-        yield ocr_client
+    )
+
+    return ocr_client
 
 
 def _meets_infographic_criteria(row: pd.Series) -> bool:
@@ -257,19 +256,20 @@ def extract_infographic_data_from_image_internal(
         base64_images = [df_extraction_ledger.at[idx, "metadata"]["content"] for idx in valid_indices]
 
         # Call bulk update to extract infographic data.
-        with _create_ocr_client(
+        ocr_client = _create_ocr_client(
             endpoint_config.ocr_endpoints,
             endpoint_config.ocr_infer_protocol,
             ocr_model_name,
             endpoint_config.auth_token,
-        ) as ocr_client:
-            bulk_results = _update_infographic_metadata(
-                base64_images=base64_images,
-                ocr_client=ocr_client,
-                ocr_model_name=ocr_model_name,
-                worker_pool_size=endpoint_config.workers_per_progress_engine,
-                trace_info=execution_trace_log,
-            )
+        )
+
+        bulk_results = _update_infographic_metadata(
+            base64_images=base64_images,
+            ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
+            worker_pool_size=endpoint_config.workers_per_progress_engine,
+            trace_info=execution_trace_log,
+        )
 
         # Write the extracted results back into the DataFrame.
         for result_idx, df_idx in enumerate(valid_indices):

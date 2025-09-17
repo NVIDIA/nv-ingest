@@ -2,6 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import hashlib
+import json
 import logging
 import threading
 import time
@@ -18,6 +20,7 @@ import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.util.string_processing import generate_url
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,6 @@ class NimClient:
         ValueError
             If an invalid protocol is specified or if required endpoints are missing.
         """
-
         self.client = None
         self.model_interface = model_interface
         self.protocol = protocol.lower()
@@ -108,21 +110,6 @@ class NimClient:
             self._stop_event = threading.Event()
             self._batcher_thread = threading.Thread(target=self._batcher_loop, daemon=True)
 
-    def __enter__(self):
-        """
-        Enter the runtime context related to this object.
-        This will start the dynamic batching thread if enabled.
-        """
-        self.start()
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Exit the runtime context and gracefully close the client.
-        """
-        self.close()
-
     def start(self):
         """Starts the dynamic batching worker thread if enabled."""
         if self.dynamic_batching_enabled and not self._batcher_thread.is_alive():
@@ -145,13 +132,12 @@ class NimClient:
             if model_name in self._max_batch_sizes:
                 return self._max_batch_sizes[model_name]
 
-            if not self._grpc_endpoint:
+            if not self._grpc_endpoint or not self.client:
                 self._max_batch_sizes[model_name] = 1
                 return 1
 
             try:
-                client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
-                model_config = client.get_model_config(model_name=model_name, model_version=model_version)
+                model_config = self.client.get_model_config(model_name=model_name, model_version=model_version)
                 self._max_batch_sizes[model_name] = model_config.config.max_batch_size
                 logger.debug(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
             except Exception as e:
@@ -466,31 +452,25 @@ class NimClient:
                     continue
                 requests_batch.append(first_req)
 
-                current_max_h = first_req.dims[0]
-                current_max_w = first_req.dims[1]
-
                 start_time = time.monotonic()
 
                 while len(requests_batch) < self._batch_size:
                     if (time.monotonic() - start_time) >= self._batch_timeout:
                         break
 
+                    if self._request_queue.empty():
+                        break
+
+                    next_req_peek = self._request_queue.queue[0]
+                    if next_req_peek is None:
+                        break
+
                     if self._batch_memory_budget_bytes:
-                        try:
-                            next_req_peek = self._request_queue.queue[0]
-
-                            next_h = max(current_max_h, next_req_peek.dims[0])
-                            next_w = max(current_max_w, next_req_peek.dims[1])
-                            potential_batch_size = len(requests_batch) + 1
-
-                            num_channels = 3
-                            bytes_per_element_fp32 = 4
-                            potential_memory_bytes = (
-                                potential_batch_size * next_h * next_w * num_channels * bytes_per_element_fp32
-                            )
-                            if potential_memory_bytes > self._batch_memory_budget_bytes:
-                                break
-                        except IndexError:
+                        if not self.model_interface.does_item_fit_in_batch(
+                            requests_batch,
+                            next_req_peek,
+                            self._batch_memory_budget_bytes,
+                        ):
                             break
 
                     try:
@@ -498,8 +478,6 @@ class NimClient:
                         if next_req is None:
                             break
                         requests_batch.append(next_req)
-                        current_max_h = max(current_max_h, next_req.dims[0])
-                        current_max_w = max(current_max_w, next_req.dims[1])
                     except queue.Empty:
                         break
 
@@ -581,6 +559,7 @@ class NimClient:
 
     def close(self):
         """Stops the dynamic batching worker and closes client connections."""
+
         if self.dynamic_batching_enabled:
             self._stop_event.set()
             # Unblock the queue in case the thread is waiting on get()
@@ -590,3 +569,82 @@ class NimClient:
 
         if self.client:
             self.client.close()
+
+
+class ClientManager:
+    """
+    A thread-safe, singleton manager for creating and sharing NimClient instances.
+
+    This manager ensures that only one NimClient is created per unique configuration.
+    """
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        # Singleton pattern
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(ClientManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, "_initialized"):
+            with self._lock:
+                if not hasattr(self, "_initialized"):
+                    self._clients = {}  # Key: config_hash, Value: NimClient instance
+                    self._client_lock = threading.Lock()
+                    self._initialized = True
+
+    def _generate_config_key(self, **kwargs) -> str:
+        """Creates a stable, hashable key from client configuration."""
+        sorted_config = sorted(kwargs.items())
+        config_str = json.dumps(sorted_config)
+        return hashlib.md5(config_str.encode("utf-8")).hexdigest()
+
+    def get_client(self, model_interface, **kwargs) -> "NimClient":
+        """
+        Gets or creates a NimClient for the given configuration.
+        """
+        config_key = self._generate_config_key(model_interface_name=model_interface.name(), **kwargs)
+
+        if config_key in self._clients:
+            return self._clients[config_key]
+
+        with self._client_lock:
+            if config_key in self._clients:
+                return self._clients[config_key]
+
+            logger.debug(f"Creating new NimClient for config hash: {config_key}")
+
+            new_client = NimClient(model_interface=model_interface, **kwargs)
+
+            if new_client.dynamic_batching_enabled:
+                new_client.start()
+
+            self._clients[config_key] = new_client
+
+            return new_client
+
+    def shutdown(self):
+        """
+        Gracefully closes all managed NimClient instances.
+        This is called automatically on application exit by `atexit`.
+        """
+        logger.debug(f"Shutting down ClientManager and {len(self._clients)} client(s)...")
+        with self._client_lock:
+            for config_key, client in self._clients.items():
+                logger.debug(f"Closing client for config: {config_key}")
+                try:
+                    client.close()
+                except Exception as e:
+                    logger.error(f"Error closing client for config {config_key}: {e}")
+            self._clients.clear()
+        logger.debug("ClientManager shutdown complete.")
+
+
+# A global helper function to make access even easier
+def get_client_manager(*args, **kwargs) -> ClientManager:
+    """Returns the singleton instance of the ClientManager."""
+    return ClientManager(*args, **kwargs)

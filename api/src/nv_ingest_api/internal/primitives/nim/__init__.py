@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .nim_client import NimClient
+from .nim_client import get_client_manager
 from .nim_model_interface import ModelInterface
 
-__all__ = ["NimClient", "ModelInterface"]
+__all__ = ["NimClient", "ModelInterface", "get_client_manager"]

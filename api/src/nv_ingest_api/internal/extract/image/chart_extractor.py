@@ -4,7 +4,6 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from typing import Any, Union
 from typing import Dict
 from typing import List
@@ -214,7 +213,6 @@ def _update_chart_metadata(
     return _merge_chart_results(base64_images, valid_indices, yolox_results, ocr_results, results)
 
 
-@contextmanager
 def _create_yolox_client(
     yolox_endpoints: Tuple[str, str],
     yolox_protocol: str,
@@ -222,16 +220,16 @@ def _create_yolox_client(
 ) -> NimClient:
     yolox_model_interface = YoloxGraphicElementsModelInterface()
 
-    with create_inference_client(
+    yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
         model_interface=yolox_model_interface,
         auth_token=auth_token,
         infer_protocol=yolox_protocol,
-    ) as yolox_client:
-        yield yolox_client
+    )
+
+    return yolox_client
 
 
-@contextmanager
 def _create_ocr_client(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
@@ -242,15 +240,16 @@ def _create_ocr_client(
         NemoRetrieverOCRModelInterface() if ocr_model_name == "scene_text_ensemble" else PaddleOCRModelInterface()
     )
 
-    with create_inference_client(
+    ocr_client = create_inference_client(
         endpoints=ocr_endpoints,
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
         enable_dynamic_batching=(True if ocr_model_name == "scene_text_ensemble" else False),
         dynamic_batch_memory_budget_mb=32,
-    ) as ocr_client:
-        yield ocr_client
+    )
+
+    return ocr_client
 
 
 def extract_chart_data_from_image_internal(
@@ -335,24 +334,27 @@ def extract_chart_data_from_image_internal(
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
         # 3) Call our bulk _update_metadata to get all results.
-        with _create_yolox_client(
+        yolox_client = _create_yolox_client(
             endpoint_config.yolox_endpoints,
             endpoint_config.yolox_infer_protocol,
             endpoint_config.auth_token,
-        ) as yolox_client, _create_ocr_client(
+        )
+
+        ocr_client = _create_ocr_client(
             endpoint_config.ocr_endpoints,
             endpoint_config.ocr_infer_protocol,
             ocr_model_name,
             endpoint_config.auth_token,
-        ) as ocr_client:
-            bulk_results = _update_chart_metadata(
-                base64_images=base64_images,
-                yolox_client=yolox_client,
-                ocr_client=ocr_client,
-                ocr_model_name=ocr_model_name,
-                worker_pool_size=endpoint_config.workers_per_progress_engine,
-                trace_info=execution_trace_log,
-            )
+        )
+
+        bulk_results = _update_chart_metadata(
+            base64_images=base64_images,
+            yolox_client=yolox_client,
+            ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
+            worker_pool_size=endpoint_config.workers_per_progress_engine,
+            trace_info=execution_trace_log,
+        )
 
         # 4) Write the results back to each row’s table_metadata
         #    The order of base64_images in bulk_results should match their original

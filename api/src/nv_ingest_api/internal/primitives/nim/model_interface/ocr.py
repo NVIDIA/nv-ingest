@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 class OCRModelInterfaceBase(ModelInterface):
 
+    NUM_CHANNELS = 3
+    BYTES_PER_ELEMENT = 4  # For float32
+
     def parse_output(
         self,
         response: Any,
@@ -93,6 +96,25 @@ class OCRModelInterfaceBase(ModelInterface):
             as the table content (or content list).
         """
         return output
+
+    def does_item_fit_in_batch(self, current_batch, next_request, memory_budget_bytes: int) -> bool:
+        """
+        Estimates the memory of a potential batch of padded images and checks it
+        against the configured budget.
+        """
+        all_requests = current_batch + [next_request]
+        all_dims = [req.dims for req in all_requests]
+
+        potential_max_h = max(d[0] for d in all_dims)
+        potential_max_w = max(d[1] for d in all_dims)
+
+        potential_batch_size = len(all_requests)
+
+        potential_memory_bytes = (
+            potential_batch_size * potential_max_h * potential_max_w * self.NUM_CHANNELS * self.BYTES_PER_ELEMENT
+        )
+
+        return potential_memory_bytes <= memory_budget_bytes
 
     def _prepare_ocr_payload(self, base64_img: str) -> Dict[str, Any]:
         """
@@ -502,9 +524,6 @@ class PaddleOCRModelInterface(OCRModelInterfaceBase):
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
-
-    def coalesce_requests_to_batch(self, *args, **kwargs):
-        raise RuntimeError("Dynamic batching is not supported.")
 
 
 class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
