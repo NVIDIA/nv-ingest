@@ -1110,8 +1110,8 @@ def dense_retrieval(
         Milvus Collection to search against
     client : MilvusClient
         Client connected to mivlus instance.
-    dense_model : NVIDIAEmbedding
-        Dense model to generate dense embeddings for queries.
+    dense_model : Partial Function
+        Partial function to generate dense embeddings with queries.
     top_k : int
         Number of search results to return per query.
     dense_field : str
@@ -1125,7 +1125,8 @@ def dense_retrieval(
     """
     dense_embeddings = []
     for query in queries:
-        dense_embeddings.append(dense_model.get_query_embedding(query))
+        # dense_embeddings.append(dense_model.get_query_embedding(query))
+        dense_embeddings += dense_model([query])
 
     search_params = {}
     if not gpu_search and not local_index:
@@ -1194,7 +1195,7 @@ def hybrid_retrieval(
     dense_embeddings = []
     sparse_embeddings = []
     for query in queries:
-        dense_embeddings.append(dense_model.get_query_embedding(query))
+        dense_embeddings += dense_model([query])
         if sparse_model:
             sparse_embeddings.append(_format_sparse_embedding(sparse_model.encode_queries([query])))
         else:
@@ -1330,15 +1331,21 @@ def nvingest_retrieval(
         kwargs.pop("vdb_op", None)
         queries = kwargs.pop("queries", [])
         return vdb_op.retrieval(queries, **kwargs)
-    from llama_index.embeddings.nvidia import NVIDIAEmbedding
 
     client_config = ClientConfigSchema()
     nvidia_api_key = client_config.nvidia_api_key
-    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
     local_index = False
-    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
+    embed_model = partial(
+        infer_microservice,
+        model_name=model_name,
+        embedding_endpoint=embedding_endpoint,
+        nvidia_api_key=nvidia_api_key,
+        input_type="query",
+        output_names=["embeddings"],
+        grpc=not (urlparse(embedding_endpoint).scheme == "http"),
+    )
     client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     final_top_k = top_k
     if nv_ranker:
@@ -1642,7 +1649,7 @@ def embed_index_collection(
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
-    intput_type: str = "passage",
+    input_type: str = "passage",
     truncate: str = "END",
     client: MilvusClient = None,
     username: str = None,
@@ -1694,7 +1701,6 @@ def embed_index_collection(
     """
     client_config = ClientConfigSchema()
     nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
-    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
     # if not scheme we assume we are using grpc
@@ -1738,7 +1744,7 @@ def embed_index_collection(
                     model_name,
                     embedding_endpoint,
                     nvidia_api_key,
-                    intput_type,
+                    input_type,
                     truncate,
                     batch_size,
                     grpc,
@@ -1756,7 +1762,7 @@ def embed_index_collection(
             model_name,
             embedding_endpoint,
             nvidia_api_key,
-            intput_type,
+            input_type,
             truncate,
             batch_size,
             grpc,
