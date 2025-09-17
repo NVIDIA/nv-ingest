@@ -52,16 +52,24 @@ helm upgrade \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set paddleocr-nim.deployed=true \
     --set nemoretriever-ocr.deployed=false \
-    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
     --set image.tag="25.9.0"
 ```
 
 > [!NOTE]
+> The Bitnami project has moved certain Redis container artifacts, which may affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
+>
+> ```bash
+> --set redis.image.repository=redis \
+> --set redis.image.tag=8.2.1 \
+> ```
+>
+> This will use the Bitnami Redis 8.2.1 image. Adjust the tag as needed for your environment.
+
+> [!NOTE]
 > For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
 > Currently, the NemoRetriever OCR v1 container is in early access preview.
-> To use nemoretriever-ocr-v1, in the above code change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`,
-> and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
+> To use nemoretriever-ocr-v1, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
 > For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
@@ -363,7 +371,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.6.2"` |  |
+| image.tag | string | `"25.9.0"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
