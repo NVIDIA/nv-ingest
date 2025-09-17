@@ -62,7 +62,7 @@ helm upgrade \
 > Currently, the NemoRetriever OCR v1 container is in early access preview.
 > To use nemoretriever-ocr-v1, in the above code change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`,
 > and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
-> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](https://docs.nvidia.com/nemo/retriever/latest/extraction/quickstart-guide/).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
