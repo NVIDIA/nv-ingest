@@ -18,6 +18,7 @@ if local_log_level in ("DEFAULT",):
 
 configure_local_logging(local_log_level)
 
+# Socket setting is required for libmode with an out of process client.
 os.environ["MESSAGE_CLIENT_INTERFACE"] = "socket"
 
 

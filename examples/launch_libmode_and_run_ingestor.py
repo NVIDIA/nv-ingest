@@ -22,6 +22,9 @@ if local_log_level in ("DEFAULT",):
 
 configure_local_logging(local_log_level)
 
+# Uncomment when using libmode with an out of process client, or when using a socket interface.
+# os.environ["MESSAGE_CLIENT_INTERFACE"] = "socket"
+
 
 def run_ingestor():
     """
@@ -72,6 +75,7 @@ def main():
     Launch the libmode pipeline service and run the ingestor against it.
     Uses the embedded default libmode pipeline configuration.
     """
+    pipeline = None
     try:
         pipeline = run_pipeline(
             block=False,
@@ -88,8 +92,13 @@ def main():
     except Exception as e:
         logger.error(f"Error running pipeline: {e}")
     finally:
-        pipeline.stop()
-        logger.info("Shutting down pipeline...")
+        if pipeline is not None:
+            try:
+                pipeline.stop()
+            except Exception:
+                logger.exception("Error stopping pipeline during shutdown")
+        else:
+            logger.info("Pipeline was not started; skipping shutdown step.")
 
 
 if __name__ == "__main__":

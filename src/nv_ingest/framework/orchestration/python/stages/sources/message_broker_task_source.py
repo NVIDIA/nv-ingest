@@ -202,7 +202,7 @@ class PythonMessageBrokerTaskSource(PythonStage):
         Fetch a message from the message broker.
         """
         try:
-            self._logger.info(f"Fetching message from queue: {self.task_queue}")
+            self._logger.debug(f"Fetching message from queue: {self.task_queue}")
             response = self.client.fetch_message(self.task_queue, timeout=(timeout, None))
 
             if response.response_code == 200 and response.response:
@@ -256,7 +256,6 @@ class PythonMessageBrokerTaskSource(PythonStage):
             self._logger.debug("Source is paused, not fetching messages")
             return None
 
-        self._logger.info("Attempting to get message from broker")
         job = self._fetch_message()
         if job is None:
             self._logger.debug("No message available from broker")

@@ -10,10 +10,11 @@ runtime overrides to pipeline configurations, replacing imperative inline logic.
 """
 
 import logging
+import os
 import yaml
 from typing import Optional
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
 from nv_ingest.pipeline.default_libmode_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
 from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_PIPELINE_YAML
 from nv_ingest.framework.orchestration.execution.options import PipelineRuntimeOverrides
@@ -219,10 +220,31 @@ def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], lib
     ValueError
         If no config provided and libmode=False.
     """
+    # If caller supplied a config, validate the framework compatibility for libmode
     if provided_config is not None:
+        if libmode:
+            try:
+                framework_type = provided_config.pipeline.framework.type
+            except Exception:
+                framework_type = PipelineFrameworkType.RAY  # default
+            if framework_type == PipelineFrameworkType.RAY:
+                raise ValueError(
+                    "Libmode does not support the Ray framework. "
+                    "Either set pipeline.framework.type to 'python' (e.g., INGEST_SERVICE_FRAMEWORK=python) "
+                    "or run using the service (Ray) pipeline instead."
+                )
         return provided_config
 
+    # No config provided: load default based on libmode flag
     if libmode:
+        # Early environment guard: if user forces Ray for libmode, fail early with guidance
+        env_framework = (os.environ.get("INGEST_SERVICE_FRAMEWORK") or "").strip().lower()
+        if env_framework == PipelineFrameworkType.RAY.value:
+            raise ValueError(
+                "Libmode does not support the Ray framework. "
+                "Detected INGEST_SERVICE_FRAMEWORK=ray. "
+                "Please set INGEST_SERVICE_FRAMEWORK=python (default) for libmode, or launch the service pipeline."
+            )
         return load_default_libmode_config()
     else:
         # For non-libmode, fall back to embedded default pipeline implementation
