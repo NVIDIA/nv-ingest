@@ -6,7 +6,7 @@ repos:
         exclude: '(^(docs|data)/|\.md$)'
     -   id: end-of-file-fixer
     -   id: check-added-large-files
-        args: [-- maxkb=1500]
+        args: ['--maxkb=1500']
     -   id: check-ast
     -   id: debug-statements
 
