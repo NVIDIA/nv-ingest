@@ -4,8 +4,8 @@
 
 from typing import Tuple, Optional
 
-from nv_ingest_api.internal.primitives.nim.nim_client import ClientManager
-from nv_ingest_api.internal.primitives.nim.nim_client import get_client_manager
+from nv_ingest_api.internal.primitives.nim.nim_client import NimClientManager
+from nv_ingest_api.internal.primitives.nim.nim_client import get_nim_client_manager
 from nv_ingest_api.internal.primitives.nim.nim_model_interface import ModelInterface
 
 __all__ = ["create_inference_client"]
@@ -19,9 +19,9 @@ def create_inference_client(
     timeout: float = 120.0,
     max_retries: int = 5,
     **kwargs,
-) -> ClientManager:
+) -> NimClientManager:
     """
-    Create a ClientManager for interfacing with a model inference server.
+    Create a NimClientManager for interfacing with a model inference server.
 
     Parameters
     ----------
@@ -36,8 +36,8 @@ def create_inference_client(
 
     Returns
     -------
-    ClientManager
-        The initialized ClientManager.
+    NimClientManager
+        The initialized NimClientManager.
 
     Raises
     ------
@@ -55,7 +55,7 @@ def create_inference_client(
     if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    manager = get_client_manager()
+    manager = get_nim_client_manager()
     client = manager.get_client(
         model_interface=model_interface,
         protocol=infer_protocol,

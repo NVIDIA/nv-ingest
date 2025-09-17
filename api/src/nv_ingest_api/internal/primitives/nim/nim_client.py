@@ -571,7 +571,7 @@ class NimClient:
             self.client.close()
 
 
-class ClientManager:
+class NimClientManager:
     """
     A thread-safe, singleton manager for creating and sharing NimClient instances.
 
@@ -586,7 +586,7 @@ class ClientManager:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super(ClientManager, cls).__new__(cls)
+                    cls._instance = super(NimClientManager, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -632,7 +632,7 @@ class ClientManager:
         Gracefully closes all managed NimClient instances.
         This is called automatically on application exit by `atexit`.
         """
-        logger.debug(f"Shutting down ClientManager and {len(self._clients)} client(s)...")
+        logger.debug(f"Shutting down NimClientManager and {len(self._clients)} client(s)...")
         with self._client_lock:
             for config_key, client in self._clients.items():
                 logger.debug(f"Closing client for config: {config_key}")
@@ -641,10 +641,10 @@ class ClientManager:
                 except Exception as e:
                     logger.error(f"Error closing client for config {config_key}: {e}")
             self._clients.clear()
-        logger.debug("ClientManager shutdown complete.")
+        logger.debug("NimClientManager shutdown complete.")
 
 
 # A global helper function to make access even easier
-def get_client_manager(*args, **kwargs) -> ClientManager:
-    """Returns the singleton instance of the ClientManager."""
-    return ClientManager(*args, **kwargs)
+def get_nim_client_manager(*args, **kwargs) -> NimClientManager:
+    """Returns the singleton instance of the NimClientManager."""
+    return NimClientManager(*args, **kwargs)

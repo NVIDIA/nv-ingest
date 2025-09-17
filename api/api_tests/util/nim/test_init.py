@@ -9,7 +9,7 @@ import nv_ingest_api.util.nim as module_under_test
 
 def test_create_inference_client_defaults_to_grpc_when_grpc_endpoint_present():
     mock_interface = MagicMock()
-    with patch(f"{module_under_test.__name__}.get_client_manager") as mock_client:
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
         client_instance = MagicMock()
         final_client_instance = MagicMock()
         mock_client.return_value = client_instance
@@ -34,7 +34,7 @@ def test_create_inference_client_defaults_to_grpc_when_grpc_endpoint_present():
 
 def test_create_inference_client_defaults_to_http_when_no_grpc_endpoint():
     mock_interface = MagicMock()
-    with patch(f"{module_under_test.__name__}.get_client_manager") as mock_client:
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
         client_instance = MagicMock()
         final_client_instance = MagicMock()
         mock_client.return_value = client_instance
@@ -59,7 +59,7 @@ def test_create_inference_client_defaults_to_http_when_no_grpc_endpoint():
 
 def test_create_inference_client_honors_explicit_protocol_grpc():
     mock_interface = MagicMock()
-    with patch(f"{module_under_test.__name__}.get_client_manager") as mock_client:
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
         client_instance = MagicMock()
         final_client_instance = MagicMock()
         mock_client.return_value = client_instance
@@ -85,7 +85,7 @@ def test_create_inference_client_honors_explicit_protocol_grpc():
 
 def test_create_inference_client_honors_explicit_protocol_http():
     mock_interface = MagicMock()
-    with patch(f"{module_under_test.__name__}.get_client_manager") as mock_client:
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
         client_instance = MagicMock()
         final_client_instance = MagicMock()
         mock_client.return_value = client_instance
