@@ -4,7 +4,7 @@
 
 from typing import Tuple, Optional
 
-from nv_ingest_api.internal.primitives.nim.nim_client import NimClient
+from nv_ingest_api.internal.primitives.nim.nim_client import ClientManager
 from nv_ingest_api.internal.primitives.nim.nim_client import get_client_manager
 from nv_ingest_api.internal.primitives.nim.nim_model_interface import ModelInterface
 
@@ -19,9 +19,9 @@ def create_inference_client(
     timeout: float = 120.0,
     max_retries: int = 5,
     **kwargs,
-) -> NimClient:
+) -> ClientManager:
     """
-    Create a NimClient for interfacing with a model inference server.
+    Create a ClientManager for interfacing with a model inference server.
 
     Parameters
     ----------
@@ -36,8 +36,8 @@ def create_inference_client(
 
     Returns
     -------
-    NimClient
-        The initialized NimClient.
+    ClientManager
+        The initialized ClientManager.
 
     Raises
     ------

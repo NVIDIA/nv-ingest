@@ -125,8 +125,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
     def test_successful_extraction(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test successful chart data extraction and DataFrame update."""
         # Configure _create_clients to return our mock clients
-        mock_create_yolox_client.return_value.__enter__.return_value = self.mock_yolox_client
-        mock_create_ocr_client.return_value.__enter__.return_value = self.mock_ocr_client
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content), ("base64_image2", self.chart_content)]
@@ -185,8 +185,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
     def test_mixed_rows(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior with a mix of matching and non-matching rows."""
         # Configure _create_clients to return our mock clients
-        mock_create_yolox_client.return_value.__enter__.return_value = self.mock_yolox_client
-        mock_create_ocr_client.return_value.__enter__.return_value = self.mock_ocr_client
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content)]
@@ -232,8 +232,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
     def test_null_trace_info(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior when trace_info is None."""
         # Configure _create_clients to return our mock clients
-        mock_create_yolox_client.return_value.__enter__.return_value = self.mock_yolox_client
-        mock_create_ocr_client.return_value.__enter__.return_value = self.mock_ocr_client
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content)]
@@ -275,8 +275,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
     def test_extraction_error(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior when an error occurs during extraction."""
         # Configure _create_clients to return our mock clients
-        mock_create_yolox_client.return_value.__enter__.return_value = self.mock_yolox_client
-        mock_create_ocr_client.return_value.__enter__.return_value = self.mock_ocr_client
+        mock_create_yolox_client.return_value.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to raise an exception
         mock_update_chart_metadata.side_effect = Exception("Chart extraction failed")
