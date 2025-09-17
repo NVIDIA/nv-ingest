@@ -39,6 +39,9 @@ NeMo Retriever extraction supports the following GPU hardware.
 <!-- - [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/) -->
 <!-- - [L40S](https://www.nvidia.com/en-us/data-center/l40s/)  -->
 
+!!! note
+
+    Release 25.09 does not support A10G and L40S hardware. To use A10G or L40S hardware, use release 25.6.x.
 
 The following are the hardware requirements to run NeMo Retriever extraction.
 
