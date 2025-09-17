@@ -50,7 +50,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
     OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text
+    OCR_MODEL_NAME=scene_text_ensemble
     ```
         
    Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
