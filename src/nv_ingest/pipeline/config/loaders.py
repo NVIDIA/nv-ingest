@@ -194,6 +194,88 @@ def validate_pipeline_config(config: Optional[PipelineConfigSchema]) -> Pipeline
     return config
 
 
+def resolve_framework_type(
+    config: PipelineConfigSchema,
+    libmode: bool,
+    env: Optional[dict] = None,
+) -> PipelineFrameworkType:
+    """
+    Resolve the execution framework in a single place and log the decision source.
+
+    Rules:
+    - If config.pipeline.framework.type is set: use it
+    - Else default to 'python' when libmode=True, else 'ray'
+    - If libmode=True and resolved is 'ray': raise ValueError with guidance
+    """
+    env = env or os.environ
+    # Prefer explicit config value
+    try:
+        cfg_type = config.pipeline.framework.type
+    except Exception:
+        cfg_type = None
+
+    if cfg_type is None:
+        resolved = PipelineFrameworkType.PYTHON if libmode else PipelineFrameworkType.RAY
+        source = "default(libmode)" if libmode else "default(service)"
+    else:
+        resolved = cfg_type
+        source = "config"
+
+    if libmode and resolved == PipelineFrameworkType.RAY:
+        raise ValueError(
+            "Libmode does not support the Ray framework. "
+            "Set pipeline.framework.type to 'python' (or INGEST_SERVICE_FRAMEWORK=python) "
+            "or use the Ray service pipeline."
+        )
+
+    logger.info(f"Resolved framework: {resolved.value} (source={source})")
+    return resolved
+
+
+def enforce_broker_interface_policy(
+    config: PipelineConfigSchema, framework: PipelineFrameworkType
+) -> PipelineConfigSchema:
+    """
+    Enforce minimal broker interface policy for the selected framework.
+    - Ray: override any 'direct' interface to 'socket' at pipeline-level service_broker and per-stage broker_client.
+    - Python: no changes.
+    """
+    if framework != PipelineFrameworkType.RAY:
+        return config
+
+    try:
+        svc_broker = getattr(getattr(config, "pipeline", None), "service_broker", None)
+        if svc_broker is not None:
+            broker_client = getattr(svc_broker, "broker_client", None)
+            if isinstance(broker_client, dict):
+                iface = str(broker_client.get("interface_type", "")).strip().lower()
+                if iface == "direct":
+                    logger.warning(
+                        "Ray framework: overriding pipeline.service_broker.broker_client.interface_type 'direct' "
+                        "-> 'socket'"
+                    )
+                    broker_client["interface_type"] = "socket"
+                    svc_broker.broker_client = broker_client
+
+        for stage in config.stages:
+            cfg = getattr(stage, "config", None) or {}
+            if isinstance(cfg, dict) and "broker_client" in cfg:
+                bcfg = cfg.get("broker_client") or {}
+                iface = str(bcfg.get("interface_type", "")).strip().lower()
+                if iface == "direct":
+                    logger.warning(
+                        "Ray framework: overriding stage '%s' broker_client.interface_type 'direct' -> 'socket'",
+                        stage.name,
+                    )
+                    bcfg["interface_type"] = "socket"
+                    cfg["broker_client"] = bcfg
+                    stage.config = cfg
+    except Exception:
+        logger.debug("Broker interface policy enforcement encountered a non-fatal issue", exc_info=True)
+
+    return config
+
+
 def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], libmode: bool) -> PipelineConfigSchema:
     """
     Resolve the final pipeline configuration from inputs.

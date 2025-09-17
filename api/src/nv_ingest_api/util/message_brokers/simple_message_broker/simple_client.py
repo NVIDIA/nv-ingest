@@ -462,8 +462,26 @@ class SimpleClient(MessageBrokerClientBase):
             if getattr(self, "_interface_type", "direct") == "socket":
                 logger.debug("Bypassing in-process broker due to interface_type='socket'")
                 return None
-            # Access the global singleton safely; no host/port matching required
-            return getattr(SimpleMessageBroker, "_instance", None)
+            # Access the global singleton safely
+            broker = getattr(SimpleMessageBroker, "_instance", None)
+            if broker is None:
+                return None
+            # Ensure the singleton matches the intended host/port to avoid cross-binding surprises
+            try:
+                bound_host, bound_port = getattr(broker, "server_address", (None, None))
+            except Exception:
+                bound_host, bound_port = (None, None)
+            if (bound_host, bound_port) != (self._host, self._port):
+                logger.debug(
+                    "In-process broker present but bound to %s:%s (client expects %s:%s); using sockets",
+                    bound_host,
+                    bound_port,
+                    self._host,
+                    self._port,
+                )
+                return None
+            logger.debug("Using in-process broker at %s:%s", bound_host, bound_port)
+            return broker
         except Exception:
             return None
 

@@ -34,6 +34,24 @@ from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 from nv_ingest.framework.schemas.ray_message_broker_task_source_config import (
     RayMessageBrokerTaskSourceConfig,
 )
+from nv_ingest.framework.schemas.broker_client_configs import (
+    RedisClientConfig,
+    SimpleClientConfig,
+    BrokerParamsRedis,
+)
+
+# Backward-compatible export names expected by tests
+# tests import MessageBrokerTaskSourceConfig directly from this module
+MessageBrokerTaskSourceConfig = RayMessageBrokerTaskSourceConfig
+
+__all__ = [
+    "MessageBrokerTaskSourceStage",
+    "MessageBrokerTaskSourceConfig",
+    "RayMessageBrokerTaskSourceConfig",
+    "RedisClientConfig",
+    "SimpleClientConfig",
+    "BrokerParamsRedis",
+]
 
 logger = logging.getLogger(__name__)
 

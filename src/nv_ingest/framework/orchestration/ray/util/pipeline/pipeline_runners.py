@@ -12,7 +12,12 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
 )
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 
-from nv_ingest.pipeline.config.loaders import resolve_pipeline_config, apply_runtime_overrides
+from nv_ingest.pipeline.config.loaders import (
+    resolve_pipeline_config,
+    apply_runtime_overrides,
+    resolve_framework_type,
+    enforce_broker_interface_policy,
+)
 from nv_ingest.framework.orchestration.process.lifecycle import PipelineLifecycleManager
 from nv_ingest.framework.orchestration.execution.helpers import (
     create_runtime_overrides,
@@ -87,6 +92,24 @@ def run_pipeline(
     config = resolve_pipeline_config(pipeline_config, libmode)
     overrides = create_runtime_overrides(disable_dynamic_scaling, dynamic_memory_threshold)
     final_config = apply_runtime_overrides(config, overrides)
+
+    # Resolve framework once and enforce minimal broker interface policy
+    framework_type = resolve_framework_type(final_config, libmode)
+    # Log a quick snapshot of stage implementations (first 3 for brevity)
+    try:
+        impls = []
+        for s in getattr(final_config, "stages", [])[:3]:
+            impls.append(getattr(s, "stage_impl", None) or getattr(s, "callable", None))
+        logger.info(
+            "Framework=%s, stages=%d, sample_impls=%s",
+            getattr(framework_type, "value", str(framework_type)),
+            len(getattr(final_config, "stages", [])),
+            impls,
+        )
+    except Exception:
+        pass
+
+    final_config = enforce_broker_interface_policy(final_config, framework_type)
 
     # Select execution strategy
     strategy = select_execution_strategy(run_in_subprocess)

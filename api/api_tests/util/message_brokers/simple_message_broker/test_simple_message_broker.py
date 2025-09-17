@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import random
-
 import pytest
 import threading
 import socket
@@ -17,28 +15,69 @@ from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessa
 # from your_module import SimpleMessageBroker
 
 HOST = "127.0.0.1"
-PORT = 2000 + random.randint(0, 10000)  # Use an available port
-MAX_QUEUE_SIZE = 5
+MAX_QUEUE_SIZE = 10
+# Module-level current broker address, set by fixture for convenience
+CURRENT_BROKER_ADDR = None
 
 
-@pytest.fixture(scope="module")
-def broker_server():
-    """Fixture to start and stop the SimpleMessageBroker server."""
-    server = SimpleMessageBroker(HOST, PORT, MAX_QUEUE_SIZE)
-    server_thread = threading.Thread(target=server.serve_forever)
-    server_thread.daemon = True  # Allows program to exit even if thread is running
+@pytest.fixture(scope="session")
+def broker():
+    """Start broker on an ephemeral port and yield (server, host, port)."""
+    global CURRENT_BROKER_ADDR
+    server = SimpleMessageBroker(HOST, 0, MAX_QUEUE_SIZE)
+    host, port = server.server_address
+    # Expose current address for helpers that don't get broker_addr explicitly
+    CURRENT_BROKER_ADDR = (host, port)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
-    time.sleep(1)  # Give the server a moment to start
-    yield
+    time.sleep(0.2)
+    try:
+        yield server, host, port
+    finally:
+        # Best-effort shutdown to avoid hangs
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        try:
+            server.server_close()
+        except Exception:
+            pass
+        # Avoid indefinite join in case shutdown is misbehaving
+        try:
+            server_thread.join(timeout=2.0)
+        except Exception:
+            pass
+        # Clear module-level address and any singleton instance to prevent reuse
+        try:
+            CURRENT_BROKER_ADDR = None
+        except Exception:
+            pass
+        try:
+            from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessageBroker as _SMB
 
-    server.shutdown()
-    server.server_close()
-    server_thread.join()
+            setattr(_SMB, "_instance", None)
+        except Exception:
+            pass
 
 
-def send_request(request_data):
+@pytest.fixture
+def broker_addr(broker):
+    """Return (host, port) for the running broker."""
+    _, host, port = broker
+    return host, port
+
+
+def send_request(request_data, broker_addr=None):
     """Helper method to send a request to the server and receive a response."""
-    sock = socket.create_connection((HOST, PORT))
+    global CURRENT_BROKER_ADDR
+    if broker_addr is None:
+        if CURRENT_BROKER_ADDR is None:
+            raise TypeError("send_request() missing required broker_addr and CURRENT_BROKER_ADDR is not set")
+        host, port = CURRENT_BROKER_ADDR
+    else:
+        host, port = broker_addr
+    sock = socket.create_connection((host, port))
     try:
         # Send request
         request_json = json.dumps(request_data).encode("utf-8")
@@ -77,10 +116,10 @@ def send_ack(sock, transaction_id, ack=True):
     sock.sendall(len(ack_data).to_bytes(8, "big") + ack_data)
 
 
-def _push_message(queue_name, message):
+def _push_message(queue_name, message, broker_addr=None):
     """Helper method to push a message into the queue without testing ACK behavior."""
     request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
     transaction_id = response["transaction_id"]
     send_ack(sock, transaction_id)
     # Receive final response
@@ -90,15 +129,14 @@ def _push_message(queue_name, message):
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_with_ack():
+def test_push_with_ack(broker_addr):
     """Test PUSH operation with acknowledgment."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
 
     # Send PUSH request
     request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     # Ensure initial response contains transaction ID
     assert response["response_code"] == 0
@@ -120,14 +158,13 @@ def test_push_with_ack():
 
     # Verify that the message is in the queue
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_without_ack():
+def test_push_without_ack(broker_addr):
     """Test PUSH operation without acknowledgment (should not store the message)."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
@@ -139,7 +176,7 @@ def test_push_without_ack():
         "message": message,
         "timeout": 1,  # Short timeout for the test
     }
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     # Do not send ACK, wait for timeout
     time.sleep(2)
@@ -156,24 +193,23 @@ def test_push_without_ack():
 
     # Verify that the message is not in the queue
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_pop_with_ack():
+def test_pop_with_ack(broker_addr):
     """Test POP operation with acknowledgment."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
 
     # Pre-populate the queue
-    _push_message(queue_name, message)
+    _push_message(queue_name, message, broker_addr)
 
     # Send POP request
     request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     # Ensure initial response contains the message and transaction ID
     assert response["response_code"] == 0
@@ -196,24 +232,23 @@ def test_pop_with_ack():
 
     # Verify that the queue is now empty
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_pop_without_ack():
+def test_pop_without_ack(broker_addr):
     """Test POP operation without acknowledgment (should return data to queue)."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
 
     # Pre-populate the queue
-    _push_message(queue_name, message)
+    _push_message(queue_name, message, broker_addr)
 
     # Send POP request
     request_data = {"command": "POP", "queue_name": queue_name, "timeout": 1}  # Short timeout for the test
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     # Do not send ACK, wait for timeout
     time.sleep(2)
@@ -230,44 +265,41 @@ def test_pop_without_ack():
 
     # Verify that the message is back in the queue
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_size_command():
+def test_size_command(broker_addr):
     """Test SIZE command to get the number of items in a queue."""
     queue_name = f"test_queue_{uuid4()}"
     messages = ["Message 1", "Message 2", "Message 3"]
 
     # Push messages into the queue
     for msg in messages:
-        _push_message(queue_name, msg)
+        _push_message(queue_name, msg, broker_addr)
 
     # Send SIZE request
     request_data = {"command": "SIZE", "queue_name": queue_name}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     assert response["response_code"] == 0
     assert response["response"] == str(len(messages))
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_invalid_command():
+def test_invalid_command(broker_addr):
     """Test handling of an invalid command."""
     request_data = {"command": "INVALID", "queue_name": "test_queue"}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     assert response["response_code"] == 1
     assert response["response_reason"] == "Unknown command"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_queue_not_exist():
+def test_queue_not_exist(broker_addr):
     """Test POP from a non-existent queue."""
     queue_name = f"non_existent_queue_{uuid4()}"
 
@@ -280,8 +312,7 @@ def test_queue_not_exist():
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_queue_full():
+def test_queue_full(broker_addr):
     """Test PUSH operation when the queue is full."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
@@ -289,7 +320,7 @@ def test_queue_full():
     # Fill the queue to its maximum size
     for _ in range(MAX_QUEUE_SIZE):
         request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
-        sock, response = send_request(request_data)
+        sock, response = send_request(request_data, broker_addr)
 
         # Receive initial response with transaction ID
         assert response["response_code"] == 0
@@ -310,7 +341,7 @@ def test_queue_full():
 
     # Attempt to push another message beyond capacity
     request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
 
     # Receive immediate failure response (no transaction ID)
     assert response["response_code"] == 1
@@ -320,8 +351,7 @@ def test_queue_full():
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_ack_with_wrong_transaction_id():
+def test_ack_with_wrong_transaction_id(broker_addr):
     """Test sending ACK with incorrect transaction ID."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
@@ -346,14 +376,13 @@ def test_ack_with_wrong_transaction_id():
 
     # Verify that the message is not in the queue
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_with_large_message():
+def test_push_with_large_message(broker_addr):
     """Test pushing a large message to the queue."""
     queue_name = f"test_queue_{uuid4()}"
     message = "A" * (1024 * 1024 * 5)  # 5MB message
@@ -378,14 +407,13 @@ def test_push_with_large_message():
 
     # Verify that the message is in the queue
     size_request = {"command": "SIZE", "queue_name": queue_name}
-    sock, size_response = send_request(size_request)
+    sock, size_response = send_request(size_request, broker_addr)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_pop_from_empty_queue():
+def test_pop_from_empty_queue(broker_addr):
     """Test POP operation from an empty queue."""
     queue_name = f"test_queue_{uuid4()}"
 
@@ -398,15 +426,14 @@ def test_pop_from_empty_queue():
     sock.close()
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_ack_timeout():
+def test_ack_timeout(broker_addr):
     """Test that the server times out waiting for ACK."""
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
 
     # Send PUSH request with a short timeout
     request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 1}  # 1-second timeout
-    sock, response = send_request(request_data)
+    sock, response = send_request(request_data, broker_addr)
     transaction_id = response["transaction_id"]
 
     # Wait for longer than the timeout
@@ -438,7 +465,7 @@ def test_ack_timeout():
     sock.close()
 
 
-def test_concurrent_push_pop():
+def test_concurrent_push_pop(broker_addr):
     """Test concurrent PUSH and POP operations."""
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(10)]
@@ -447,7 +474,7 @@ def test_concurrent_push_pop():
 
     def push_message(msg):
         try:
-            _push_message(queue_name, msg)
+            _push_message(queue_name, msg, broker_addr)
             with lock:
                 results.append(f"Pushed: {msg}")
         except Exception as e:
@@ -458,7 +485,7 @@ def test_concurrent_push_pop():
         try:
             # Send POP request
             request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
-            sock, response = send_request(request_data)
+            sock, response = send_request(request_data, broker_addr)
             if response["response_code"] == 0:
                 transaction_id = response["transaction_id"]
                 message = response["response"]
@@ -507,8 +534,7 @@ def test_concurrent_push_pop():
     assert len(popped) == len(messages)
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_multiple_clients():
+def test_multiple_clients(broker_addr):
     """Test multiple clients interacting with the server simultaneously."""
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Client {i} Message" for i in range(5)]
@@ -517,10 +543,10 @@ def test_multiple_clients():
 
     def client_thread(message):
         # Push message
-        _push_message(queue_name, message)
+        _push_message(queue_name, message, broker_addr)
         # Pop message
         request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
-        sock, response = send_request(request_data)
+        sock, response = send_request(request_data, broker_addr)
         if response["response_code"] == 0:
             transaction_id = response["transaction_id"]
             popped_message = response["response"]
