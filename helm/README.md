@@ -42,7 +42,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -53,7 +53,7 @@ helm upgrade \
     --set paddleocr-nim.deployed=true \
     --set nemoretriever-ocr.deployed=false \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.3.0"
+    --set image.tag="25.9.0"
 ```
 
 > [!NOTE]
