@@ -34,7 +34,7 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
+         uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
     ```
 
     !!! tip
@@ -114,7 +114,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         # extract_method="nemoretriever_parse",

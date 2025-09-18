@@ -92,7 +92,7 @@ Create a fresh Python environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
+  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
 ```
 
 Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -156,7 +156,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
