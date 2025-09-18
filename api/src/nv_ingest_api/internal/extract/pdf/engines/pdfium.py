@@ -357,13 +357,6 @@ def _extract_page_elements(
     except Exception as e:
         logger.exception(f"Error in page element extraction: {str(e)}")
         raise
-    finally:
-        # Ensure client is closed properly
-        if yolox_client:
-            try:
-                yolox_client.close()
-            except Exception as e:
-                logger.warning(f"Error closing YOLOX client: {str(e)}")
 
     return extracted_page_elements
 

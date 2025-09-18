@@ -355,7 +355,6 @@ def test_extract_page_elements_happy_path2(
     mock_extract_ensemble.assert_called_once_with(dummy_pages, mock_client, execution_trace_log=dummy_trace_log)
     assert mock_construct_metadata.call_count == 2
     assert result == ["meta_0", "meta_1"]
-    mock_client.close.assert_called_once()
 
 
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
@@ -391,7 +390,6 @@ def test_extract_page_elements_fallback_to_default_model(
     mock_extract_ensemble.assert_called_once()
     mock_construct_metadata.assert_called_once()
     assert result == ["chart_meta"]
-    mock_client.close.assert_called_once()
 
 
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
@@ -421,7 +419,6 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
     # Should skip everything, hence no metadata constructed, result empty
     mock_extract_ensemble.assert_called_once()
     assert result == []
-    mock_client.close.assert_called_once()
 
 
 @patch(f"{MODULE_UNDER_TEST}.construct_image_metadata_from_base64")
@@ -490,7 +487,6 @@ def test_pdfium_extractor_happy_path(
     mock_extract_images.assert_called()
     mock_pages_to_numpy.assert_called()
     mock_extract_elements.assert_called()
-    mock_doc.close.assert_called_once()
     assert result == ["text_meta", "image_meta", "page_image_meta", "table_chart_meta"]
 
 

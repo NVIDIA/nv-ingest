@@ -88,6 +88,8 @@ def preprocess_image_for_ocr(
     target_height: Optional[int] = None,
     target_width: Optional[int] = None,
     pad_how: str = "bottom_right",
+    normalize: bool = False,
+    channel_first: bool = False,
 ) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with NemoRetriever-OCR.
@@ -122,10 +124,12 @@ def preprocess_image_for_ocr(
         how=pad_how,
     )
 
-    padded = padded / 255.0
+    if normalize:
+        padded = padded / 255.0
 
-    # NemoRetriever-OCR NIM (GRPC) requires input to be (channel, height, width).
-    transposed = padded.transpose((2, 0, 1))
+    if channel_first:
+        # NemoRetriever-OCR NIM (GRPC) requires input to be (channel, height, width).
+        padded = padded.transpose((2, 0, 1))
 
     # Metadata can used for inverting transformations on the resulting bounding boxes.
     metadata = {
@@ -137,7 +141,7 @@ def preprocess_image_for_ocr(
         "pad_width": pad_width,
     }
 
-    return transposed, metadata
+    return padded, metadata
 
 
 def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
