@@ -231,6 +231,7 @@ class NimClient:
                     all_results.extend(batch_results)
                 else:
                     all_results.append(batch_results)
+
         except Exception as err:
             error_str = f"Error during NimClient inference [{self.model_interface.name()}, {self.protocol}]: {err}"
             logger.error(error_str)

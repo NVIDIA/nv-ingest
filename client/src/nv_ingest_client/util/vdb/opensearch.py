@@ -82,7 +82,7 @@ class OpenSearch(VDB):
         index_name = kwargs.get("index_name", f"{self.index_name}_dense")
         top_k = kwargs.get("top_k", 10)
         nvidia_api_key = kwargs.get("nvidia_api_key" or client_config.nvidia_api_key)
-
+        # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
         embedding_endpoint = kwargs.get("embedding_endpoint", client_config.embedding_nim_endpoint)
         model_name = kwargs.get("model_name", client_config.embedding_nim_model_name)
         from llama_index.embeddings.nvidia import NVIDIAEmbedding
