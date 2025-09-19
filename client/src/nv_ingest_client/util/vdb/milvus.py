@@ -788,9 +788,9 @@ def bulk_insert_milvus(
         time.sleep(1)
         tasks = copy.copy(task_ids)
         for task_id in tasks:
-            logger.info(f"Checking task: {task_id}")
             task = utility.get_bulk_insert_state(task_id=task_id)
             state = task.state_name
+            logger.info(f"Checking task: {task_id} - imported rows: {task.row_count}")
             if state == "Completed":
                 logger.info(f"Task: {task_id}")
                 logger.info(f"Start time: {task.create_time_str}")
