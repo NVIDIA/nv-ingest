@@ -15,12 +15,18 @@ def infer_microservice(
     truncate: str = "END",
     batch_size: int = 8191,
     grpc: bool = False,
+    input_names: list = ["text"],
+    output_names: list = ["embeddings"],
+    dtypes: list = ["BYTES"],
 ):
     """
     This function takes the input data and creates a list of embeddings
     using the NVIDIA embedding microservice.
     """
-    data = {"prompts": [res["metadata"]["content"] for res in data]}
+    if isinstance(data[0], str):
+        data = {"prompts": data}
+    else:
+        data = {"prompts": [res["metadata"]["content"] for res in data]}
     if grpc:
         model_name = re.sub(r"[^a-zA-Z0-9]", "_", model_name)
         client = NimClient(
@@ -33,10 +39,10 @@ def infer_microservice(
             data,
             model_name,
             parameters={"input_type": input_type, "truncate": truncate},
-            outputs=["embeddings"],
-            dtype=["BYTES"],
-            input_name=["text"],
+            dtypes=dtypes,
+            input_names=input_names,
             batch_size=batch_size,
+            output_names=output_names,
         )
     else:
         embedding_endpoint = f"{embedding_endpoint}/embeddings"

@@ -776,17 +776,21 @@ def bulk_insert_milvus(
     t_bulk_start = time.time()
     task_ids = []
 
-    task_id = utility.do_bulk_insert(
-        collection_name=collection_name,
-        files=[file for files in writer.batch_files for file in files],
-        consistency_level=CONSISTENCY,
+    task_ids.append(
+        utility.do_bulk_insert(
+            collection_name=collection_name,
+            files=[file for files in writer.batch_files for file in files],
+            consistency_level=CONSISTENCY,
+        )
     )
 
     while len(task_ids) > 0:
         time.sleep(1)
-        for task_id in task_ids:
+        tasks = copy.copy(task_ids)
+        for task_id in tasks:
             task = utility.get_bulk_insert_state(task_id=task_id)
             state = task.state_name
+            logger.info(f"Checking task: {task_id} - imported rows: {task.row_count}")
             if state == "Completed":
                 logger.info(f"Task: {task_id}")
                 logger.info(f"Start time: {task.create_time_str}")
@@ -884,7 +888,6 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     for idx in range(0, len(records), batch_size):
         client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
         count += len(records[idx : idx + batch_size])
-    client.flush(collection_name)
     logger.info(f"streamed {count} records")
 
 
@@ -896,6 +899,7 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     bulk inserts are not supported by this function
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
+    client.flush(collection_name)
     index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
     for index_name in index_names:
@@ -1082,6 +1086,7 @@ def write_to_nvingest_collection(
         )
         # fixes bulk insert lag time https://github.com/milvus-io/milvus/issues/21746
         client.refresh_load(collection_name)
+        logger.info(f"Refresh load response: {client.get_load_state(collection_name)}")
 
 
 def dense_retrieval(
@@ -1110,8 +1115,8 @@ def dense_retrieval(
         Milvus Collection to search against
     client : MilvusClient
         Client connected to mivlus instance.
-    dense_model : NVIDIAEmbedding
-        Dense model to generate dense embeddings for queries.
+    dense_model : Partial Function
+        Partial function to generate dense embeddings with queries.
     top_k : int
         Number of search results to return per query.
     dense_field : str
@@ -1125,7 +1130,8 @@ def dense_retrieval(
     """
     dense_embeddings = []
     for query in queries:
-        dense_embeddings.append(dense_model.get_query_embedding(query))
+        # dense_embeddings.append(dense_model.get_query_embedding(query))
+        dense_embeddings += dense_model([query])
 
     search_params = {}
     if not gpu_search and not local_index:
@@ -1194,7 +1200,7 @@ def hybrid_retrieval(
     dense_embeddings = []
     sparse_embeddings = []
     for query in queries:
-        dense_embeddings.append(dense_model.get_query_embedding(query))
+        dense_embeddings += dense_model([query])
         if sparse_model:
             sparse_embeddings.append(_format_sparse_embedding(sparse_model.encode_queries([query])))
         else:
@@ -1330,15 +1336,21 @@ def nvingest_retrieval(
         kwargs.pop("vdb_op", None)
         queries = kwargs.pop("queries", [])
         return vdb_op.retrieval(queries, **kwargs)
-    from llama_index.embeddings.nvidia import NVIDIAEmbedding
 
     client_config = ClientConfigSchema()
     nvidia_api_key = client_config.nvidia_api_key
-    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
     local_index = False
-    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
+    embed_model = partial(
+        infer_microservice,
+        model_name=model_name,
+        embedding_endpoint=embedding_endpoint,
+        nvidia_api_key=nvidia_api_key,
+        input_type="query",
+        output_names=["embeddings"],
+        grpc=not (urlparse(embedding_endpoint).scheme == "http"),
+    )
     client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     final_top_k = top_k
     if nv_ranker:
@@ -1642,7 +1654,7 @@ def embed_index_collection(
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
-    intput_type: str = "passage",
+    input_type: str = "passage",
     truncate: str = "END",
     client: MilvusClient = None,
     username: str = None,
@@ -1694,7 +1706,6 @@ def embed_index_collection(
     """
     client_config = ClientConfigSchema()
     nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
-    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
     # if not scheme we assume we are using grpc
@@ -1738,7 +1749,7 @@ def embed_index_collection(
                     model_name,
                     embedding_endpoint,
                     nvidia_api_key,
-                    intput_type,
+                    input_type,
                     truncate,
                     batch_size,
                     grpc,
@@ -1756,7 +1767,7 @@ def embed_index_collection(
             model_name,
             embedding_endpoint,
             nvidia_api_key,
-            intput_type,
+            input_type,
             truncate,
             batch_size,
             grpc,
