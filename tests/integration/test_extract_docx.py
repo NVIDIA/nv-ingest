@@ -70,8 +70,6 @@ def test_docx_extract_only(
 ):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
-        message_client_port=7671,
-        message_client_hostname="localhost",
         worker_pool_size=2,
     )
 

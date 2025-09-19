@@ -22,14 +22,25 @@ if local_log_level in ("DEFAULT",):
 
 configure_local_logging(local_log_level)
 
+# Uncomment when using libmode with an out of process client, or when using a socket interface.
+# os.environ["MESSAGE_CLIENT_INTERFACE"] = "socket"
+
 
 def run_ingestor():
     """
     Set up and run the ingestion process to send traffic against the pipeline.
     """
     logger.info("Setting up Ingestor client...")
+    # IMPORTANT: In libmode direct interface, the in-process SimpleMessageBroker is keyed by ("0.0.0.0", 7671).
+    # Using "localhost" prevents in-process detection and would attempt a socket connection
+    # (not started in direct mode).
     client = NvIngestClient(
-        message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="localhost"
+        message_client_allocator=SimpleClient,
+        # message_client_hostname=os.environ.get("MESSAGE_CLIENT_HOST", "0.0.0.0"),
+        # message_client_port=int(os.environ.get("MESSAGE_CLIENT_PORT", 7671)),
+        # message_client_kwargs={
+        #    "interface_type": "socket",
+        # },
     )
 
     ingestor = (
@@ -64,11 +75,12 @@ def main():
     Launch the libmode pipeline service and run the ingestor against it.
     Uses the embedded default libmode pipeline configuration.
     """
+    pipeline = None
     try:
         pipeline = run_pipeline(
             block=False,
             disable_dynamic_scaling=True,
-            run_in_subprocess=True,
+            run_in_subprocess=False,
             stdout=sys.stdout,
             stderr=sys.stderr,
         )
@@ -80,8 +92,13 @@ def main():
     except Exception as e:
         logger.error(f"Error running pipeline: {e}")
     finally:
-        pipeline.stop()
-        logger.info("Shutting down pipeline...")
+        if pipeline is not None:
+            try:
+                pipeline.stop()
+            except Exception:
+                logger.exception("Error stopping pipeline during shutdown")
+        else:
+            logger.info("Pipeline was not started; skipping shutdown step.")
 
 
 if __name__ == "__main__":
