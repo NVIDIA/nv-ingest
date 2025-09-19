@@ -776,15 +776,19 @@ def bulk_insert_milvus(
     t_bulk_start = time.time()
     task_ids = []
 
-    task_id = utility.do_bulk_insert(
-        collection_name=collection_name,
-        files=[file for files in writer.batch_files for file in files],
-        consistency_level=CONSISTENCY,
+    task_ids.append(
+        utility.do_bulk_insert(
+            collection_name=collection_name,
+            files=[file for files in writer.batch_files for file in files],
+            consistency_level=CONSISTENCY,
+        )
     )
 
     while len(task_ids) > 0:
         time.sleep(1)
-        for task_id in task_ids:
+        tasks = copy.copy(task_ids)
+        for task_id in tasks:
+            logger.info(f"Checking task: {task_id}")
             task = utility.get_bulk_insert_state(task_id=task_id)
             state = task.state_name
             if state == "Completed":
@@ -884,7 +888,6 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     for idx in range(0, len(records), batch_size):
         client.insert(collection_name=collection_name, data=records[idx : idx + batch_size])
         count += len(records[idx : idx + batch_size])
-    client.flush(collection_name)
     logger.info(f"streamed {count} records")
 
 
@@ -896,6 +899,7 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     bulk inserts are not supported by this function
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
+    client.flush(collection_name)
     index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
     for index_name in index_names:
@@ -1082,6 +1086,7 @@ def write_to_nvingest_collection(
         )
         # fixes bulk insert lag time https://github.com/milvus-io/milvus/issues/21746
         client.refresh_load(collection_name)
+        logger.info(f"Refresh load response: {client.get_load_state(collection_name)}")
 
 
 def dense_retrieval(
