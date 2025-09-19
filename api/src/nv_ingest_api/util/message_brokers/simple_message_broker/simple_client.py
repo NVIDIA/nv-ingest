@@ -74,7 +74,10 @@ class SimpleClient(MessageBrokerClientBase):
         # Interface selection: 'auto' (prefer in-process if present), 'direct' (force in-process if present),
         # 'socket' (force sockets)
         # Priority: explicit parameter > environment variable > 'auto'
-        self._interface_type = (interface_type or os.environ.get("MESSAGE_CLIENT_INTERFACE") or "auto").strip().lower()
+        # Default to 'direct' so libmode prefers in-process by default unless overridden
+        self._interface_type = (
+            (interface_type or os.environ.get("MESSAGE_CLIENT_INTERFACE") or "direct").strip().lower()
+        )
         if self._interface_type not in ("auto", "direct", "socket"):
             self._interface_type = "direct"
         logger.debug(
@@ -466,6 +469,10 @@ class SimpleClient(MessageBrokerClientBase):
             broker = getattr(SimpleMessageBroker, "_instance", None)
             if broker is None:
                 return None
+            # If 'direct' is requested, prefer in-process broker regardless of host/port mismatch
+            if getattr(self, "_interface_type", "auto") == "direct":
+                logger.debug("interface_type='direct': using in-process broker without host/port check")
+                return broker
             # Ensure the singleton matches the intended host/port to avoid cross-binding surprises
             try:
                 bound_host, bound_port = getattr(broker, "server_address", (None, None))

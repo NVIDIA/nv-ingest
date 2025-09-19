@@ -407,6 +407,19 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         with cls._instance_lock:
             if cls._instance is None:
                 cls._instance = super(SimpleMessageBroker, cls).__new__(cls)
+            # Defensive: ensure critical attributes exist on reused singleton before __init__ returns early
+            if not hasattr(cls._instance, "lock"):
+                # Note: do not import logging here to avoid import-time side effects; keep minimal
+                cls._instance.lock = threading.Lock()
+            # Ensure other critical dicts exist (may be missing if previous init failed early)
+            if not hasattr(cls._instance, "queues"):
+                cls._instance.queues = {}
+            if not hasattr(cls._instance, "queue_locks"):
+                cls._instance.queue_locks = {}
+            if not hasattr(cls._instance, "_pending_pushes"):
+                cls._instance._pending_pushes = {}
+            if not hasattr(cls._instance, "_inflight_pops"):
+                cls._instance._inflight_pops = {}
             return cls._instance
 
     def __init__(self, host: str, port: int, max_queue_size: int):
@@ -423,14 +436,30 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             The maximum size of each message queue.
         """
 
+        # Ensure critical attributes exist even if a previous init attempt failed before setting them
+        # This protects against stale singleton instances where super().__init__ previously raised
+        if not hasattr(self, "lock"):
+            self.lock = threading.Lock()
+        if not hasattr(self, "queues"):
+            self.queues = {}
+        if not hasattr(self, "queue_locks"):
+            self.queue_locks = {}
+        if not hasattr(self, "_pending_pushes"):
+            self._pending_pushes = {}
+        if not hasattr(self, "_inflight_pops"):
+            self._inflight_pops = {}
+
         # Prevent __init__ from running multiple times on the same instance
         if hasattr(self, "_initialized") and self._initialized:
             return
+
         super().__init__((host, port), SimpleMessageBrokerHandler)
         self.max_queue_size = max_queue_size
-        self.queues = {}
+        self.queues = {}  # Fresh maps for a new server bind
         self.queue_locks = {}  # Dictionary to hold locks for each queue
-        self.lock = threading.Lock()  # Global lock to protect access to queues and locks
+        # Re-create lock if missing (shouldn't happen due to guard above, but defensive)
+        if not hasattr(self, "lock"):
+            self.lock = threading.Lock()  # Global lock to protect access to queues and locks
         # State for in-process (direct) API two-phase operations
         self._pending_pushes: Dict[str, Dict[str, str]] = {}
         # maps transaction_id -> {"queue_name": str, "message": str}
@@ -454,10 +483,12 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         super().server_close()
         # Mark instance as not initialized so it can be re-initialized if reused by mistake
         self._initialized = False
-        # Clear any in-process state
-        with self.lock:
-            self._pending_pushes.clear()
-            self._inflight_pops.clear()
+        # Clear any in-process state (tolerate missing lock defensively)
+        _lock = getattr(self, "lock", None)
+        if _lock is not None:
+            with _lock:
+                self._pending_pushes.clear()
+                self._inflight_pops.clear()
 
     def _initialize_queue(self, queue_name: str):
         """
