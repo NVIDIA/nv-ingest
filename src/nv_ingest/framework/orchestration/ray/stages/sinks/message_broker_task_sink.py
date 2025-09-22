@@ -15,6 +15,11 @@ from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClien
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+from nv_ingest_api.data_handlers.data_writer import (
+    IngestDataWriter,
+    RedisDestinationConfig,
+    FilesystemDestinationConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +86,14 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         super().__init__(config, log_to_stdout=False, stage_name=stage_name)
 
         self.config: MessageBrokerTaskSinkConfig
-
         self.poll_interval = self.config.poll_interval
 
         # Create the appropriate broker client (e.g., Redis or Simple).
         self.client = self._create_client()
+
+        # NEW: Create the data writer for external system outputs
+        self.data_writer = IngestDataWriter(max_workers=4)
+
         self.start_time = None
         self.message_count = 0
 
@@ -224,40 +232,127 @@ class MessageBrokerTaskSinkStage(RayActorStage):
 
         self.client.submit_message(response_channel, json.dumps(fail_msg))
 
+    def _execute_output(
+        self, output_destination: str, json_result_fragments: List[Dict[str, Any]], response_channel: str
+    ) -> None:
+        """
+        Execute output using the IngestDataWriter.
+
+        Parameters
+        ----------
+        output_destination : str
+            Where to send output ('redis' or filesystem URI)
+        json_result_fragments : List[Dict[str, Any]]
+            JSON payload fragments to output
+        response_channel : str
+            Broker channel or base path for filesystem output
+        """
+        # Convert fragments to JSON strings
+        json_payloads = [json.dumps(fragment) for fragment in json_result_fragments]
+
+        # Calculate and log sizes (unchanged logic)
+        total_payload_size = sum(len(payload.encode("utf-8")) for payload in json_payloads)
+        total_size_mb = total_payload_size / (1024 * 1024)
+        logger.debug(f"Sink Total JSON payload size: {total_size_mb:.2f} MB")
+
+        # Create destination config and write asynchronously
+        if output_destination == "redis":
+            # Use existing broker config for Redis
+            broker_config = self.config.broker_client
+            if hasattr(broker_config, "host") and hasattr(broker_config, "port"):
+                dest_config = RedisDestinationConfig(
+                    host=broker_config.host,
+                    port=getattr(broker_config, "port", 6379),
+                    db=getattr(broker_config, "db", 0),
+                    password=getattr(broker_config, "password", None),
+                    channel=response_channel,
+                )
+            else:
+                # Fallback: assume SimpleClient, but for Redis we need proper config
+                raise ValueError("Redis output requires Redis broker configuration")
+        else:
+            # Filesystem destination
+            dest_path = self._resolve_destination_path(output_destination, response_channel)
+            dest_config = FilesystemDestinationConfig(path=dest_path)
+
+        # Write asynchronously using the data writer
+        self.data_writer.write_async(json_payloads, dest_config)
+
+    def _handle_async_output_result(self, future) -> None:
+        """
+        Handle completion of asynchronous output tasks.
+
+        Parameters
+        ----------
+        future : Future
+            The completed future from the async output operation
+        """
+        try:
+            # Check if the task completed successfully
+            future.result()  # This will raise an exception if the task failed
+        except Exception as e:
+            logger.error(f"Asynchronous output operation failed: {e}", exc_info=True)
+
+    def _resolve_destination_path(self, destination: str, response_channel: str) -> str:
+        """
+        Resolve the full destination path for filesystem output.
+
+        Parameters
+        ----------
+        destination : str
+            Base destination URI
+        response_channel : str
+            Response channel (used for filename if destination is a directory)
+
+        Returns
+        -------
+        str
+            Full destination path
+        """
+        # If destination ends with '/', treat as directory and append filename
+        if destination.endswith("/"):
+            return f"{destination.rstrip('/')}/{response_channel}.json"
+        # Otherwise, use destination directly
+        return destination
+
     # --- Public API Methods for message broker sink ---
 
     @udf_intercept_hook()
     def on_data(self, control_message: Any) -> Any:
         """
-        Processes the control message and pushes the resulting JSON payloads to the broker.
+        Process control message through declarative phases:
+        1. Extract metadata
+        2. Determine processing path (success/failure)
+        3. Extract and transform data
+        4. Resolve output destination
+        5. Create output payloads
+        6. Execute output
+        7. Handle completion
         """
-        mdf, df_json = None, None
-        json_result_fragments = []
+        # Phase 1: Extract metadata
         response_channel = control_message.get_metadata("response_channel")
+        output_destination = control_message.get_metadata("output_destination", "redis")
+        cm_failed = control_message.get_metadata("cm_failed", False)
+
+        # Phase 2: Determine processing path
         try:
-            cm_failed = control_message.get_metadata("cm_failed", False)
+            # Phase 3: Extract and transform data
             if not cm_failed:
                 mdf, df_json = self._extract_data_frame(control_message)
-                json_result_fragments = self._create_json_payload(control_message, df_json)
             else:
-                json_result_fragments = self._create_json_payload(control_message, None)
+                mdf, df_json = None, None
 
-            total_payload_size = 0
-            json_payloads = []
-            for i, fragment in enumerate(json_result_fragments, start=1):
-                payload = json.dumps(fragment)
-                size_bytes = len(payload.encode("utf-8"))
-                total_payload_size += size_bytes
-                size_mb = size_bytes / (1024 * 1024)
-                logger.debug(f"Sink Fragment {i} size: {size_mb:.2f} MB")
-                json_payloads.append(payload)
+            # Phase 4: Create output payloads (unchanged logic)
+            json_result_fragments = self._create_json_payload(control_message, df_json)
 
-            total_size_mb = total_payload_size / (1024 * 1024)
-            logger.debug(f"Sink Total JSON payload size: {total_size_mb:.2f} MB")
+            # Phase 5: Execute output based on destination
+            self._execute_output(output_destination, json_result_fragments, response_channel)
+
+            # Phase 6: Handle success
             annotate_cm(control_message, message="Pushed")
-            self._push_to_broker(json_payloads, response_channel)
 
         except ValueError as e:
+            # Phase 7: Handle failure
             mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
             self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
         except Exception as e:
