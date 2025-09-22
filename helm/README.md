@@ -332,7 +332,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
 | envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
-| envVars.INSTALL_AUDIO_EXTRACTION_DEPS | string | `"true"` |  |
 | envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |

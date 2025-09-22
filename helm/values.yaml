@@ -1014,7 +1014,6 @@ prometheus:
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
-## @param envVars.INSTALL_AUDIO_EXTRACTION_DEPS [default: "true"] Install required libraries for audio processing
 envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   INGEST_LOG_LEVEL: "DEFAULT"
@@ -1068,7 +1067,6 @@ envVars:
 
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
-  INSTALL_AUDIO_EXTRACTION_DEPS: "true"
 
 ## @section Open Telemetry
 ## @descriptionStart
