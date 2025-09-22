@@ -81,3 +81,10 @@ class TestBackoffStrategies:
             assert 0.1 <= s
             # Must stay within 25% of base (since fixed)
             assert 1.5 <= s <= 2.5
+
+    @patch("nv_ingest_api.data_handlers.backoff_strategies.random.random", return_value=0.0)
+    def test_jitter_min_floor_applies(self, _):
+        """When jitter would push below 0.1s, the 0.1s floor should apply."""
+        # base_delay=0.1, negative jitter of 25% yields 0.075, floor to 0.1
+        strat = FixedBackoffStrategy(base_delay=0.1, max_delay=100.0)
+        assert strat.calculate_delay(0) == 0.1

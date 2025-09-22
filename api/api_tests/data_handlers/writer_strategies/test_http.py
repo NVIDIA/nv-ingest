@@ -213,6 +213,25 @@ class TestHttpWriterStrategy:
         # Both should use the same session instance
         # (In practice, HttpWriterStrategy creates one session and reuses it)
 
+    def test_session_creation_path_uses_requests_session(self):
+        """Exercise _get_session branch that constructs a real Session from injected requests module."""
+        strategy = HttpWriterStrategy()
+        config = HttpDestinationConfig(url="https://api.example.com/data")
+
+        # Build a dummy requests module with a Session class
+        class DummySession:
+            def __init__(self):
+                self.request = Mock(return_value=Mock(ok=True))
+
+        dummy_requests = type("R", (), {"Session": DummySession})()
+
+        with patch.dict("sys.modules", {"requests": dummy_requests}):
+            # Do not patch _get_session so code constructs the session
+            strategy.write(['{"a": 1}'], config)
+
+            # Ensure request was issued
+            assert isinstance(strategy._get_session(), DummySession)
+
     def test_write_408_without_retry_after_is_permanent(self):
         """HTTP 408 without Retry-After should be classified as permanent error per policy."""
         strategy = HttpWriterStrategy()
@@ -223,6 +242,24 @@ class TestHttpWriterStrategy:
         mock_response.ok = False
         mock_response.status_code = 408
         mock_response.headers = {}
+        mock_session.request.return_value = mock_response
+
+        with patch.object(strategy, "_get_session", return_value=mock_session):
+            from nv_ingest_api.data_handlers.errors import PermanentError
+
+            with pytest.raises(PermanentError):
+                strategy.write(['{"test": "data"}'], config)
+
+    def test_write_429_with_invalid_retry_after_is_permanent(self):
+        """HTTP 429 with non-integer Retry-After should fall back to permanent error path."""
+        strategy = HttpWriterStrategy()
+        config = HttpDestinationConfig(url="https://api.example.com/data")
+
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.ok = False
+        mock_response.status_code = 429
+        mock_response.headers = {"Retry-After": "not-a-number"}
         mock_session.request.return_value = mock_response
 
         with patch.object(strategy, "_get_session", return_value=mock_session):

@@ -110,6 +110,12 @@ def classify_error(error: Exception, destination_type: str) -> DataWriterError:
     DataWriterError
         Classified error with appropriate category
     """
+    # Preserve already-classified errors
+    if isinstance(error, PermanentError):
+        return error
+    if isinstance(error, TransientError):
+        return error
+
     # Handle dependency errors first - always permanent
     if isinstance(error, DependencyError):
         return PermanentError(f"Dependency not available: {error}")
