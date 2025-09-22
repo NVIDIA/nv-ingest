@@ -227,9 +227,7 @@ def convert_to_mono_wav(audio_bytes):
     """
 
     if librosa is None:
-        raise ImportError(
-            "Librosa is required for audio processing. "
-        )
+        raise ImportError("Librosa is required for audio processing. ")
 
     # Create a BytesIO object from the audio bytes
     byte_io = io.BytesIO(audio_bytes)
