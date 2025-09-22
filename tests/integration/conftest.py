@@ -48,11 +48,8 @@ def pipeline_process():
     - Ensures clean shutdown at session teardown.
     """
     # Configure the pipeline to run in-process and prefer direct in-process Simple broker access
-    # These must be set BEFORE loading the YAML so substitution applies where relevant.
+    # Keep settings minimal: do NOT set socket host/port; use direct interface only.
     os.environ["MESSAGE_CLIENT_TYPE"] = "simple"
-    os.environ["MESSAGE_CLIENT_HOST"] = "0.0.0.0"
-    os.environ["MESSAGE_CLIENT_PORT"] = "7671"
-    os.environ["INGEST_SERVICE_BROKER_ENABLED"] = "true"
     # Force Python framework for libmode tests (Ray is not supported in libmode)
     os.environ["INGEST_SERVICE_FRAMEWORK"] = "python"
     # Force test clients to use direct in-process interface (no sockets needed)
@@ -64,8 +61,12 @@ def pipeline_process():
     framework_env = os.environ.get("INGEST_SERVICE_FRAMEWORK", "python").strip().lower()
     explicit_config = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH")
 
-    if framework_env == "python" and not explicit_config:
-        # Use embedded libmode config which is guaranteed to be Python-framework friendly
+    # In libmode (python framework), always prefer the embedded libmode config for CI stability,
+    # even if NV_INGEST_PIPELINE_CONFIG_PATH is set in the environment.
+    if framework_env == "python":
+        if explicit_config:
+            # Clear the override to avoid pulling a Ray-oriented YAML in CI
+            os.environ.pop("NV_INGEST_PIPELINE_CONFIG_PATH", None)
         config = load_default_libmode_config()
     else:
         pipeline_config_path = explicit_config or default_pipeline_config_path
@@ -78,14 +79,31 @@ def pipeline_process():
     try:
         pipeline = run_pipeline(config, block=False, run_in_subprocess=False, disable_dynamic_scaling=True)
         # Small warm-up for in-process startup; no socket waits needed for direct API
-        time.sleep(0.5)
+        time.sleep(1.0)
         yield pipeline
     except KeyboardInterrupt:
-        print("Keyboard interrupt received. Shutting down pipeline...")
+        raise
     except Exception as e:
-        print(f"Error running pipeline: {e}")
-    finally:
+        # Emit a concise diagnostic to help CI debugging
+        print("Error running pipeline:", e)
+        try:
+            from pydantic.json import pydantic_encoder  # type: ignore
+            import json
+
+            print("[DEBUG] Resolved framework:", framework_env)
+            print("[DEBUG] Using default libmode config:", framework_env == "python")
+            # Avoid dumping huge configs; show stage count and first few stage impls
+            try:
+                stages = getattr(config, "stages", [])
+                impls = [getattr(s, "stage_impl", "?") for s in stages[:5]]
+                print(f"[DEBUG] Stage count: {len(stages)}; first impls: {impls}")
+            except Exception:
+                pass
+        except Exception:
+            pass
         print("Shutting down pipeline...")
+        raise
+    finally:
         if pipeline:
             pipeline.stop()
 
