@@ -189,7 +189,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
                 return 1
 
         # Run case
-        if case in ["dc20_e2e", "e2e"]:
+        if case in ["dc20_e2e", "e2e", "dc20_v2_e2e"]:
             rc = run_case(case, stdout_path, doc_analysis)
         else:
             print(f"Unknown case: {case}")

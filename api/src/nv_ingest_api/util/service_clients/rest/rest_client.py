@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 import re
 import time
 from typing import Any, Union, Tuple, Optional, Dict, Callable
@@ -137,13 +138,17 @@ class RestClient(MessageBrokerClientBase):
                 )
                 self._client = requests.Session()
 
-        self._submit_endpoint: str = "/v1/submit_job"
-        self._fetch_endpoint: str = "/v1/fetch_job"
+        # Allow API version override via environment variable or kwargs
+        api_version = kwargs.get("api_version") or os.getenv("NV_INGEST_API_VERSION", "v1")
+        self._api_version = api_version
+        self._submit_endpoint: str = f"/{api_version}/submit_job"
+        self._fetch_endpoint: str = f"/{api_version}/fetch_job"
         self._base_url: str = kwargs.get("base_url") or self._generate_url(self._host, self._port)
         self._headers = kwargs.get("headers", {})
         self._auth = kwargs.get("auth", None)
 
         logger.debug(f"RestClient base URL set to: {self._base_url}")
+        logger.info(f"RestClient using API version: {api_version} (endpoints: {self._submit_endpoint}, {self._fetch_endpoint})")
 
     @staticmethod
     def _generate_url(host: str, port: int) -> str:

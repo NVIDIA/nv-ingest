@@ -7,9 +7,7 @@ import json
 import logging
 import os
 from json import JSONDecodeError
-from typing import Optional, Dict, Any
-
-from typing import List
+from typing import Optional, Dict, Any, List
 
 import redis
 
@@ -393,3 +391,107 @@ class RedisIngestService(IngestServiceMeta):
             The current fetch mode.
         """
         return self._fetch_mode
+
+    async def set_parent_job_mapping(self, parent_job_id: str, subjob_ids: List[str], metadata: Dict[str, Any]) -> None:
+        """
+        Store parent-subjob mapping in Redis for V2 PDF splitting.
+        
+        Parameters
+        ----------
+        parent_job_id : str
+            The parent job identifier
+        subjob_ids : List[str]
+            List of subjob identifiers
+        metadata : Dict[str, Any]
+            Metadata about the parent job (total_pages, original_source_id, etc.)
+        """
+        parent_key = f"parent:{parent_job_id}:subjobs"
+        metadata_key = f"parent:{parent_job_id}:metadata"
+        
+        try:
+            # Store subjob IDs as a set
+            await asyncio.to_thread(
+                self._ingest_client.get_client().sadd,
+                parent_key,
+                *subjob_ids
+            )
+            
+            # Store metadata as hash
+            await asyncio.to_thread(
+                self._ingest_client.get_client().hset,
+                metadata_key,
+                mapping=metadata
+            )
+            
+            # Set TTL on both keys to match state TTL
+            if self._state_ttl_seconds:
+                await asyncio.to_thread(
+                    self._ingest_client.get_client().expire,
+                    parent_key,
+                    self._state_ttl_seconds
+                )
+                await asyncio.to_thread(
+                    self._ingest_client.get_client().expire,
+                    metadata_key,
+                    self._state_ttl_seconds
+                )
+                
+            logger.debug(f"Stored parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
+            
+        except Exception as err:
+            logger.exception(f"Error storing parent job mapping for {parent_job_id}: {err}")
+            raise
+
+    async def get_parent_job_info(self, parent_job_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve parent job information including subjob IDs and metadata.
+        
+        Parameters
+        ----------
+        parent_job_id : str
+            The parent job identifier
+            
+        Returns
+        -------
+        Dict[str, Any] or None
+            Dictionary with 'subjob_ids' and 'metadata' keys, or None if not a parent job
+        """
+        parent_key = f"parent:{parent_job_id}:subjobs"
+        metadata_key = f"parent:{parent_job_id}:metadata"
+        
+        try:
+            # Check if this is a parent job
+            exists = await asyncio.to_thread(
+                self._ingest_client.get_client().exists,
+                parent_key
+            )
+            
+            if not exists:
+                return None
+                
+            # Get subjob IDs
+            subjob_ids_bytes = await asyncio.to_thread(
+                self._ingest_client.get_client().smembers,
+                parent_key
+            )
+            subjob_ids = sorted([id.decode("utf-8") for id in subjob_ids_bytes])
+            
+            # Get metadata
+            metadata_dict = await asyncio.to_thread(
+                self._ingest_client.get_client().hgetall,
+                metadata_key
+            )
+            metadata = {k.decode("utf-8"): v.decode("utf-8") for k, v in metadata_dict.items()}
+            
+            # Convert numeric strings back to numbers
+            if "total_pages" in metadata:
+                metadata["total_pages"] = int(metadata["total_pages"])
+                
+            return {
+                "subjob_ids": subjob_ids,
+                "metadata": metadata
+            }
+            
+        except Exception as err:
+            logger.error(f"Error retrieving parent job info for {parent_job_id}: {err}")
+            return None

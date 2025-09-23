@@ -24,8 +24,12 @@ logger = logging.getLogger(__name__)
 # Tracing Options Schema
 class TracingOptionsSchema(BaseModelNoExt):
     trace: bool = False
-    ts_send: int
+    ts_send: Optional[int] = None  # Made optional for flexibility
     trace_id: Optional[str] = None
+    # V2 PDF splitting support
+    parent_job_id: Optional[str] = None
+    page_num: Optional[int] = None
+    total_pages: Optional[int] = None
 
 
 # Ingest Task Schemas
