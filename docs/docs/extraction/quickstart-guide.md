@@ -50,7 +50,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
     OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text
+    OCR_MODEL_NAME=scene_text_ensemble
     ```
         
    Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
@@ -128,7 +128,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest-client==2025.3.10.dev20250310
+pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 ```
 
 !!! tip
