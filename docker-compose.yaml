@@ -224,14 +224,14 @@ services:
       - vlm
 
   audio:
-    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/riva-asr}:${AUDIO_TAG:-latest}
+    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-latest}
     shm_size: 2gb
     ports:
       - "8021:50051"  # grpc
       - "8022:9000"  # http
     user: root
     environment:
-      - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-riva-en-us,mode=ofl
+      - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-en-us,mode=ofl
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
