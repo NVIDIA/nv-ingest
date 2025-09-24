@@ -416,11 +416,21 @@ class RedisIngestService(IngestServiceMeta):
                 *subjob_ids
             )
             
-            # Store metadata as hash
+            # Store metadata as hash (including original subjob ordering for deterministic fetches)
+            metadata_to_store = dict(metadata)
+            try:
+                metadata_to_store["subjob_order"] = json.dumps(subjob_ids)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Unable to serialize subjob ordering for parent %s; falling back to Redis set ordering",
+                    parent_job_id,
+                )
+                metadata_to_store.pop("subjob_order", None)
+
             await asyncio.to_thread(
                 self._ingest_client.get_client().hset,
                 metadata_key,
-                mapping=metadata
+                mapping=metadata_to_store
             )
             
             # Set TTL on both keys to match state TTL
@@ -474,7 +484,7 @@ class RedisIngestService(IngestServiceMeta):
                 self._ingest_client.get_client().smembers,
                 parent_key
             )
-            subjob_ids = sorted([id.decode("utf-8") for id in subjob_ids_bytes])
+            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes}
             
             # Get metadata
             metadata_dict = await asyncio.to_thread(
@@ -486,9 +496,29 @@ class RedisIngestService(IngestServiceMeta):
             # Convert numeric strings back to numbers
             if "total_pages" in metadata:
                 metadata["total_pages"] = int(metadata["total_pages"])
+
+            ordered_ids: Optional[List[str]] = None
+            stored_order = metadata.pop("subjob_order", None)
+            if stored_order:
+                try:
+                    candidate_order = json.loads(stored_order)
+                    if isinstance(candidate_order, list):
+                        ordered_ids = [sid for sid in candidate_order if sid in subjob_id_set]
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "Failed to parse stored subjob order for parent %s: %s",
+                        parent_job_id,
+                        exc,
+                    )
+
+            if ordered_ids is None:
+                ordered_ids = sorted(subjob_id_set)
+            else:
+                remaining_ids = sorted(subjob_id_set - set(ordered_ids))
+                ordered_ids.extend(remaining_ids)
                 
             return {
-                "subjob_ids": subjob_ids,
+                "subjob_ids": ordered_ids,
                 "metadata": metadata
             }
             

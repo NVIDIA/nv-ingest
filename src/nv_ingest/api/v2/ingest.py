@@ -152,6 +152,17 @@ async def submit_job_v2(request: Request, response: Response, job_spec: MessageW
                     original_source_id = source_ids[0] if source_ids else "document.pdf"
                     original_source_name = source_names[0] if source_names else "document.pdf"
                     
+                    try:
+                        parent_uuid = uuid.UUID(parent_job_id)
+                    except ValueError:
+                        logger.warning(
+                            "Parent job id %s is not a valid UUID; generating fallback namespace for subjobs",
+                            parent_job_id,
+                        )
+                        parent_uuid = uuid.uuid4()
+
+                    subjob_order = []
+
                     for page_num, page_pdf in enumerate(page_pdfs, 1):
                         # Create subjob spec by deep copying and modifying
                         subjob_spec = copy.deepcopy(job_spec_dict)
@@ -161,9 +172,11 @@ async def submit_job_v2(request: Request, response: Response, job_spec: MessageW
                         subjob_spec["job_payload"]["source_id"] = [f"{original_source_id}#page_{page_num}"]
                         subjob_spec["job_payload"]["source_name"] = [f"{original_source_name}#page_{page_num}"]
                         
-                        # Generate subjob ID
-                        subjob_id = f"{parent_job_id}_page_{page_num}"
+                        # Generate telemetry-safe subjob ID derived from the parent UUID
+                        subjob_uuid = uuid.uuid5(parent_uuid, f"page-{page_num}")
+                        subjob_id = str(subjob_uuid)
                         subjob_spec["job_id"] = subjob_id
+                        subjob_order.append(subjob_id)
                         
                         # Add tracing info with V2 fields
                         if "tracing_options" not in subjob_spec:
@@ -180,12 +193,16 @@ async def submit_job_v2(request: Request, response: Response, job_spec: MessageW
                         subjob_ids.append(subjob_id)
                     
                     # Store parent-child mapping in Redis
-                    await ingest_service.set_parent_job_mapping(parent_job_id, subjob_ids, {
+                    parent_metadata = {
                         "total_pages": page_count,
                         "original_source_id": original_source_id,
                         "original_source_name": original_source_name,
-                        "document_type": document_types[0] if document_types else "pdf" # NOTE: not sure this is correct.
-                    })
+                        "document_type": document_types[0] if document_types else "pdf",
+                    }
+                    if subjob_order:
+                        parent_metadata["subjob_order"] = subjob_order
+
+                    await ingest_service.set_parent_job_mapping(parent_job_id, subjob_ids, parent_metadata)
                     
                     # Set parent job state
                     await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
@@ -340,14 +357,16 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             all_complete = True
             any_failed = False
             subjob_results = []
+            failed_subjobs: List[Dict[str, object]] = []
             
-            for subjob_id in subjob_ids:
+            for page_index, subjob_id in enumerate(subjob_ids, 1):
                 subjob_state = await ingest_service.get_job_state(subjob_id)
                 
                 if subjob_state == STATE_FAILED:
                     any_failed = True
                     logger.warning(f"Subjob {subjob_id} failed")
                     subjob_results.append(None)  # Placeholder for failed page
+                    failed_subjobs.append({"subjob_id": subjob_id, "page_num": page_index})
                 elif subjob_state in INTERMEDIATE_STATES:
                     all_complete = False
                     break
@@ -356,10 +375,15 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                     try:
                         subjob_response = await ingest_service.fetch_job(subjob_id)
                         subjob_results.append(subjob_response)
+                    except TimeoutError:
+                        logger.debug(f"Subjob {subjob_id} not ready yet; deferring aggregation")
+                        all_complete = False
+                        break
                     except Exception as e:
                         logger.error(f"Failed to fetch subjob {subjob_id}: {e}")
                         any_failed = True
                         subjob_results.append(None)
+                        failed_subjobs.append({"subjob_id": subjob_id, "page_num": page_index, "error": str(e)})
             
             if not all_complete:
                 # Some subjobs still processing
@@ -368,13 +392,21 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             # All subjobs complete - aggregate results
             aggregated_result = {
                 "data": [],
+                "status": "failed" if any_failed else "success",
+                "description": (
+                    "One or more subjobs failed to complete"
+                    if any_failed
+                    else "Aggregated result composed from subjob outputs"
+                ),
                 "metadata": {
                     "parent_job_id": job_id,
                     "total_pages": metadata.get("total_pages", len(subjob_ids)),
                     "original_source_id": metadata.get("original_source_id"),
                     "original_source_name": metadata.get("original_source_name"),
-                    "subjobs_failed": sum(1 for r in subjob_results if r is None)
-                }
+                    "subjobs_failed": sum(1 for r in subjob_results if r is None),
+                    "failed_subjobs": failed_subjobs,
+                    "subjob_ids": subjob_ids,
+                },
             }
             
             # Aggregate subjob data in page order
