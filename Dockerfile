@@ -31,6 +31,12 @@ RUN apt-get update && apt-get install -y \
       wget \
     && apt-get clean
 
+# Install ffmpeg
+COPY ./docker/scripts/install_ffmpeg.sh scripts/install_ffmpeg.sh
+RUN chmod +x scripts/install_ffmpeg.sh \
+    && bash scripts/install_ffmpeg.sh \
+    && rm scripts/install_ffmpeg.sh
+
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
