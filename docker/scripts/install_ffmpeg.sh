@@ -25,33 +25,33 @@ for i in "$@"; do
     shift
 done
 
-# Install video dependency
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
+
+# Get a list of all currently installed packages
+dpkg -l | awk '{print $2}' | sort > /tmp/packages_before_ffmpeg_build.txt
+
+# Install build libraries for video dependency
 apt-get install -y \
-    libcrypt-dev \
     autoconf \
     automake \
     build-essential \
     cmake \
-    libaom-dev \
-    libass-dev \
-    libdav1d-dev \
-    libdrm-dev \
-    libfreetype6-dev \
-    libgnutls28-dev \
-    libnuma-dev \
-    libopenh264-dev \
     libtool \
-    libva-dev \
-    libvorbis-dev \
-    libvpx-dev \
-    libwebp-dev \
     pkg-config \
     vainfo \
-    wget \
-    yasm \
-    zlib1g-dev
+    yasm
+
+# Get a list of all packages installed after the build dependencies
+dpkg -l | awk '{print $2}' | sort > /tmp/packages_after_ffmpeg_build.txt
+
+# Use `comm` to find packages that are in the 'after' list but not in the 'before' list.
+PACKAGES_TO_REMOVE=$(comm -13 /tmp/packages_before_ffmpeg_build.txt /tmp/packages_after_ffmpeg_build.txt | tr '\n' ' ')
+
+echo $PACKAGES_TO_REMOVE
+
+# Clean up temporary package lists
+rm /tmp/packages_before_ffmpeg_build.txt /tmp/packages_after_ffmpeg_build.txt
 
 # INSTALL FFMPEG
 wget -O /tmp/ffmpeg-snapshot.tar.bz2 https://www.ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.bz2
@@ -59,13 +59,6 @@ tar xjvf /tmp/ffmpeg-snapshot.tar.bz2 -C /tmp/
 cd /tmp/ffmpeg-${FFMPEG_VERSION}
 PATH="/usr/local/cuda/bin:$PATH" ./configure \
     --prefix=/usr/local \
-    --enable-libopenh264 \
-    --enable-libaom \
-    --enable-libdav1d \
-    --enable-libvorbis \
-    --enable-libvpx \
-    --enable-libwebp \
-    --enable-vaapi \
     --extra-libs=-lpthread \
     --extra-libs=-lm \
     --disable-static \
@@ -76,7 +69,14 @@ make -j$(nproc)
 make install
 ldconfig
 
-# Clean up
+# Clean up build tools.
+if [ -n "$PACKAGES_TO_REMOVE" ]; then
+    echo "Purging build dependencies: $PACKAGES_TO_REMOVE"
+    apt-get purge -y $PACKAGES_TO_REMOVE
+    apt-get autoremove -y
+fi
+
+# Clean up FFmpeg source and temporary files
 cd /
 rm -rf /tmp/ffmpeg*
 rm -rf /var/lib/apt/lists/
