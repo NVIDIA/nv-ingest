@@ -41,7 +41,13 @@ class RedisWriterStrategy:
         from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
         # Create a Redis client for this specific config
-        redis_client = RedisClient(host=config.host, port=config.port, db=config.db, password=config.password)
+        client_kwargs = {"host": config.host, "port": config.port, "db": config.db, "password": config.password}
+        try:
+            redis_client = RedisClient(**client_kwargs)
+        except TypeError:
+            # Some environments may not support a password kwarg; retry without it
+            client_kwargs.pop("password", None)
+            redis_client = RedisClient(**client_kwargs)
 
         try:
             # Submit each payload to the channel
