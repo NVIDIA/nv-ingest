@@ -11,11 +11,25 @@ existing service infrastructure.
 """
 
 import json
+import os
 import logging
 import time
-from typing import Annotated, List
+import asyncio
+from typing import Annotated, Any, List, Dict, Set
 
-from fastapi import APIRouter, Request, Response, HTTPException, Depends
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    Request,
+    Response,
+    HTTPException,
+    Depends,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import JSONResponse
 from opentelemetry import trace
 from pydantic import ValidationError
 
@@ -28,6 +42,7 @@ from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from redis import RedisError
 from .schemas import SubmitJobRequestV2, SubmitJobResponseV2, FetchJobResponseV2
 from .pdf_splitter import split_pdf_job
+
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -421,3 +436,151 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T) -> FetchJo
         except Exception as initial_err:
             logger.exception(f"Unexpected server error handling fetch for job {job_id}: {initial_err}")
             raise HTTPException(status_code=500, detail="Internal Server Error during job fetch")
+
+
+@router.post("/ingest")
+async def ingest_file(
+    file: UploadFile = File(...),
+    metadata: str = Form(...),
+    request: Request = None,
+) -> Dict[str, Any]:
+    """
+    Accepts a file upload and a JSON metadata payload as multipart/form-data.
+    """
+    # Parse metadata JSON
+    try:
+        local_metadata = json.loads(metadata)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Invalid metadata JSON: {e}"})
+
+    # Example: Save file to disk (optional)
+    # file_location = f"/tmp/{file.filename}"
+    # with open(file_location, "wb") as f:
+    #     f.write(await file.read())
+
+    # Example: Read file content (not required, just for demonstration)
+    file_content = await file.read()
+
+    # Here you would process the file and metadata as needed
+    # For demonstration, just echo back some info
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "metadata": local_metadata,
+        "size_bytes": len(file_content),
+        "elements": local_metadata.get("elements", 0),  # Example field
+    }
+
+
+# Add a sub-router for websocket endpoints if not already present
+active_connections: Dict[str, Set[WebSocket]] = {}
+
+
+@router.websocket("/ws/ingest/{job_id}")
+async def websocket_ingest_status(websocket: WebSocket, job_id: str):
+    """
+    WebSocket endpoint for streaming live job status, logs, and events to CLI clients.
+
+    - Connect with: ws://<host>/ws/ingest/{job_id}
+    - Receives: JSON messages with status updates, logs, or events for the given job_id.
+    """
+    await websocket.accept()
+    if job_id not in active_connections:
+        active_connections[job_id] = set()
+    active_connections[job_id].add(websocket)
+    try:
+        while True:
+            # Optionally, receive pings or keepalive from client
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                # Optionally handle client messages (e.g., pings, commands)
+            except asyncio.TimeoutError:
+                # Send a ping or keepalive if needed
+                await websocket.send_json({"event": "keepalive"})
+    except WebSocketDisconnect:
+        active_connections[job_id].remove(websocket)
+        if not active_connections[job_id]:
+            del active_connections[job_id]
+
+
+# This function is not called automatically; you need to start it as a background task
+async def redis_pubsub_monitor(job_id: str, redis_service: IngestServiceMeta):
+    """
+    Monitors Redis Streams for incoming events for a given job_id and broadcasts them to websocket clients.
+    Uses XREAD to read new entries from the configured stream and filters by job_id.
+    """
+    # Resolve underlying sync Redis client
+    try:
+        ingest_client = getattr(redis_service, "_ingest_client", None)
+        if ingest_client is None or not hasattr(ingest_client, "get_client"):
+            logger.error("Underlying Redis client not available on ingest service")
+            return
+        redis_client = ingest_client.get_client()
+    except Exception as e:
+        logger.error(f"Failed to obtain Redis client: {e}")
+        return
+
+    stream_name: str = os.getenv("REDIS_EVENTS_STREAM", "job_events")
+    last_id: str = "$"  # start from new messages only
+
+    while True:
+        try:
+            # Block up to 5s for new messages
+            resp = await asyncio.to_thread(
+                redis_client.xread,
+                {stream_name: last_id},
+                100,
+                5000,
+            )
+            if not resp:
+                continue
+            for _stream, messages in resp:
+                for msg_id, fields in messages:
+                    try:
+                        print(f"Received message: {msg_id}: {fields}")
+                        # fields are bytes keys/values
+                        job_bytes = fields.get(b"job_id") or fields.get("job_id")
+                        payload_bytes = fields.get(b"payload") or fields.get("payload")
+                        if not job_bytes or not payload_bytes:
+                            continue
+                        this_job_id = (
+                            job_bytes.decode() if isinstance(job_bytes, (bytes, bytearray)) else str(job_bytes)
+                        )
+                        if this_job_id != job_id:
+                            continue
+                        payload_str = (
+                            payload_bytes.decode()
+                            if isinstance(payload_bytes, (bytes, bytearray))
+                            else str(payload_bytes)
+                        )
+                        event = json.loads(payload_str)
+                        await broadcast_job_event(job_id, event)
+                    except Exception as per_msg_err:
+                        logger.warning(f"Failed to process stream message {msg_id} for job {job_id}: {per_msg_err}")
+                    finally:
+                        last_id = msg_id
+        except Exception as loop_err:
+            logger.error(f"Error in redis_pubsub_monitor stream loop for job {job_id}: {loop_err}")
+            await asyncio.sleep(1)
+
+
+# Helper function to broadcast events to all clients for a job
+async def broadcast_job_event(job_id: str, event: dict):
+    """
+    Broadcast an event (status update, log, etc.) to all websocket clients for a job.
+    """
+    connections = active_connections.get(job_id, set())
+    to_remove = set()
+    for ws in connections:
+        try:
+            await ws.send_json(event)
+        except Exception:
+            to_remove.add(ws)
+    for ws in to_remove:
+        connections.remove(ws)
+    if not connections and job_id in active_connections:
+        del active_connections[job_id]
+
+
+# Example usage: In your ingestion logic, call this to send updates
+# await broadcast_job_event(job_id, {"event": "status_update", "status": "processing", "progress": 42})
