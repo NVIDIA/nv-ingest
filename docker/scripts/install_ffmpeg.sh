@@ -28,6 +28,12 @@ done
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 
+# Install video runtime libraries
+apt-get install -y \
+    libmp3lame0 \
+    libopenh264-6 \
+    libvpx7
+
 # Get a list of all currently installed packages
 dpkg -l | awk '{print $2}' | sort > /tmp/packages_before_ffmpeg_build.txt
 
@@ -38,6 +44,9 @@ apt-get install -y \
     build-essential \
     cmake \
     libtool \
+    libmp3lame-dev \
+    libopenh264-dev \
+    libvpx-dev \
     pkg-config \
     vainfo \
     yasm
@@ -63,6 +72,9 @@ PATH="/usr/local/cuda/bin:$PATH" ./configure \
     --extra-libs=-lm \
     --disable-static \
     --enable-shared \
+    --enable-libmp3lame \
+    --enable-libopenh264 \
+    --enable-libvpx \
     --disable-doc \
     --disable-debug
 make -j$(nproc)
