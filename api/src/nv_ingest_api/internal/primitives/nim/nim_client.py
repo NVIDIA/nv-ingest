@@ -2,10 +2,14 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import hashlib
+import json
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import queue
+from collections import namedtuple
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any
 from typing import Optional
 from typing import Tuple, Union
@@ -17,7 +21,11 @@ import tritonclient.grpc as grpcclient
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.util.string_processing import generate_url
 
+
 logger = logging.getLogger(__name__)
+
+# A simple structure to hold a request's data and its Future for the result
+InferenceRequest = namedtuple("InferenceRequest", ["data", "future", "model_name", "dims", "kwargs"])
 
 
 class NimClient:
@@ -34,6 +42,9 @@ class NimClient:
         timeout: float = 120.0,
         max_retries: int = 5,
         max_429_retries: int = 5,
+        enable_dynamic_batching: bool = False,
+        dynamic_batch_timeout: float = 0.1,  # 100 milliseconds
+        dynamic_batch_memory_budget_mb: Optional[float] = None,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -60,7 +71,6 @@ class NimClient:
         ValueError
             If an invalid protocol is specified or if required endpoints are missing.
         """
-
         self.client = None
         self.model_interface = model_interface
         self.protocol = protocol.lower()
@@ -88,11 +98,31 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
+        self.dynamic_batching_enabled = enable_dynamic_batching
+        if self.dynamic_batching_enabled:
+            self._batch_timeout = dynamic_batch_timeout
+            if dynamic_batch_memory_budget_mb is not None:
+                self._batch_memory_budget_bytes = dynamic_batch_memory_budget_mb * 1024 * 1024
+            else:
+                self._batch_memory_budget_bytes = None
+
+            self._request_queue = queue.Queue()
+            self._stop_event = threading.Event()
+            self._batcher_thread = threading.Thread(target=self._batcher_loop, daemon=True)
+
+    def start(self):
+        """Starts the dynamic batching worker thread if enabled."""
+        if self.dynamic_batching_enabled and not self._batcher_thread.is_alive():
+            self._batcher_thread.start()
+
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
 
         if model_name == "yolox_ensemble":
             model_name = "yolox"
+
+        if model_name == "scene_text_ensemble":
+            model_name = "scene_text_pre"
 
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
@@ -102,13 +132,12 @@ class NimClient:
             if model_name in self._max_batch_sizes:
                 return self._max_batch_sizes[model_name]
 
-            if not self._grpc_endpoint:
+            if not self._grpc_endpoint or not self.client:
                 self._max_batch_sizes[model_name] = 1
                 return 1
 
             try:
-                client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
-                model_config = client.get_model_config(model_name=model_name, model_version=model_version)
+                model_config = self.client.get_model_config(model_name=model_name, model_version=model_version)
                 self._max_batch_sizes[model_name] = model_config.config.max_batch_size
                 logger.debug(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
             except Exception as e:
@@ -176,17 +205,40 @@ class NimClient:
         Any
             The processed inference results, coalesced in the same order as the input images.
         """
-        try:
-            # 1. Retrieve or default to the model's maximum batch size.
-            batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
-            max_batch_size = (
-                max(1, min(batch_size, max_requested_batch_size))
-                if not force_requested_batch_size
-                else max_requested_batch_size
-            )
+        # 1. Retrieve or default to the model's maximum batch size.
+        batch_size = self._fetch_max_batch_size(model_name)
+        max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
+        force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
+        max_batch_size = (
+            max(1, min(batch_size, max_requested_batch_size))
+            if not force_requested_batch_size
+            else max_requested_batch_size
+        )
+        self._batch_size = max_batch_size
 
+        if self.dynamic_batching_enabled:
+            # DYNAMIC BATCHING PATH
+            try:
+                data = self.model_interface.prepare_data_for_inference(data)
+
+                futures = []
+                for base64_image, image_array in zip(data["base64_images"], data["images"]):
+                    dims = image_array.shape[:2]
+                    futures.append(self.submit(base64_image, model_name, dims, **kwargs))
+
+                results = [future.result() for future in futures]
+
+                return results
+
+            except Exception as err:
+                error_str = (
+                    f"Error during synchronous infer with dynamic batching [{self.model_interface.name()}]: {err}"
+                )
+                logger.error(error_str)
+                raise RuntimeError(error_str) from err
+
+        # OFFLINE BATCHING PATH
+        try:
             # 2. Prepare data for inference.
             data = self.model_interface.prepare_data_for_inference(data)
 
@@ -390,6 +442,209 @@ class NimClient:
         logger.error(f"Failed to get a successful response after {self.max_retries} retries.")
         raise Exception(f"Failed to get a successful response after {self.max_retries} retries.")
 
+    def _batcher_loop(self):
+        """The main loop for the background thread to form and process batches."""
+        while not self._stop_event.is_set():
+            requests_batch = []
+            try:
+                first_req = self._request_queue.get(timeout=self._batch_timeout)
+                if first_req is None:
+                    continue
+                requests_batch.append(first_req)
+
+                start_time = time.monotonic()
+
+                while len(requests_batch) < self._batch_size:
+                    if (time.monotonic() - start_time) >= self._batch_timeout:
+                        break
+
+                    if self._request_queue.empty():
+                        break
+
+                    next_req_peek = self._request_queue.queue[0]
+                    if next_req_peek is None:
+                        break
+
+                    if self._batch_memory_budget_bytes:
+                        if not self.model_interface.does_item_fit_in_batch(
+                            requests_batch,
+                            next_req_peek,
+                            self._batch_memory_budget_bytes,
+                        ):
+                            break
+
+                    try:
+                        next_req = self._request_queue.get_nowait()
+                        if next_req is None:
+                            break
+                        requests_batch.append(next_req)
+                    except queue.Empty:
+                        break
+
+            except queue.Empty:
+                continue
+
+            if requests_batch:
+                self._process_dynamic_batch(requests_batch)
+
+    def _process_dynamic_batch(self, requests: list[InferenceRequest]):
+        """Coalesces, infers, and distributes results for a dynamic batch."""
+        if not requests:
+            return
+
+        first_req = requests[0]
+        model_name = first_req.model_name
+        kwargs = first_req.kwargs
+
+        try:
+            # 1. Coalesce individual data items into a single batch input
+            batch_input, batch_data = self.model_interface.coalesce_requests_to_batch(
+                [req.data for req in requests],
+                [req.dims for req in requests],
+                protocol=self.protocol,
+                model_name=model_name,
+                **kwargs,
+            )
+
+            # 2. Perform inference using the existing _process_batch logic
+            parsed_output, _ = self._process_batch(batch_input, batch_data=batch_data, model_name=model_name, **kwargs)
+
+            # 3. Process the batched output to get final results
+            all_results = self.model_interface.process_inference_results(
+                parsed_output,
+                original_image_shapes=batch_data.get("original_image_shapes"),
+                protocol=self.protocol,
+                **kwargs,
+            )
+
+            # 4. Distribute the individual results back to the correct Future
+            if len(all_results) != len(requests):
+                raise ValueError("Mismatch between result count and request count.")
+
+            for i, req in enumerate(requests):
+                req.future.set_result(all_results[i])
+
+        except Exception as e:
+            # If anything fails, propagate the exception to all futures in the batch
+            logger.error(f"Error processing dynamic batch: {e}")
+            for req in requests:
+                req.future.set_exception(e)
+
+    def submit(self, data: Any, model_name: str, dims: Tuple[int, int], **kwargs) -> Future:
+        """
+        Submits a single inference request to the dynamic batcher.
+
+        This method is non-blocking and returns a Future object that will
+        eventually contain the inference result.
+
+        Parameters
+        ----------
+        data : Any
+            The single data item for inference (e.g., one image, one text prompt).
+
+        Returns
+        -------
+        concurrent.futures.Future
+            A future that will be fulfilled with the inference result.
+        """
+        if not self.dynamic_batching_enabled:
+            raise RuntimeError(
+                "Dynamic batching is not enabled. Please initialize NimClient with " "enable_dynamic_batching=True."
+            )
+
+        future = Future()
+        request = InferenceRequest(data=data, future=future, model_name=model_name, dims=dims, kwargs=kwargs)
+        self._request_queue.put(request)
+        return future
+
     def close(self):
-        if self.protocol == "grpc" and hasattr(self.client, "close"):
+        """Stops the dynamic batching worker and closes client connections."""
+
+        if self.dynamic_batching_enabled:
+            self._stop_event.set()
+            # Unblock the queue in case the thread is waiting on get()
+            self._request_queue.put(None)
+            if self._batcher_thread.is_alive():
+                self._batcher_thread.join()
+
+        if self.client:
             self.client.close()
+
+
+class NimClientManager:
+    """
+    A thread-safe, singleton manager for creating and sharing NimClient instances.
+
+    This manager ensures that only one NimClient is created per unique configuration.
+    """
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        # Singleton pattern
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(NimClientManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, "_initialized"):
+            with self._lock:
+                if not hasattr(self, "_initialized"):
+                    self._clients = {}  # Key: config_hash, Value: NimClient instance
+                    self._client_lock = threading.Lock()
+                    self._initialized = True
+
+    def _generate_config_key(self, **kwargs) -> str:
+        """Creates a stable, hashable key from client configuration."""
+        sorted_config = sorted(kwargs.items())
+        config_str = json.dumps(sorted_config)
+        return hashlib.md5(config_str.encode("utf-8")).hexdigest()
+
+    def get_client(self, model_interface, **kwargs) -> "NimClient":
+        """
+        Gets or creates a NimClient for the given configuration.
+        """
+        config_key = self._generate_config_key(model_interface_name=model_interface.name(), **kwargs)
+
+        if config_key in self._clients:
+            return self._clients[config_key]
+
+        with self._client_lock:
+            if config_key in self._clients:
+                return self._clients[config_key]
+
+            logger.debug(f"Creating new NimClient for config hash: {config_key}")
+
+            new_client = NimClient(model_interface=model_interface, **kwargs)
+
+            if new_client.dynamic_batching_enabled:
+                new_client.start()
+
+            self._clients[config_key] = new_client
+
+            return new_client
+
+    def shutdown(self):
+        """
+        Gracefully closes all managed NimClient instances.
+        This is called automatically on application exit by `atexit`.
+        """
+        logger.debug(f"Shutting down NimClientManager and {len(self._clients)} client(s)...")
+        with self._client_lock:
+            for config_key, client in self._clients.items():
+                logger.debug(f"Closing client for config: {config_key}")
+                try:
+                    client.close()
+                except Exception as e:
+                    logger.error(f"Error closing client for config {config_key}: {e}")
+            self._clients.clear()
+        logger.debug("NimClientManager shutdown complete.")
+
+
+# A global helper function to make access even easier
+def get_nim_client_manager(*args, **kwargs) -> NimClientManager:
+    """Returns the singleton instance of the NimClientManager."""
+    return NimClientManager(*args, **kwargs)

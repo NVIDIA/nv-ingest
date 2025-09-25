@@ -92,7 +92,7 @@ Create a fresh Python environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
+  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
 ```
 
 Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -156,7 +156,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
@@ -390,3 +390,15 @@ The following is the full text of the Developer Certificate of Origin (DCO)
 
   (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
 ```
+
+
+## Security Considerations
+
+- NeMo Retriever Extraction doesn't generate any code that may require sandboxing.
+- NeMo Retriever Extraction is shared as a reference and is provided "as is". The security in the production environment is the responsibility of the end users deploying it. When deploying in a production environment, please have security experts review any potential risks and threats; define the trust boundaries, implement logging and monitoring capabilities, secure the communication channels, integrate AuthN & AuthZ with appropriate access controls, keep the deployment up to date, ensure the containers/source code are secure and free of known vulnerabilities.
+- A frontend that handles AuthN & AuthZ should be in place as missing AuthN & AuthZ could provide ungated access to customer models if directly exposed to e.g. the internet, resulting in either cost to the customer, resource exhaustion, or denial of service.
+- NeMo Retriever Extraction doesn't require any privileged access to the system.
+- The end users are responsible for ensuring the availability of their deployment.
+- The end users are responsible for building the container images and keeping them up to date.
+- The end users are responsible for ensuring that OSS packages used by the developer blueprint are current.
+- The logs from nginx proxy, backend, and demo app are printed to standard out. They can include input prompts and output completions for development purposes. The end users are advised to handle logging securely and avoid information leakage for production use cases.

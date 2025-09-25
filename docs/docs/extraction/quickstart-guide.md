@@ -50,7 +50,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
     OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text
+    OCR_MODEL_NAME=scene_text_ensemble
     ```
         
    Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
@@ -66,6 +66,18 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     !!! tip
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+
+    !!! tip
+
+    	For optimal performance on specific hardware, you can use `docker-compose` override files. Override files adjust settings, such as memory allocation, for different GPU architectures. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+
+    The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
+    ```shell
+    docker compose \
+      -f docker-compose.yaml \
+      -f docker-compose.a100-40gb.yaml \
+      --profile retrieval --profile table-structure up
+    ```
 
 8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
@@ -116,7 +128,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest-client==2025.3.10.dev20250310
+pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 ```
 
 !!! tip
