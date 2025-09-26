@@ -4,89 +4,118 @@
 # pylint: skip-file
 
 from io import BytesIO
-from typing import Annotated, Dict, List, Optional
+from typing import Any, Dict, List
 import base64
 import copy
 import json
 import logging
+import os
 import time
 import uuid
 
 from fastapi import APIRouter, Request, Response
-from fastapi import Depends
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from opentelemetry import trace
 from redis import RedisError
 
 from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
-from nv_ingest.framework.util.service.impl.ingest.redis_ingest_service import RedisIngestService
-from nv_ingest.framework.util.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_api.util.service_clients.client_base import FetchMode
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
 # For PDF splitting
 import pypdfium2 as pdfium
 
-logger = logging.getLogger("uvicorn")
-tracer = trace.get_tracer(__name__)
-
-router = APIRouter()
-
 # Reuse V1 state constants and helper functions
 from ..v1.ingest import (
-    _get_ingest_service,
     trace_id_to_uuid,
     INGEST_SERVICE_T,
     STATE_RETRIEVED_DESTRUCTIVE,
     STATE_RETRIEVED_NON_DESTRUCTIVE,
     STATE_RETRIEVED_CACHED,
     STATE_FAILED,
-    STATE_PROCESSING,
     STATE_SUBMITTED,
     INTERMEDIATE_STATES,
 )
 
+logger = logging.getLogger("uvicorn")
+tracer = trace.get_tracer(__name__)
 
-def split_pdf_to_pages(pdf_content: bytes) -> List[bytes]:
+router = APIRouter()
+
+DEFAULT_PDF_SPLIT_PAGE_COUNT = 10
+
+
+def get_pdf_split_page_count() -> int:
+    """Resolve the configured page chunk size for PDF splitting."""
+
+    raw_value = os.environ.get("PDF_SPLIT_PAGE_COUNT")
+    if raw_value is None:
+        return DEFAULT_PDF_SPLIT_PAGE_COUNT
+
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid PDF_SPLIT_PAGE_COUNT '%s'; falling back to default %s", raw_value, DEFAULT_PDF_SPLIT_PAGE_COUNT
+        )
+        return DEFAULT_PDF_SPLIT_PAGE_COUNT
+
+    if parsed <= 0:
+        logger.warning("PDF_SPLIT_PAGE_COUNT must be >= 1; received %s. Using 1.", parsed)
+        return 1
+
+    return parsed
+
+
+def split_pdf_to_chunks(pdf_content: bytes, pages_per_chunk: int) -> List[Dict[str, Any]]:
     """
-    Split a PDF into individual pages using pypdfium2.
-    
-    Parameters
-    ----------
-    pdf_content : bytes
-        The PDF file content as bytes
-        
-    Returns
-    -------
-    List[bytes]
-        List of single-page PDFs as bytes
+    Split a PDF into multi-page chunks using pypdfium2.
+
+    Returns a list of dictionaries containing the chunk bytes and page range metadata.
+    Note: this currently buffers each chunk in-memory; consider streaming in future upgrades.
     """
-    page_pdfs = []
-    
-    # Load the PDF
+
+    chunks: List[Dict[str, Any]] = []
+
+    if pages_per_chunk <= 0:
+        pages_per_chunk = 1
+
     pdf = pdfium.PdfDocument(pdf_content)
-    page_count = len(pdf)
-    
-    for page_index in range(page_count):
-        # Create a new document with just this page
-        new_pdf = pdfium.PdfDocument.new()
-        new_pdf.import_pages(pdf, [page_index])
-        
-        # Save to BytesIO buffer
-        buffer = BytesIO()
-        new_pdf.save(buffer)
-        buffer.seek(0)
-        page_pdfs.append(buffer.read())
-        
-        # Clean up the new PDF
-        new_pdf.close()
-    
-    # Clean up original PDF
-    pdf.close()
-    
-    return page_pdfs
+    total_pages = len(pdf)
+
+    try:
+        for chunk_index, start_zero in enumerate(range(0, total_pages, pages_per_chunk)):
+            end_zero = min(start_zero + pages_per_chunk, total_pages)
+            page_indices = list(range(start_zero, end_zero))
+
+            new_pdf = pdfium.PdfDocument.new()
+            try:
+                new_pdf.import_pages(pdf, page_indices)
+
+                buffer = BytesIO()
+                try:
+                    new_pdf.save(buffer)
+                    chunk_bytes = buffer.getvalue()
+                finally:
+                    buffer.close()
+            finally:
+                new_pdf.close()
+
+            start_page = start_zero + 1
+            end_page = end_zero
+            chunk_info: Dict[str, Any] = {
+                "bytes": chunk_bytes,
+                "chunk_index": chunk_index,
+                "start_page": start_page,
+                "end_page": end_page,
+                "page_count": end_page - start_page + 1,
+            }
+            chunks.append(chunk_info)
+
+    finally:
+        pdf.close()
+
+    return chunks
 
 
 def get_pdf_page_count(pdf_content: bytes) -> int:
@@ -113,7 +142,9 @@ def get_pdf_page_count(pdf_content: bytes) -> int:
     summary="submit jobs to the core nv ingestion service for processing with PDF splitting",
     operation_id="submit_job_v2",
 )
-async def submit_job_v2(request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
+async def submit_job_v2(
+    request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T
+):
     with tracer.start_as_current_span("http-submit-job-v2") as span:
         try:
             # Add custom attributes to the span
@@ -126,32 +157,35 @@ async def submit_job_v2(request: Request, response: Response, job_spec: MessageW
 
             # Parse job spec
             job_spec_dict = json.loads(job_spec.payload)
-            
+
             # Extract document type and payload from the proper structure
             job_payload = job_spec_dict.get("job_payload", {})
             document_types = job_payload.get("document_type", [])
             payloads = job_payload.get("content", [])
-            
+
             # Check if this is a PDF that needs splitting
             if document_types and payloads and document_types[0].lower() == "pdf":
                 # Decode the payload to check page count
                 pdf_content = base64.b64decode(payloads[0])
                 page_count = get_pdf_page_count(pdf_content)
-                
-                # Split if more than 3 pages
-                if page_count > 3:
-                    logger.info(f"Splitting PDF with {page_count} pages into subjobs")
-                    
-                    # Split the PDF
-                    page_pdfs = split_pdf_to_pages(pdf_content)
-                    
-                    # Create subjobs for each page
-                    subjob_ids = []
+                pages_per_chunk = get_pdf_split_page_count()
+
+                # Split if the document has more pages than our chunk size
+                if page_count > pages_per_chunk:
+                    logger.info(
+                        "Splitting PDF with %s pages into chunks of %s",
+                        page_count,
+                        pages_per_chunk,
+                    )
+
+                    chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
+
+                    subjob_ids: List[str] = []
                     source_ids = job_payload.get("source_id", ["document.pdf"])
                     source_names = job_payload.get("source_name", ["document.pdf"])
                     original_source_id = source_ids[0] if source_ids else "document.pdf"
                     original_source_name = source_names[0] if source_names else "document.pdf"
-                    
+
                     try:
                         parent_uuid = uuid.UUID(parent_job_id)
                     except ValueError:
@@ -161,68 +195,65 @@ async def submit_job_v2(request: Request, response: Response, job_spec: MessageW
                         )
                         parent_uuid = uuid.uuid4()
 
-                    subjob_order = []
+                    for chunk in chunks:
+                        chunk_number = chunk["chunk_index"] + 1
+                        start_page = chunk["start_page"]
+                        end_page = chunk["end_page"]
 
-                    for page_num, page_pdf in enumerate(page_pdfs, 1):
-                        # Create subjob spec by deep copying and modifying
                         subjob_spec = copy.deepcopy(job_spec_dict)
-                        
-                        # Update the payload in the proper location
-                        subjob_spec["job_payload"]["content"] = [base64.b64encode(page_pdf).decode("utf-8")]
-                        subjob_spec["job_payload"]["source_id"] = [f"{original_source_id}#page_{page_num}"]
-                        subjob_spec["job_payload"]["source_name"] = [f"{original_source_name}#page_{page_num}"]
-                        
-                        # Generate telemetry-safe subjob ID derived from the parent UUID
-                        subjob_uuid = uuid.uuid5(parent_uuid, f"page-{page_num}")
+                        subjob_payload = subjob_spec.setdefault("job_payload", {})
+
+                        chunk_bytes = chunk["bytes"]
+                        subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
+
+                        page_suffix = (
+                            f"page_{start_page}" if start_page == end_page else f"pages_{start_page}-{end_page}"
+                        )
+                        subjob_payload["source_id"] = [f"{original_source_id}#{page_suffix}"]
+                        subjob_payload["source_name"] = [f"{original_source_name}#{page_suffix}"]
+
+                        subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
                         subjob_id = str(subjob_uuid)
                         subjob_spec["job_id"] = subjob_id
-                        subjob_order.append(subjob_id)
-                        
-                        # Add tracing info with V2 fields
-                        if "tracing_options" not in subjob_spec:
-                            subjob_spec["tracing_options"] = {"trace": True}
-                        subjob_spec["tracing_options"]["trace_id"] = str(current_trace_id)
-                        subjob_spec["tracing_options"]["ts_send"] = int(time.time() * 1000)  # ms
-                        subjob_spec["tracing_options"]["parent_job_id"] = parent_job_id
-                        subjob_spec["tracing_options"]["page_num"] = page_num
-                        subjob_spec["tracing_options"]["total_pages"] = page_count
-                        
-                        # Submit subjob
+
+                        tracing_options = subjob_spec.setdefault("tracing_options", {"trace": True})
+                        tracing_options["trace_id"] = str(current_trace_id)
+                        tracing_options["ts_send"] = int(time.time() * 1000)
+                        tracing_options["parent_job_id"] = parent_job_id
+                        tracing_options["page_num"] = start_page
+
                         subjob_wrapper = MessageWrapper(payload=json.dumps(subjob_spec))
                         await ingest_service.submit_job(subjob_wrapper, subjob_id)
                         subjob_ids.append(subjob_id)
-                    
-                    # Store parent-child mapping in Redis
-                    parent_metadata = {
+
+                    parent_metadata: Dict[str, Any] = {
                         "total_pages": page_count,
                         "original_source_id": original_source_id,
                         "original_source_name": original_source_name,
                         "document_type": document_types[0] if document_types else "pdf",
+                        "subjob_order": subjob_ids,
                     }
-                    if subjob_order:
-                        parent_metadata["subjob_order"] = subjob_order
 
                     await ingest_service.set_parent_job_mapping(parent_job_id, subjob_ids, parent_metadata)
-                    
-                    # Set parent job state
+
                     await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
-                    
+
                     span.add_event(f"Split into {len(subjob_ids)} subjobs")
                     response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
                     return parent_job_id
-                    
-            # For non-PDFs or PDFs with <= 3 pages, submit as normal
+
+            # For non-PDFs or cases where splitting is not required, submit as normal
             if "tracing_options" not in job_spec_dict:
                 job_spec_dict["tracing_options"] = {"trace": True}
             job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
             updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
-            
+
             span.add_event("Submitting as single job (no split needed)")
-            
+
             # Submit the job to the pipeline task queue
             await ingest_service.submit_job(updated_job_spec, parent_job_id)
             await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
-            
+
             response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
             return parent_job_id
 
@@ -253,7 +284,7 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
     try:
         # Check if this is a parent job with subjobs
         subjob_info = await ingest_service.get_parent_job_info(job_id)
-        
+
         if subjob_info is None:
             # Not a parent job, fetch normally like V1
             current_state = await ingest_service.get_job_state(job_id)
@@ -303,7 +334,9 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                         return StreamingResponse(iter([json_bytes]), media_type="application/json", status_code=200)
                     except TypeError as json_err:
                         logger.exception(f"Serialization error for job {job_id}: {json_err}")
-                        raise HTTPException(status_code=500, detail="Internal server error: Failed to serialize result.")
+                        raise HTTPException(
+                            status_code=500, detail="Internal server error: Failed to serialize result."
+                        )
 
                 except (TimeoutError, RedisError, ConnectionError) as fetch_err:
                     # Handle timeout/error cases same as V1
@@ -327,7 +360,9 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                                 status_code=503, detail="Backend service unavailable preventing access to job result."
                             )
                     elif current_state == STATE_RETRIEVED_CACHED:
-                        raise HTTPException(status_code=410, detail="Job result is gone (previously cached, fetch failed).")
+                        raise HTTPException(
+                            status_code=410, detail="Job result is gone (previously cached, fetch failed)."
+                        )
                     elif current_state in INTERMEDIATE_STATES:
                         if isinstance(fetch_err, TimeoutError):
                             raise HTTPException(
@@ -344,29 +379,48 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                         )
             else:
                 logger.error(f"Unknown job state '{current_state}' for job {job_id}.")
-                raise HTTPException(status_code=500, detail=f"Internal server error: Unknown job state '{current_state}'.")
-                
+                raise HTTPException(
+                    status_code=500, detail=f"Internal server error: Unknown job state '{current_state}'."
+                )
+
         else:
             # This is a parent job - need to aggregate subjobs
-            subjob_ids = subjob_info["subjob_ids"]
-            metadata = subjob_info["metadata"]
-            
+            subjob_ids = subjob_info.get("subjob_ids", [])
+            metadata = subjob_info.get("metadata", {})
+
             logger.info(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
-            
+
+            total_pages = metadata.get("total_pages")
+            if isinstance(total_pages, str):
+                try:
+                    total_pages = int(total_pages)
+                except ValueError:
+                    logger.warning("Invalid total_pages '%s' for parent %s; recomputing", total_pages, job_id)
+                    total_pages = None
+
+            ordered_descriptors: List[Dict[str, Any]] = []
+            for idx, subjob_id in enumerate(subjob_ids, 1):
+                ordered_descriptors.append({"job_id": subjob_id, "chunk_index": idx})
+
             # Check all subjob states
             all_complete = True
             any_failed = False
             subjob_results = []
             failed_subjobs: List[Dict[str, object]] = []
-            
-            for page_index, subjob_id in enumerate(subjob_ids, 1):
+
+            for page_index, descriptor in enumerate(ordered_descriptors, 1):
+                subjob_id = descriptor.get("job_id")
                 subjob_state = await ingest_service.get_job_state(subjob_id)
-                
+
                 if subjob_state == STATE_FAILED:
                     any_failed = True
                     logger.warning(f"Subjob {subjob_id} failed")
-                    subjob_results.append(None)  # Placeholder for failed page
-                    failed_subjobs.append({"subjob_id": subjob_id, "page_num": page_index})
+                    subjob_results.append(None)  # Placeholder for failed chunk
+                    failed_entry: Dict[str, object] = {
+                        "subjob_id": subjob_id,
+                        "chunk_index": page_index,
+                    }
+                    failed_subjobs.append(failed_entry)
                 elif subjob_state in INTERMEDIATE_STATES:
                     all_complete = False
                     break
@@ -383,12 +437,17 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                         logger.error(f"Failed to fetch subjob {subjob_id}: {e}")
                         any_failed = True
                         subjob_results.append(None)
-                        failed_subjobs.append({"subjob_id": subjob_id, "page_num": page_index, "error": str(e)})
-            
+                        failed_entry = {
+                            "subjob_id": subjob_id,
+                            "chunk_index": page_index,
+                            "error": str(e),
+                        }
+                        failed_subjobs.append(failed_entry)
+
             if not all_complete:
                 # Some subjobs still processing
                 raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
-            
+
             # All subjobs complete - aggregate results
             aggregated_result = {
                 "data": [],
@@ -401,24 +460,28 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                 "metadata": {
                     "parent_job_id": job_id,
                     "total_pages": metadata.get("total_pages", len(subjob_ids)),
+                    "pages_per_chunk": metadata.get("pages_per_chunk"),
                     "original_source_id": metadata.get("original_source_id"),
                     "original_source_name": metadata.get("original_source_name"),
                     "subjobs_failed": sum(1 for r in subjob_results if r is None),
                     "failed_subjobs": failed_subjobs,
                     "subjob_ids": subjob_ids,
+                    "chunks": [],
                 },
             }
-            
+
             # Aggregate subjob data in page order
-            for page_num, result in enumerate(subjob_results, 1):
+            for page_num, (result, descriptor) in enumerate(zip(subjob_results, ordered_descriptors), 1):
                 if result is not None:
                     # Add page data to aggregated result
                     if "data" in result:
                         aggregated_result["data"].extend(result["data"])
+                    chunk_entry = dict(descriptor)
+                    aggregated_result["metadata"].setdefault("chunks", []).append(chunk_entry)
                 else:
                     # Note failed page
                     logger.warning(f"Page {page_num} failed or missing")
-            
+
             # Update parent state
             try:
                 current_fetch_mode = await ingest_service.get_fetch_mode()
@@ -428,11 +491,11 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                     target_state = STATE_RETRIEVED_NON_DESTRUCTIVE
                 else:
                     target_state = STATE_RETRIEVED_CACHED
-                    
+
                 await ingest_service.set_job_state(job_id, target_state)
             except Exception as e:
                 logger.error(f"Failed to update parent job state: {e}")
-            
+
             # Return aggregated result
             json_bytes = json.dumps(aggregated_result).encode("utf-8")
             return StreamingResponse(iter([json_bytes]), media_type="application/json", status_code=200)

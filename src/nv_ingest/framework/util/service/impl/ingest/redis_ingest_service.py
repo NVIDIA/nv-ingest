@@ -395,7 +395,7 @@ class RedisIngestService(IngestServiceMeta):
     async def set_parent_job_mapping(self, parent_job_id: str, subjob_ids: List[str], metadata: Dict[str, Any]) -> None:
         """
         Store parent-subjob mapping in Redis for V2 PDF splitting.
-        
+
         Parameters
         ----------
         parent_job_id : str
@@ -407,15 +407,11 @@ class RedisIngestService(IngestServiceMeta):
         """
         parent_key = f"parent:{parent_job_id}:subjobs"
         metadata_key = f"parent:{parent_job_id}:metadata"
-        
+
         try:
             # Store subjob IDs as a set
-            await asyncio.to_thread(
-                self._ingest_client.get_client().sadd,
-                parent_key,
-                *subjob_ids
-            )
-            
+            await asyncio.to_thread(self._ingest_client.get_client().sadd, parent_key, *subjob_ids)
+
             # Store metadata as hash (including original subjob ordering for deterministic fetches)
             metadata_to_store = dict(metadata)
             try:
@@ -427,27 +423,15 @@ class RedisIngestService(IngestServiceMeta):
                 )
                 metadata_to_store.pop("subjob_order", None)
 
-            await asyncio.to_thread(
-                self._ingest_client.get_client().hset,
-                metadata_key,
-                mapping=metadata_to_store
-            )
-            
+            await asyncio.to_thread(self._ingest_client.get_client().hset, metadata_key, mapping=metadata_to_store)
+
             # Set TTL on both keys to match state TTL
             if self._state_ttl_seconds:
-                await asyncio.to_thread(
-                    self._ingest_client.get_client().expire,
-                    parent_key,
-                    self._state_ttl_seconds
-                )
-                await asyncio.to_thread(
-                    self._ingest_client.get_client().expire,
-                    metadata_key,
-                    self._state_ttl_seconds
-                )
-                
+                await asyncio.to_thread(self._ingest_client.get_client().expire, parent_key, self._state_ttl_seconds)
+                await asyncio.to_thread(self._ingest_client.get_client().expire, metadata_key, self._state_ttl_seconds)
+
             logger.debug(f"Stored parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
-            
+
         except Exception as err:
             logger.exception(f"Error storing parent job mapping for {parent_job_id}: {err}")
             raise
@@ -455,12 +439,12 @@ class RedisIngestService(IngestServiceMeta):
     async def get_parent_job_info(self, parent_job_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve parent job information including subjob IDs and metadata.
-        
+
         Parameters
         ----------
         parent_job_id : str
             The parent job identifier
-            
+
         Returns
         -------
         Dict[str, Any] or None
@@ -468,34 +452,30 @@ class RedisIngestService(IngestServiceMeta):
         """
         parent_key = f"parent:{parent_job_id}:subjobs"
         metadata_key = f"parent:{parent_job_id}:metadata"
-        
+
         try:
             # Check if this is a parent job
-            exists = await asyncio.to_thread(
-                self._ingest_client.get_client().exists,
-                parent_key
-            )
-            
+            exists = await asyncio.to_thread(self._ingest_client.get_client().exists, parent_key)
+
             if not exists:
                 return None
-                
+
             # Get subjob IDs
-            subjob_ids_bytes = await asyncio.to_thread(
-                self._ingest_client.get_client().smembers,
-                parent_key
-            )
+            subjob_ids_bytes = await asyncio.to_thread(self._ingest_client.get_client().smembers, parent_key)
             subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes}
-            
+
             # Get metadata
-            metadata_dict = await asyncio.to_thread(
-                self._ingest_client.get_client().hgetall,
-                metadata_key
-            )
+            metadata_dict = await asyncio.to_thread(self._ingest_client.get_client().hgetall, metadata_key)
             metadata = {k.decode("utf-8"): v.decode("utf-8") for k, v in metadata_dict.items()}
-            
+
             # Convert numeric strings back to numbers
             if "total_pages" in metadata:
                 metadata["total_pages"] = int(metadata["total_pages"])
+            if "pages_per_chunk" in metadata:
+                try:
+                    metadata["pages_per_chunk"] = int(metadata["pages_per_chunk"])
+                except ValueError:
+                    metadata.pop("pages_per_chunk", None)
 
             ordered_ids: Optional[List[str]] = None
             stored_order = metadata.pop("subjob_order", None)
@@ -516,12 +496,12 @@ class RedisIngestService(IngestServiceMeta):
             else:
                 remaining_ids = sorted(subjob_id_set - set(ordered_ids))
                 ordered_ids.extend(remaining_ids)
-                
+
             return {
                 "subjob_ids": ordered_ids,
-                "metadata": metadata
+                "metadata": metadata,
             }
-            
+
         except Exception as err:
             logger.error(f"Error retrieving parent job info for {parent_job_id}: {err}")
             return None
