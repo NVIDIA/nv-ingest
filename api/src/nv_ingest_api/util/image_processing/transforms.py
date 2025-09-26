@@ -155,9 +155,6 @@ def scale_image_to_encoding_size(
 
         # Check initial size
         if len(base64_image) <= max_base64_size:
-            with open("/local/b64_img", "w") as f:
-                f.write(numpy_to_base64(img_array, format=format, **kwargs))
-            raise ValueError
             return numpy_to_base64(img_array, format=format, **kwargs), original_size
 
         # Initial reduction step
@@ -181,8 +178,6 @@ def scale_image_to_encoding_size(
             if len(base64_image) > max_base64_size:
                 reduction_step *= 0.95  # Reduce size further if needed
 
-        with open("/local/b64_img", "w") as f:
-            f.write(base64_image)
         return base64_image, new_size
 
     except Exception as e:
@@ -691,7 +686,6 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
         # Convert 4 channel to 3 channel if necessary
         if img.shape[2] == 4:
             img = rgba_to_rgb_white_bg(img)
-            # img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
         # Convert BGR to RGB for consistent processing (OpenCV loads as BGR)
         # Only convert if it's a 3-channel color image
