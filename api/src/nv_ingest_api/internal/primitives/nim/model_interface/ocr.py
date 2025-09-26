@@ -21,7 +21,8 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import prepro
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
-NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
+NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
+NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +232,7 @@ class OCRModelInterfaceBase(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+        if model_name in [NEMORETRIEVER_OCR_MODEL_NAME, NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME]:
             response = response.transpose((1, 0))
 
         # If we have shape (3,), convert to (3, 1)
