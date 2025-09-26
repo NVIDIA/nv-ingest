@@ -13,6 +13,10 @@ def get_vdb_op_cls(vdb_op: str):
         from nv_ingest_client.util.vdb.milvus import Milvus
 
         return Milvus
+    elif vdb_op == "teradata":
+        from teradatagenai.vector_store.teradata import Teradata
+
+        return Teradata
 
     raise ValueError(f"Invalid vdb_op: {vdb_op}. Available vdb_ops - {available_vdb_ops}.")
 
