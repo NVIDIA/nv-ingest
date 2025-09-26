@@ -237,7 +237,9 @@ def _create_ocr_client(
     auth_token: str,
 ) -> NimClient:
     ocr_model_interface = (
-        NemoRetrieverOCRModelInterface() if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"} else PaddleOCRModelInterface()
+        NemoRetrieverOCRModelInterface()
+        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"}
+        else PaddleOCRModelInterface()
     )
 
     ocr_client = create_inference_client(
