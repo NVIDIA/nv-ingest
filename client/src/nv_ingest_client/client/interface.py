@@ -764,6 +764,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
+        
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
@@ -837,6 +838,7 @@ class Ingestor:
             # Create ExtractTask with mapped document type for API schema compatibility
             extract_task_params = {"document_type": api_document_type, "extract_method": method, **params}
             extract_task = ExtractTask(**extract_task_params)
+            print(f" ==> EXTRACT configs: {str(extract_task)}")
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
