@@ -162,7 +162,7 @@ class IngestPipelineBuilder:
             config_instance = config_schema(**stage_config.config) if config_schema else None
         else:
             # Handle actor stage (existing logic)
-            actor_class = resolve_actor_class_from_path(stage_config.actor, expected_base_class)
+            actor_class = resolve_actor_class_from_path(stage_config.stage_impl, expected_base_class)
             config_schema = find_pydantic_config_schema(actor_class, expected_base_class)
             config_instance = config_schema(**stage_config.config) if config_schema else None
 

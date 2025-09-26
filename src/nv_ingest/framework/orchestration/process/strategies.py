@@ -17,7 +17,7 @@ import multiprocessing
 import time
 from abc import ABC, abstractmethod
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
 from nv_ingest.framework.orchestration.execution.options import ExecutionOptions, ExecutionResult
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipelineInterface,
@@ -100,9 +100,15 @@ class InProcessStrategy(ProcessExecutionStrategy):
             logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
             return ExecutionResult(interface=None, elapsed_time=total_elapsed)
         else:
-            # Wrap the raw RayPipeline in RayPipelineInterface
-            interface = RayPipelineInterface(pipeline)
-            return ExecutionResult(interface=interface, elapsed_time=None)
+            # Wrap only if Ray framework; otherwise return raw pipeline object
+            framework_cfg = getattr(getattr(config, "pipeline", None), "framework", None)
+            framework_type = getattr(framework_cfg, "type", PipelineFrameworkType.RAY)
+            if framework_type == PipelineFrameworkType.RAY:
+                interface = RayPipelineInterface(pipeline)
+                return ExecutionResult(interface=interface, elapsed_time=None)
+            else:
+                # Python framework returns the PythonPipeline instance directly
+                return ExecutionResult(interface=pipeline, elapsed_time=None)
 
 
 class SubprocessStrategy(ProcessExecutionStrategy):

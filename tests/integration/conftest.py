@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.pipeline.config.loaders import load_pipeline_config
+from nv_ingest.pipeline.config.loaders import load_pipeline_config, load_default_libmode_config
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 
 
 def _wait_for_port(host: str, port: int, timeout: float = 120.0, interval: float = 0.5) -> None:
@@ -46,34 +47,63 @@ def pipeline_process():
     - Waits briefly to allow pipeline warm-up.
     - Ensures clean shutdown at session teardown.
     """
-    # Configure the pipeline to use the in-process Simple broker so tests can connect on localhost:7671
-    # These must be set BEFORE loading the YAML so substitution applies.
+    # Configure the pipeline to run in-process and prefer direct in-process Simple broker access
+    # Keep settings minimal: do NOT set socket host/port; use direct interface only.
     os.environ["MESSAGE_CLIENT_TYPE"] = "simple"
-    os.environ["MESSAGE_CLIENT_HOST"] = "0.0.0.0"  # bind all interfaces; clients use localhost
-    os.environ["MESSAGE_CLIENT_PORT"] = "7671"
-    os.environ["INGEST_LAUNCH_SIMPLE_BROKER"] = "true"
+    # Force Python framework for libmode tests (Ray is not supported in libmode)
+    os.environ["INGEST_SERVICE_FRAMEWORK"] = "python"
+    # Force test clients to use direct in-process interface (no sockets needed)
+    os.environ["MESSAGE_CLIENT_INTERFACE"] = "direct"
 
-    # Load pipeline configuration from the default pipeline YAML (with env var substitution)
+    # Load pipeline configuration
     repo_root = Path(__file__).resolve().parents[2]  # 2 levels: tests/integration
     default_pipeline_config_path = repo_root / "config" / "default_pipeline.yaml"
-    pipeline_config_path = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH", default_pipeline_config_path)
-    config = load_pipeline_config(pipeline_config_path)
+    framework_env = os.environ.get("INGEST_SERVICE_FRAMEWORK", "python").strip().lower()
+    explicit_config = os.environ.get("NV_INGEST_PIPELINE_CONFIG_PATH")
+
+    # In libmode (python framework), always prefer the embedded libmode config for CI stability,
+    # even if NV_INGEST_PIPELINE_CONFIG_PATH is set in the environment.
+    if framework_env == "python":
+        if explicit_config:
+            # Clear the override to avoid pulling a Ray-oriented YAML in CI
+            os.environ.pop("NV_INGEST_PIPELINE_CONFIG_PATH", None)
+        config = load_default_libmode_config()
+    else:
+        pipeline_config_path = explicit_config or default_pipeline_config_path
+        config = load_pipeline_config(pipeline_config_path)
 
     # Set environment to disable dynamic scaling for testing
     os.environ["INGEST_DISABLE_DYNAMIC_SCALING"] = "True"
 
     pipeline = None
     try:
-        pipeline = run_pipeline(config, block=False, run_in_subprocess=True, disable_dynamic_scaling=True)
-        # Wait for message broker readiness using explicit IPv4 loopback to avoid IPv6 localhost mismatch
-        _wait_for_port("127.0.0.1", 7671, timeout=120.0, interval=0.5)
+        pipeline = run_pipeline(config, block=False, run_in_subprocess=False, disable_dynamic_scaling=True)
+        # Small warm-up for in-process startup; no socket waits needed for direct API
+        time.sleep(1.0)
         yield pipeline
     except KeyboardInterrupt:
-        print("Keyboard interrupt received. Shutting down pipeline...")
+        raise
     except Exception as e:
-        print(f"Error running pipeline: {e}")
-    finally:
+        # Emit a concise diagnostic to help CI debugging
+        print("Error running pipeline:", e)
+        try:
+            from pydantic.json import pydantic_encoder  # type: ignore
+            import json
+
+            print("[DEBUG] Resolved framework:", framework_env)
+            print("[DEBUG] Using default libmode config:", framework_env == "python")
+            # Avoid dumping huge configs; show stage count and first few stage impls
+            try:
+                stages = getattr(config, "stages", [])
+                impls = [getattr(s, "stage_impl", "?") for s in stages[:5]]
+                print(f"[DEBUG] Stage count: {len(stages)}; first impls: {impls}")
+            except Exception:
+                pass
+        except Exception:
+            pass
         print("Shutting down pipeline...")
+        raise
+    finally:
         if pipeline:
             pipeline.stop()
 
