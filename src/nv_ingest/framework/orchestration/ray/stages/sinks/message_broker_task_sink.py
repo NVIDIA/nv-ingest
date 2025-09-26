@@ -92,7 +92,7 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         self.client = self._create_client()
 
         # Create the data writer for external system outputs (Redis routing)
-        self.data_writer = IngestDataWriter(max_workers=4)
+        self.data_writer = IngestDataWriter.get_instance(max_workers=4)
 
         self.start_time = None
         self.message_count = 0
@@ -197,7 +197,7 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         """
         # Validate payload sizes
         for payload in json_payloads:
-            payload_size = sys.getsizeof(payload)
+            payload_size = len(payload.encode("utf-8"))
             size_limit = 2**28  # 256 MB
             if payload_size > size_limit:
                 raise ValueError(f"Payload size {payload_size} exceeds limit of {size_limit / 1e6} MB.")
@@ -211,7 +211,25 @@ class MessageBrokerTaskSinkStage(RayActorStage):
             password=None,
             channel=response_channel,
         )
-        self.data_writer.write_async(json_payloads, dest_config)
+
+        # Add lightweight callbacks for observability
+        def _on_success(data, cfg):
+            logger.debug("Published %d fragment(s) to Redis channel '%s'", len(data), getattr(cfg, "channel", "?"))
+
+        def _on_failure(data, cfg, exc):
+            logger.exception(
+                "Failed publishing %d fragment(s) to Redis channel '%s': %s",
+                len(data),
+                getattr(cfg, "channel", "?"),
+                exc,
+            )
+
+        self.data_writer.write_async(
+            json_payloads,
+            dest_config,
+            on_success=_on_success,
+            on_failure=_on_failure,
+        )
 
     def _handle_failure(
         self, response_channel: str, json_result_fragments: List[Dict[str, Any]], e: Exception, mdf_size: int
