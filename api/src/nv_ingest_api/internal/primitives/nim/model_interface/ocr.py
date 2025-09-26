@@ -30,7 +30,8 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
 NEMORETRIEVER_OCR_EA_MODEL_NAME = "scene_text"
-NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
+NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
+NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class OCRModelInterface(ModelInterface):
                         target_width=max_length,
                         pad_how="bottom_right",
                     )
-                elif model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+                elif model_name in [NEMORETRIEVER_OCR_MODEL_NAME, NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME]:
                     arr = img
                     _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
                 else:
@@ -172,7 +173,7 @@ class OCRModelInterface(ModelInterface):
 
                 dims.append(_dims)
 
-                if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+                if model_name in [NEMORETRIEVER_OCR_MODEL_NAME, NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME]:
                     arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
                 else:
                     arr = arr.astype(np.float32)
@@ -417,7 +418,7 @@ class OCRModelInterface(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+        if model_name in [NEMORETRIEVER_OCR_MODEL_NAME, NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME]:
             response = response.transpose((1, 0))
 
         # If we have shape (3,), convert to (3, 1)
