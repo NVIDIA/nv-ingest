@@ -49,6 +49,68 @@ def _resize_image_opencv(
     return cv2.resize(array, target_size, interpolation=interpolation)
 
 
+def rgba_to_rgb_white_bg(rgba_image):
+    """
+    Convert RGBA image to RGB by blending with a white background.
+
+    This function properly handles transparency by alpha-blending transparent
+    and semi-transparent pixels with a white background, producing visually
+    accurate results that match how the image would appear when displayed.
+
+    Parameters
+    ----------
+    rgba_image : numpy.ndarray
+        Input image array with shape (height, width, 4) where the channels
+        are Red, Green, Blue, Alpha. Alpha values can be in range [0, 1]
+        (float) or [0, 255] (uint8).
+
+    Returns
+    -------
+    numpy.ndarray
+        RGB image array with shape (height, width, 3) and dtype uint8.
+        Values are in range [0, 255] representing Red, Green, Blue channels.
+
+    Notes
+    -----
+    The alpha blending formula used is:
+        RGB_out = RGB_in * alpha + background * (1 - alpha)
+
+    Where background is white (255, 255, 255).
+
+    For pixels with alpha = 1.0 (fully opaque), the original RGB values
+    are preserved. For pixels with alpha = 0.0 (fully transparent), the
+    result is white. Semi-transparent pixels are blended proportionally.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Create a sample RGBA image with some transparency
+    >>> rgba = np.random.randint(0, 256, (100, 100, 4), dtype=np.uint8)
+    >>> rgb = rgba_to_rgb_white_bg(rgba)
+    >>> print(rgb.shape)  # (100, 100, 3)
+    >>> print(rgb.dtype)  # uint8
+
+    >>> # Example with float alpha values [0, 1]
+    >>> rgba_float = np.random.rand(50, 50, 4).astype(np.float32)
+    >>> rgb_float = rgba_to_rgb_white_bg(rgba_float)
+    >>> print(rgb_float.dtype)  # uint8
+    """
+    # Extract RGB and alpha channels
+    rgb = rgba_image[:, :, :3]  # RGB channels (H, W, 3)
+    alpha = rgba_image[:, :, 3:4]  # Alpha channel (H, W, 1)
+
+    # Normalize alpha to [0, 1] range if it's in [0, 255] range
+    if alpha.max() > 1.0:
+        alpha = alpha / 255.0
+
+    # Alpha blend with white background using the formula:
+    # result = foreground * alpha + background * (1 - alpha)
+    rgb_image = rgb * alpha + 255 * (1 - alpha)
+
+    # Convert to uint8 format for standard image representation
+    return rgb_image.astype(np.uint8)
+
+
 def scale_image_to_encoding_size(
     base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9, format: str = "PNG", **kwargs
 ) -> Tuple[str, Tuple[int, int]]:
@@ -93,7 +155,7 @@ def scale_image_to_encoding_size(
 
         # Check initial size
         if len(base64_image) <= max_base64_size:
-            return base64_image, original_size
+            return numpy_to_base64(img_array, format=format, **kwargs), original_size
 
         # Initial reduction step
         reduction_step = initial_reduction
@@ -620,6 +682,10 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
         if img is None:
             raise ValueError("OpenCV failed to decode image")
+
+        # Convert 4 channel to 3 channel if necessary
+        if img.shape[2] == 4:
+            img = rgba_to_rgb_white_bg(img)
 
         # Convert BGR to RGB for consistent processing (OpenCV loads as BGR)
         # Only convert if it's a 3-channel color image
