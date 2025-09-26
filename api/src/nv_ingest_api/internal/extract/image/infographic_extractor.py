@@ -115,7 +115,7 @@ def _update_infographic_metadata(
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
-    elif ocr_model_name == "scene_text_ensemble":
+    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"}:
         infer_kwargs.update(
             model_name=ocr_model_name,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
