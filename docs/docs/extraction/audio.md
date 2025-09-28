@@ -23,10 +23,6 @@ to transcribe audio files to text, which is then embedded by using the NeMo Retr
 
     Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements to run RIVA NIM, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
 
-!!! important
-
-    To perform audio ingestion, [librosa](https://librosa.org/doc/latest/index.html) must be installed in the nv-ingest container. Edit docker-compose.yaml and set `INSTALL_AUDIO_EXTRACTION_DEPS=true`  to install librosa during container startup.
-
 This Early Access pipeline enables users to now retrieve audio files at the segment level. 
 
 
@@ -68,10 +64,9 @@ Again, replace <your-ngc-key> with your actual NGC key.
 3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
 
     - The `--profile audio` flag ensures that audio-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
-    - The `--build` flag ensures that any changes to the container images are applied before starting.
 
     ```shell
-    docker compose --profile retrieval --profile audio up --build
+    docker compose --profile retrieval --profile audio up
     ```
 
 4. After the services are running, you can interact with nv-ingest by using Python.
@@ -136,6 +131,6 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 ## Related Topics
 
-- [Support Matrix](support-matrix.md).
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
