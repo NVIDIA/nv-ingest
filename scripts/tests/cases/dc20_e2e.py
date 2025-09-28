@@ -7,6 +7,7 @@ from datetime import datetime
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.milvus import nvingest_retrieval
+from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -110,6 +111,7 @@ def main() -> int:
             sparse=sparse,
             gpu_search=gpu_search,
             model_name=model_name,
+            purge_results_after_upload=False,
         )
         .save_to_disk(output_directory=spill_dir)
     )
@@ -126,6 +128,25 @@ def main() -> int:
     kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
     kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)
     kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
+
+    # Document-level analysis
+    if _get_env("DOC_ANALYSIS", "false").lower() == "true":
+        print("\nDocument Analysis:")
+        document_breakdown = analyze_document_chunks(results)
+
+        if document_breakdown:
+            # Show individual documents
+            for doc_name, pages in document_breakdown.items():
+                total_counts = pages["total"]
+                total_elements = sum(total_counts.values())
+                print(
+                    f"  {doc_name}: {total_elements} elements "
+                    f"(text: {total_counts['text']}, tables: {total_counts['tables']}, "
+                    f"charts: {total_counts['charts']}, images: {total_counts['unstructured_images']}, "
+                    f"infographics: {total_counts['infographics']})"
+                )
+        else:
+            print("  No document data available")
 
     # Retrieval sanity
     queries = [

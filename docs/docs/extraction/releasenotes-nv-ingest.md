@@ -30,7 +30,7 @@ The NeMo Retriever extraction 25.09 release adds new hardware and software suppo
 
 The following are the known issues for this release:
 
-- A10G and L40S are not supported. For details, refer to [Support Matrix](support-matrix.md).
+- A10G and L40S are not supported. To use A10G or L40S hardware, use release 25.6.x.
 - `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
@@ -42,8 +42,7 @@ There are no breaking changes in this version.
 
 ### Upgrade
 
-QA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/main/helm/values.yaml).
-GA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/TODO/helm/values.yaml).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/25.9.0/helm/README.md).
 
 
 

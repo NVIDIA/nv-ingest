@@ -12,10 +12,9 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 exporters:
-  # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
   zipkin:
     endpoint: "http://zipkin:9411/api/v2/spans"
-  logging:
+  debug:
     verbosity: detailed
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -45,16 +44,19 @@ service:
   telemetry:
     logs:
       level: "debug"
+    metrics:
+      level: "basic"
+      # listen_address: "0.0.0.0:8888"  # optional if you want to override default
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch, tail_sampling]
-      exporters: [zipkin, logging]
+      exporters: [zipkin, debug]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, logging]
+      exporters: [prometheus, debug]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [debug]
