@@ -1,18 +1,25 @@
-import click
 import json
 import os
 import subprocess
 import sys
 import time
 from datetime import datetime
+from datetime import timezone
 
+import click
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 COMPOSE_FILE = os.path.join(REPO_ROOT, "docker-compose.yaml")
 
 
 def now_timestr() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    """Return UTC timestamp"""
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%Z")
+
+
+def _last_commit() -> str:
+    """Returns the commit hash of the last commit"""
+    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
 
 
 def run_cmd(cmd: list[str]) -> int:
@@ -21,9 +28,7 @@ def run_cmd(cmd: list[str]) -> int:
 
 
 def stop_services() -> int:
-    """
-    Simple cleanup of Docker services.
-    """
+    """Simple cleanup of Docker services"""
     print("Performing service cleanup...")
 
     # Stop all services with all profiles
@@ -200,6 +205,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
             json.dump(
                 {
                     "case": case,
+                    "latest-commit": _last_commit(),
                     "infra": "managed" if managed else "attach",
                     "profiles": profiles,
                     "stdout": os.path.basename(stdout_path),
