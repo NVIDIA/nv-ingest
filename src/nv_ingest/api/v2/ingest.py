@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # pylint: skip-file
 
+import asyncio
 from io import BytesIO
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 import base64
 import copy
 import json
@@ -42,7 +43,7 @@ tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
-DEFAULT_PDF_SPLIT_PAGE_COUNT = 10
+DEFAULT_PDF_SPLIT_PAGE_COUNT = 64
 
 
 def get_pdf_split_page_count() -> int:
@@ -130,6 +131,45 @@ def get_pdf_page_count(pdf_content: bytes) -> int:
         return 1  # Assume single page on error
 
 
+def _prepare_chunk_submission(
+    job_spec_template: Dict[str, Any],
+    chunk: Dict[str, Any],
+    *,
+    parent_uuid: uuid.UUID,
+    parent_job_id: str,
+    current_trace_id: int,
+    original_source_id: str,
+    original_source_name: str,
+) -> Tuple[str, MessageWrapper]:
+    """Create a subjob MessageWrapper for a PDF chunk and return its identifier."""
+
+    chunk_number = chunk["chunk_index"] + 1
+    start_page = chunk["start_page"]
+    end_page = chunk["end_page"]
+
+    subjob_spec = copy.deepcopy(job_spec_template)
+    subjob_payload = subjob_spec.setdefault("job_payload", {})
+
+    chunk_bytes = chunk["bytes"]
+    subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
+
+    page_suffix = f"page_{start_page}" if start_page == end_page else f"pages_{start_page}-{end_page}"
+    subjob_payload["source_id"] = [f"{original_source_id}#{page_suffix}"]
+    subjob_payload["source_name"] = [f"{original_source_name}#{page_suffix}"]
+
+    subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
+    subjob_id = str(subjob_uuid)
+    subjob_spec["job_id"] = subjob_id
+
+    tracing_options = subjob_spec.setdefault("tracing_options", {"trace": True})
+    tracing_options["trace_id"] = str(current_trace_id)
+    tracing_options["ts_send"] = int(time.time() * 1000)
+    tracing_options["parent_job_id"] = parent_job_id
+    tracing_options["page_num"] = start_page
+
+    return subjob_id, MessageWrapper(payload=json.dumps(subjob_spec))
+
+
 # POST /v2/submit_job
 @router.post(
     "/submit_job",
@@ -181,6 +221,7 @@ async def submit_job_v2(
                     chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
 
                     subjob_ids: List[str] = []
+                    submission_tasks = []
                     source_ids = job_payload.get("source_id", ["document.pdf"])
                     source_names = job_payload.get("source_name", ["document.pdf"])
                     original_source_id = source_ids[0] if source_ids else "document.pdf"
@@ -196,35 +237,20 @@ async def submit_job_v2(
                         parent_uuid = uuid.uuid4()
 
                     for chunk in chunks:
-                        chunk_number = chunk["chunk_index"] + 1
-                        start_page = chunk["start_page"]
-                        end_page = chunk["end_page"]
-
-                        subjob_spec = copy.deepcopy(job_spec_dict)
-                        subjob_payload = subjob_spec.setdefault("job_payload", {})
-
-                        chunk_bytes = chunk["bytes"]
-                        subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
-
-                        page_suffix = (
-                            f"page_{start_page}" if start_page == end_page else f"pages_{start_page}-{end_page}"
+                        subjob_id, subjob_wrapper = _prepare_chunk_submission(
+                            job_spec_dict,
+                            chunk,
+                            parent_uuid=parent_uuid,
+                            parent_job_id=parent_job_id,
+                            current_trace_id=current_trace_id,
+                            original_source_id=original_source_id,
+                            original_source_name=original_source_name,
                         )
-                        subjob_payload["source_id"] = [f"{original_source_id}#{page_suffix}"]
-                        subjob_payload["source_name"] = [f"{original_source_name}#{page_suffix}"]
-
-                        subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
-                        subjob_id = str(subjob_uuid)
-                        subjob_spec["job_id"] = subjob_id
-
-                        tracing_options = subjob_spec.setdefault("tracing_options", {"trace": True})
-                        tracing_options["trace_id"] = str(current_trace_id)
-                        tracing_options["ts_send"] = int(time.time() * 1000)
-                        tracing_options["parent_job_id"] = parent_job_id
-                        tracing_options["page_num"] = start_page
-
-                        subjob_wrapper = MessageWrapper(payload=json.dumps(subjob_spec))
-                        await ingest_service.submit_job(subjob_wrapper, subjob_id)
+                        submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
                         subjob_ids.append(subjob_id)
+
+                    if submission_tasks:
+                        await asyncio.gather(*submission_tasks)
 
                     parent_metadata: Dict[str, Any] = {
                         "total_pages": page_count,
@@ -402,51 +428,78 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             for idx, subjob_id in enumerate(subjob_ids, 1):
                 ordered_descriptors.append({"job_id": subjob_id, "chunk_index": idx})
 
-            # Check all subjob states
-            all_complete = True
-            any_failed = False
-            subjob_results = []
-            failed_subjobs: List[Dict[str, object]] = []
+            # Limit concurrent Redis calls to stay within connection pool bounds
+            max_parallel_ops = max(
+                1, min(len(ordered_descriptors), getattr(ingest_service, "_concurrency_level", 10) // 2)
+            )
 
-            for page_index, descriptor in enumerate(ordered_descriptors, 1):
+            # Check all subjob states using bounded concurrency
+            any_failed = False
+            failed_subjobs: List[Dict[str, object]] = []
+            subjob_results: List[Optional[Dict[str, Any]]] = [None] * len(ordered_descriptors)
+
+            subjob_states: List[Optional[str]] = []
+            for offset in range(0, len(ordered_descriptors), max_parallel_ops):
+                state_batch = ordered_descriptors[offset : offset + max_parallel_ops]
+                batch_tasks = [ingest_service.get_job_state(descriptor.get("job_id")) for descriptor in state_batch]
+                subjob_states.extend(await asyncio.gather(*batch_tasks))
+
+            fetch_coroutines = []
+            fetch_targets: List[Dict[str, Any]] = []
+
+            for list_index, (page_index, descriptor, subjob_state) in enumerate(
+                zip(range(1, len(ordered_descriptors) + 1), ordered_descriptors, subjob_states)
+            ):
                 subjob_id = descriptor.get("job_id")
-                subjob_state = await ingest_service.get_job_state(subjob_id)
 
                 if subjob_state == STATE_FAILED:
                     any_failed = True
                     logger.warning(f"Subjob {subjob_id} failed")
-                    subjob_results.append(None)  # Placeholder for failed chunk
-                    failed_entry: Dict[str, object] = {
+                    failed_subjobs.append({"subjob_id": subjob_id, "chunk_index": page_index})
+                    continue
+
+                if subjob_state in INTERMEDIATE_STATES:
+                    raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
+
+                fetch_coroutines.append(ingest_service.fetch_job(subjob_id))
+                fetch_targets.append(
+                    {
+                        "list_index": list_index,
+                        "page_index": page_index,
+                        "descriptor": descriptor,
                         "subjob_id": subjob_id,
-                        "chunk_index": page_index,
                     }
-                    failed_subjobs.append(failed_entry)
-                elif subjob_state in INTERMEDIATE_STATES:
-                    all_complete = False
-                    break
-                else:
-                    # Try to fetch the subjob result
-                    try:
-                        subjob_response = await ingest_service.fetch_job(subjob_id)
-                        subjob_results.append(subjob_response)
-                    except TimeoutError:
+                )
+
+            if fetch_coroutines:
+                fetch_results: List[Any] = []
+                for offset in range(0, len(fetch_coroutines), max_parallel_ops):
+                    fetch_batch = fetch_coroutines[offset : offset + max_parallel_ops]
+                    fetch_results.extend(await asyncio.gather(*fetch_batch, return_exceptions=True))
+
+                for target, fetch_result in zip(fetch_targets, fetch_results):
+                    subjob_id = target["subjob_id"]
+                    page_index = target["page_index"]
+                    list_index = target["list_index"]
+
+                    if isinstance(fetch_result, TimeoutError):
                         logger.debug(f"Subjob {subjob_id} not ready yet; deferring aggregation")
-                        all_complete = False
-                        break
-                    except Exception as e:
-                        logger.error(f"Failed to fetch subjob {subjob_id}: {e}")
+                        raise HTTPException(
+                            status_code=202, detail="Parent job still processing. Some pages not complete."
+                        )
+
+                    if isinstance(fetch_result, Exception):
+                        logger.error(f"Failed to fetch subjob {subjob_id}: {fetch_result}")
                         any_failed = True
-                        subjob_results.append(None)
                         failed_entry = {
                             "subjob_id": subjob_id,
                             "chunk_index": page_index,
-                            "error": str(e),
+                            "error": str(fetch_result),
                         }
                         failed_subjobs.append(failed_entry)
+                        continue
 
-            if not all_complete:
-                # Some subjobs still processing
-                raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
+                    subjob_results[list_index] = fetch_result
 
             # All subjobs complete - aggregate results
             aggregated_result = {

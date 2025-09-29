@@ -11,7 +11,7 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -46,7 +46,7 @@ def main() -> int:
     # Set API version to V2 (can be overridden by environment)
     if "NV_INGEST_API_VERSION" not in os.environ:
         os.environ["NV_INGEST_API_VERSION"] = "v2"
-    
+
     # Dataset-agnostic: no hardcoded paths, configurable via environment
     data_dir = _get_env("DATASET_DIR")
     if not data_dir:
@@ -83,7 +83,7 @@ def main() -> int:
 
     # Get actual API version being used
     actual_api_version = os.environ.get("NV_INGEST_API_VERSION", "v1")
-    
+
     # Log configuration for transparency
     print("=== Configuration ===")
     print(f"Dataset: {data_dir}")
@@ -103,7 +103,7 @@ def main() -> int:
     # Create Ingestor with V2 API endpoints
     ingestor = (
         Ingestor(
-            message_client_hostname=hostname, 
+            message_client_hostname=hostname,
             message_client_port=7670,
             # The API version is set via environment variable above
         )
@@ -134,6 +134,12 @@ def main() -> int:
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
+
+    total_pages = pdf_page_count(data_dir)
+    pages_per_second = None
+    if total_pages > 0 and ingestion_time > 0:
+        pages_per_second = total_pages / ingestion_time
+        kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)
@@ -197,16 +203,18 @@ def main() -> int:
         "text_chunks": sum(len(x) for x in text_results),
         "table_chunks": sum(len(x) for x in table_results),
         "chart_chunks": sum(len(x) for x in chart_results),
+        "dataset_pages": total_pages,
+        "pages_per_second": pages_per_second if total_pages > 0 and ingestion_time > 0 else None,
     }
     print(f"\n{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
-    
+
     # Compare with expected V1 results if available
     print("\n=== V2 API Results ===")
     print(f"Text chunks: {sum(len(x) for x in text_results)}")
     print(f"Table chunks: {sum(len(x) for x in table_results)}")
     print(f"Chart chunks: {sum(len(x) for x in chart_results)}")
-    
+
     # For dc20/bo20 dataset, expected values from V1:
     # text: 496, tables: 164, charts: 184
     if "bo20" in data_dir or "dc20" in data_dir:
@@ -218,7 +226,7 @@ def main() -> int:
             print("✓ V2 results match V1 expected values!")
         else:
             print("✗ V2 results differ from V1 expected values")
-    
+
     return 0
 
 

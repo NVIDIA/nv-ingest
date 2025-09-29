@@ -131,6 +131,8 @@ class RedisIngestService(IngestServiceMeta):
         self._bulk_vdb_cache_prefix: str = "vdb_bulk_upload_cache:"
         self._cache_prefix: str = "processing_cache:"
         self._state_prefix: str = "job_state:"
+        # Bound async-to-thread concurrency slightly below Redis connection pool
+        self._async_operation_semaphore: Optional[asyncio.Semaphore] = None
 
         self._ingest_client = RedisClient(
             host=self._redis_hostname,
@@ -148,6 +150,16 @@ class RedisIngestService(IngestServiceMeta):
             f"RedisClient initialized for service. Host: {redis_hostname}:{redis_port}, "
             f"FetchMode: {fetch_mode.name}, ResultTTL: {result_data_ttl_seconds}, StateTTL: {state_ttl_seconds}"
         )
+
+    def _get_async_semaphore(self) -> asyncio.Semaphore:
+        if self._async_operation_semaphore is None:
+            semaphore_limit = max(1, self._concurrency_level - 2)
+            self._async_operation_semaphore = asyncio.Semaphore(semaphore_limit)
+        return self._async_operation_semaphore
+
+    async def _run_bounded_to_thread(self, func, *args, **kwargs):
+        async with self._get_async_semaphore():
+            return await asyncio.to_thread(func, *args, **kwargs)
 
     async def submit_job(self, job_spec_wrapper: "MessageWrapper", trace_id: str) -> str:
         """
@@ -209,7 +221,7 @@ class RedisIngestService(IngestServiceMeta):
             logger.debug(
                 f"Submitting job {trace_id} to queue '{self._redis_task_queue}' with result TTL: {ttl_for_result}"
             )
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.submit_message,
                 channel_name=self._redis_task_queue,
                 message=job_spec_json,
@@ -250,7 +262,7 @@ class RedisIngestService(IngestServiceMeta):
         try:
             result_channel: str = f"{job_id}"
             logger.debug(f"Attempting to fetch job result for {job_id} using mode {self._fetch_mode.name}")
-            message = await asyncio.to_thread(
+            message = await self._run_bounded_to_thread(
                 self._ingest_client.fetch_message,
                 channel_name=result_channel,
                 timeout=10,
@@ -287,7 +299,7 @@ class RedisIngestService(IngestServiceMeta):
         ttl_to_set: Optional[int] = self._state_ttl_seconds
         try:
             logger.debug(f"Setting state for {job_id} to {state} with TTL {ttl_to_set}")
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.get_client().set,
                 state_key,
                 state,
@@ -315,7 +327,10 @@ class RedisIngestService(IngestServiceMeta):
         """
         state_key: str = f"{self._state_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await asyncio.to_thread(self._ingest_client.get_client().get, state_key)
+            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().get,
+                state_key,
+            )
             if data_bytes:
                 state: str = data_bytes.decode("utf-8")
                 logger.debug(f"Retrieved state for {job_id}: {state}")
@@ -348,7 +363,7 @@ class RedisIngestService(IngestServiceMeta):
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
             data_to_store: str = json.dumps([job.model_dump(mode="json") for job in jobs_data])
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.get_client().set,
                 cache_key,
                 data_to_store,
@@ -373,7 +388,10 @@ class RedisIngestService(IngestServiceMeta):
         """
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await asyncio.to_thread(self._ingest_client.get_client().get, cache_key)
+            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().get,
+                cache_key,
+            )
             if data_bytes is None:
                 return []
             return [ProcessingJob(**job) for job in json.loads(data_bytes)]
@@ -410,7 +428,11 @@ class RedisIngestService(IngestServiceMeta):
 
         try:
             # Store subjob IDs as a set
-            await asyncio.to_thread(self._ingest_client.get_client().sadd, parent_key, *subjob_ids)
+            await self._run_bounded_to_thread(
+                self._ingest_client.get_client().sadd,
+                parent_key,
+                *subjob_ids,
+            )
 
             # Store metadata as hash (including original subjob ordering for deterministic fetches)
             metadata_to_store = dict(metadata)
@@ -423,12 +445,24 @@ class RedisIngestService(IngestServiceMeta):
                 )
                 metadata_to_store.pop("subjob_order", None)
 
-            await asyncio.to_thread(self._ingest_client.get_client().hset, metadata_key, mapping=metadata_to_store)
+            await self._run_bounded_to_thread(
+                self._ingest_client.get_client().hset,
+                metadata_key,
+                mapping=metadata_to_store,
+            )
 
             # Set TTL on both keys to match state TTL
             if self._state_ttl_seconds:
-                await asyncio.to_thread(self._ingest_client.get_client().expire, parent_key, self._state_ttl_seconds)
-                await asyncio.to_thread(self._ingest_client.get_client().expire, metadata_key, self._state_ttl_seconds)
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().expire,
+                    parent_key,
+                    self._state_ttl_seconds,
+                )
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().expire,
+                    metadata_key,
+                    self._state_ttl_seconds,
+                )
 
             logger.debug(f"Stored parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
 
@@ -455,17 +489,26 @@ class RedisIngestService(IngestServiceMeta):
 
         try:
             # Check if this is a parent job
-            exists = await asyncio.to_thread(self._ingest_client.get_client().exists, parent_key)
+            exists = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().exists,
+                parent_key,
+            )
 
             if not exists:
                 return None
 
             # Get subjob IDs
-            subjob_ids_bytes = await asyncio.to_thread(self._ingest_client.get_client().smembers, parent_key)
+            subjob_ids_bytes = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().smembers,
+                parent_key,
+            )
             subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes}
 
             # Get metadata
-            metadata_dict = await asyncio.to_thread(self._ingest_client.get_client().hgetall, metadata_key)
+            metadata_dict = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().hgetall,
+                metadata_key,
+            )
             metadata = {k.decode("utf-8"): v.decode("utf-8") for k, v in metadata_dict.items()}
 
             # Convert numeric strings back to numbers
