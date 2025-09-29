@@ -247,7 +247,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.9.0
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
@@ -277,7 +277,7 @@ services:
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
-      - INGEST_LOG_LEVEL=DEFAULT
+      - INGEST_LOG_LEVEL=DEBUG
       - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
@@ -322,6 +322,7 @@ services:
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- OCR_INFER_PROTOCOL=http
+      - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
       # Self-hosted redis endpoints.
       - YOLOX_PAGE_IMAGE_FORMAT=JPEG # JPG is faster than PNG
