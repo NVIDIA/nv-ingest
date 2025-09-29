@@ -261,9 +261,8 @@ Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
 To add new configurable parameters:
 
 1. **Add to `env.example`** with documentation
-2. **Read in test script** using `_get_env()`
-3. **Add to configuration logging**
-4. **Update this README** with parameter description
+2. **Add to configuration logging**
+3. **Update this README** with parameter description
 
 ### Testing Different Datasets
 
