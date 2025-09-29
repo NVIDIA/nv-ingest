@@ -144,8 +144,10 @@ class TestVLMModelInterface(unittest.TestCase):
             self.assertEqual(message["content"][0]["type"], "text")
             self.assertEqual(message["content"][0]["text"], self.sample_prompt)
             self.assertEqual(message["content"][1]["type"], "image_url")
-            self.assertEqual(message["content"][1]["image_url"]["url"], f"data:image/png;base64,{self.sample_images[i]}")
-            
+            self.assertEqual(
+                message["content"][1]["image_url"]["url"], f"data:image/png;base64,{self.sample_images[i]}"
+            )
+
         # Check batch data
         self.assertEqual(len(batch_data), 1)
         self.assertEqual(batch_data[0]["base64_images"], self.sample_images)
