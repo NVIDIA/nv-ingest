@@ -3,8 +3,6 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
-from datetime import timezone
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -25,22 +23,7 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-
-def _now_timestr() -> str:
-    """Returns UTC timestamp"""
-    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M_%Z")
-
-
-def _default_collection_name() -> str:
-    # Derive test name from dataset directory or use explicit TEST_NAME
-    dataset_dir = os.getenv("DATASET_DIR", "")
-    if dataset_dir:
-        dataset_name = os.path.basename(dataset_dir.rstrip("/"))
-    else:
-        dataset_name = "e2e"
-
-    test_name = os.getenv("TEST_NAME", dataset_name)
-    return f"{test_name}_{_now_timestr()}"
+from utils import default_collection_name
 
 
 def main() -> int:
@@ -59,7 +42,7 @@ def main() -> int:
     spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", _default_collection_name())
+    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
     hostname = os.getenv("HOSTNAME", "localhost")
     sparse = os.getenv("SPARSE", "true").lower() == "true"
     gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"

@@ -3,23 +3,15 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
-from datetime import timezone
-
 import click
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 COMPOSE_FILE = os.path.join(REPO_ROOT, "docker-compose.yaml")
 
-
-def now_timestr() -> str:
-    """Return UTC timestamp"""
-    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%Z")
+from cases.utils import last_commit, now_timestr
 
 
-def _last_commit() -> str:
-    """Returns the commit hash of the last commit"""
-    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+CASES = ["dc20_e2e", "e2e", "e2e_with_llm_summary"]
 
 
 def run_cmd(cmd: list[str]) -> int:
@@ -129,6 +121,11 @@ def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> in
         sys.stdout = tee_stdout
         sys.stderr = tee_stdout
 
+        # Add cases directory to sys.path so modules can import from utils
+        cases_dir = os.path.dirname(case_path)
+        if cases_dir not in sys.path:
+            sys.path.insert(0, cases_dir)
+
         # Load and execute the test case module
         spec = importlib.util.spec_from_file_location(case_name, case_path)
         if spec is None or spec.loader is None:
@@ -184,7 +181,6 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
     else:
         tests_dir = os.path.dirname(__file__)
         candidate_env = os.path.join(tests_dir, ".env")
-        # candidate_env = os.path.join(tests_dir, ".env")
         if os.path.exists(candidate_env):
             load_env_file(candidate_env)
 
@@ -235,7 +231,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
                 return 1
 
         # Run case
-        if case in ["dc20_e2e", "e2e", "e2e_with_llm_summaries"]:
+        if case in CASES:
             rc = run_case(case, stdout_path, doc_analysis)
         else:
             print(f"Unknown case: {case}")
@@ -246,7 +242,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
             json.dump(
                 {
                     "case": case,
-                    "latest-commit": _last_commit(),
+                    "latest-commit": last_commit(),
                     "infra": "managed" if managed else "attach",
                     "profiles": profiles,
                     "stdout": os.path.basename(stdout_path),
