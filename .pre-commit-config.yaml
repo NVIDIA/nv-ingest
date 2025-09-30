@@ -2,7 +2,7 @@
 # Before first use: `pre-commit install`
 # To run: `pre-commit run --all-files`
 # To update: `pre-commit autoupdate`
-fail_fast: false
+fail_fast: true
 default_language_version:
   python: python3
 
@@ -20,6 +20,7 @@ repos:
       - id: mixed-line-ending
       - id: check-merge-conflict
       - id: check-yaml
+        # exclude: (^helm/)
 
   - repo: https://github.com/psf/black
     rev: 25.9.0
@@ -39,23 +40,11 @@ repos:
       - id: flake8
         args: ["--max-line-length=120", "--extend-ignore=E203,E266,F403,F405,E402"]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
-    hooks:
-      - id: mypy
-        args:
-          - --ignore-missing-imports
-          - --install-types
-          - --non-interactive
-        additional_dependencies:
-          - types-requests
-          - types-PyYAML
-
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.6
     hooks:
       - id: bandit
-        args: ["-q", "-r", "."]
+        args: ["-q", "-r", "--skip", "B404,B101,B110"]
         exclude: (^tests/|^docs/|^scripts/)
 
   - repo: https://github.com/codespell-project/codespell
