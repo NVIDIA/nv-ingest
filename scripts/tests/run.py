@@ -94,27 +94,67 @@ def load_env_file(env_file: str | None):
 
 
 def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> int:
-    """Run a test case as a subprocess to keep runner simple and capture output."""
+    """Run a test case directly in the same process with real-time output."""
+    import importlib.util
+
     case_path = os.path.join(os.path.dirname(__file__), "cases", f"{case_name}.py")
 
     # Set LOG_PATH to artifacts directory for kv_event_log
-    env = os.environ.copy()
-    env["LOG_PATH"] = os.path.dirname(stdout_path)
+    os.environ["LOG_PATH"] = os.path.dirname(stdout_path)
     if doc_analysis:
-        env["DOC_ANALYSIS"] = "true"
+        os.environ["DOC_ANALYSIS"] = "true"
 
-    proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True, env=env)
-    # Echo to console and also save to file
-    if proc.stdout:
-        print(proc.stdout, end="")
-    if proc.stderr:
-        print(proc.stderr, end="", file=sys.stderr)
-    with open(stdout_path, "w") as fp:
-        if proc.stdout:
-            fp.write(proc.stdout)
-        if proc.stderr:
-            fp.write(proc.stderr)
-    return proc.returncode
+    # Redirect stdout/stderr to both console and file
+    class TeeFile:
+        def __init__(self, file_path, original_stream):
+            self.file = open(file_path, "w")
+            self.original = original_stream
+
+        def write(self, data):
+            self.original.write(data)
+            self.file.write(data)
+
+        def flush(self):
+            self.original.flush()
+            self.file.flush()
+
+        def close(self):
+            self.file.close()
+
+    tee_stdout = TeeFile(stdout_path, sys.stdout)
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+
+    try:
+        sys.stdout = tee_stdout
+        sys.stderr = tee_stdout
+
+        # Load and execute the test case module
+        spec = importlib.util.spec_from_file_location(case_name, case_path)
+        if spec is None or spec.loader is None:
+            print(f"Error: Could not load case {case_name} from {case_path}")
+            return 1
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[case_name] = module
+        spec.loader.exec_module(module)
+
+        # If the module has a main function, call it
+        if hasattr(module, "main"):
+            result = module.main()
+            return result if isinstance(result, int) else 0
+        return 0
+
+    except Exception as e:
+        print(f"Error running case {case_name}: {e}", file=sys.stderr)
+        import traceback
+
+        traceback.print_exc()
+        return 1
+    finally:
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+        tee_stdout.close()
 
 
 @click.command()
@@ -144,6 +184,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
     else:
         tests_dir = os.path.dirname(__file__)
         candidate_env = os.path.join(tests_dir, ".env")
+        # candidate_env = os.path.join(tests_dir, ".env")
         if os.path.exists(candidate_env):
             load_env_file(candidate_env)
 
@@ -194,7 +235,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
                 return 1
 
         # Run case
-        if case in ["dc20_e2e", "e2e"]:
+        if case in ["dc20_e2e", "e2e", "e2e_with_llm_summaries"]:
             rc = run_case(case, stdout_path, doc_analysis)
         else:
             print(f"Unknown case: {case}")
