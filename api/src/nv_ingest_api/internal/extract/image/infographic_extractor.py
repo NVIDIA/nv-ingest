@@ -107,7 +107,7 @@ def _update_infographic_metadata(
             model_name="paddle",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
-    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"}:
+    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
         infer_kwargs.update(
             model_name=ocr_model_name,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
@@ -153,7 +153,7 @@ def _create_ocr_client(
 ) -> NimClient:
     ocr_model_interface = (
         NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"}
+        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
         else PaddleOCRModelInterface()
     )
 
@@ -162,7 +162,9 @@ def _create_ocr_client(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
-        enable_dynamic_batching=(True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper"} else False),
+        enable_dynamic_batching=(
+            True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"} else False
+        ),
         dynamic_batch_memory_budget_mb=32,
     )
 
