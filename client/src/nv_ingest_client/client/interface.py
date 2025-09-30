@@ -243,10 +243,6 @@ class Ingestor:
         self._output_config = None
         self._created_temp_output_dir = None
 
-        # --- variables for tracking disk usage ---
-        self._total_disk_usage = 0
-        self._disk_usage_lock = threading.Lock()
-
     def __enter__(self):
         return self
 
@@ -466,7 +462,6 @@ class Ingestor:
                     file_suffix += ".gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
-                # --- CHANGE: Pass compression argument to the save utility ---
                 num_items_saved = save_document_results_to_jsonl(
                     doc_data,
                     jsonl_filepath,
@@ -476,18 +471,6 @@ class Ingestor:
                 )
 
                 if num_items_saved > 0:
-                    # --- CHANGE: Get file size and log it ---
-                    file_size = os.path.getsize(jsonl_filepath)
-                    with self._disk_usage_lock:
-                        self._total_disk_usage += file_size
-
-                    print(
-                        f"Saved {os.path.basename(jsonl_filepath)} "
-                        f"(Size: {file_size / 1024:.2f} KB). "
-                        f"Total disk usage so far: {self._total_disk_usage / (1024*1024):.2f} MB"
-                    )
-
-                    # --- CHANGE: Tell LazyLoadedList it's compressed ---
                     results = LazyLoadedList(
                         jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
                     )
@@ -587,7 +570,6 @@ class Ingestor:
             io_executor.shutdown(wait=True)
 
         if self._output_config:
-            print(f"BENCHMARK: Final total disk space used: {self._total_disk_usage / (1024*1024):.2f} MB")
             results = final_results_payload_list
 
         if self._vdb_bulk_upload:
