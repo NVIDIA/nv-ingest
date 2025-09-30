@@ -32,6 +32,7 @@ from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 from nv_ingest_client.util.system import ensure_directory_with_permissions
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 try:
     NV_INGEST_VERSION = version("nv_ingest")
@@ -169,6 +170,22 @@ Tasks and Options:
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
 \b
+- udf: Executes user-defined functions (UDFs) for custom processing logic.
+    Options:
+    - udf_function (str): UDF specification. Supports three formats:
+        1. Inline function: 'def my_func(control_message): ...'
+        2. Import path: 'my_module.my_function'
+        3. File path: '/path/to/file.py:function_name' or '/path/to/file.py' (assumes 'process' function)
+    - udf_function_name (str): Name of the function to execute from the UDF specification. Required.
+    - target_stage (str): Specific pipeline stage name to target for UDF execution (e.g.,
+        'text_extractor', 'text_embedder', 'image_extractor'). Cannot be used with phase.
+    - run_before (bool): If True and target_stage is specified, run UDF before the target stage. Default: False.
+    - run_after (bool): If True and target_stage is specified, run UDF after the target stage. Default: False.
+    Examples:
+        --task 'udf:{"udf_function": "my_file.py:my_func", "target_stage": "text_embedder", "run_before": true}'
+        --task 'udf:{"udf_function": "def process(cm): return cm",
+            "target_stage": "image_extractor", "run_after": true}'
+\b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
 )
@@ -221,7 +238,9 @@ def main(
 
     try:
         configure_logging(logger, log_level)
-        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(ctx.params, indent=2, default=repr)}")
+        # Sanitize CLI params before logging to avoid leaking secrets
+        _sanitized_params = sanitize_for_logging(dict(ctx.params))
+        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(_sanitized_params, indent=2, default=repr)}")
 
         docs = list(doc)
         if dataset:
@@ -244,7 +263,16 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
+            # Sanitize client kwargs (JSON string) before logging
+            try:
+                _client_kwargs_obj = json.loads(client_kwargs)
+            except Exception:
+                _client_kwargs_obj = {"raw": client_kwargs}
+            _sanitized_client_kwargs = sanitize_for_logging(_client_kwargs_obj)
+            logging.debug(
+                f"Creating message client: {client_host} and port: {client_port} -> "
+                f"{json.dumps(_sanitized_client_kwargs, indent=2, default=repr)}"
+            )
 
             if client_type == "rest":
                 client_allocator = RestClient

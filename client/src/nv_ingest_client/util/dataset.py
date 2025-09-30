@@ -94,8 +94,14 @@ def get_dataset_files(dataset_bytes: BytesIO, shuffle: bool = False) -> list:
         dataset_bytes.seek(0)
         dataset = json.load(dataset_bytes)
         sampled_files = dataset.get("sampled_files", [])
-        if shuffle:
-            random.shuffle(sampled_files)
+        if shuffle and len(sampled_files) > 1:
+            original = list(sampled_files)
+            # Create a shuffled copy without mutating the original list
+            shuffled = random.sample(sampled_files, k=len(sampled_files))
+            # Guard against seeded RNG or accidental identity by forcing a different order
+            if shuffled == original:
+                shuffled = shuffled[1:] + shuffled[:1]
+            return shuffled
         return sampled_files
     except json.JSONDecodeError as err:
         raise ValueError(f"{err}")

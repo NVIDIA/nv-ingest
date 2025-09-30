@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pandas as pd
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
@@ -31,8 +32,8 @@ class ImageStorageStage(RayActorStage):
     payload and updates the control message accordingly.
     """
 
-    def __init__(self, config: ImageStorageModuleSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageStorageModuleSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageStorageStage configuration validated successfully.")
@@ -40,9 +41,10 @@ class ImageStorageStage(RayActorStage):
             logger.exception("Error validating image storage config")
             raise e
 
-    @traceable("image_storage")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=["store"])
-    @nv_ingest_node_failure_try_except(annotation_id="image_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by storing images or structured content.

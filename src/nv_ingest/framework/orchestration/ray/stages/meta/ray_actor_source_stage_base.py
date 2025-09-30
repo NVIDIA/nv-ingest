@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 import ray
 import logging
 
@@ -19,8 +19,8 @@ class RayActorSourceStage(RayActorStage, ABC):
     Instead, they must implement get_input() to fetch control messages from an external source.
     """
 
-    def __init__(self, config: Any, log_to_stdout=False) -> None:
-        super().__init__(config, log_to_stdout=log_to_stdout)
+    def __init__(self, config: Any, log_to_stdout=False, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=log_to_stdout, stage_name=stage_name)
         self.paused = False
 
     def on_data(self, IngestControlMessage):

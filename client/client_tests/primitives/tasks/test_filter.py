@@ -52,11 +52,8 @@ def test_filter_task_str_representation():
     "content_type, min_size, max_aspect_ratio, min_aspect_ratio, filter",
     [
         ("image", 128, 5.0, 0.2, True),
-        (None, 128, 5.0, 0.2, True),
-        ("image", None, 5.0, 0.2, True),
-        ("image", 128, None, 0.2, True),
-        ("image", 128, 5.0, None, True),
-        ("image", 128, 5.0, 0.2, None),
+        ("image", 256, 3.0, 0.5, False),
+        ("image", 64, 10.0, 0.1, True),
     ],
 )
 def test_filter_task_to_dict(
@@ -66,39 +63,26 @@ def test_filter_task_to_dict(
     min_aspect_ratio,
     filter,
 ):
-    kwargs = {}
-    if content_type is not None:
-        kwargs["content_type"] = content_type
-    if min_size is not None:
-        kwargs["min_size"] = min_size
-    if max_aspect_ratio is not None:
-        kwargs["max_aspect_ratio"] = max_aspect_ratio
-    if min_aspect_ratio is not None:
-        kwargs["min_aspect_ratio"] = min_aspect_ratio
-    if filter is not None:
-        kwargs["filter"] = filter
-
-    task = FilterTask(**kwargs)
+    task = FilterTask(
+        content_type=content_type,
+        min_size=min_size,
+        max_aspect_ratio=max_aspect_ratio,
+        min_aspect_ratio=min_aspect_ratio,
+        filter=filter,
+    )
 
     expected_dict = {
         "type": "filter",
         "task_properties": {
-            "content_type": "image",
-            "params": {"min_size": 128, "max_aspect_ratio": 5.0, "min_aspect_ratio": 0.2, "filter": False},
+            "content_type": content_type,
+            "params": {
+                "min_size": min_size,
+                "max_aspect_ratio": max_aspect_ratio,
+                "min_aspect_ratio": min_aspect_ratio,
+                "filter": filter,
+            },
         },
     }
-
-    # Only add properties to expected_dict if they are not None
-    if content_type is not None:
-        expected_dict["task_properties"]["content_type"] = content_type
-    if min_size is not None:
-        expected_dict["task_properties"]["params"]["min_size"] = min_size
-    if max_aspect_ratio is not None:
-        expected_dict["task_properties"]["params"]["max_aspect_ratio"] = max_aspect_ratio
-    if min_aspect_ratio is not None:
-        expected_dict["task_properties"]["params"]["min_aspect_ratio"] = min_aspect_ratio
-    if filter is not None:
-        expected_dict["task_properties"]["params"]["filter"] = filter
 
     assert task.to_dict() == expected_dict, "The to_dict method did not return the expected dictionary representation"
 
@@ -125,5 +109,51 @@ def test_filter_task_default_params():
             "params": {"min_size": 128, "max_aspect_ratio": 5.0, "min_aspect_ratio": 0.2, "filter": False},
         },
     }
-
     assert task.to_dict() == expected_dict
+
+
+# Schema Consolidation Tests
+
+
+def test_filter_task_schema_consolidation():
+    """Test that FilterTask uses API schema for validation."""
+    # Test that invalid content_type raises validation error
+    with pytest.raises(ValueError):
+        FilterTask(content_type="invalid_type")
+
+    # Test that valid parameters work
+    task = FilterTask(
+        content_type="image",
+        min_size=200,
+        max_aspect_ratio=8.0,
+        min_aspect_ratio=0.1,
+        filter=True,
+    )
+    assert task._content_type == "image"
+    assert task._min_size == 200
+    assert task._max_aspect_ratio == 8.0
+    assert task._min_aspect_ratio == 0.1
+    assert task._filter is True
+
+
+def test_filter_task_edge_cases():
+    """Test FilterTask edge cases and boundary conditions."""
+    # Test with minimum valid values
+    task = FilterTask(
+        content_type="image",
+        min_size=1,
+        max_aspect_ratio=0.1,
+        min_aspect_ratio=0.01,
+        filter=False,
+    )
+    assert task._min_size == 1
+    assert task._max_aspect_ratio == 0.1
+    assert task._min_aspect_ratio == 0.01
+    assert task._filter is False
+
+    # Test serialization of edge case values
+    result_dict = task.to_dict()
+    assert result_dict["task_properties"]["params"]["min_size"] == 1
+    assert result_dict["task_properties"]["params"]["max_aspect_ratio"] == 0.1
+    assert result_dict["task_properties"]["params"]["min_aspect_ratio"] == 0.01
+    assert result_dict["task_properties"]["params"]["filter"] is False
