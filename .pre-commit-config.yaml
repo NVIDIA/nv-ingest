@@ -2,7 +2,7 @@
 # Before first use: `pre-commit install`
 # To run: `pre-commit run --all-files`
 # To update: `pre-commit autoupdate`
-fail_fast: true
+fail_fast: false
 default_language_version:
   python: python3
 
