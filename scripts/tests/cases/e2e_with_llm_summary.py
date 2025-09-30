@@ -1,10 +1,8 @@
 import os
 import json
 import logging
-import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
@@ -26,44 +24,7 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-
-def _now_timestr() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M_%Z")
-
-
-def _get_repo_root() -> str:
-    start = Path.cwd()
-
-    # Try Git (works in subdirs, submodules, worktrees)
-    try:
-        root = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"],
-            cwd=start,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-        return root
-    except subprocess.CalledProcessError:
-        pass
-
-    # Fallback: walk up looking for a .git directory/file
-    for parent in [start, *start.parents]:
-        if (parent / ".git").exists():
-            return str(parent)
-
-    raise RuntimeError(f"Not inside a Git repository starting from {start}")
-
-
-def _default_collection_name() -> str:
-    # Derive test name from dataset directory or use explicit TEST_NAME
-    dataset_dir = os.getenv("DATASET_DIR", "")
-    if dataset_dir:
-        dataset_name = os.path.basename(dataset_dir.rstrip("/"))
-    else:
-        dataset_name = "e2e"
-
-    test_name = os.getenv("TEST_NAME", dataset_name)
-    return f"{test_name}_{_now_timestr()}"
+from utils import default_collection_name, get_repo_root
 
 
 def main() -> int:
@@ -82,7 +43,7 @@ def main() -> int:
     spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", _default_collection_name())
+    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
     hostname = os.getenv("HOSTNAME", "localhost")
     sparse = os.getenv("SPARSE", "true").lower() == "true"
     gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
@@ -104,8 +65,8 @@ def main() -> int:
     log_path = os.getenv("LOG_PATH", "test_results")
 
     # UDF and LLM Summaries
-    udf_path = Path(_get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
-    print(f"Path to User-Defined Function:{udf_path}")
+    udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
+    print(f"Path to User-Defined Function: {str(udf_path)}")
     llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
 
     model_name, dense_dim = embed_info()
@@ -142,7 +103,7 @@ def main() -> int:
             table_output_format=table_output_format,
             extract_infographics=extract_infographics,
         )
-        .udf(udf_function=udf_path, target_stage="text_splitter", run_after=True)
+        .udf(udf_function=str(udf_path), target_stage="text_splitter", run_after=True)
     )
 
     # Optional pipeline steps
@@ -153,6 +114,7 @@ def main() -> int:
         ingestor = ingestor.split()
 
     # Embed and upload (core pipeline)
+    print("Uploading to collection:", collection_name)
     ingestor = (
         ingestor.embed(model_name=model_name)
         .vdb_upload(

@@ -3,7 +3,6 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -24,15 +23,7 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-
-def _now_timestr() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M")
-
-
-def _default_collection_name() -> str:
-    # Make collection name configurable via TEST_NAME env var, default to dc20
-    test_name = os.getenv("TEST_NAME", "dc20")
-    return f"{test_name}_{_now_timestr()}"
+from utils import default_collection_name
 
 
 def main() -> int:
@@ -51,7 +42,7 @@ def main() -> int:
     spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", _default_collection_name())
+    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
     hostname = os.getenv("HOSTNAME", "localhost")
     sparse = os.getenv("SPARSE", "true").lower() == "true"
     gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
