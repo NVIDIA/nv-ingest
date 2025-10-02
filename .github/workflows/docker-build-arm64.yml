@@ -1,8 +1,12 @@
 name: Build NV-Ingest Runtime Image (arm64)
 
-# Trigger for pull requests and pushing to main
 on:
-  pull_request:
+  # Trigger only for pushing to main the build takes long
+  push:
+    branches:
+      - main
+
+  pull_request:  # TODO: remove this
     types:
       - opened
       - synchronize
@@ -39,7 +43,7 @@ jobs:
 
       - name: Run Pytest inside Docker container
         run: |
-          docker run --platform=linux/arm64 -e INSTALL_AUDIO_EXTRACTION_DEPS=true nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
+          docker run --platform=linux/arm64 nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
