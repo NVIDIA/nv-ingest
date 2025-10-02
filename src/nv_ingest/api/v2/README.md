@@ -2,7 +2,7 @@
 
 ## Overview
 
-The V2 API introduces automatic PDF splitting at the REST layer to improve processing throughput. When a multi-page PDF is submitted, it's automatically split into single-page subjobs before being sent to the Ray processing backend.
+The V2 API introduces automatic PDF splitting at the REST layer to improve processing throughput. When a multi-page PDF is submitted, it's automatically split into configurable multi-page chunks (default 32 pages) before being sent to the Redis service that then communicates with our Ray processing backend.
 
 ## Key Changes from V1
 
@@ -19,7 +19,7 @@ The V2 API introduces automatic PDF splitting at the REST layer to improve proce
    - Source IDs are modified to maintain association: `document.pdf#page_1`
    - Parent-child mapping is stored in Redis
 
-2. **Processing**: Each subjob is processed independently by Ray, appearing as individual single-page PDFs
+2. **Processing**: Each subjob is processed independently by Ray, appearing as chunk-sized PDFs that honor the configured `PDF_SPLIT_PAGE_COUNT`
 
 3. **Fetch**: When fetching the parent job via `/v2/fetch_job/{parent_id}`:
    - Subjob states and results are retrieved concurrently (bounded by the Redis connection pool)
