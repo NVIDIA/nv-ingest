@@ -40,7 +40,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker buildx create --use
-          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
+          docker buildx build --platform linux/amd64,linux/arm64 --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
 
       # Push the container to NGC
       - name: Upload nv-ingest container
