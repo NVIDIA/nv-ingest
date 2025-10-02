@@ -6,6 +6,7 @@
 
 import collections
 import glob
+import gzip
 import json
 import logging
 import os
@@ -96,6 +97,8 @@ class LazyLoadedList(collections.abc.Sequence):
         if self._len == 0:
             self._offsets = []
 
+        self._open = gzip.open if self.compression == "gzip" else open
+
     def __iter__(self) -> Iterator[Any]:
         try:
             with open(self.filepath, encoding="utf-8") as f:
@@ -115,7 +118,7 @@ class LazyLoadedList(collections.abc.Sequence):
         self._offsets = []
         line_count = 0
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 while True:
                     current_pos = f.tell()
                     line = f.readline()
@@ -139,10 +142,12 @@ class LazyLoadedList(collections.abc.Sequence):
     def __len__(self) -> int:
         if self._len is not None:
             return self._len
+
         if self._offsets is not None:
             self._len = len(self._offsets)
             return self._len
         self._build_index()
+
         return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
@@ -165,7 +170,7 @@ class LazyLoadedList(collections.abc.Sequence):
             raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 f.seek(self._offsets[idx])
                 line_bytes = f.readline()
                 return json.loads(line_bytes.decode("utf-8"))
@@ -450,6 +455,8 @@ class Ingestor:
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
                 file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+                if self._output_config["compression"] == "gzip":
+                    file_suffix += ".gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
@@ -457,10 +464,13 @@ class Ingestor:
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
+                    compression=self._output_config["compression"],
                 )
 
                 if num_items_saved > 0:
-                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    results = LazyLoadedList(
+                        jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
+                    )
                     if results_lock:
                         with results_lock:
                             final_results_payload_list.append(results)
@@ -1064,6 +1074,7 @@ class Ingestor:
         self,
         output_directory: str | None = None,
         cleanup: bool = True,
+        compression: Optional[str] = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
@@ -1088,6 +1099,12 @@ class Ingestor:
             when the Ingestor's context is exited (i.e., when used in a `with`
             statement).
             Defaults to True.
+        compression : str, optional
+            The compression algorithm to use for the saved result files.
+            Currently, the only supported value is `'gzip'`. To disable
+            compression, set this parameter to `None`. Defaults to `'gzip'`,
+            which significantly reduces the disk space required for results.
+            When enabled, files are saved with a `.gz` suffix (e.g., `results.jsonl.gz`).
 
         Returns
         -------
@@ -1103,6 +1120,7 @@ class Ingestor:
         self._output_config = {
             "output_directory": output_directory,
             "cleanup": cleanup,
+            "compression": compression,
         }
         ensure_directory_with_permissions(output_directory)
 
