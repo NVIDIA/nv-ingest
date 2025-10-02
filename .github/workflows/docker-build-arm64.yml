@@ -37,12 +37,12 @@ jobs:
           docker buildx create --use
           docker buildx build --platform linux/arm64 --load --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
 
-      - name: Run
+      - name: Run Pytest inside Docker container
         run: |
-          output=$(docker run --platform=linux/arm64 --rm -it nv-ingest:latest uname -m)
-          if [[ "$output" == "aarch64" ]]; then
-            echo "aarch64"
-          else
-            echo "Build failed"
-            exit 1
-          fi
+          docker run --platform=linux/arm64 -e INSTALL_AUDIO_EXTRACTION_DEPS=true nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: coverage.xml
