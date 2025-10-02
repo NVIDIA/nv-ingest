@@ -24,7 +24,6 @@ dependencies:
   - protobuf=5.29.3
   - pydantic>2.0.0
   - pydantic-settings>2.0.0
-  - pypdfium2>=4.30.0
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0
@@ -33,7 +32,6 @@ dependencies:
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
-  - ray-all>=2.49.0
   - redis-py>=5.2.1
   - requests>=2.28.2
   - scikit-learn>=1.6.0
