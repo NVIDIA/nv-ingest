@@ -148,7 +148,9 @@ class RestClient(MessageBrokerClientBase):
         self._auth = kwargs.get("auth", None)
 
         logger.debug(f"RestClient base URL set to: {self._base_url}")
-        logger.info(f"RestClient using API version: {api_version} (endpoints: {self._submit_endpoint}, {self._fetch_endpoint})")
+        logger.info(
+            f"RestClient using API version: {api_version} (endpoints: {self._submit_endpoint}, {self._fetch_endpoint})"
+        )
 
     @staticmethod
     def _generate_url(host: str, port: int) -> str:
