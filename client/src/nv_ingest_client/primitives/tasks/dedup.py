@@ -10,27 +10,11 @@ import logging
 from typing import Dict
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
-
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class DedupTaskSchema(BaseModel):
-    content_type: str = "image"
-    filter: bool = False
-
-    @field_validator("content_type")
-    def content_type_must_be_valid(cls, v):
-        valid_criteria = ["image"]
-        if v not in valid_criteria:
-            raise ValueError(f"content_type must be one of {valid_criteria}")
-        return v
-
-    class Config:
-        extra = "forbid"
 
 
 class DedupTask(Task):
@@ -49,8 +33,15 @@ class DedupTask(Task):
         Setup Dedup Task Config
         """
         super().__init__()
-        self._content_type = content_type
-        self._filter = filter
+
+        # Use the API schema for validation
+        validated_data = IngestTaskDedupSchema(
+            content_type=content_type,
+            params={"filter": filter},
+        )
+
+        self._content_type = validated_data.content_type
+        self._filter = validated_data.params.filter
 
     def __str__(self) -> str:
         """
@@ -58,7 +49,7 @@ class DedupTask(Task):
         """
         info = ""
         info += "Dedup Task:\n"
-        info += f"  content_type: {self._content_type}\n"
+        info += f"  content_type: {self._content_type.value}\n"
         info += f"  filter: {self._filter}\n"
         return info
 
@@ -69,7 +60,7 @@ class DedupTask(Task):
         dedup_params = {"filter": self._filter}
 
         task_properties = {
-            "content_type": self._content_type,
+            "content_type": self._content_type.value,
             "params": dedup_params,
         }
 

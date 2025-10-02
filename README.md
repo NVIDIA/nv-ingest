@@ -47,7 +47,7 @@ NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
@@ -92,7 +92,7 @@ Create a fresh Python environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
+  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
 ```
 
 Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -156,7 +156,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
@@ -172,10 +172,16 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-# Return both successes and failures so you can inspect partial errors without stopping uploads
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
 results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
@@ -189,7 +195,7 @@ You can see the extracted text that represents the content of the ingested test 
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text
@@ -289,13 +295,6 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
-> [!IMPORTANT]
-> About `return_failures`
->
-> - `ingestor.ingest(..., return_failures=False)` (default): returns only successful results. Any failed jobs are omitted from the return value and are logged. If you have configured `.vdb_upload(...)` and any failures are present, `ingest()` will raise a `RuntimeError` and will NOT upload. This preserves the previous all-or-nothing bulk upload behavior.
-> - `ingestor.ingest(..., return_failures=True)`: returns a tuple `(results, failures)`. If `.vdb_upload(...)` is configured and some jobs failed, `ingest()` will still proceed to upload only the successful results to your vector database and will not raise. You can then inspect `failures` to decide whether to retry or remediate.
->
-> This makes `return_failures=True` ideal for large batches where you want successful chunks/pages to be committed while still collecting detailed diagnostics for anything that didn’t complete.
 
 
 ## GitHub Repository Structure
@@ -391,3 +390,15 @@ The following is the full text of the Developer Certificate of Origin (DCO)
 
   (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
 ```
+
+
+## Security Considerations
+
+- NeMo Retriever Extraction doesn't generate any code that may require sandboxing.
+- NeMo Retriever Extraction is shared as a reference and is provided "as is". The security in the production environment is the responsibility of the end users deploying it. When deploying in a production environment, please have security experts review any potential risks and threats; define the trust boundaries, implement logging and monitoring capabilities, secure the communication channels, integrate AuthN & AuthZ with appropriate access controls, keep the deployment up to date, ensure the containers/source code are secure and free of known vulnerabilities.
+- A frontend that handles AuthN & AuthZ should be in place as missing AuthN & AuthZ could provide ungated access to customer models if directly exposed to e.g. the internet, resulting in either cost to the customer, resource exhaustion, or denial of service.
+- NeMo Retriever Extraction doesn't require any privileged access to the system.
+- The end users are responsible for ensuring the availability of their deployment.
+- The end users are responsible for building the container images and keeping them up to date.
+- The end users are responsible for ensuring that OSS packages used by the developer blueprint are current.
+- The logs from nginx proxy, backend, and demo app are printed to standard out. They can include input prompts and output completions for development purposes. The end users are advised to handle logging securely and avoid information leakage for production use cases.

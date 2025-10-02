@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -15,6 +16,9 @@ from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +34,8 @@ class EmbeddingStorageStage(RayActorStage):
       3. Updates the message payload with the stored embeddings DataFrame.
     """
 
-    def __init__(self, config: EmbeddingStorageSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: EmbeddingStorageSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("EmbeddingStorageStage configuration validated successfully.")
@@ -39,9 +43,10 @@ class EmbeddingStorageStage(RayActorStage):
             logger.exception(f"Error validating Embedding Storage config: {e}")
             raise
 
-    @traceable("embedding_storage")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=["store_embedding"])
-    @nv_ingest_node_failure_try_except(annotation_id="embedding_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by storing embeddings.
@@ -64,7 +69,7 @@ class EmbeddingStorageStage(RayActorStage):
 
         # Remove the "store_embedding" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "store_embedding")
-        logger.debug("Extracted task config: %s", task_config)
+        logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
         # Perform embedding storage.
         new_df = store_text_embeddings_internal(

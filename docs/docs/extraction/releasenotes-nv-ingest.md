@@ -8,9 +8,9 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 
 
-## Release 25.8.0
+## Release 25.09 (25.9.0)
 
-The NeMo Retriever extraction 25.8.0 release adds new hardware and software support, and other improvements, including the following:
+The NeMo Retriever extraction 25.09 release adds new hardware and software support, and other improvements, including the following:
 
 - Add functional support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
 - Add functional support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
@@ -25,22 +25,24 @@ The NeMo Retriever extraction 25.8.0 release adds new hardware and software supp
 - Add support for Integer, float, boolean, and array in custom metadata during Milvus entity creation.
 - Add support for running more than one VLM at a time by using Helm.  For details, refer to [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
 
+
 ### Known Issues
 
-The following are the know issues for this release:
+The following are the known issues for this release:
 
-- A10G and L40S are not supported. For details, refer to [Support Matrix](support-matrix.md).
+- A10G and L40S are not supported. To use A10G or L40S hardware, use release 25.6.x.
 - `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
 
 ### Breaking Changes
 
 There are no breaking changes in this version.
 
+
 ### Upgrade
 
-QA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/main/helm/values.yaml).
-GA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/TODO/helm/values.yaml).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/25.9.0/helm/README.md).
 
 
 
@@ -51,6 +53,13 @@ that updates the client's dependency on [pypdfium2](https://github.com/pypdfium2
 
 Only the release branch and the `nv-ingest-client` package have been updated in 25.6.3. 
 The previously released 25.6.2 container on NGC remains unchanged.
+
+
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
 
 
@@ -68,9 +77,17 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/examples/metadata_and_filtered_search.ipynb).
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 ### Breaking Changes
 
 There are no breaking changes in this version.
+
 
 ### Upgrade
 

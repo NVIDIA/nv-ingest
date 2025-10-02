@@ -227,11 +227,7 @@ def convert_to_mono_wav(audio_bytes):
     """
 
     if librosa is None:
-        raise ImportError(
-            "Librosa is required for audio processing. "
-            "If you are running this code with the ingest container, it can be installed by setting "
-            "the environment variable. INSTALL_AUDIO_EXTRACTION_DEPS=true"
-        )
+        raise ImportError("Librosa is required for audio processing. ")
 
     # Create a BytesIO object from the audio bytes
     byte_io = io.BytesIO(audio_bytes)

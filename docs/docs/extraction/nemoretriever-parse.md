@@ -31,10 +31,9 @@ Use the following procedure to run the NIM locally.
 1. Start the nv-ingest services with the `nemoretriever-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
 
     - The --profile nemoretriever-parse flag ensures that vision-language retrieval services are launched.  For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
-    - The --build flag ensures that any changes to the container images are applied before starting.
 
     ```shell
-    docker compose --profile nemoretriever-parse up --build
+    docker compose --profile nemoretriever-parse up
     ```
 
 2. After the services are running, you can interact with nv-ingest by using Python.
@@ -104,6 +103,6 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 ## Related Topics
 
-- [Support Matrix](support-matrix.md).
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)

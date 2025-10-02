@@ -36,28 +36,37 @@ NeMo Retriever extraction supports the following GPU hardware.
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
 - [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
 - [A100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/a100/)
-- [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/)
-- [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
+<!-- - [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/) -->
+<!-- - [L40S](https://www.nvidia.com/en-us/data-center/l40s/)  -->
+
 
 The following are the hardware requirements to run NeMo Retriever extraction.
 
-| GPU Option                                    | RTX Pro 6000  | B200          | H100        | A100        | A10G   | L40S   |
-|-----------------------------------------------|---------------|---------------|-------------|-------------|--------|--------|
-| Family                                        | PCIe          | SXM           | SXM or PCIe | SXM or PCIe | —      | —      |
-| Memory                                        | 96GB          | 192GB         | 80GB        | 80GB        | 24GB   | 48GB   |
-| Core Features Total GPUs                      | 1             | 1             | 1           | 1           | 1      | 1      |
-| Core Features Total Disk Space                | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB | ~150GB |
-| Audio Additional Dedicated GPUs               | 1             | 1             | 1           | 1           | 1      | 1      |
-| Audio Additional Disk Space                   | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB  | ~37GB  |
-| nemoretriever-parse Additional Dedicated GPUs | Not supported | Not supported | 1           | 1           | 1      | 1      |
-| nemoretriever-parse Additional Disk Space     | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
-| VLM Additional Dedicated GPUs                 | 1             | 1             | 1           | 1           | 1      | 1      |
-| VLM Additional Disk Space                     | ~16GB         | ~16GB         | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
+| GPU Option                                    | RTX Pro 6000  | B200          | H100        | A100        |
+|-----------------------------------------------|---------------|---------------|-------------|-------------|
+| Family                                        | PCIe          | SXM           | SXM         | SXM         |
+| Memory                                        | 96GB          | 192GB         | 80GB        | 80GB        |
+| Core Features Total GPUs                      | 1             | 1             | 1           | 1           |
+| Core Features Total Disk Space                | ~150GB        | ~150GB        | ~150GB      | ~150GB      |
+| Audio Additional Dedicated GPUs               | 1             | 1             | 1           | 1           |
+| Audio Additional Disk Space                   | ~37GB         | ~37GB         | ~37GB       | ~37GB       |
+| nemoretriever-parse Additional Dedicated GPUs | Not supported | Not supported | 1           | 1           |
+| nemoretriever-parse Additional Disk Space     | Not supported | Not supported | ~16GB       | ~16GB       |
+| VLM Additional Dedicated GPUs                 | 1             | 1             | 1           | 1           |
+| VLM Additional Disk Space                     | ~16GB         | ~16GB         | ~16GB       | ~16GB       |
 
-
-!!! note
-
-    Release 25.08 does not support A10G and L40S hardware. For details, refer to [Release Notes](releasenotes-nv-ingest.md).
+<!-- A10G    | L40S   | -->
+<!-- --------|--------| -->
+<!--  —      | —      | -->
+<!--  24GB   | 48GB   | -->
+<!--  1      | 1      | -->
+<!--  ~150GB | ~150GB | -->
+<!--  1      | 1      | -->
+<!--  ~37GB  | ~37GB  | -->
+<!--  1      | 1      | -->
+<!--  ~16GB  | ~16GB  | -->
+<!--  1      | 1      | -->
+<!--  ~16GB  | ~16GB  | -->
 
 
 

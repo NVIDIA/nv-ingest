@@ -9,6 +9,7 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import (
     ChartExtractorConfigSchema,
     ChartExtractorSchema,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 
 ### Tests for ChartExtractorConfigSchema ###
@@ -95,3 +96,41 @@ def test_extractor_rejects_low_values_correctly():
         ChartExtractorSchema(max_queue_size=0, n_workers=15)
     with pytest.raises(ValidationError):
         ChartExtractorSchema(max_queue_size=-1, n_workers=10)
+
+
+### Sanitization and Redaction Tests ###
+
+
+def test_chart_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    cfg = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        ocr_endpoints=("grpc_ocr", None),
+        auth_token="chart_secret",
+    )
+
+    rep = repr(cfg)
+    s = str(cfg)
+    assert "chart_secret" not in rep
+    assert "chart_secret" not in s
+
+    sanitized = sanitize_for_logging(cfg)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_chart_extractor_schema_sanitize_nested_config():
+    cfg = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        ocr_endpoints=("grpc_ocr", None),
+        auth_token="nested_chart_secret",
+    )
+    schema = ChartExtractorSchema(
+        max_queue_size=3,
+        n_workers=2,
+        raise_on_failure=False,
+        endpoint_config=cfg,
+    )
+
+    sanitized = sanitize_for_logging(schema)
+    assert isinstance(sanitized, dict)
+    assert sanitized["endpoint_config"]["auth_token"] == "***REDACTED***"
