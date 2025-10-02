@@ -55,7 +55,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 -n base -c conda-forge
+    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
 COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
@@ -65,10 +65,11 @@ COPY conda/environments/nv_ingest_environment.linux_aarch64.yml /workspace/nv_in
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      mamba env create -f /workspace/nv_ingest_environment.base.yml -f /workspace/nv_ingest_environment.linux_aarch64.yml; \
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
     else \
-      mamba env create -f /workspace/nv_ingest_environment.base.yml -f /workspace/nv_ingest_environment.linux_64.yml; \
-    fi;
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
+    fi; \
+    mamba env create -f /workspace/nv_ingest_environment.yml
 
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
