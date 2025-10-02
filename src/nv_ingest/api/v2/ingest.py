@@ -170,6 +170,283 @@ def _prepare_chunk_submission(
     return subjob_id, MessageWrapper(payload=json.dumps(subjob_spec))
 
 
+# ============================================================================
+# Helper Functions for Fetch Job Aggregation
+# ============================================================================
+
+
+async def _gather_in_batches(coroutines: List, batch_size: int, return_exceptions: bool = False) -> List[Any]:
+    """
+    Execute coroutines in batches to respect concurrency limits.
+
+    Parameters
+    ----------
+    coroutines : List
+        List of coroutines to execute
+    batch_size : int
+        Maximum number of coroutines to execute concurrently
+    return_exceptions : bool
+        Whether to return exceptions as results (passed to asyncio.gather)
+
+    Returns
+    -------
+    List[Any]
+        Results from all coroutines in original order
+    """
+    results: List[Any] = []
+    for offset in range(0, len(coroutines), batch_size):
+        batch = coroutines[offset : offset + batch_size]
+        batch_results = await asyncio.gather(*batch, return_exceptions=return_exceptions)
+        results.extend(batch_results)
+    return results
+
+
+async def _update_job_state_after_fetch(job_id: str, ingest_service: INGEST_SERVICE_T) -> None:
+    """
+    Update job state after successful fetch based on configured fetch mode.
+
+    Parameters
+    ----------
+    job_id : str
+        The job identifier
+    ingest_service : IngestServiceMeta
+        The ingest service instance
+    """
+    try:
+        current_fetch_mode = await ingest_service.get_fetch_mode()
+        if current_fetch_mode == FetchMode.DESTRUCTIVE:
+            target_state = STATE_RETRIEVED_DESTRUCTIVE
+        elif current_fetch_mode == FetchMode.NON_DESTRUCTIVE:
+            target_state = STATE_RETRIEVED_NON_DESTRUCTIVE
+        else:
+            target_state = STATE_RETRIEVED_CACHED
+
+        await ingest_service.set_job_state(job_id, target_state)
+        logger.debug(f"Updated job {job_id} state to {target_state}")
+    except Exception as e:
+        logger.error(f"Failed to update job state for {job_id}: {e}")
+
+
+def _stream_json_response(data: Dict[str, Any]) -> StreamingResponse:
+    """
+    Create a StreamingResponse for JSON data.
+
+    Parameters
+    ----------
+    data : Dict[str, Any]
+        The data to serialize and stream
+
+    Returns
+    -------
+    StreamingResponse
+        FastAPI streaming response with JSON content
+    """
+    json_bytes = json.dumps(data).encode("utf-8")
+    return StreamingResponse(iter([json_bytes]), media_type="application/json", status_code=200)
+
+
+async def _check_all_subjob_states(
+    ordered_descriptors: List[Dict[str, Any]], max_parallel_ops: int, ingest_service: INGEST_SERVICE_T
+) -> Tuple[List[Optional[str]], List[Dict[str, object]]]:
+    """
+    Check the state of all subjobs in parallel batches.
+
+    Parameters
+    ----------
+    ordered_descriptors : List[Dict[str, Any]]
+        List of subjob descriptors with job_id and chunk_index
+    max_parallel_ops : int
+        Maximum number of parallel operations
+    ingest_service : IngestServiceMeta
+        The ingest service instance
+
+    Returns
+    -------
+    Tuple[List[Optional[str]], List[Dict[str, object]]]
+        Tuple of (subjob_states, failed_subjobs_list)
+
+    Raises
+    ------
+    HTTPException
+        If any subjob is still processing (202)
+    """
+    # Gather all subjob states in parallel batches
+    state_coroutines = [ingest_service.get_job_state(descriptor.get("job_id")) for descriptor in ordered_descriptors]
+    subjob_states = await _gather_in_batches(state_coroutines, max_parallel_ops)
+
+    # Check for failures and pending work
+    failed_subjobs: List[Dict[str, object]] = []
+
+    for page_index, (descriptor, subjob_state) in enumerate(zip(ordered_descriptors, subjob_states), start=1):
+        subjob_id = descriptor.get("job_id")
+
+        if subjob_state == STATE_FAILED:
+            logger.warning(f"Subjob {subjob_id} failed")
+            failed_subjobs.append({"subjob_id": subjob_id, "chunk_index": page_index})
+        elif subjob_state in INTERMEDIATE_STATES:
+            raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
+
+    return subjob_states, failed_subjobs
+
+
+async def _fetch_all_subjob_results(
+    ordered_descriptors: List[Dict[str, Any]],
+    subjob_states: List[Optional[str]],
+    failed_subjobs: List[Dict[str, object]],
+    max_parallel_ops: int,
+    ingest_service: INGEST_SERVICE_T,
+) -> List[Optional[Dict[str, Any]]]:
+    """
+    Fetch results for all completed subjobs in parallel batches.
+
+    Parameters
+    ----------
+    ordered_descriptors : List[Dict[str, Any]]
+        List of subjob descriptors
+    subjob_states : List[Optional[str]]
+        States of all subjobs (from _check_all_subjob_states)
+    failed_subjobs : List[Dict[str, object]]
+        List to append failed fetch attempts to (modified in place)
+    max_parallel_ops : int
+        Maximum number of parallel operations
+    ingest_service : IngestServiceMeta
+        The ingest service instance
+
+    Returns
+    -------
+    List[Optional[Dict[str, Any]]]
+        Results for each subjob (None for failed ones)
+
+    Raises
+    ------
+    HTTPException
+        If any subjob is not ready yet (202)
+    """
+    # Initialize results array with None placeholders
+    subjob_results: List[Optional[Dict[str, Any]]] = [None] * len(ordered_descriptors)
+
+    # Build list of fetch tasks (only for non-failed subjobs)
+    fetch_coroutines = []
+    fetch_targets: List[Dict[str, Any]] = []
+
+    for list_index, (page_index, descriptor, subjob_state) in enumerate(
+        zip(range(1, len(ordered_descriptors) + 1), ordered_descriptors, subjob_states)
+    ):
+        subjob_id = descriptor.get("job_id")
+
+        # Skip failed subjobs (already recorded in failed_subjobs)
+        if subjob_state == STATE_FAILED:
+            continue
+
+        # Skip intermediate states (should have been caught earlier, but defensive)
+        if subjob_state in INTERMEDIATE_STATES:
+            continue
+
+        # Queue this subjob for fetching
+        fetch_coroutines.append(ingest_service.fetch_job(subjob_id))
+        fetch_targets.append(
+            {
+                "list_index": list_index,
+                "page_index": page_index,
+                "subjob_id": subjob_id,
+            }
+        )
+
+    # Fetch all results in parallel batches
+    if fetch_coroutines:
+        fetch_results = await _gather_in_batches(fetch_coroutines, max_parallel_ops, return_exceptions=True)
+
+        # Process results and handle errors
+        for target, fetch_result in zip(fetch_targets, fetch_results):
+            subjob_id = target["subjob_id"]
+            page_index = target["page_index"]
+            list_index = target["list_index"]
+
+            if isinstance(fetch_result, TimeoutError):
+                logger.debug(f"Subjob {subjob_id} not ready yet; deferring aggregation")
+                raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
+
+            if isinstance(fetch_result, Exception):
+                logger.error(f"Failed to fetch subjob {subjob_id}: {fetch_result}")
+                failed_subjobs.append(
+                    {
+                        "subjob_id": subjob_id,
+                        "chunk_index": page_index,
+                        "error": str(fetch_result),
+                    }
+                )
+                continue
+
+            subjob_results[list_index] = fetch_result
+
+    return subjob_results
+
+
+def _build_aggregated_response(
+    parent_job_id: str,
+    subjob_results: List[Optional[Dict[str, Any]]],
+    failed_subjobs: List[Dict[str, object]],
+    ordered_descriptors: List[Dict[str, Any]],
+    metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Build the aggregated response from subjob results.
+
+    Parameters
+    ----------
+    parent_job_id : str
+        The parent job identifier
+    subjob_results : List[Optional[Dict[str, Any]]]
+        Results from all subjobs (None for failed ones)
+    failed_subjobs : List[Dict[str, object]]
+        List of failed subjob information
+    ordered_descriptors : List[Dict[str, Any]]
+        Subjob descriptors in original order
+    metadata : Dict[str, Any]
+        Parent job metadata
+
+    Returns
+    -------
+    Dict[str, Any]
+        Aggregated response with combined data and metadata
+    """
+    any_failed = len(failed_subjobs) > 0
+    subjob_ids = [desc.get("job_id") for desc in ordered_descriptors]
+
+    aggregated_result = {
+        "data": [],
+        "status": "failed" if any_failed else "success",
+        "description": (
+            "One or more subjobs failed to complete" if any_failed else "Aggregated result composed from subjob outputs"
+        ),
+        "metadata": {
+            "parent_job_id": parent_job_id,
+            "total_pages": metadata.get("total_pages", len(subjob_ids)),
+            "pages_per_chunk": metadata.get("pages_per_chunk"),
+            "original_source_id": metadata.get("original_source_id"),
+            "original_source_name": metadata.get("original_source_name"),
+            "subjobs_failed": sum(1 for r in subjob_results if r is None),
+            "failed_subjobs": failed_subjobs,
+            "subjob_ids": subjob_ids,
+            "chunks": [],
+        },
+    }
+
+    # Aggregate subjob data in page order
+    for page_num, (result, descriptor) in enumerate(zip(subjob_results, ordered_descriptors), 1):
+        if result is not None:
+            # Add page data to aggregated result
+            if "data" in result:
+                aggregated_result["data"].extend(result["data"])
+            chunk_entry = dict(descriptor)
+            aggregated_result["metadata"]["chunks"].append(chunk_entry)
+        else:
+            # Note failed page
+            logger.warning(f"Page {page_num} failed or missing")
+
+    return aggregated_result
+
+
 # POST /v2/submit_job
 @router.post(
     "/submit_job",
@@ -312,7 +589,7 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
         subjob_info = await ingest_service.get_parent_job_info(job_id)
 
         if subjob_info is None:
-            # Not a parent job, fetch normally like V1
+            # Not a parent job, fetch identical to V1
             current_state = await ingest_service.get_job_state(job_id)
             logger.debug(f"Initial state check for job {job_id}: {current_state}")
 
@@ -410,148 +687,42 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                 )
 
         else:
-            # This is a parent job - need to aggregate subjobs
+            # This is a parent job - orchestrate aggregation using declarative helpers
             subjob_ids = subjob_info.get("subjob_ids", [])
             metadata = subjob_info.get("metadata", {})
 
             logger.info(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
 
-            total_pages = metadata.get("total_pages")
-            if isinstance(total_pages, str):
-                try:
-                    total_pages = int(total_pages)
-                except ValueError:
-                    logger.warning("Invalid total_pages '%s' for parent %s; recomputing", total_pages, job_id)
-                    total_pages = None
-
+            # Build ordered descriptors for subjobs
             ordered_descriptors: List[Dict[str, Any]] = []
             for idx, subjob_id in enumerate(subjob_ids, 1):
                 ordered_descriptors.append({"job_id": subjob_id, "chunk_index": idx})
 
-            # Limit concurrent Redis calls to stay within connection pool bounds
+            # Calculate max parallel operations (stay within Redis connection pool)
             max_parallel_ops = max(
                 1, min(len(ordered_descriptors), getattr(ingest_service, "_concurrency_level", 10) // 2)
             )
 
-            # Check all subjob states using bounded concurrency
-            any_failed = False
-            failed_subjobs: List[Dict[str, object]] = []
-            subjob_results: List[Optional[Dict[str, Any]]] = [None] * len(ordered_descriptors)
+            # Check all subjob states (raises 202 if any still processing)
+            subjob_states, failed_subjobs = await _check_all_subjob_states(
+                ordered_descriptors, max_parallel_ops, ingest_service
+            )
 
-            subjob_states: List[Optional[str]] = []
-            for offset in range(0, len(ordered_descriptors), max_parallel_ops):
-                state_batch = ordered_descriptors[offset : offset + max_parallel_ops]
-                batch_tasks = [ingest_service.get_job_state(descriptor.get("job_id")) for descriptor in state_batch]
-                subjob_states.extend(await asyncio.gather(*batch_tasks))
+            # Fetch all subjob results (raises 202 if any not ready)
+            subjob_results = await _fetch_all_subjob_results(
+                ordered_descriptors, subjob_states, failed_subjobs, max_parallel_ops, ingest_service
+            )
 
-            fetch_coroutines = []
-            fetch_targets: List[Dict[str, Any]] = []
+            # Build aggregated response from all subjob results
+            aggregated_result = _build_aggregated_response(
+                job_id, subjob_results, failed_subjobs, ordered_descriptors, metadata
+            )
 
-            for list_index, (page_index, descriptor, subjob_state) in enumerate(
-                zip(range(1, len(ordered_descriptors) + 1), ordered_descriptors, subjob_states)
-            ):
-                subjob_id = descriptor.get("job_id")
+            # Update parent job state after successful aggregation
+            await _update_job_state_after_fetch(job_id, ingest_service)
 
-                if subjob_state == STATE_FAILED:
-                    any_failed = True
-                    logger.warning(f"Subjob {subjob_id} failed")
-                    failed_subjobs.append({"subjob_id": subjob_id, "chunk_index": page_index})
-                    continue
-
-                if subjob_state in INTERMEDIATE_STATES:
-                    raise HTTPException(status_code=202, detail="Parent job still processing. Some pages not complete.")
-
-                fetch_coroutines.append(ingest_service.fetch_job(subjob_id))
-                fetch_targets.append(
-                    {
-                        "list_index": list_index,
-                        "page_index": page_index,
-                        "descriptor": descriptor,
-                        "subjob_id": subjob_id,
-                    }
-                )
-
-            if fetch_coroutines:
-                fetch_results: List[Any] = []
-                for offset in range(0, len(fetch_coroutines), max_parallel_ops):
-                    fetch_batch = fetch_coroutines[offset : offset + max_parallel_ops]
-                    fetch_results.extend(await asyncio.gather(*fetch_batch, return_exceptions=True))
-
-                for target, fetch_result in zip(fetch_targets, fetch_results):
-                    subjob_id = target["subjob_id"]
-                    page_index = target["page_index"]
-                    list_index = target["list_index"]
-
-                    if isinstance(fetch_result, TimeoutError):
-                        logger.debug(f"Subjob {subjob_id} not ready yet; deferring aggregation")
-                        raise HTTPException(
-                            status_code=202, detail="Parent job still processing. Some pages not complete."
-                        )
-
-                    if isinstance(fetch_result, Exception):
-                        logger.error(f"Failed to fetch subjob {subjob_id}: {fetch_result}")
-                        any_failed = True
-                        failed_entry = {
-                            "subjob_id": subjob_id,
-                            "chunk_index": page_index,
-                            "error": str(fetch_result),
-                        }
-                        failed_subjobs.append(failed_entry)
-                        continue
-
-                    subjob_results[list_index] = fetch_result
-
-            # All subjobs complete - aggregate results
-            aggregated_result = {
-                "data": [],
-                "status": "failed" if any_failed else "success",
-                "description": (
-                    "One or more subjobs failed to complete"
-                    if any_failed
-                    else "Aggregated result composed from subjob outputs"
-                ),
-                "metadata": {
-                    "parent_job_id": job_id,
-                    "total_pages": metadata.get("total_pages", len(subjob_ids)),
-                    "pages_per_chunk": metadata.get("pages_per_chunk"),
-                    "original_source_id": metadata.get("original_source_id"),
-                    "original_source_name": metadata.get("original_source_name"),
-                    "subjobs_failed": sum(1 for r in subjob_results if r is None),
-                    "failed_subjobs": failed_subjobs,
-                    "subjob_ids": subjob_ids,
-                    "chunks": [],
-                },
-            }
-
-            # Aggregate subjob data in page order
-            for page_num, (result, descriptor) in enumerate(zip(subjob_results, ordered_descriptors), 1):
-                if result is not None:
-                    # Add page data to aggregated result
-                    if "data" in result:
-                        aggregated_result["data"].extend(result["data"])
-                    chunk_entry = dict(descriptor)
-                    aggregated_result["metadata"].setdefault("chunks", []).append(chunk_entry)
-                else:
-                    # Note failed page
-                    logger.warning(f"Page {page_num} failed or missing")
-
-            # Update parent state
-            try:
-                current_fetch_mode = await ingest_service.get_fetch_mode()
-                if current_fetch_mode == FetchMode.DESTRUCTIVE:
-                    target_state = STATE_RETRIEVED_DESTRUCTIVE
-                elif current_fetch_mode == FetchMode.NON_DESTRUCTIVE:
-                    target_state = STATE_RETRIEVED_NON_DESTRUCTIVE
-                else:
-                    target_state = STATE_RETRIEVED_CACHED
-
-                await ingest_service.set_job_state(job_id, target_state)
-            except Exception as e:
-                logger.error(f"Failed to update parent job state: {e}")
-
-            # Return aggregated result
-            json_bytes = json.dumps(aggregated_result).encode("utf-8")
-            return StreamingResponse(iter([json_bytes]), media_type="application/json", status_code=200)
+            # Return aggregated result as streaming response
+            return _stream_json_response(aggregated_result)
 
     except HTTPException:
         raise
