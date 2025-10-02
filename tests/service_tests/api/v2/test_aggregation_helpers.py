@@ -190,8 +190,7 @@ class TestPrepareChunkSubmission:
 class TestSubmitJobV2Splitting:
     """Tests for the submit_job_v2 PDF splitting path."""
 
-    @pytest.mark.asyncio
-    async def test_splits_pdf_and_registers_parent(self, monkeypatch, mock_ingest_service):
+    def test_splits_pdf_and_registers_parent(self, monkeypatch, mock_ingest_service):
         """Ensure multi-page PDFs are chunked, subjobs submitted, and parent mappings stored."""
 
         monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "2")
@@ -216,21 +215,25 @@ class TestSubmitJobV2Splitting:
         mock_ingest_service.set_parent_job_mapping = AsyncMock()
         mock_ingest_service.set_job_state = AsyncMock()
 
-        scope = {
-            "type": "http",
-            "method": "POST",
-            "path": "/submit_job",
-            "headers": [],
-            "query_string": b"",
-        }
+        async def runner():
+            scope = {
+                "type": "http",
+                "method": "POST",
+                "path": "/submit_job",
+                "headers": [],
+                "query_string": b"",
+            }
 
-        async def receive():
-            return {"type": "http.request", "body": b"", "more_body": False}
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
 
-        request = Request(scope, receive)
-        response = Response()
+            request = Request(scope, receive)
+            response = Response()
 
-        parent_job_id = await submit_job_v2(request, response, message, mock_ingest_service)
+            parent_job_id = await submit_job_v2(request, response, message, mock_ingest_service)
+            return parent_job_id, response
+
+        parent_job_id, response = asyncio.run(runner())
 
         assert len(mock_ingest_service.submit_job.call_args_list) == 2
 
@@ -253,61 +256,44 @@ class TestSubmitJobV2Splitting:
 class TestGatherInBatches:
     """Tests for the _gather_in_batches helper function."""
 
-    @pytest.mark.asyncio
-    async def test_gather_in_batches_success(self):
-        """
-        Test that coroutines are executed in batches and results maintain original order.
+    def test_gather_in_batches_success(self):
+        """Test that coroutines are executed in batches and results maintain original order."""
 
-        This test verifies:
-        - Coroutines are batched according to batch_size
-        - All coroutines are executed
-        - Results maintain their original order
-        - Function works with varying batch sizes
-        """
+        async def runner():
+            async def async_return(value):
+                await asyncio.sleep(0.001)  # Simulate async work
+                return value
 
-        # Create 10 async functions that return their index
-        async def async_return(value):
-            await asyncio.sleep(0.001)  # Simulate async work
-            return value
+            coroutines = [async_return(i) for i in range(10)]
+            return await _gather_in_batches(coroutines, batch_size=3)
 
-        coroutines = [async_return(i) for i in range(10)]
+        results = asyncio.run(runner())
 
-        # Execute with batch_size of 3
-        results = await _gather_in_batches(coroutines, batch_size=3)
-
-        # Verify all results are present and in order
         assert len(results) == 10
         assert results == list(range(10))
 
-    @pytest.mark.asyncio
-    async def test_gather_in_batches_with_exceptions(self):
-        """
-        Test that exceptions are properly returned when return_exceptions=True.
+    def test_gather_in_batches_with_exceptions(self):
+        """Test that exceptions are properly returned when return_exceptions=True."""
 
-        This test verifies:
-        - Exceptions are captured when return_exceptions=True
-        - Non-failing coroutines still return their results
-        - Results maintain correct position even with exceptions
-        """
+        async def runner():
+            async def async_success(value):
+                return value
 
-        # Create mix of successful and failing coroutines
-        async def async_success(value):
-            return value
+            async def async_fail():
+                raise ValueError("Test error")
 
-        async def async_fail():
-            raise ValueError("Test error")
+            coroutines = [
+                async_success(0),
+                async_fail(),
+                async_success(2),
+                async_fail(),
+                async_success(4),
+            ]
 
-        coroutines = [
-            async_success(0),
-            async_fail(),
-            async_success(2),
-            async_fail(),
-            async_success(4),
-        ]
+            return await _gather_in_batches(coroutines, batch_size=2, return_exceptions=True)
 
-        results = await _gather_in_batches(coroutines, batch_size=2, return_exceptions=True)
+        results = asyncio.run(runner())
 
-        # Verify results
         assert len(results) == 5
         assert results[0] == 0
         assert isinstance(results[1], ValueError)
@@ -315,20 +301,17 @@ class TestGatherInBatches:
         assert isinstance(results[3], ValueError)
         assert results[4] == 4
 
-    @pytest.mark.asyncio
-    async def test_gather_in_batches_single_batch(self):
-        """
-        Test batch execution when all items fit in a single batch.
+    def test_gather_in_batches_single_batch(self):
+        """Test batch execution when all items fit in a single batch."""
 
-        This test verifies the function works correctly when batch_size
-        is larger than the number of coroutines.
-        """
+        async def runner():
+            async def async_return(value):
+                return value
 
-        async def async_return(value):
-            return value
+            coroutines = [async_return(i) for i in range(3)]
+            return await _gather_in_batches(coroutines, batch_size=10)
 
-        coroutines = [async_return(i) for i in range(3)]
-        results = await _gather_in_batches(coroutines, batch_size=10)
+        results = asyncio.run(runner())
 
         assert len(results) == 3
         assert results == [0, 1, 2]
@@ -337,29 +320,33 @@ class TestGatherInBatches:
 class TestCheckAllSubjobStates:
     """Tests for the subjob state inspection helper."""
 
-    @pytest.mark.asyncio
-    async def test_raises_when_intermediate_state_found(self, mock_ingest_service, sample_subjob_descriptors):
+    def test_raises_when_intermediate_state_found(self, mock_ingest_service, sample_subjob_descriptors):
         """Ensure a 202 response is surfaced when any subjob is still processing."""
 
         intermediate_state = next(iter(INTERMEDIATE_STATES))
         mock_ingest_service.get_job_state.side_effect = ["SUCCESS", intermediate_state, "SUCCESS"]
 
-        with pytest.raises(HTTPException) as excinfo:
-            await _check_all_subjob_states(
+        async def runner():
+            return await _check_all_subjob_states(
                 sample_subjob_descriptors, max_parallel_ops=2, ingest_service=mock_ingest_service
             )
 
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(runner())
+
         assert excinfo.value.status_code == 202
 
-    @pytest.mark.asyncio
-    async def test_collects_failed_subjobs(self, mock_ingest_service, sample_subjob_descriptors):
+    def test_collects_failed_subjobs(self, mock_ingest_service, sample_subjob_descriptors):
         """Verify failed subjobs are reported while returning gathered states."""
 
         mock_ingest_service.get_job_state.side_effect = ["SUCCESS", STATE_FAILED, "SUCCESS"]
 
-        states, failed = await _check_all_subjob_states(
-            sample_subjob_descriptors, max_parallel_ops=2, ingest_service=mock_ingest_service
-        )
+        async def runner():
+            return await _check_all_subjob_states(
+                sample_subjob_descriptors, max_parallel_ops=2, ingest_service=mock_ingest_service
+            )
+
+        states, failed = asyncio.run(runner())
 
         assert states == ["SUCCESS", STATE_FAILED, "SUCCESS"]
         assert failed == [{"subjob_id": sample_subjob_descriptors[1]["job_id"], "chunk_index": 2}]
@@ -368,8 +355,7 @@ class TestCheckAllSubjobStates:
 class TestFetchAllSubjobResults:
     """Tests for fetching completed subjob results in batches."""
 
-    @pytest.mark.asyncio
-    async def test_returns_results_for_completed_subjobs(self, mock_ingest_service, sample_subjob_descriptors):
+    def test_returns_results_for_completed_subjobs(self, mock_ingest_service, sample_subjob_descriptors):
         """Ensure successful fetches populate the results list in the correct order."""
 
         mock_ingest_service.fetch_job.side_effect = [
@@ -381,19 +367,21 @@ class TestFetchAllSubjobResults:
         states = ["SUCCESS", "SUCCESS", "SUCCESS"]
         failed: List[Dict[str, object]] = []
 
-        results = await _fetch_all_subjob_results(
-            sample_subjob_descriptors,
-            states,
-            failed,
-            max_parallel_ops=2,
-            ingest_service=mock_ingest_service,
-        )
+        async def runner():
+            return await _fetch_all_subjob_results(
+                sample_subjob_descriptors,
+                states,
+                failed,
+                max_parallel_ops=2,
+                ingest_service=mock_ingest_service,
+            )
+
+        results = asyncio.run(runner())
 
         assert [result["data"][0] for result in results if result] == ["chunk-1", "chunk-2", "chunk-3"]
         assert failed == []
 
-    @pytest.mark.asyncio
-    async def test_raises_202_on_timeout(self, mock_ingest_service, sample_subjob_descriptors):
+    def test_raises_202_on_timeout(self, mock_ingest_service, sample_subjob_descriptors):
         """Verify a TimeoutError defers aggregation with a 202 response."""
 
         mock_ingest_service.fetch_job.side_effect = [TimeoutError("not ready")]
@@ -401,8 +389,8 @@ class TestFetchAllSubjobResults:
         states = ["SUCCESS", STATE_FAILED, "SUCCESS"]
         failed: List[Dict[str, object]] = []
 
-        with pytest.raises(HTTPException) as excinfo:
-            await _fetch_all_subjob_results(
+        async def runner():
+            return await _fetch_all_subjob_results(
                 sample_subjob_descriptors,
                 states,
                 failed,
@@ -410,11 +398,13 @@ class TestFetchAllSubjobResults:
                 ingest_service=mock_ingest_service,
             )
 
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(runner())
+
         assert excinfo.value.status_code == 202
         assert failed == []
 
-    @pytest.mark.asyncio
-    async def test_records_failures_without_raising(self, mock_ingest_service, sample_subjob_descriptors):
+    def test_records_failures_without_raising(self, mock_ingest_service, sample_subjob_descriptors):
         """Ensure unexpected exceptions mark the subjob as failed but allow aggregation to continue."""
 
         mock_ingest_service.fetch_job.side_effect = [ValueError("boom"), {"data": ["ok"]}]
@@ -422,13 +412,16 @@ class TestFetchAllSubjobResults:
         states = ["SUCCESS", "SUCCESS", STATE_FAILED]
         failed: List[Dict[str, object]] = []
 
-        results = await _fetch_all_subjob_results(
-            sample_subjob_descriptors,
-            states,
-            failed,
-            max_parallel_ops=2,
-            ingest_service=mock_ingest_service,
-        )
+        async def runner():
+            return await _fetch_all_subjob_results(
+                sample_subjob_descriptors,
+                states,
+                failed,
+                max_parallel_ops=2,
+                ingest_service=mock_ingest_service,
+            )
+
+        results = asyncio.run(runner())
 
         assert results[0] is None
         assert results[1]["data"] == ["ok"]
@@ -470,7 +463,6 @@ class TestBuildAggregatedResponse:
 class TestUpdateJobStateAfterFetch:
     """Tests for updating the parent job state based on fetch mode."""
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "mode,expected_state",
         [
@@ -479,12 +471,15 @@ class TestUpdateJobStateAfterFetch:
             (FetchMode.CACHE_BEFORE_DELETE, STATE_RETRIEVED_CACHED),
         ],
     )
-    async def test_sets_state_per_mode(self, mock_ingest_service, mode, expected_state):
+    def test_sets_state_per_mode(self, mock_ingest_service, mode, expected_state):
         """Ensure parent job transitions respect current fetch mode mapping."""
 
         mock_ingest_service.get_fetch_mode.return_value = mode
 
-        await _update_job_state_after_fetch("parent-id", mock_ingest_service)
+        async def runner():
+            await _update_job_state_after_fetch("parent-id", mock_ingest_service)
+
+        asyncio.run(runner())
 
         mock_ingest_service.set_job_state.assert_called_once_with("parent-id", expected_state)
         mock_ingest_service.set_job_state.reset_mock()
@@ -493,8 +488,7 @@ class TestUpdateJobStateAfterFetch:
 class TestFetchJobV2Aggregation:
     """Tests for the parent aggregation fetch flow."""
 
-    @pytest.mark.asyncio
-    async def test_streams_aggregated_result_for_parent_job(self, mock_ingest_service, sample_parent_metadata):
+    def test_streams_aggregated_result_for_parent_job(self, mock_ingest_service, sample_parent_metadata):
         """Ensure fetch_job_v2 aggregates subjob outputs and updates parent state."""
 
         mock_ingest_service.get_parent_job_info = AsyncMock(
@@ -517,13 +511,18 @@ class TestFetchJobV2Aggregation:
 
         mock_ingest_service.set_job_state = AsyncMock()
 
-        response = await fetch_job_v2("parent-job", mock_ingest_service)
+        async def runner():
+            response = await fetch_job_v2("parent-job", mock_ingest_service)
 
-        assert response.status_code == 200
+            body = b""
+            async for chunk in response.body_iterator:
+                body += chunk
 
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk
+            return response.status_code, body
+
+        status_code, body = asyncio.run(runner())
+
+        assert status_code == 200
 
         payload = json.loads(body)
 
