@@ -131,23 +131,23 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Stats for reporting
     stats = {"processed": 0, "summarized": 0, "skipped": 0, "failed": 0, "tokens": 0}
 
-    # Process each row (page) of the document
-    # Probably don't need to loop here. Looped LLM calls is slow. We know # pages in doc and how many
-    # pages to extract. This should be parallelized.
     content_for_summary = ""
+    # Don't necessarily need to loop here. Should be able to get all content in one call for all pages.
+    # TODO: Should profile this if it necessary
     for idx, row in df.iterrows():
         stats["processed"] += 1
-        # Extract content - be more flexible about where it comes from
         content = _extract_content(row)
 
         if content is not None:
             content = content.strip()
             if len(content) < min_content_length:
                 stats["skipped"] += 1
-                log(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
+                warn(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
                 continue
             elif len(content) > max_content_length:
-                log("Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters")
+                warn(
+                    f"Page {idx}: Content exceeds max length." f"Truncating content to {max_content_length} characters"
+                )
                 content = content[:max_content_length]
 
             content_for_summary += content
@@ -181,19 +181,19 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     summary, duration = _generate_summary(client, content_for_summary, model_name)
 
     if summary is not None:
-        _add_summary(df, idx, row, summary, model_name)
+        _add_summary(df, summary, model_name)
         stats["summarized"] += 1
     else:
         stats["failed"] += 1
 
     log(
-        f"LLM summarization complete: "
-        f"summarized={stats['summarized']}/{stats['processed']}, "
-        f"skipped={stats['skipped']}, "
-        f"failed={stats['failed']}, "
-        f"tokens={stats['tokens']}, "
-        f"duration={stats['duration']:.2f}s, "
-        f"tokens/s={stats['tokens'] / stats['duration']:.2f}"
+        f"LLM summarization complete:\n"
+        f"summarized={stats['summarized']}/{stats['processed']},\n"
+        f"skipped={stats['skipped']},\n"
+        f"failed={stats['failed']},\n"
+        f"tokens={stats['tokens']},\n"
+        f"duration={duration:.2f}s,\n"
+        f"tokens/s={(stats['tokens'] / duration):.2f}\n"
     )
 
     # Update the control message with modified DataFrame
@@ -257,29 +257,22 @@ def _generate_summary(client, content: str, model_name: str) -> tuple[str | None
         return None, time.time() - start_time
 
 
-def _add_summary(df, idx: int, row, summary: str, model_name: str):
+def _add_summary(df, summary: str, model_name: str):
     """Add summary to metadata and store in df"""
     try:
-        # Get current metadata or create new dict - handle None case properly
-        existing_metadata = row.get("metadata")
-        logger.debug(f"existing_metadata type: {type(existing_metadata)}, contents: {existing_metadata}")
-        if existing_metadata is not None and isinstance(existing_metadata, dict):
-            metadata = dict(existing_metadata)  # Create a copy
-        else:
-            metadata = {}
+        # TODO: INCOMPLETE
+        log("Adding summary to df...")
+        # metadata["custom_content"]["llm_summary"] = {"summary": summary, "model": model_name}
 
-        # Add LLM summary
-        metadata["custom_content"]["llm_summary"] = {"summary": summary, "model": model_name}
-
-        # Update the DataFrame at the specific index
-        try:
-            df.at[idx, "metadata"] = metadata
-        except Exception:
-            # Alternative approach: update the original row reference
-            df.iloc[idx]["metadata"] = metadata
+        # # Update the DataFrame at the specific index
+        # try:
+        #     df.at[idx, "metadata"] = metadata
+        # except Exception:
+        #     # Alternative approach: update the original row reference
+        #     df.iloc[idx]["metadata"] = metadata
 
     except Exception as e:
-        logger.error(f"Failed to add summary to row {idx}: {e}")
+        logger.error(e)
 
 
 def _estimate_tokens(text: str) -> int:
