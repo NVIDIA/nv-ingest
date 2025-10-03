@@ -19,6 +19,19 @@ import logging
 import os
 import time
 
+# import yaml
+# from pathlib import Path
+
+PROMPT = """
+Here are the contents from the first and last page of a document. Please provide a comprehensive summary in 3-4
+sentences. Focus on the main purpose, key topics, and important details. This summary will be used for document
+search and understanding.
+
+[CONTENT]
+{content}
+[END CONTENT]
+"""
+
 
 def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":  # noqa: F821
     """
@@ -45,9 +58,9 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
       default="https://integrate.api.nvidia.com/v1"
     - LLM_SUMMARIZATION_TIMEOUT: (Optional) Timeout in seconds for API requests.
       default=60 seconds
-    - LLM_MIN_CONTENT_LENGTH: (Optional) Minimum number of characters required in a content
+    - LLM_MIN_CONTENT_LENGTH: (Optional) Minimum number of chars required in a content
       chunk to trigger summarization. default=50
-    - LLM_MAX_CONTENT_LENGTH: (Optional) Maximum number of characters to send to the API
+    - LLM_MAX_CONTENT_LENGTH: (Optional) Maximum number of chars to send to the API
       for summarization. default=12000
     - NUM_FIRST_LAST_PAGES: (Optional) Number of first and last pages to summarize. default=1
 
@@ -82,21 +95,21 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Get the DataFrame payload
     df = control_message.payload()
 
-    # Remove me
-    logger.info("")
-    logger.info("=================SUMMARY OF THE DATAFRAME==================")
-    logger.info(f"df: {df.head()}")
-    logger.info("=================DIRECTORY CONTENTS==================")
-    logger.info(f"Current absolute path: {os.path.abspath(os.curdir)}")
-    logger.info(f"Directory contents: {os.listdir(os.curdir)}")
-    df.to_csv("df.csv", index=False)
-    # Remove me
-
     if df is None or len(df) == 0:
         logger.warning("No payload found in control message")
         return control_message
 
-    logger.info(f"Processing {len(df)} rows for LLM summarization")
+    logger.info(f"Processing {len(df)} pages for LLM summarization")
+    # Select first and last page for summarization
+    # TODO: add feature to select N first and last pages
+    if len(df) > 1:
+        df = df.iloc[[0, -1]]
+    else:
+        logger.info("Document has only one page")
+
+    # Remove me
+    df.to_csv("df.csv", index=False)
+    # Remove me
 
     # Initialize OpenAI client with error handling
     try:
@@ -111,53 +124,71 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Process each row (page) of the document
     # Probably don't need to loop here. Looped LLM calls is slow. We know # pages in doc and how many
     # pages to extract. This should be parallelized.
+    content_for_summary = ""
     for idx, row in df.iterrows():
         stats["processed"] += 1
-        try:
-            # Extract content - be more flexible about where it comes from
-            content = _extract_content(row, logger)
+        # Extract content - be more flexible about where it comes from
+        content = _extract_content(row, logger)
 
-            if content is not None:
-                content = content.strip()
-                if len(content) < min_content_length:
-                    stats["skipped"] += 1
-                    logger.info(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
-                    continue
-
-                # Truncate if needed
-                if len(content) > max_content_length:
-                    logger.info(
-                        "Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters"
-                    )
-                    content = content[:max_content_length]
-                # remove
-                logger.info(f"Page {idx}: Content: {content}")
-                # remove
-                stats["tokens"] += _estimate_tokens(content)
-
-                # Generate summary
-                summary, duration = _generate_summary(client, content, model_name, logger)
-
-                if summary is not None:
-                    # Add to metadata
-                    _add_summary(df, idx, row, summary, model_name, logger)
-                    stats["summarized"] += 1
-                else:
-                    stats["failed"] += 1
-
-            else:
+        if content is not None:
+            content = content.strip()
+            if len(content) < min_content_length:
                 stats["skipped"] += 1
+                logger.info(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
+                continue
+            elif len(content) > max_content_length:
+                logger.info(
+                    "Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters"
+                )
+                content = content[:max_content_length]
 
-        except Exception as e:
-            stats["failed"] += 1
-            logger.error(f"Row {idx}: Error processing content: {e}")
+            content_for_summary += content
+        else:
+            stats["skipped"] += 1
+
+    ## FOR RANDY
+    # Log the current directory
+    logger.info(f"Current working directory: {os.getcwd()}")
+
+    # Create "prompt_dumps" directory if it doesn't exist
+    # prompt_dumps_dir = Path("prompt_dumps")
+    # if not prompt_dumps_dir.exists():
+    #     prompt_dumps_dir.mkdir(parents=True, exist_ok=True)
+    #     logger.info(f"Created directory: {prompt_dumps_dir.absolute()}")
+
+    # doc_name = Path(df.iloc[0]['metadata']['source_metadata']['source_name'].split("/")[-1])
+    # filename = prompt_dumps_dir / doc_name.with_suffix(".yaml")
+    # # Write the contents of for_randy as a YAML file named after the 'doc' field
+    # for_randy = {
+    #     "doc": str(doc_name),
+    #     "prompt": PROMPT.format(content=content_for_summary),
+    # }
+    # with open(filename, "w") as f:
+    #     logger.info(f"Dumping prompt to {filename}")
+    #     yaml.dump(for_randy, f)
+    ##
+
+    # Generate summary
+    stats["tokens"] = _estimate_tokens(content_for_summary)
+    logger.info(f"Summarizing {stats['tokens']} tokens\n")
+    summary, duration = _generate_summary(client, content_for_summary, model_name, logger)
+
+    if summary is not None:
+        # Add to metadata
+        _add_summary(df, idx, row, summary, model_name, logger)
+        stats["summarized"] += 1
+    else:
+        stats["failed"] += 1
 
     # Update the control message with modified DataFrame
     control_message.payload(df)
 
     logger.info(
-        f"LLM summarization complete: {stats['summarized']}/{stats['processed']} documents summarized, "
-        f"{stats['skipped']} skipped, {stats['failed']} failed"
+        "LLM summarization complete:\n"
+        f"{stats['summarized']}/{stats['processed']} documents summarized\n"
+        f"{stats['skipped']} skipped, {stats['failed']} failed\n"
+        f"Total tokens: {stats['tokens']}, Total duration: {stats['duration']}\n"
+        f"Tokens/s: {stats['tokens'] / stats['duration']}"
     )
 
     return control_message
@@ -192,21 +223,14 @@ def _extract_content(row, logger) -> str | None:
 
 
 def _generate_summary(client, content: str, model_name: str, logger) -> tuple[str | None, float]:
-    """Generate summary with robust error handling."""
-    prompt = f"""Please provide a comprehensive 3-4 sentence summary of the following document:
-
-{content}
-
-Focus on the main purpose, key topics, and important details.
-This summary will be used for document search and understanding.
-
-Summary:"""
+    """Ask an LLM to summarize content extracted from doc."""
+    ### SEE if prompt should go in here. Also see if
 
     try:
         start_time = time.time()
         completion = client.chat.completions.create(
             model=model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": PROMPT.format(content=content)}],
             max_tokens=400,  # Increased for more comprehensive summaries
             temperature=0.7,
         )
@@ -255,5 +279,5 @@ def _add_summary(df, idx: int, row, summary: str, model_name: str, logger):
 
 
 def _estimate_tokens(text: str) -> int:
-    """Rough estimate: ~4 characters per token for English."""
+    """Rough estimate (~4 characters per token)"""
     return len(text) // 4
