@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import time
+import random
 from collections import defaultdict
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
@@ -76,6 +77,7 @@ class _ConcurrentProcessor:
         batch_size: int,
         timeout: Tuple[int, Union[float, None]],
         max_job_retries: Optional[int],
+        retry_delay: float,
         completion_callback: Optional[Callable[[Dict[str, Any], str], None]],
         fail_on_submit_error: bool,
         stream_to_callback_only: bool,
@@ -128,6 +130,7 @@ class _ConcurrentProcessor:
         self.batch_size = batch_size
         self.timeout = timeout
         self.max_job_retries = max_job_retries
+        self.retry_base_delay = retry_delay
         self.completion_callback = completion_callback
         self.fail_on_submit_error = fail_on_submit_error
         self.stream_to_callback_only = stream_to_callback_only
@@ -136,8 +139,13 @@ class _ConcurrentProcessor:
         # State variables managed across batch cycles
         self.retry_job_ids: List[str] = []
         self.retry_counts: Dict[str, int] = defaultdict(int)
+        self.next_allowed_fetch_time: Dict[str, float] = {}
         self.results: List[Dict[str, Any]] = []  # Stores successful results (full dicts)
         self.failures: List[Tuple[str, str]] = []  # (job_index, error_message)
+
+        # Backoff configuration
+        self._retry_backoff_cap: float = 10.0  # seconds, cap exponential backoff
+        self._jitter_fraction: float = 0.2  # +/- 20% jitter window
 
         # --- Initial Checks ---
         if not self.job_queue_id:
@@ -183,6 +191,8 @@ class _ConcurrentProcessor:
         # Cleanup retry count if it exists for this job
         if job_index in self.retry_counts:
             del self.retry_counts[job_index]
+        if job_index in self.next_allowed_fetch_time:
+            del self.next_allowed_fetch_time[job_index]
 
         # Attempt to mark state as FAILED locally in the client (best effort)
         try:
@@ -236,6 +246,8 @@ class _ConcurrentProcessor:
         # Cleanup retry count if it exists
         if job_index in self.retry_counts:
             del self.retry_counts[job_index]
+        if job_index in self.next_allowed_fetch_time:
+            del self.next_allowed_fetch_time[job_index]
 
         # Execute completion callback if provided
         if self.completion_callback:
@@ -329,12 +341,20 @@ class _ConcurrentProcessor:
 
             # Add retries from the previous batch first
             if self.retry_job_ids:
-                num_retries = len(self.retry_job_ids)
-                current_batch_job_indices.extend(self.retry_job_ids)
-                if self.verbose:
-                    logger.debug(f"Adding {num_retries} retry jobs to current batch.")
-                # Clear the list; retries for *this* batch will be collected later
-                self.retry_job_ids = []
+                now_ts = time.time()
+                ready_retries: List[str] = []
+                pending_retries: List[str] = []
+                for rid in self.retry_job_ids:
+                    allow_ts = self.next_allowed_fetch_time.get(rid, 0.0)
+                    if allow_ts <= now_ts:
+                        ready_retries.append(rid)
+                    else:
+                        pending_retries.append(rid)
+                if ready_retries and self.verbose:
+                    logger.debug(f"Adding {len(ready_retries)} retry jobs to current batch (ready).")
+                current_batch_job_indices.extend(ready_retries)
+                # Keep non-ready retries for future cycles
+                self.retry_job_ids = pending_retries
 
             # Determine and add new jobs to the batch
             num_already_in_batch = len(current_batch_job_indices)
@@ -391,6 +411,14 @@ class _ConcurrentProcessor:
                 if not self.retry_job_ids and submitted_new_indices_count >= total_jobs:
                     logger.debug("Exiting loop: No jobs to fetch and no retries pending.")
                     break
+                # If only retries remain but none are ready yet, sleep until the earliest allowed
+                # time to avoid busy loop
+                if self.retry_job_ids:
+                    now_ts = time.time()
+                    next_times = [self.next_allowed_fetch_time.get(rid, now_ts) for rid in self.retry_job_ids]
+                    sleep_for = max(0.05, min(max(t - now_ts, 0.0) for t in next_times))
+                    # Cap sleep to 1s to remain responsive to new submissions
+                    time.sleep(min(sleep_for, 1.0))
                 continue  # Otherwise, proceed to next iteration
 
             # --- Initiate Fetching for the Current Batch ---
@@ -481,7 +509,17 @@ class _ConcurrentProcessor:
                                     f"{self.retry_counts[job_index]}/"
                                     f"{self.max_job_retries or 'inf'})."
                                 )
-                            # Collect for the *next* batch
+                            # Compute exponential backoff with jitter and schedule next eligible time
+                            base = max(self.retry_base_delay, 0.0)
+                            exp_delay = base * (2 ** max(self.retry_counts[job_index] - 1, 0)) if base > 0 else 0.0
+                            delay = min(exp_delay, self._retry_backoff_cap)
+                            if delay > 0:
+                                jitter = delay * self._jitter_fraction
+                                delay = max(0.0, delay + random.uniform(-jitter, jitter))
+                            next_time = time.time() + delay
+                            self.next_allowed_fetch_time[job_index] = next_time
+                            # Collect for the *future* batch cycles; actual inclusion is gated
+                            # by next_allowed_fetch_time
                             self.retry_job_ids.append(job_index)
                         else:
                             error_msg = f"Exceeded max fetch retries " f"({self.max_job_retries}) for job {job_index}."
@@ -1093,6 +1131,7 @@ class NvIngestClient:
             job_queue_id=job_queue_id,
             timeout=effective_timeout,
             max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
             completion_callback=completion_callback,
             fail_on_submit_error=fail_on_submit_error,
             stream_to_callback_only=stream_to_callback_only,
