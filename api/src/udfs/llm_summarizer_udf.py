@@ -15,9 +15,9 @@ Environment Variables:
 - LLM_MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
 """
 
-import os
 import logging
-from typing import Optional
+import os
+import time
 
 
 def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":  # noqa: F821
@@ -33,6 +33,24 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     - Comprehensive logging for monitoring and debugging
     - Configurable content length thresholds
     - Safe metadata manipulation preserving existing data
+
+    Environment Variable Argument Handling:
+
+    These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
+
+    - NVIDIA_API_KEY: (Required) The API key for authenticating with NVIDIA NIM endpoints.
+    - LLM_SUMMARIZATION_MODEL: (Optional) The NIM model to use for summarization.
+      default="nvidia/llama-3.1-nemotron-70b-instruct"
+    - LLM_SUMMARIZATION_BASE_URL: (Optional) The base URL for the LLM API endpoint.
+      default="https://integrate.api.nvidia.com/v1"
+    - LLM_SUMMARIZATION_TIMEOUT: (Optional) Timeout in seconds for API requests.
+      default=60 seconds
+    - LLM_MIN_CONTENT_LENGTH: (Optional) Minimum number of characters required in a content
+      chunk to trigger summarization. default=50
+    - LLM_MAX_CONTENT_LENGTH: (Optional) Maximum number of characters to send to the API
+      for summarization. default=12000
+    - NUM_FIRST_LAST_PAGES: (Optional) Number of first and last pages to summarize. default=1
+
 
     Parameters
     ----------
@@ -63,6 +81,17 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     # Get the DataFrame payload
     df = control_message.payload()
+
+    # Remove me
+    logger.info("")
+    logger.info("=================SUMMARY OF THE DATAFRAME==================")
+    logger.info(f"df: {df.head()}")
+    logger.info("=================DIRECTORY CONTENTS==================")
+    logger.info(f"Current absolute path: {os.path.abspath(os.curdir)}")
+    logger.info(f"Directory contents: {os.listdir(os.curdir)}")
+    df.to_csv("df.csv", index=False)
+    # Remove me
+
     if df is None or len(df) == 0:
         logger.warning("No payload found in control message")
         return control_message
@@ -77,38 +106,47 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         return control_message
 
     # Stats for reporting
-    stats = {"processed": 0, "summarized": 0, "skipped": 0, "failed": 0}
+    stats = {"processed": 0, "summarized": 0, "skipped": 0, "failed": 0, "tokens": 0}
 
-    # Process each row
+    # Process each row (page) of the document
+    # Probably don't need to loop here. Looped LLM calls is slow. We know # pages in doc and how many
+    # pages to extract. This should be parallelized.
     for idx, row in df.iterrows():
         stats["processed"] += 1
-
         try:
             # Extract content - be more flexible about where it comes from
             content = _extract_content(row, logger)
 
-            if not content:
-                stats["skipped"] += 1
-                continue
+            if content is not None:
+                content = content.strip()
+                if len(content) < min_content_length:
+                    stats["skipped"] += 1
+                    logger.info(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
+                    continue
 
-            content = content.strip()
-            if len(content) < min_content_length:
-                stats["skipped"] += 1
-                continue
+                # Truncate if needed
+                if len(content) > max_content_length:
+                    logger.info(
+                        "Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters"
+                    )
+                    content = content[:max_content_length]
+                # remove
+                logger.info(f"Page {idx}: Content: {content}")
+                # remove
+                stats["tokens"] += _estimate_tokens(content)
 
-            # Truncate if needed
-            if len(content) > max_content_length:
-                content = content[:max_content_length]
+                # Generate summary
+                summary, duration = _generate_summary(client, content, model_name, logger)
 
-            # Generate summary
-            summary = _generate_summary(client, content, model_name, logger)
+                if summary is not None:
+                    # Add to metadata
+                    _add_summary(df, idx, row, summary, model_name, logger)
+                    stats["summarized"] += 1
+                else:
+                    stats["failed"] += 1
 
-            if summary:
-                # Add to metadata
-                _add_summary(df, idx, row, summary, model_name, logger)
-                stats["summarized"] += 1
             else:
-                stats["failed"] += 1
+                stats["skipped"] += 1
 
         except Exception as e:
             stats["failed"] += 1
@@ -125,34 +163,35 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     return control_message
 
 
-def _extract_content(row, logger) -> Optional[str]:
+def _extract_content(row, logger) -> str | None:
     """Extract text content from row, trying multiple locations."""
-    content = ""
+    content = None
 
     # Try different locations for content
     if isinstance(row.get("metadata"), dict):
         metadata = row["metadata"]
 
         # Primary location: metadata.content
-        content = metadata.get("content", "")
+        content = metadata.get("content", None)
 
         # If no content, try other locations
-        if not content:
+        # TODO: This does not seem to adhere to the schema of the document!!
+        if content is None:
             # Try in text_metadata
             text_metadata = metadata.get("text_metadata", {})
             content = text_metadata.get("text", "") or text_metadata.get("content", "")
 
     # Try top-level content field
-    if not content:
-        content = row.get("content", "")
-
-    if not content:
-        return None
+    # TODO: Convert to GitHub Thread
+    # This does not seem to adhere to the schema of a document!!
+    # Why would we look in here? We only expect it to be under row.metadata
+    if content is None:
+        content = row.get("content", None)
 
     return content
 
 
-def _generate_summary(client, content: str, model_name: str, logger) -> Optional[str]:
+def _generate_summary(client, content: str, model_name: str, logger) -> tuple[str | None, float]:
     """Generate summary with robust error handling."""
     prompt = f"""Please provide a comprehensive 3-4 sentence summary of the following document:
 
@@ -164,22 +203,27 @@ This summary will be used for document search and understanding.
 Summary:"""
 
     try:
+        start_time = time.time()
         completion = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400,  # Increased for more comprehensive summaries
             temperature=0.7,
         )
+        duration = time.time() - start_time
 
-        if completion.choices and len(completion.choices) > 0:
+        if completion.choices:
             summary = completion.choices[0].message.content.strip()
-            return summary
+            return summary, duration
         else:
-            return None
+            return None, duration
 
     except Exception as e:
+        # TODO: GitHub Thread
+        # Reviewers, tell me if this is a bad idea.
+        # I think the convention is to return timestamp for time even if it fails
         logger.error(f"API call failed: {e}")
-        return None
+        return None, time.time() - start_time
 
 
 def _add_summary(df, idx: int, row, summary: str, model_name: str, logger):
@@ -208,3 +252,8 @@ def _add_summary(df, idx: int, row, summary: str, model_name: str, logger):
 
     except Exception as e:
         logger.error(f"Failed to add summary to row {idx}: {e}")
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough estimate: ~4 characters per token for English."""
+    return len(text) // 4
