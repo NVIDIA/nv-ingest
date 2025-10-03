@@ -23,14 +23,25 @@ import time
 # from pathlib import Path
 
 PROMPT = """
-Here are the contents from the first and last page of a document. Please provide a comprehensive summary in 3-4
-sentences. Focus on the main purpose, key topics, and important details. This summary will be used for document
-search and understanding.
+Here are the contents from the first and last page of a document. Focus on the main purpose, key topics,
+and important details. Just return the summary as a paragraph. Do not add special characters for formatting.
+This summary will be used for document search and understanding.
 
 [CONTENT]
 {content}
 [END CONTENT]
 """
+
+logger = logging.getLogger(__name__)
+
+
+def log(msg: str) -> None:
+    """Log a message"""
+    logger.info(msg)
+
+
+def warn(msg: str) -> None:
+    logger.warning(msg)
 
 
 def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":  # noqa: F821
@@ -77,8 +88,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     """
     from openai import OpenAI
 
-    logger = logging.getLogger(__name__)
-    logger.info("UDF: Starting LLM content summarization")
+    log("UDF: Starting LLM content summarization")
 
     # Get configuration from environment
     api_key = os.getenv("NVIDIA_API_KEY", "")
@@ -89,23 +99,23 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", "12000"))
 
     if not api_key:
-        logger.warning("NVIDIA_API_KEY not found, skipping summarization")
+        warn("NVIDIA_API_KEY not found, skipping summarization")
         return control_message
 
     # Get the DataFrame payload
     df = control_message.payload()
 
     if df is None or len(df) == 0:
-        logger.warning("No payload found in control message")
+        warn("No payload found in control message")
         return control_message
 
-    logger.info(f"Processing {len(df)} pages for LLM summarization")
+    log(f"Processing {len(df)} pages for LLM summarization")
     # Select first and last page for summarization
     # TODO: add feature to select N first and last pages
     if len(df) > 1:
         df = df.iloc[[0, -1]]
     else:
-        logger.info("Document has only one page")
+        log("Document has only one page")
 
     # Remove me
     df.to_csv("df.csv", index=False)
@@ -128,18 +138,16 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     for idx, row in df.iterrows():
         stats["processed"] += 1
         # Extract content - be more flexible about where it comes from
-        content = _extract_content(row, logger)
+        content = _extract_content(row)
 
         if content is not None:
             content = content.strip()
             if len(content) < min_content_length:
                 stats["skipped"] += 1
-                logger.info(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
+                log(f"Page {idx}: Content less than min={min_content_length}. Skipping...")
                 continue
             elif len(content) > max_content_length:
-                logger.info(
-                    "Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters"
-                )
+                log("Warning: Content exceeds max length." f"Truncating content to {max_content_length} characters")
                 content = content[:max_content_length]
 
             content_for_summary += content
@@ -148,53 +156,52 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     ## FOR RANDY
     # Log the current directory
-    logger.info(f"Current working directory: {os.getcwd()}")
+    # log(f"Current working directory: {os.getcwd()}")
 
     # Create "prompt_dumps" directory if it doesn't exist
     # prompt_dumps_dir = Path("prompt_dumps")
     # if not prompt_dumps_dir.exists():
     #     prompt_dumps_dir.mkdir(parents=True, exist_ok=True)
-    #     logger.info(f"Created directory: {prompt_dumps_dir.absolute()}")
+    #     log(f"Created directory: {prompt_dumps_dir.absolute()}")
 
     # doc_name = Path(df.iloc[0]['metadata']['source_metadata']['source_name'].split("/")[-1])
     # filename = prompt_dumps_dir / doc_name.with_suffix(".yaml")
     # # Write the contents of for_randy as a YAML file named after the 'doc' field
     # for_randy = {
-    #     "doc": str(doc_name),
-    #     "prompt": PROMPT.format(content=content_for_summary),
+    # "doc": str(doc_name),
+    # "prompt": PROMPT.format(content=content_for_summary),
     # }
     # with open(filename, "w") as f:
-    #     logger.info(f"Dumping prompt to {filename}")
+    #     log(f"Dumping prompt to {filename}")
     #     yaml.dump(for_randy, f)
     ##
 
-    # Generate summary
+    # Generate summary from combined content from document
     stats["tokens"] = _estimate_tokens(content_for_summary)
-    logger.info(f"Summarizing {stats['tokens']} tokens\n")
-    summary, duration = _generate_summary(client, content_for_summary, model_name, logger)
+    summary, duration = _generate_summary(client, content_for_summary, model_name)
 
     if summary is not None:
-        # Add to metadata
-        _add_summary(df, idx, row, summary, model_name, logger)
+        _add_summary(df, idx, row, summary, model_name)
         stats["summarized"] += 1
     else:
         stats["failed"] += 1
 
-    # Update the control message with modified DataFrame
-    control_message.payload(df)
-
-    logger.info(
-        "LLM summarization complete:\n"
-        f"{stats['summarized']}/{stats['processed']} documents summarized\n"
-        f"{stats['skipped']} skipped, {stats['failed']} failed\n"
-        f"Total tokens: {stats['tokens']}, Total duration: {stats['duration']}\n"
-        f"Tokens/s: {stats['tokens'] / stats['duration']}"
+    log(
+        f"LLM summarization complete: "
+        f"summarized={stats['summarized']}/{stats['processed']}, "
+        f"skipped={stats['skipped']}, "
+        f"failed={stats['failed']}, "
+        f"tokens={stats['tokens']}, "
+        f"duration={stats['duration']:.2f}s, "
+        f"tokens/s={stats['tokens'] / stats['duration']:.2f}"
     )
 
+    # Update the control message with modified DataFrame
+    control_message.payload(df)
     return control_message
 
 
-def _extract_content(row, logger) -> str | None:
+def _extract_content(row) -> str | None:
     """Extract text content from row, trying multiple locations."""
     content = None
 
@@ -222,7 +229,7 @@ def _extract_content(row, logger) -> str | None:
     return content
 
 
-def _generate_summary(client, content: str, model_name: str, logger) -> tuple[str | None, float]:
+def _generate_summary(client, content: str, model_name: str) -> tuple[str | None, float]:
     """Ask an LLM to summarize content extracted from doc."""
     ### SEE if prompt should go in here. Also see if
 
@@ -250,19 +257,16 @@ def _generate_summary(client, content: str, model_name: str, logger) -> tuple[st
         return None, time.time() - start_time
 
 
-def _add_summary(df, idx: int, row, summary: str, model_name: str, logger):
-    """Add summary to metadata with safe handling."""
+def _add_summary(df, idx: int, row, summary: str, model_name: str):
+    """Add summary to metadata and store in df"""
     try:
         # Get current metadata or create new dict - handle None case properly
         existing_metadata = row.get("metadata")
+        logger.debug(f"existing_metadata type: {type(existing_metadata)}, contents: {existing_metadata}")
         if existing_metadata is not None and isinstance(existing_metadata, dict):
             metadata = dict(existing_metadata)  # Create a copy
         else:
             metadata = {}
-
-        # Ensure custom_content exists
-        if "custom_content" not in metadata or metadata["custom_content"] is None:
-            metadata["custom_content"] = {}
 
         # Add LLM summary
         metadata["custom_content"]["llm_summary"] = {"summary": summary, "model": model_name}
