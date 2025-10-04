@@ -19,8 +19,8 @@ import logging
 import os
 import time
 
-# import yaml
-# from pathlib import Path
+import yaml
+from pathlib import Path
 
 PROMPT = """
 Here are the contents from the first and last page of a document. Focus on the main purpose, key topics,
@@ -41,6 +41,7 @@ def log(msg: str) -> None:
 
 
 def warn(msg: str) -> None:
+    """Log warning msg"""
     logger.warning(msg)
 
 
@@ -73,6 +74,8 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
       chunk to trigger summarization. default=50
     - LLM_MAX_CONTENT_LENGTH: (Optional) Maximum number of chars to send to the API
       for summarization. default=12000
+
+      TODO: Implement this
     - NUM_FIRST_LAST_PAGES: (Optional) Number of first and last pages to summarize. default=1
 
 
@@ -92,7 +95,8 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     # Get configuration from environment
     api_key = os.getenv("NVIDIA_API_KEY", "")
-    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
+    # BUG: This doesn't work correctly. Env var set on client doesn't propagate to UDF on docker service
+    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", "60"))
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", "50"))
@@ -118,7 +122,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         log("Document has only one page")
 
     # Remove me
-    df.to_csv("df.csv", index=False)
+    # df.to_csv("df.csv", index=False)
     # Remove me
 
     # Initialize OpenAI client with error handling
@@ -154,50 +158,53 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         else:
             stats["skipped"] += 1
 
-    ## FOR RANDY
-    # Log the current directory
-    # log(f"Current working directory: {os.getcwd()}")
-
-    # Create "prompt_dumps" directory if it doesn't exist
-    # prompt_dumps_dir = Path("prompt_dumps")
-    # if not prompt_dumps_dir.exists():
-    #     prompt_dumps_dir.mkdir(parents=True, exist_ok=True)
-    #     log(f"Created directory: {prompt_dumps_dir.absolute()}")
-
-    # doc_name = Path(df.iloc[0]['metadata']['source_metadata']['source_name'].split("/")[-1])
-    # filename = prompt_dumps_dir / doc_name.with_suffix(".yaml")
-    # # Write the contents of for_randy as a YAML file named after the 'doc' field
-    # for_randy = {
-    # "doc": str(doc_name),
-    # "prompt": PROMPT.format(content=content_for_summary),
-    # }
-    # with open(filename, "w") as f:
-    #     log(f"Dumping prompt to {filename}")
-    #     yaml.dump(for_randy, f)
-    ##
-
     # Generate summary from combined content from document
     stats["tokens"] = _estimate_tokens(content_for_summary)
     summary, duration = _generate_summary(client, content_for_summary, model_name)
 
+    ## REMOVE STORING
+    # Log the current directory
+    log(f"Current working directory: {os.getcwd()}")
+
+    # Create "prompt_dumps" directory if it doesn't exist
+    doc_stats_dir = Path("doc_stats") / _safe_model_name(model_name)
+    if not doc_stats_dir.exists():
+        doc_stats_dir.mkdir(parents=True, exist_ok=True)
+        log(f"Created directory: {doc_stats_dir.absolute()}")
+
+    doc_name = Path(df.iloc[0]["metadata"]["source_metadata"]["source_name"].split("/")[-1])
+    filename = doc_stats_dir / doc_name.with_suffix(".yaml")
+    # Write the contents of for_randy as a YAML file named after the 'doc' field
+    experiment_stats = {
+        "doc": str(doc_name),
+        "prompt": PROMPT.format(content=content_for_summary),
+        "tokens": stats["tokens"],
+        "duration": duration,
+        "tokens/s": stats["tokens"] / duration,
+        "summary": summary,
+        "model": model_name,
+    }
+    with open(filename, "w") as f:
+        log(f"Dumping prompt to {filename}")
+        yaml.dump(experiment_stats, f, indent=2)
+    ###### END
+
     if summary is not None:
-        _add_summary(df, summary, model_name)
+        # _add_summary(df, summary, model_name)
         stats["summarized"] += 1
     else:
         stats["failed"] += 1
 
     log(
         f"LLM summarization complete:\n"
-        f"summarized={stats['summarized']}/{stats['processed']},\n"
-        f"skipped={stats['skipped']},\n"
-        f"failed={stats['failed']},\n"
-        f"tokens={stats['tokens']},\n"
-        f"duration={duration:.2f}s,\n"
-        f"tokens/s={(stats['tokens'] / duration):.2f}\n"
+        f"\ttokens={stats['tokens']},\n"
+        f"\tduration={duration:.2f}s,\n"
+        f"\ttokens/s={(stats['tokens'] / duration):.2f}\n"
+        f"\tmodel={model_name}\n"
     )
 
     # Update the control message with modified DataFrame
-    control_message.payload(df)
+    # control_message.payload(df)
     return control_message
 
 
@@ -278,3 +285,7 @@ def _add_summary(df, summary: str, model_name: str):
 def _estimate_tokens(text: str) -> int:
     """Rough estimate (~4 characters per token)"""
     return len(text) // 4
+
+
+def _safe_model_name(name: str) -> str:
+    return name.replace("/", "__").replace("-", "_")
