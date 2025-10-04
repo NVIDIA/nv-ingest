@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import base64
 import io
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -69,16 +70,32 @@ def dummy_extractor_config():
 
 @pytest.fixture
 def pdf_stream_test_page_form_pdf():
-    with open("data/test-page-form.pdf", "rb") as f:
-        pdf_stream = io.BytesIO(f.read())
-    return pdf_stream
+    """Return BytesIO of test-page-form.pdf or skip if not available."""
+    base = Path(__file__).parent
+    candidates = [
+        base / "data" / "test-page-form.pdf",
+        base.parent / "data" / "test-page-form.pdf",
+        Path.cwd() / "data" / "test-page-form.pdf",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return io.BytesIO(p.read_bytes())
+    pytest.skip("test-page-form.pdf not found; skipping pdfium page form test")
 
 
 @pytest.fixture
 def pdf_stream_test_shapes_pdf():
-    with open("data/test-shapes.pdf", "rb") as f:
-        pdf_stream = io.BytesIO(f.read())
-    return pdf_stream
+    """Return BytesIO of test-shapes.pdf or skip if not available."""
+    base = Path(__file__).parent
+    candidates = [
+        base / "data" / "test-shapes.pdf",
+        base.parent / "data" / "test-shapes.pdf",
+        Path.cwd() / "data" / "test-shapes.pdf",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return io.BytesIO(p.read_bytes())
+    pytest.skip("test-shapes.pdf not found; skipping pdfium shapes test")
 
 
 @pytest.mark.xfail(reason="TODO: Fix this test")
