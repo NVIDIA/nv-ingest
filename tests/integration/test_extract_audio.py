@@ -42,12 +42,6 @@ def _wait_for_service(host: str, port: int, timeout: float = 3.0) -> bool:
 def test_audio_extract_only(
     pipeline_process,
 ):
-    # Skip test if audio extraction deps aren't installed (librosa required)
-    if os.environ.get("INSTALL_AUDIO_EXTRACTION_DEPS", "").lower() not in ("1", "true", "yes"):
-        pytest.skip(
-            "Audio extraction dependencies not installed. Set INSTALL_AUDIO_EXTRACTION_DEPS=true to enable this test."
-        )
-
     # Determine audio endpoint and skip if not reachable
     audio_grpc_endpoint = os.environ.get(
         "AUDIO_GRPC_ENDPOINT", "localhost:8021"
