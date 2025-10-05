@@ -240,6 +240,8 @@ def generate_matching_files(file_sources):
         if os.path.isdir(pattern):
             pattern = os.path.join(pattern, "*")
 
+        pattern = pattern.replace('[', '[[]').replace(']', '[]]')
+
         for file_path in glob.glob(pattern, recursive=True):
             if os.path.isfile(file_path):
                 yield file_path
