@@ -96,7 +96,10 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Get configuration from environment
     api_key = os.getenv("NVIDIA_API_KEY", "")
     # BUG: This doesn't work correctly. Env var set on client doesn't propagate to UDF on docker service
-    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
+    # model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
+
+    model_name = "nvdev/qwen/qwen3-next-80b-a3b-instruct"  # CHANGE ME!!!!
+
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", "60"))
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", "50"))
