@@ -1074,7 +1074,7 @@ class Ingestor:
         self,
         output_directory: str | None = None,
         cleanup: bool = True,
-        compression: Optional[str] = "gzip",
+        compression: str | None = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
