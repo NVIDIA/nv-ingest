@@ -29,17 +29,29 @@ def _now_timestr() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M")
 
 
-def _get_env(name: str, default: str | None = None) -> str | None:
-    val = os.environ.get(name)
-    if val is None or val == "":
-        return default
-    return val
-
-
 def _default_collection_name() -> str:
     # Make collection name configurable via TEST_NAME env var, default to dc20_v2
-    test_name = _get_env("TEST_NAME", "dc20_v2")
+    test_name = os.getenv("TEST_NAME") or "dc20_v2"
     return f"{test_name}_{_now_timestr()}"
+
+
+def _expected_counts_for_dataset(dataset_path: str) -> dict[str, int] | None:
+    dataset_path_lower = dataset_path.lower()
+    if any(marker in dataset_path_lower for marker in ("bo20", "dc20")):
+        return {"text": 496, "tables": 164, "charts": 184}
+    return None
+
+
+def _assert_counts_match(expected: dict[str, int], actual: dict[str, int]) -> None:
+    mismatches: list[str] = []
+    for key, expected_value in expected.items():
+        actual_value = actual.get(key)
+        if actual_value != expected_value:
+            mismatches.append(f"{key}: expected {expected_value}, got {actual_value}")
+
+    if mismatches:
+        mismatch_details = "; ".join(mismatches)
+        raise AssertionError("Chunk count assertions failed compared to V1 baseline: " + mismatch_details)
 
 
 def main() -> int:
@@ -48,7 +60,7 @@ def main() -> int:
         os.environ["NV_INGEST_API_VERSION"] = "v2"
 
     # Dataset-agnostic: no hardcoded paths, configurable via environment
-    data_dir = _get_env("DATASET_DIR")
+    data_dir = os.getenv("DATASET_DIR")
     if not data_dir:
         print("ERROR: DATASET_DIR environment variable is required")
         print("Example: DATASET_DIR=/datasets/bo20 python dc20_v2_e2e.py")
@@ -59,30 +71,31 @@ def main() -> int:
         print("Please check the DATASET_DIR path and ensure it's accessible")
         return 2
 
-    spill_dir = _get_env("SPILL_DIR", "/tmp/spill")
+    spill_dir = os.getenv("SPILL_DIR") or "/tmp/spill"
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = _get_env("COLLECTION_NAME", _default_collection_name())
-    hostname = _get_env("HOSTNAME", "localhost")
-    sparse = _get_env("SPARSE", "true").lower() == "true"
-    gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
+    collection_name = os.getenv("COLLECTION_NAME") or _default_collection_name()
+    hostname = os.getenv("HOSTNAME") or "localhost"
+    sparse = (os.getenv("SPARSE") or "true").lower() == "true"
+    gpu_search = (os.getenv("GPU_SEARCH") or "false").lower() == "true"
 
     # Extraction configuration from environment variables
-    extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
-    extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
-    extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
-    extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
-    text_depth = _get_env("TEXT_DEPTH", "page")
-    table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
-    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+    extract_text = (os.getenv("EXTRACT_TEXT") or "true").lower() == "true"
+    extract_tables = (os.getenv("EXTRACT_TABLES") or "true").lower() == "true"
+    extract_charts = (os.getenv("EXTRACT_CHARTS") or "true").lower() == "true"
+    extract_images = (os.getenv("EXTRACT_IMAGES") or "false").lower() == "true"
+    text_depth = os.getenv("TEXT_DEPTH") or "page"
+    table_output_format = os.getenv("TABLE_OUTPUT_FORMAT") or "markdown"
+    extract_infographics = (os.getenv("EXTRACT_INFOGRAPHICS") or "true").lower() == "true"
 
     # Logging configuration
-    log_path = _get_env("LOG_PATH", "test_results")
+    log_path = os.getenv("LOG_PATH") or "test_results"
 
     model_name, dense_dim = embed_info()
 
     # Get actual API version being used
     actual_api_version = os.environ.get("NV_INGEST_API_VERSION", "v1")
+    assert_v1_baseline = (os.getenv("ASSERT_V1_BASELINE") or "false").lower() == "true"
 
     # Log configuration for transparency
     print("=== Configuration ===")
@@ -96,6 +109,7 @@ def main() -> int:
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    print(f"Assert V1 baseline counts: {assert_v1_baseline}")
     print("==============================")
 
     ingestion_start = time.time()
@@ -124,13 +138,19 @@ def main() -> int:
             sparse=sparse,
             gpu_search=gpu_search,
             model_name=model_name,
-            purge_results_after_upload=False,
+            purge_results_after_upload=False,  # Leave chunks intact so the baseline assertions can run
         )
         .save_to_disk(output_directory=spill_dir)
     )
 
     results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
     ingestion_time = time.time() - ingestion_start
+    if not results:
+        raise AssertionError("Ingestion returned zero results; expected at least one chunk.")
+
+    if failures:
+        raise AssertionError(f"Ingestion produced {len(failures)} failures: {failures}")
+
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
@@ -144,12 +164,16 @@ def main() -> int:
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)
     text_results, table_results, chart_results = segment_results(results)
-    kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
-    kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)
-    kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
+    text_chunk_count = sum(len(x) for x in text_results)
+    table_chunk_count = sum(len(x) for x in table_results)
+    chart_chunk_count = sum(len(x) for x in chart_results)
+
+    kv_event_log("text_chunks", text_chunk_count, log_path)
+    kv_event_log("table_chunks", table_chunk_count, log_path)
+    kv_event_log("chart_chunks", chart_chunk_count, log_path)
 
     # Document-level analysis
-    if _get_env("DOC_ANALYSIS", "false").lower() == "true":
+    if (os.getenv("DOC_ANALYSIS") or "false").lower() == "true":
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
@@ -186,7 +210,7 @@ def main() -> int:
     kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
-    test_name = _get_env("TEST_NAME", "dc20_v2")
+    test_name = os.getenv("TEST_NAME") or "dc20_v2"
     summary = {
         "test_name": test_name,
         "api_version": "v2",
@@ -200,32 +224,30 @@ def main() -> int:
         "ingestion_time_s": ingestion_time,
         "result_count": len(results),
         "failure_count": len(failures),
-        "text_chunks": sum(len(x) for x in text_results),
-        "table_chunks": sum(len(x) for x in table_results),
-        "chart_chunks": sum(len(x) for x in chart_results),
+        "text_chunks": text_chunk_count,
+        "table_chunks": table_chunk_count,
+        "chart_chunks": chart_chunk_count,
         "dataset_pages": total_pages,
         "pages_per_second": pages_per_second if total_pages > 0 and ingestion_time > 0 else None,
+        "assert_v1_baseline": assert_v1_baseline,
     }
     print(f"\n{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
 
     # Compare with expected V1 results if available
-    print("\n=== V2 API Results ===")
-    print(f"Text chunks: {sum(len(x) for x in text_results)}")
-    print(f"Table chunks: {sum(len(x) for x in table_results)}")
-    print(f"Chart chunks: {sum(len(x) for x in chart_results)}")
+    if assert_v1_baseline:
+        expected_counts = _expected_counts_for_dataset(data_dir)
+        if not expected_counts:
+            raise AssertionError(
+                "ASSERT_V1_BASELINE is true but no baseline expectations are defined for this dataset."
+            )
 
-    # For dc20/bo20 dataset, expected values from V1:
-    # text: 496, tables: 164, charts: 184
-    if "bo20" in data_dir or "dc20" in data_dir:
-        print("\nExpected from V1 (bo20/dc20): text=496, tables=164, charts=184")
-        text_count = sum(len(x) for x in text_results)
-        table_count = sum(len(x) for x in table_results)
-        chart_count = sum(len(x) for x in chart_results)
-        if text_count == 496 and table_count == 164 and chart_count == 184:
-            print("✓ V2 results match V1 expected values!")
-        else:
-            print("✗ V2 results differ from V1 expected values")
+        actual_counts = {
+            "text": text_chunk_count,
+            "tables": table_chunk_count,
+            "charts": chart_chunk_count,
+        }
+        _assert_counts_match(expected_counts, actual_counts)
 
     return 0
 

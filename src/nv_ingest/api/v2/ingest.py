@@ -7,7 +7,6 @@ import asyncio
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple
 import base64
-import copy
 import json
 import logging
 import os
@@ -147,8 +146,18 @@ def _prepare_chunk_submission(
     start_page = chunk["start_page"]
     end_page = chunk["end_page"]
 
-    subjob_spec = copy.deepcopy(job_spec_template)
-    subjob_payload = subjob_spec.setdefault("job_payload", {})
+    subjob_spec = {
+        key: value
+        for key, value in job_spec_template.items()
+        if key not in {"job_payload", "job_id", "tracing_options"}
+    }
+
+    subjob_payload_template = job_spec_template.get("job_payload", {})
+    subjob_payload = {
+        key: value
+        for key, value in subjob_payload_template.items()
+        if key not in {"content", "source_id", "source_name"}
+    }
 
     chunk_bytes = chunk["bytes"]
     subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
@@ -159,13 +168,18 @@ def _prepare_chunk_submission(
 
     subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
     subjob_id = str(subjob_uuid)
+    subjob_spec["job_payload"] = subjob_payload
     subjob_spec["job_id"] = subjob_id
 
-    tracing_options = subjob_spec.setdefault("tracing_options", {"trace": True})
+    base_tracing_options = job_spec_template.get("tracing_options") or {}
+    tracing_options = dict(base_tracing_options)
+    tracing_options.setdefault("trace", True)
     tracing_options["trace_id"] = str(current_trace_id)
     tracing_options["ts_send"] = int(time.time() * 1000)
     tracing_options["parent_job_id"] = parent_job_id
     tracing_options["page_num"] = start_page
+
+    subjob_spec["tracing_options"] = tracing_options
 
     return subjob_id, MessageWrapper(payload=json.dumps(subjob_spec))
 
@@ -489,7 +503,7 @@ async def submit_job_v2(
 
                 # Split if the document has more pages than our chunk size
                 if page_count > pages_per_chunk:
-                    logger.info(
+                    logger.debug(
                         "Splitting PDF with %s pages into chunks of %s",
                         page_count,
                         pages_per_chunk,
@@ -499,10 +513,10 @@ async def submit_job_v2(
 
                     subjob_ids: List[str] = []
                     submission_tasks = []
-                    source_ids = job_payload.get("source_id", ["document.pdf"])
-                    source_names = job_payload.get("source_name", ["document.pdf"])
-                    original_source_id = source_ids[0] if source_ids else "document.pdf"
-                    original_source_name = source_names[0] if source_names else "document.pdf"
+                    source_ids = job_payload.get("source_id", ["unknown_source.pdf"])
+                    source_names = job_payload.get("source_name", ["unknown_source.pdf"])
+                    original_source_id = source_ids[0] if source_ids else "unknown_source.pdf"
+                    original_source_name = source_names[0] if source_names else "unknown_source.pdf"
 
                     try:
                         parent_uuid = uuid.UUID(parent_job_id)
@@ -646,7 +660,7 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
                     fetch_err_type = type(fetch_err).__name__
 
                     if isinstance(fetch_err, TimeoutError):
-                        logger.info(
+                        logger.debug(
                             f"Job {job_id} still processing (state: {current_state}), fetch attempt timed out cleanly."
                         )
                     else:
@@ -691,7 +705,7 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             subjob_ids = subjob_info.get("subjob_ids", [])
             metadata = subjob_info.get("metadata", {})
 
-            logger.info(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
+            logger.debug(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
 
             # Build ordered descriptors for subjobs
             ordered_descriptors: List[Dict[str, Any]] = []
