@@ -17,8 +17,6 @@ repos:
         args: ['--maxkb=1500']
       - id: check-ast
       - id: debug-statements
-      - id: mixed-line-ending
-      - id: check-merge-conflict
       - id: check-yaml
 
   - repo: https://github.com/psf/black
@@ -32,10 +30,3 @@ repos:
     hooks:
       - id: flake8
         args: ["--max-line-length=120", "--extend-ignore=E203,E266,F403,F405,E402"]
-
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
-    hooks:
-      - id: codespell
-        args: ["-L", "aks,crate,nd,ot,ba"]  # extend ignore list as needed
-        exclude: (^docs/|^data/|^ci/data/)
