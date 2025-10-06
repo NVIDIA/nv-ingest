@@ -67,7 +67,7 @@ def main() -> int:
     # UDF and LLM Summaries
     udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
     print(f"Path to User-Defined Function: {str(udf_path)}")
-    llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
+    llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", None)
 
     model_name, dense_dim = embed_info()
 
@@ -76,6 +76,7 @@ def main() -> int:
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
     print(f"Hostname: {hostname}")
+    print(f"LLM for Summarization: {model_name}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
     print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")

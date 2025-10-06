@@ -63,6 +63,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
 
+    # BUG: NOT WORKING
     - NVIDIA_API_KEY: (Required) The API key for authenticating with NVIDIA NIM endpoints.
     - LLM_SUMMARIZATION_MODEL: (Optional) The NIM model to use for summarization.
       default="nvidia/llama-3.1-nemotron-70b-instruct"
@@ -93,27 +94,25 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     log("UDF: Starting LLM content summarization")
 
-    # Get configuration from environment
-    api_key = os.getenv("NVIDIA_API_KEY", "")
-    # BUG: This doesn't work correctly. Env var set on client doesn't propagate to UDF on docker service
-    # model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
-
-    model_name = "nvdev/qwen/qwen3-next-80b-a3b-instruct"  # CHANGE ME!!!!
-
+    # BUG: This doesn't work as designed. Env var set on client doesn't propagate to UDF on docker service.
+    # I think this is a bug but let me know if you can confirm that it's working properly before and
+    # I introduced the bug.
+    api_key = os.getenv("NVIDIA_API_KEY")
+    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", "60"))
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", "50"))
     max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", "12000"))
 
-    if not api_key:
-        warn("NVIDIA_API_KEY not found, skipping summarization")
+    if api_key is None:
+        logger.error("NVIDIA_API_KEY not set. Skipping...")
         return control_message
 
     # Get the DataFrame payload
     df = control_message.payload()
 
     if df is None or len(df) == 0:
-        warn("No payload found in control message")
+        warn("No payload found in control message. Nothing to summarize.")
         return control_message
 
     log(f"Processing {len(df)} pages for LLM summarization")
@@ -124,16 +123,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     else:
         log("Document has only one page")
 
-    # Remove me
-    # df.to_csv("df.csv", index=False)
-    # Remove me
-
-    # Initialize OpenAI client with error handling
-    try:
-        client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
-    except Exception as e:
-        logger.error(f"Failed to initialize OpenAI client: {e}")
-        return control_message
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
 
     # Stats for reporting
     stats = {"processed": 0, "summarized": 0, "skipped": 0, "failed": 0, "tokens": 0}
@@ -192,19 +182,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         yaml.dump(experiment_stats, f, indent=2)
     ###### END
 
-    if summary is not None:
-        # _add_summary(df, summary, model_name)
-        stats["summarized"] += 1
-    else:
-        stats["failed"] += 1
-
-    log(
-        f"LLM summarization complete:\n"
-        f"\ttokens={stats['tokens']},\n"
-        f"\tduration={duration:.2f}s,\n"
-        f"\ttokens/s={(stats['tokens'] / duration):.2f}\n"
-        f"\tmodel={model_name}\n"
-    )
+    log(f"LLM summarization complete:\n" f"\tFailed={summary is None},\n" f"\tmodel={model_name}\n")
 
     # Update the control message with modified DataFrame
     # control_message.payload(df)
@@ -260,10 +238,10 @@ def _generate_summary(client, content: str, model_name: str) -> tuple[str | None
             return None, duration
 
     except Exception as e:
+        logger.error(f"API call failed: {e}")
         # TODO: GitHub Thread
         # Reviewers, tell me if this is a bad idea.
         # I think the convention is to return timestamp for time even if it fails
-        logger.error(f"API call failed: {e}")
         return None, time.time() - start_time
 
 
