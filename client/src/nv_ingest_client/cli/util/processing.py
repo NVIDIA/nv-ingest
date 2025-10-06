@@ -156,6 +156,8 @@ def process_response(response: Dict[str, Any], stage_elapsed_times: defaultdict)
     exit key is determined by replacing "entry" with "exit". The stage name is assumed to be the third element when
     splitting the key by "::".
     """
+    # print(json.dumps(response.get("trace", {}), indent=2))
+    # print(json.dumps(response.get("annotations", {}), indent=2))
     trace_data: Dict[str, Any] = response.get("trace", {})
     for key, entry_time in trace_data.items():
         if "entry" in key:
@@ -512,6 +514,14 @@ def create_and_process_jobs(
                     # Do not update progress bar if we're going to retry the job.
                     if not retry:
                         pbar.update(1)
+
+    # Print telemetry summary if supported
+    try:
+        if hasattr(client, "summarize_telemetry"):
+            summary = client.summarize_telemetry()
+            logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
+    except Exception:
+        pass
 
     return total_files, trace_times, total_pages_processed, trace_ids
 

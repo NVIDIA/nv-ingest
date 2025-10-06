@@ -308,7 +308,18 @@ class RestClient(MessageBrokerClientBase):
 
         retries: int = 0
         url: str = f"{self._base_url}{self._fetch_endpoint}/{job_id}"
-        req_timeout: Tuple[float, Optional[float]] = self._timeout
+        # Derive per-call timeout if provided; otherwise use default
+        if timeout is None:
+            req_timeout: Tuple[float, Optional[float]] = self._timeout
+        else:
+            if isinstance(timeout, tuple):
+                # Expect (connect, read)
+                connect_t = float(timeout[0])
+                read_t = None if (len(timeout) < 2 or timeout[1] is None) else float(timeout[1])
+                req_timeout = (connect_t, read_t)
+            else:
+                # Single float means override read timeout, keep a small connect timeout
+                req_timeout = (min(self._default_connect_timeout, 5.0), float(timeout))
 
         while True:
             result: Optional[Any] = None
