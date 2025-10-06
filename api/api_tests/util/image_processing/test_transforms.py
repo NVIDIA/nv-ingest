@@ -43,6 +43,15 @@ def corrupted_base64_image():
     return "not_a_valid_base64_string"
 
 
+# Fixture for a valid base64-encoded RGBA image string
+@pytest.fixture
+def valid_base64_rgba_image():
+    img = Image.new("RGBA", (64, 64), (255, 255, 255, 100))
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
 # Fixture for a base64 string that decodes but is not a valid image
 @pytest.fixture
 def non_image_base64():
@@ -216,6 +225,16 @@ def test_numpy_to_base64_grayscale_2d_array():
 
 
 # Tests for base64_to_numpy
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_base64_rgba_to_numpy_valid(valid_base64_rgba_image, format):
+    img_array = base64_to_numpy(valid_base64_rgba_image)
+    assert isinstance(img_array, np.ndarray)
+    assert img_array.shape[0] == 64  # Height
+    assert img_array.shape[1] == 64  # Width
+    assert img_array.shape[2] == 3  # channels
+    assert np.array_equal(img_array, base64_to_numpy(create_base64_image(64, 64)))  # Verify white background blend
+
+
 @pytest.mark.parametrize("format", ["PNG", "JPEG"])
 def test_base64_to_numpy_valid(valid_base64_image, format):
     img_array = base64_to_numpy(valid_base64_image)
