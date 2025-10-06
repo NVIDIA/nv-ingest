@@ -59,11 +59,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     - Configurable content length thresholds
     - Safe metadata manipulation preserving existing data
 
-    Environment Variable Argument Handling:
-
     These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
-
-    # BUG: NOT WORKING
     - NVIDIA_API_KEY: (Required) The API key for authenticating with NVIDIA NIM endpoints.
     - LLM_SUMMARIZATION_MODEL: (Optional) The NIM model to use for summarization.
       default="nvidia/llama-3.1-nemotron-70b-instruct"
@@ -94,9 +90,6 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
 
     log("UDF: Starting LLM content summarization")
 
-    # BUG: This doesn't work as designed. Env var set on client doesn't propagate to UDF on docker service.
-    # I think this is a bug but let me know if you can confirm that it's working properly before and
-    # I introduced the bug.
     api_key = os.getenv("NVIDIA_API_KEY")
     model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
