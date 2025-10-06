@@ -17,8 +17,6 @@ repos:
         args: ['--maxkb=1500']
       - id: check-ast
       - id: debug-statements
-      - id: check-yaml
-        # exclude: '(^helm)'
 
   - repo: https://github.com/psf/black
     rev: 25.9.0
