@@ -8,20 +8,15 @@ from typing import Dict
 from typing import Type
 from typing import Union
 
-from nv_ingest_client.primitives import Task
-from nv_ingest_client.primitives.tasks import (
-    TaskType,
-    CaptionTask,
-    DedupTask,
-    EmbedTask,
-    ExtractTask,
-    FilterTask,
-    SplitTask,
-    StoreEmbedTask,
-    StoreTask,
-    UDFTask,
-    is_valid_task_type,
-)
+from nv_ingest_client.primitives.tasks.task_base import Task, TaskType, is_valid_task_type
+from nv_ingest_client.primitives.tasks.caption import CaptionTask
+from nv_ingest_client.primitives.tasks.dedup import DedupTask
+from nv_ingest_client.primitives.tasks.embed import EmbedTask
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
+from nv_ingest_client.primitives.tasks.filter import FilterTask
+from nv_ingest_client.primitives.tasks.split import SplitTask
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTask, StoreTask
+from nv_ingest_client.primitives.tasks.udf import UDFTask
 
 
 class TaskUnimplemented(Task):
