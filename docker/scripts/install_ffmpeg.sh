@@ -31,7 +31,6 @@ apt-get update
 # Install video runtime libraries
 apt-get install -y \
     libmp3lame0 \
-    libopenh264-6 \
     libvpx7
 
 # Get a list of all currently installed packages
@@ -45,7 +44,6 @@ apt-get install -y \
     cmake \
     libtool \
     libmp3lame-dev \
-    libopenh264-dev \
     libvpx-dev \
     pkg-config \
     vainfo \
@@ -73,7 +71,6 @@ PATH="/usr/local/cuda/bin:$PATH" ./configure \
     --disable-static \
     --enable-shared \
     --enable-libmp3lame \
-    --enable-libopenh264 \
     --enable-libvpx \
     --disable-doc \
     --disable-debug
