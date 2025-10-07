@@ -58,46 +58,56 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     api_key = os.getenv("NVIDIA_API_KEY")
     model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", "60"))
-    min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", "50"))
-    max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", "12000"))
-    # Stats for reporting
-    stats = {"processed": 0, "summarized": 0, "skipped": 0, "failed": 0, "tokens": 0}
+    min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
+    max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
+    timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", 60))
 
-    if api_key is None:
+    stats = {
+        "processed": 0,
+        "summarized": 0,
+        "skipped": 0,
+        "failed": 0,
+        "tokens": 0,
+    }
+
+    if not api_key:
         logger.error("NVIDIA_API_KEY not set. Skipping...")
         return control_message
 
-    # Get the DataFrame payload
     df = control_message.payload()
 
-    if df is None or len(df) == 0:
+    if df is None or df.empty:
         logger.warning("No payload found. Nothing to summarize.")
         return control_message
 
     logger.info(f"Processing {len(df)} chunks for LLM summarization")
-    # Select first and last chunk for summarization
-    # TODO: add feature to select N first and last chunks
-    # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
-    # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select pages
-    # it must require parsing the payload to see which chunks correspond to which pages and then selecting from there
     if len(df) > 1:
+        # Select first and last chunk for summarization
+        # TODO: add feature to select N first and last chunks
+        # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
+        # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
+        # pages, it must require parsing the payload to see which chunks correspond to which pages and then selecting
+        # from there
         df = df.iloc[[0, -1]]
     else:
         logger.info("Document has only one chunk")
 
-    content_for_summary = ""
-    # Don't necessarily need to loop here. Should be able to get all content in one call for all pages.
-    # TODO: Should profile this if it necessary
-    for idx, row in df.iterrows():
-        stats["processed"] += 1
-        content = _extract_content(row)
+    # Combine all content into a single string
+    content = " ".join(
+        df.apply(
+            _extract_content,
+            axis=1,
+            min_content_length=min_content_length,
+            max_content_length=max_content_length,
+            stats=stats,
+        )
+    )
+    stats["tokens"] = _estimate_tokens(content)
+    summary, duration = _generate_llm_summary(content, model_name, base_url, api_key, timeout)
+    _store_summary(df, summary, model_name)
 
-    # Generate summary from combined content from document
-    stats["tokens"] = _estimate_tokens(content_for_summary)
-    summary, duration = _generate_llm_summary(content_for_summary, model_name, base_url, api_key, timeout)
-
-    ## REMOVE STORING
+    ###
+    ## REMOVE
     # Log the current directory
     logger.info(f"Current working directory: {os.getcwd()}")
 
@@ -112,7 +122,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Write the contents of for_randy as a YAML file named after the 'doc' field
     experiment_stats = {
         "doc": str(doc_name),
-        "prompt": PROMPT.format(content=content_for_summary),
+        "prompt": PROMPT.format(content=content),
         "tokens": stats["tokens"],
         "duration": duration,
         "tokens/s": stats["tokens"] / duration,
@@ -122,36 +132,30 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     with open(filename, "w") as f:
         logger.info(f"Dumping prompt to {filename}")
         yaml.dump(experiment_stats, f, indent=2)
-    ###### END
+    1  # END
+    ###
 
     logger.info(f"LLM summarization complete:\n" f"\tFailed={summary is None},\n" f"\tmodel={model_name}\n")
 
     # Update the control message with modified DataFrame
-    # control_message.payload(df)
+    control_message.payload(df)
     return control_message
 
 
-def _extract_content(row, min_content_length: int, max_content_length: int) -> str:
+def _extract_content(row, min_content_length: int, max_content_length: int, stats: dict) -> str:
     """Extract text content from row"""
-    logger.info(f"Extracting content from row: \n\n{row}\n\n")
     metadata = row.get("metadata")
 
-    if metadata is not None and isinstance(metadata, dict):
+    if isinstance(metadata, dict):
         content = metadata.get("content")
-
         if content is not None:
             content = content.strip()
             if len(content) < min_content_length:
                 stats["skipped"] += 1
                 logger.warning(f"Content less than min={min_content_length}. Skipping...")
-                continue
             elif len(content) > max_content_length:
-                logger.warning(
-                    f"Page {idx}: Content exceeds max length." f"Truncating content to {max_content_length} characters"
-                )
+                logger.warning(f"Truncating content to {max_content_length} characters")
                 content = content[:max_content_length]
-
-            content_for_summary += content
         else:
             stats["skipped"] += 1
 
@@ -183,8 +187,7 @@ def _generate_llm_summary(
         if completion.choices:
             summary = completion.choices[0].message.content.strip()
             return summary, duration
-        else:
-            return None, duration
+        return None, duration
 
     except Exception as e:
         logger.error(f"API call failed: {e}")
@@ -194,22 +197,19 @@ def _generate_llm_summary(
         return None, time.time() - start_time
 
 
-def _add_summary(df, summary: str, model_name: str):
+def _store_summary(df, summary: str, model_name: str):
     """Add summary to metadata and store in df"""
-    try:
-        # TODO: INCOMPLETE
-        logger.info("Adding summary to df...")
-        # metadata["custom_content"]["llm_summary"] = {"summary": summary, "model": model_name}
+    # hardcoded heuristic to store everything on chunk 0's metadata
+    row_0 = df.iloc[0]
 
-        # # Update the DataFrame at the specific index
-        # try:
-        #     df.at[idx, "metadata"] = metadata
-        # except Exception:
-        #     # Alternative approach: update the original row reference
-        #     df.iloc[idx]["metadata"] = metadata
+    # this is a reference to a dictionary that is stored in the dataframe
+    # and is modified in place
+    metadata = row_0.get("metadata")
 
-    except Exception as e:
-        logger.error(e)
+    logger.info("Adding summary to row 0")
+    if metadata.get("custom_content") is None:
+        metadata["custom_content"] = {}
+    metadata["custom_content"]["llm_summarizer_udf"] = {"summary": summary, "model": model_name}
 
 
 def _estimate_tokens(text: str) -> int:
