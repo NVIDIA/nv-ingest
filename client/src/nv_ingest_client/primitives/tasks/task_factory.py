@@ -8,18 +8,20 @@ from typing import Dict
 from typing import Type
 from typing import Union
 
-from .caption import CaptionTask
-from .dedup import DedupTask
-from .embed import EmbedTask
-from .extract import ExtractTask
-from .filter import FilterTask
-from .split import SplitTask
-from .store import StoreEmbedTask
-from .store import StoreTask
-from .task_base import Task
-from .task_base import TaskType
-from .task_base import is_valid_task_type
-from .udf import UDFTask
+from nv_ingest_client.primitives import Task
+from nv_ingest_client.primitives.tasks import (
+    TaskType,
+    CaptionTask,
+    DedupTask,
+    EmbedTask,
+    ExtractTask,
+    FilterTask,
+    SplitTask,
+    StoreEmbedTask,
+    StoreTask,
+    UDFTask,
+    is_valid_task_type,
+)
 
 
 class TaskUnimplemented(Task):
