@@ -251,3 +251,59 @@ def test_click_match_and_validate_files_not_found():
     with patch(f"{MODULE_UNDER_TEST}.generate_matching_files", return_value=iter([])):
         result = click_match_and_validate_files(None, None, ["*.txt"])
         assert result == []
+
+
+def test_convert_string_booleans_basic_variants():
+    data = {
+        "t1": "true",
+        "t2": " TRUE ",
+        "t3": "Yes",
+        "t4": " y ",
+        "t5": "ON",
+        "f1": "false",
+        "f2": " FALSE ",
+        "f3": "No",
+        "f4": " n ",
+        "f5": "off",
+        "n1": "notabool",
+        "n2": 123,
+    }
+    out = module_under_test.convert_string_booleans(data)
+    assert out["t1"] is True
+    assert out["t2"] is True
+    assert out["t3"] is True
+    assert out["t4"] is True
+    assert out["t5"] is True
+    assert out["f1"] is False
+    assert out["f2"] is False
+    assert out["f3"] is False
+    assert out["f4"] is False
+    assert out["f5"] is False
+    assert out["n1"] == "notabool"
+    assert out["n2"] == 123
+
+
+def test_convert_string_booleans_nested_structures():
+    data = {
+        "list": [" true ", {"inner": "OFF", "arr": ["1", "no", "foo"]}],
+        "tuple": ("Y", "False"),
+        "dict": {"a": "on", "b": "0", "c": "maybe"},
+    }
+    out = module_under_test.convert_string_booleans(data)
+    assert out["list"][0] is True
+    assert out["list"][1]["inner"] is False
+    assert out["list"][1]["arr"][0] is True
+    assert out["list"][1]["arr"][1] is False
+    assert out["list"][1]["arr"][2] == "foo"
+    assert isinstance(out["tuple"], tuple) and out["tuple"][0] is True and out["tuple"][1] is False
+    assert out["dict"]["a"] is True
+    assert out["dict"]["b"] is False
+    assert out["dict"]["c"] == "maybe"
+
+
+def test_parse_task_options_applies_boolean_conversion():
+    options_str = '{"structured": "true", "images": "0", "params": {"flag": "Yes"}}'
+    opts = module_under_test.parse_task_options("store", options_str)
+    assert opts["structured"] is True
+    assert opts["images"] is False
+    assert opts["params"]["flag"] is True

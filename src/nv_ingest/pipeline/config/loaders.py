@@ -10,10 +10,11 @@ runtime overrides to pipeline configurations, replacing imperative inline logic.
 """
 
 import logging
+import os
 import yaml
 from typing import Optional
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
 from nv_ingest.pipeline.default_libmode_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
 from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_PIPELINE_YAML
 from nv_ingest.framework.orchestration.execution.options import PipelineRuntimeOverrides
@@ -193,6 +194,88 @@ def validate_pipeline_config(config: Optional[PipelineConfigSchema]) -> Pipeline
     return config
 
 
+def resolve_framework_type(
+    config: PipelineConfigSchema,
+    libmode: bool,
+    env: Optional[dict] = None,
+) -> PipelineFrameworkType:
+    """
+    Resolve the execution framework in a single place and log the decision source.
+
+    Rules:
+    - If config.pipeline.framework.type is set: use it
+    - Else default to 'python' when libmode=True, else 'ray'
+    - If libmode=True and resolved is 'ray': raise ValueError with guidance
+    """
+    env = env or os.environ
+    # Prefer explicit config value
+    try:
+        cfg_type = config.pipeline.framework.type
+    except Exception:
+        cfg_type = None
+
+    if cfg_type is None:
+        resolved = PipelineFrameworkType.PYTHON if libmode else PipelineFrameworkType.RAY
+        source = "default(libmode)" if libmode else "default(service)"
+    else:
+        resolved = cfg_type
+        source = "config"
+
+    if libmode and resolved == PipelineFrameworkType.RAY:
+        raise ValueError(
+            "Libmode does not support the Ray framework. "
+            "Set pipeline.framework.type to 'python' (or INGEST_SERVICE_FRAMEWORK=python) "
+            "or use the Ray service pipeline."
+        )
+
+    logger.info(f"Resolved framework: {resolved.value} (source={source})")
+    return resolved
+
+
+def enforce_broker_interface_policy(
+    config: PipelineConfigSchema, framework: PipelineFrameworkType
+) -> PipelineConfigSchema:
+    """
+    Enforce minimal broker interface policy for the selected framework.
+    - Ray: override any 'direct' interface to 'socket' at pipeline-level service_broker and per-stage broker_client.
+    - Python: no changes.
+    """
+    if framework != PipelineFrameworkType.RAY:
+        return config
+
+    try:
+        svc_broker = getattr(getattr(config, "pipeline", None), "service_broker", None)
+        if svc_broker is not None:
+            broker_client = getattr(svc_broker, "broker_client", None)
+            if isinstance(broker_client, dict):
+                iface = str(broker_client.get("interface_type", "")).strip().lower()
+                if iface == "direct":
+                    logger.warning(
+                        "Ray framework: overriding pipeline.service_broker.broker_client.interface_type 'direct' "
+                        "-> 'socket'"
+                    )
+                    broker_client["interface_type"] = "socket"
+                    svc_broker.broker_client = broker_client
+
+        for stage in config.stages:
+            cfg = getattr(stage, "config", None) or {}
+            if isinstance(cfg, dict) and "broker_client" in cfg:
+                bcfg = cfg.get("broker_client") or {}
+                iface = str(bcfg.get("interface_type", "")).strip().lower()
+                if iface == "direct":
+                    logger.warning(
+                        "Ray framework: overriding stage '%s' broker_client.interface_type 'direct' -> 'socket'",
+                        stage.name,
+                    )
+                    bcfg["interface_type"] = "socket"
+                    cfg["broker_client"] = bcfg
+                    stage.config = cfg
+    except Exception:
+        logger.debug("Broker interface policy enforcement encountered a non-fatal issue", exc_info=True)
+
+    return config
+
+
 def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], libmode: bool) -> PipelineConfigSchema:
     """
     Resolve the final pipeline configuration from inputs.
@@ -219,10 +302,31 @@ def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], lib
     ValueError
         If no config provided and libmode=False.
     """
+    # If caller supplied a config, validate the framework compatibility for libmode
     if provided_config is not None:
+        if libmode:
+            try:
+                framework_type = provided_config.pipeline.framework.type
+            except Exception:
+                framework_type = PipelineFrameworkType.RAY  # default
+            if framework_type == PipelineFrameworkType.RAY:
+                raise ValueError(
+                    "Libmode does not support the Ray framework. "
+                    "Either set pipeline.framework.type to 'python' (e.g., INGEST_SERVICE_FRAMEWORK=python) "
+                    "or run using the service (Ray) pipeline instead."
+                )
         return provided_config
 
+    # No config provided: load default based on libmode flag
     if libmode:
+        # Early environment guard: if user forces Ray for libmode, fail early with guidance
+        env_framework = (os.environ.get("INGEST_SERVICE_FRAMEWORK") or "").strip().lower()
+        if env_framework == PipelineFrameworkType.RAY.value:
+            raise ValueError(
+                "Libmode does not support the Ray framework. "
+                "Detected INGEST_SERVICE_FRAMEWORK=ray. "
+                "Please set INGEST_SERVICE_FRAMEWORK=python (default) for libmode, or launch the service pipeline."
+            )
         return load_default_libmode_config()
     else:
         # For non-libmode, fall back to embedded default pipeline implementation

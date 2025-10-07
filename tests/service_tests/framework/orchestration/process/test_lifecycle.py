@@ -6,275 +6,206 @@ import pytest
 from unittest.mock import Mock, patch
 
 from nv_ingest.framework.orchestration.process.lifecycle import PipelineLifecycleManager
-from nv_ingest.framework.orchestration.process.strategies import ProcessExecutionStrategy
+from nv_ingest.framework.orchestration.process.strategies import ProcessExecutionStrategy, SubprocessStrategy
 from nv_ingest.framework.orchestration.execution.options import ExecutionOptions, ExecutionResult
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 
 
 class TestPipelineLifecycleManager:
-    """Test suite for PipelineLifecycleManager class."""
+    """Tests for PipelineLifecycleManager behavior with broker and strategies."""
 
-    def test_init_with_strategy(self):
-        """Test PipelineLifecycleManager initialization with strategy."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
+    def test_init_preserves_strategy(self):
+        """Manager should keep the provided strategy reference."""
+        s = Mock(spec=ProcessExecutionStrategy)
+        m = PipelineLifecycleManager(s)
+        assert m.strategy is s
 
-        # Execute
-        manager = PipelineLifecycleManager(mock_strategy)
+    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker_inthread")
+    def test_start_with_broker_enabled_inprocess_thread(self, mock_start_thread, monkeypatch):
+        """When broker enabled and not using SubprocessStrategy, start in-thread by default."""
+        # Clear env gates
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_THREAD", raising=False)
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_SUBPROCESS", raising=False)
 
-        # Verify
-        assert manager.strategy is mock_strategy
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
+        opts = ExecutionOptions(block=True)
+        strategy.execute.return_value = ExecutionResult(interface=Mock(), elapsed_time=1.0)
 
-    def test_init_parameter_validation(self):
-        """Test initialization parameter validation."""
-        # Test with None strategy - should work but may cause issues later
-        manager = PipelineLifecycleManager(None)
-        assert manager.strategy is None
+        m = PipelineLifecycleManager(strategy)
+        res = m.start(cfg, opts)
 
-        # Test with non-strategy object - should work but may cause issues later
-        manager = PipelineLifecycleManager("not_a_strategy")
-        assert manager.strategy == "not_a_strategy"
-
-    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_start_with_broker_enabled(self, mock_start_broker):
-        """Test start method with message broker enabled."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
-        mock_options = Mock(spec=ExecutionOptions)
-        mock_result = Mock(spec=ExecutionResult)
-
-        mock_strategy.execute.return_value = mock_result
-        mock_broker_process = Mock()
-        mock_start_broker.return_value = mock_broker_process
-
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Execute
-        result = manager.start(mock_config, mock_options)
-
-        # Verify
-        assert result is mock_result
-        mock_start_broker.assert_called_once_with({})
-        mock_strategy.execute.assert_called_once_with(mock_config, mock_options)
+        assert isinstance(res, ExecutionResult)
+        mock_start_thread.assert_called_once_with({})
+        strategy.execute.assert_called_once_with(cfg, opts)
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_start_with_broker_disabled(self, mock_start_broker):
-        """Test start method with message broker disabled."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
-        mock_options = Mock(spec=ExecutionOptions)
-        mock_result = Mock(spec=ExecutionResult)
+    def test_start_with_broker_enabled_process_launch(self, mock_start_proc, monkeypatch):
+        """Force process launch with NV_INGEST_BROKER_IN_THREAD=0."""
+        monkeypatch.setenv("NV_INGEST_BROKER_IN_THREAD", "0")
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_SUBPROCESS", raising=False)
 
-        mock_strategy.execute.return_value = mock_result
+        strategy = Mock(spec=ProcessExecutionStrategy)  # not subprocess
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
+        opts = ExecutionOptions(block=False)
+        strategy.execute.return_value = ExecutionResult(interface=None, elapsed_time=2.0)
 
-        manager = PipelineLifecycleManager(mock_strategy)
+        m = PipelineLifecycleManager(strategy)
+        res = m.start(cfg, opts)
 
-        # Execute
-        result = manager.start(mock_config, mock_options)
-
-        # Verify
-        assert result is mock_result
-        mock_start_broker.assert_not_called()
-        mock_strategy.execute.assert_called_once_with(mock_config, mock_options)
+        assert isinstance(res, ExecutionResult)
+        mock_start_proc.assert_called_once_with({})
+        strategy.execute.assert_called_once_with(cfg, opts)
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_start_strategy_execution_failure(self, mock_start_broker):
-        """Test start method when strategy execution fails."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
-        mock_options = Mock(spec=ExecutionOptions)
+    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker_inthread")
+    def test_start_with_broker_enabled_subprocess_defers(self, mock_start_thread, mock_start_proc, monkeypatch):
+        """If strategy is SubprocessStrategy, broker launch defers to child via env gate."""
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_THREAD", raising=False)
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_SUBPROCESS", raising=False)
 
-        mock_strategy.execute.side_effect = RuntimeError("Strategy failed")
+        strategy = Mock(spec=SubprocessStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
+        opts = ExecutionOptions(block=True)
+        strategy.execute.return_value = ExecutionResult(interface=None, elapsed_time=3.0)
 
-        manager = PipelineLifecycleManager(mock_strategy)
+        m = PipelineLifecycleManager(strategy)
+        res = m.start(cfg, opts)
 
-        # Execute and verify exception
-        with pytest.raises(RuntimeError, match="Pipeline startup failed: Strategy failed"):
-            manager.start(mock_config, mock_options)
+        assert isinstance(res, ExecutionResult)
+        mock_start_thread.assert_not_called()
+        mock_start_proc.assert_not_called()
+        strategy.execute.assert_called_once_with(cfg, opts)
 
-        mock_strategy.execute.assert_called_once_with(mock_config, mock_options)
+    def test_start_with_broker_disabled(self):
+        """No broker launches when disabled."""
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=False, broker_client={})
+        opts = ExecutionOptions(block=False)
+        strategy.execute.return_value = ExecutionResult(interface=None, elapsed_time=0.5)
 
-    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_start_broker_setup_failure(self, mock_start_broker):
-        """Test start method when broker setup fails."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
-        mock_options = Mock(spec=ExecutionOptions)
+        m = PipelineLifecycleManager(strategy)
+        res = m.start(cfg, opts)
+        assert isinstance(res, ExecutionResult)
+        strategy.execute.assert_called_once_with(cfg, opts)
 
-        mock_start_broker.side_effect = Exception("Broker setup failed")
+    def test_start_wraps_execute_error(self):
+        """Exceptions from strategy.execute are wrapped in RuntimeError with message."""
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=False, broker_client={})
+        opts = ExecutionOptions(block=True)
+        strategy.execute.side_effect = RuntimeError("boom")
 
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Execute and verify exception
-        with pytest.raises(RuntimeError, match="Pipeline startup failed: Broker setup failed"):
-            manager.start(mock_config, mock_options)
-
-        mock_start_broker.assert_called_once_with({})
-        mock_strategy.execute.assert_not_called()
-
-    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_start_return_value_passthrough(self, mock_start_broker):
-        """Test that start method passes through strategy execution result."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
-        mock_options = Mock(spec=ExecutionOptions)
-
-        # Create specific result to verify passthrough
-        expected_result = ExecutionResult(interface=Mock(), elapsed_time=42.5)
-        mock_strategy.execute.return_value = expected_result
-
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Execute
-        result = manager.start(mock_config, mock_options)
-
-        # Verify exact result passthrough
-        assert result is expected_result
-        assert result.elapsed_time == 42.5
-
-    def test_start_parameter_validation(self):
-        """Test start method parameter validation."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Test with None config - should raise RuntimeError wrapping AttributeError
-        with pytest.raises(
-            RuntimeError, match="Pipeline startup failed: 'NoneType' object has no attribute 'pipeline'"
-        ):
-            manager.start(None, Mock(spec=ExecutionOptions))
-
-        # Test with None options - configure strategy to fail when passed None
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
-
-        mock_strategy.execute.side_effect = AttributeError("'NoneType' object has no attribute 'block'")
-
-        with pytest.raises(RuntimeError, match="Pipeline startup failed: 'NoneType' object has no attribute 'block'"):
-            manager.start(mock_config, None)
+        m = PipelineLifecycleManager(strategy)
+        with pytest.raises(RuntimeError, match="Pipeline startup failed: boom"):
+            m.start(cfg, opts)
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_setup_message_broker_private_method(self, mock_start_broker):
-        """Test _setup_message_broker private method behavior."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        manager = PipelineLifecycleManager(mock_strategy)
+    def test_stop_terminates_broker_process(self, mock_start_proc, monkeypatch):
+        """stop() should terminate a previously started broker process."""
+        # Arrange a running proc
+        proc = Mock()
+        proc.is_alive.return_value = True
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        m = PipelineLifecycleManager(strategy)
+        m._broker_process = proc
 
-        # Test with broker enabled
-        mock_config_enabled = Mock()
-        mock_config_enabled.pipeline = Mock()
-        mock_config_enabled.pipeline.launch_simple_broker = True
+        # Act
+        m.stop()
 
-        manager._setup_message_broker(mock_config_enabled)
-        mock_start_broker.assert_called_once_with({})
+        # Assert
+        proc.terminate.assert_called_once()
 
-        # Reset and test with broker disabled
-        mock_start_broker.reset_mock()
-        mock_config_disabled = Mock()
-        mock_config_disabled.pipeline = Mock()
-        mock_config_disabled.pipeline.launch_simple_broker = False
+    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
+    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker_inthread")
+    def test_setup_message_broker_respects_env_deferral(self, mock_start_thread, mock_start_proc, monkeypatch):
+        """_setup_message_broker should defer when NV_INGEST_BROKER_IN_SUBPROCESS=1 is set."""
+        monkeypatch.setenv("NV_INGEST_BROKER_IN_SUBPROCESS", "1")
+        strategy = Mock(spec=SubprocessStrategy)
+        m = PipelineLifecycleManager(strategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
 
-        manager._setup_message_broker(mock_config_disabled)
-        mock_start_broker.assert_not_called()
+        m._setup_message_broker(cfg)
+        mock_start_thread.assert_not_called()
+        mock_start_proc.assert_not_called()
 
 
 class TestPipelineLifecycleManagerIntegration:
-    """Integration tests for PipelineLifecycleManager."""
+    """Integration-ish tests for complete lifecycle flows."""
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_complete_lifecycle_with_broker(self, mock_start_broker):
-        """Test complete pipeline lifecycle with broker."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
-        mock_options = ExecutionOptions(block=True)
+    def test_complete_lifecycle_with_broker_process(self, mock_start_broker, monkeypatch):
+        """End-to-end: with NV_INGEST_BROKER_IN_THREAD=0, process path is used and strategy runs."""
+        monkeypatch.setenv("NV_INGEST_BROKER_IN_THREAD", "0")
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
+        opts = ExecutionOptions(block=True)
+        expected = ExecutionResult(interface=None, elapsed_time=10.0)
+        strategy.execute.return_value = expected
 
-        mock_broker_process = Mock()
-        mock_start_broker.return_value = mock_broker_process
-
-        expected_result = ExecutionResult(interface=None, elapsed_time=30.0)
-        mock_strategy.execute.return_value = expected_result
-
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Execute complete lifecycle
-        result = manager.start(mock_config, mock_options)
-
-        # Verify complete flow
+        m = PipelineLifecycleManager(strategy)
+        result = m.start(cfg, opts)
         mock_start_broker.assert_called_once_with({})
-        mock_strategy.execute.assert_called_once_with(mock_config, mock_options)
-        assert result is expected_result
+        strategy.execute.assert_called_once_with(cfg, opts)
+        assert result is expected
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
     def test_complete_lifecycle_without_broker(self, mock_start_broker):
-        """Test complete pipeline lifecycle without broker."""
-        # Setup
-        mock_strategy = Mock(spec=ProcessExecutionStrategy)
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = False
-        mock_options = ExecutionOptions(block=False)
+        """End-to-end: disabled broker should not be started and strategy executes."""
+        strategy = Mock(spec=ProcessExecutionStrategy)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=False, broker_client={})
+        opts = ExecutionOptions(block=False)
+        expected = ExecutionResult(interface=None, elapsed_time=5.0)
+        strategy.execute.return_value = expected
 
-        expected_result = ExecutionResult(interface=Mock(), elapsed_time=None)
-        mock_strategy.execute.return_value = expected_result
-
-        manager = PipelineLifecycleManager(mock_strategy)
-
-        # Execute complete lifecycle
-        result = manager.start(mock_config, mock_options)
-
-        # Verify complete flow
+        m = PipelineLifecycleManager(strategy)
+        result = m.start(cfg, opts)
         mock_start_broker.assert_not_called()
-        mock_strategy.execute.assert_called_once_with(mock_config, mock_options)
-        assert result is expected_result
+        strategy.execute.assert_called_once_with(cfg, opts)
+        assert result is expected
 
+    @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker_inthread")
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_multiple_manager_instances(self, mock_start_broker):
-        """Test multiple lifecycle manager instances."""
-        # Setup
+    def test_multiple_manager_instances(self, mock_start_proc, mock_start_thread, monkeypatch):
+        """Multiple managers should each launch a broker once (thread or process)."""
+        # Ensure no subprocess deferral
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_SUBPROCESS", raising=False)
+        # Do not force thread or process; allow policy to choose
+        monkeypatch.delenv("NV_INGEST_BROKER_IN_THREAD", raising=False)
+
         strategies = [Mock(spec=ProcessExecutionStrategy) for _ in range(3)]
         managers = [PipelineLifecycleManager(strategy) for strategy in strategies]
 
-        mock_config = Mock()
-        mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
-        mock_options = Mock(spec=ExecutionOptions)
+        cfg = Mock()
+        cfg.pipeline = Mock()
+        cfg.pipeline.service_broker = Mock(enabled=True, broker_client={})
+        opts = Mock(spec=ExecutionOptions)
 
-        mock_broker_process = Mock()
-        mock_start_broker.return_value = mock_broker_process
+        # Each manager returns a distinct result
+        for i, s in enumerate(strategies):
+            s.execute.return_value = ExecutionResult(interface=Mock(), elapsed_time=float(i * 10))
 
-        # Execute with each manager
-        results = []
-        for i, manager in enumerate(managers):
-            expected_result = ExecutionResult(interface=Mock(), elapsed_time=float(i * 10))
-            strategies[i].execute.return_value = expected_result
+        results = [m.start(cfg, opts) for m in managers]
 
-            result = manager.start(mock_config, mock_options)
-            results.append(result)
-
-        # Verify each manager worked independently
         assert len(results) == 3
-        assert mock_start_broker.call_count == 3
-        for i, strategy in enumerate(strategies):
-            strategy.execute.assert_called_once_with(mock_config, mock_options)
+        total_starts = mock_start_proc.call_count + mock_start_thread.call_count
+        assert total_starts == 3
 
     def test_manager_with_different_strategy_types(self):
         """Test manager works with different strategy implementations."""
@@ -295,19 +226,24 @@ class TestPipelineLifecycleManagerIntegration:
 
     @patch("nv_ingest.framework.orchestration.process.lifecycle.logger")
     @patch("nv_ingest.framework.orchestration.process.lifecycle.start_simple_message_broker")
-    def test_logging_behavior(self, mock_start_broker, mock_logger):
+    def test_logging_behavior(self, mock_start_broker, mock_logger, monkeypatch):
         """Test that appropriate logging occurs during lifecycle management."""
         # Setup
         mock_strategy = Mock(spec=ProcessExecutionStrategy)
         mock_config = Mock()
         mock_config.pipeline = Mock()
-        mock_config.pipeline.launch_simple_broker = True
+        sb = Mock()
+        sb.enabled = True
+        sb.broker_client = {}
+        mock_config.pipeline.service_broker = sb
         mock_options = Mock(spec=ExecutionOptions)
 
         mock_broker_process = Mock()
         mock_start_broker.return_value = mock_broker_process
         mock_strategy.execute.return_value = ExecutionResult(interface=Mock(), elapsed_time=None)
 
+        # Force process path to avoid in-thread real server binding during test
+        monkeypatch.setenv("NV_INGEST_BROKER_IN_THREAD", "0")
         manager = PipelineLifecycleManager(mock_strategy)
 
         # Execute

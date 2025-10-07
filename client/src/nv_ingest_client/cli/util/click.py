@@ -158,6 +158,53 @@ TaskType = Union[
 ]
 
 
+def convert_string_booleans(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert string boolean-like values to actual booleans in a (possibly nested) dictionary.
+
+    Robust handling includes, case-insensitively and with surrounding whitespace ignored:
+    - Truthy:  "true", "1", "yes", "y", "on"
+    - Falsey:  "false", "0", "no", "n", "off"
+
+    The function recurses into nested dictionaries and lists.
+
+    Parameters
+    ----------
+    data : Dict[str, Any]
+        Dictionary that may contain string boolean values, including nested structures.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary with string boolean-like values converted to actual booleans.
+    """
+
+    truthy = {"true", "1", "yes", "y", "on"}
+    falsey = {"false", "0", "no", "n", "off"}
+
+    def _convert(value: Any) -> Any:
+        # Strings: normalize and map if in known sets
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in truthy:
+                return True
+            if normalized in falsey:
+                return False
+            return value
+        # Dicts: recurse per key
+        if isinstance(value, dict):
+            return {k: _convert(v) for k, v in value.items()}
+        # Lists/Tuples: recurse per element (preserve type)
+        if isinstance(value, list):
+            return [_convert(v) for v in value]
+        if isinstance(value, tuple):
+            return tuple(_convert(v) for v in value)
+        # Other types unchanged
+        return value
+
+    return {k: _convert(v) for k, v in data.items()}
+
+
 def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:
     """
     Parse the task options string as JSON.
@@ -182,30 +229,7 @@ def parse_task_options(task_id: str, options_str: str) -> Dict[str, Any]:
     """
     try:
         options = json.loads(options_str)
-
-        # Convert string boolean values to actual booleans for extract tasks
-        if task_id == "extract":
-            boolean_fields = [
-                "extract_text",
-                "extract_images",
-                "extract_tables",
-                "extract_charts",
-                "extract_infographics",
-                "extract_page_as_image",
-            ]
-            for field in boolean_fields:
-                if field in options:
-                    value = options[field]
-                    if isinstance(value, str):
-                        if value.lower() in ("true", "1", "yes", "on"):
-                            options[field] = True
-                        elif value.lower() in ("false", "0", "no", "off"):
-                            options[field] = False
-                        else:
-                            raise ValueError(
-                                f"Invalid boolean value for {field}: '{value}'. Use true/false, 1/0, yes/no, or on/off."
-                            )
-
+        options = convert_string_booleans(options)
         return options
     except json.JSONDecodeError as e:
         error_message = (

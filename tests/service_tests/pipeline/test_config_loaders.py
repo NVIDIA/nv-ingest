@@ -27,7 +27,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -42,7 +42,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -59,7 +59,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -91,7 +92,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -106,7 +107,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       auth_token: $TEST_TOKEN|""
     replicas:
@@ -123,7 +124,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -158,7 +160,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -173,7 +175,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       service_name: $SERVICE_NAME|"default-service"
       endpoint_url: $ENDPOINT_URL|'http://localhost:8000'
@@ -192,7 +194,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -216,7 +219,7 @@ stages:
   - name: "source_stage"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       broker_client:
         client_type: "redis"
@@ -231,7 +234,7 @@ stages:
   - name: "pdf_extractor"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
@@ -256,7 +259,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: $DISABLE_SCALING|false
   dynamic_memory_threshold: $MEMORY_THRESHOLD|0.75
-  launch_simple_broker: true
+  service_broker:
+    enabled: true
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -286,7 +290,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1
       param2: [invalid, yaml, syntax
@@ -302,7 +306,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_yaml_content)
@@ -325,7 +330,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       endpoints: [$ENDPOINT1|"service1:8001", $ENDPOINT2|"service2:8002"]
     replicas:
@@ -340,7 +345,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_content)
@@ -362,7 +368,7 @@ description: "A test pipeline configuration"
 stages:
   - name: "test_stage"
     type: "stage"
-    # Missing required phase and actor
+    # Missing required phase and stage_impl
     config:
       param1: "value1"
     replicas:
@@ -377,7 +383,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_schema_content)
@@ -398,7 +405,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -426,7 +433,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"
     replicas:
@@ -441,7 +448,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: "not_a_boolean"  # Should be bool
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_types_content)
@@ -475,7 +483,7 @@ stages:
   - name: "test_stage"  # This is a test stage
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param1: "value1"  # Test parameter
     replicas:
@@ -490,7 +498,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false  # Dynamic scaling setting
   dynamic_memory_threshold: 0.8   # Memory threshold
-  launch_simple_broker: false     # Broker launch setting
+  service_broker:
+    enabled: false     # Broker launch setting
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(config_with_comments)
@@ -516,7 +525,7 @@ stages:
   - name: "stage1"
     type: "source"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
     config:
       param1: "value1"
     replicas:
@@ -526,7 +535,7 @@ stages:
   - name: "stage2"
     type: "stage"
     phase: 1
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param2: "value2"
     replicas:
@@ -536,7 +545,7 @@ stages:
   - name: "stage3"
     type: "stage"
     phase: 2
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       param3: "value3"
     replicas:
@@ -554,7 +563,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(multi_stage_config)
@@ -581,7 +591,7 @@ stages:
   - name: "complex_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       database:
         host: $DB_HOST|"localhost"
@@ -609,7 +619,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(nested_config)
@@ -647,7 +658,7 @@ stages:
   - name: "pdf_extractor"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       pdfium_config:
         auth_token: $NGC_API_KEY|""
@@ -694,7 +705,7 @@ pipeline:
                     assert nemo_config["auth_token"] == "test-key"
                     assert nemo_config["model_name"] == "nvidia/nemoretriever-parse"
 
-                    assert config.pipeline.launch_simple_broker == True
+                    assert config.pipeline.service_broker.enabled is True
             finally:
                 os.unlink(f.name)
 
@@ -707,7 +718,7 @@ stages:
   - name: "test_stage"
     type: "stage"
     phase: 0
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    stage_impl: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
       string_value: "hello"
       int_value: 42
@@ -730,7 +741,8 @@ edges:
 pipeline:
   disable_dynamic_scaling: false
   dynamic_memory_threshold: 0.8
-  launch_simple_broker: false
+  service_broker:
+    enabled: false
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(special_types_config)

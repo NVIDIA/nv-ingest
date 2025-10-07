@@ -18,7 +18,6 @@ import time
 from ctypes import CDLL
 from datetime import datetime
 from typing import Union, Tuple, Optional, TextIO, Any
-import json
 
 import ray
 from ray import LoggingConfig
@@ -27,10 +26,11 @@ from nv_ingest.framework.orchestration.process.dependent_services import start_s
 from nv_ingest.framework.orchestration.process.termination import (
     kill_pipeline_process_group as _kill_pipeline_process_group,
 )
-from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
-from nv_ingest.pipeline.config.replica_resolver import resolve_static_replicas
-from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config
+from nv_ingest.framework.orchestration.process.build_strategies import (
+    RayPipelineBuildStrategy,
+    PythonPipelineBuildStrategy,
+)
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, PipelineFrameworkType
 
 logger = logging.getLogger(__name__)
 
@@ -277,88 +277,48 @@ def launch_pipeline(
     """
     logger.info("Starting pipeline setup")
 
-    # Initialize Ray if not already initialized
-    if not ray.is_initialized():
-        # Build Ray logging configuration
-        logging_config = build_logging_config_from_env()
+    # Determine framework and select strategy
+    framework_cfg = getattr(getattr(pipeline_config, "pipeline", None), "framework", None)
+    framework_type = getattr(framework_cfg, "type", PipelineFrameworkType.RAY)
 
-        # Clear existing handlers from root logger before Ray adds its handler
-        # This prevents duplicate logging caused by multiple handlers on the root logger
-        root_logger = logging.getLogger()
-        for handler in root_logger.handlers[:]:
-            root_logger.removeHandler(handler)
-        logger.info("Cleared existing root logger handlers to prevent Ray logging duplicates")
-
-        ray.init(
-            namespace="nv_ingest_ray",
-            ignore_reinit_error=True,
-            dashboard_host="0.0.0.0",
-            dashboard_port=8265,
-            logging_config=logging_config,  # Ray will add its own StreamHandler
-            _system_config={
-                "local_fs_capacity_threshold": 0.9,
-                "object_spilling_config": json.dumps(
-                    {
-                        "type": "filesystem",
-                        "params": {
-                            "directory_path": [
-                                "/tmp/ray_spill_testing_0",
-                                "/tmp/ray_spill_testing_1",
-                                "/tmp/ray_spill_testing_2",
-                                "/tmp/ray_spill_testing_3",
-                            ],
-                            "buffer_size": 100_000_000,
-                        },
-                    },
-                ),
-            },
-        )
-
-    # Handle disable_dynamic_scaling parameter override
-    if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:
-        # Directly modify the pipeline config to disable dynamic scaling
+    # Handle disable_dynamic_scaling parameter override before build
+    if (
+        disable_dynamic_scaling
+        and getattr(pipeline_config, "pipeline", None)
+        and not pipeline_config.pipeline.disable_dynamic_scaling
+    ):
         pipeline_config.pipeline.disable_dynamic_scaling = True
         logger.info("Dynamic scaling disabled via function parameter override")
 
-    # Resolve static replicas
-    pipeline_config = resolve_static_replicas(pipeline_config)
+    if framework_type == PipelineFrameworkType.PYTHON:
+        strategy = PythonPipelineBuildStrategy(pipeline_config)
+    else:
+        strategy = RayPipelineBuildStrategy(pipeline_config)
 
-    # Pretty print the final pipeline configuration (after replica resolution)
-    pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
-    logger.info("\n" + pretty_output)
-
-    # Set up the ingestion pipeline
     start_abs = datetime.now()
-    ingest_pipeline = None
+    pipeline_handle = None
     try:
-        ingest_pipeline = IngestPipelineBuilder(pipeline_config)
-        ingest_pipeline.build()
+        # Prepare framework environment (e.g., Ray init)
+        strategy.prepare_environment()
+
+        # Build pipeline per strategy
+        pipeline_handle = strategy.build()
 
         # Record setup time
         end_setup = start_run = datetime.now()
         setup_time = (end_setup - start_abs).total_seconds()
         logger.info(f"Pipeline setup complete in {setup_time:.2f} seconds")
 
-        # Run the pipeline
+        # Start the pipeline
         logger.debug("Running pipeline")
-        ingest_pipeline.start()
+        strategy.start(pipeline_handle)
     except Exception as e:
-        # Ensure any partial startup is torn down
         logger.error(f"Pipeline startup failed, initiating cleanup: {e}", exc_info=True)
         try:
-            if ingest_pipeline is not None:
-                try:
-                    ingest_pipeline.stop()
-                except Exception:
-                    pass
-        finally:
-            try:
-                if ray.is_initialized():
-                    ray.shutdown()
-                    logger.info("Ray shutdown complete after startup failure.")
-            finally:
-                pass
-        # Re-raise to surface failure to caller
+            if pipeline_handle is not None:
+                strategy.stop(pipeline_handle)
+        except Exception:
+            pass
         raise
 
     if block:
@@ -368,16 +328,16 @@ def launch_pipeline(
                 time.sleep(5)
         except KeyboardInterrupt:
             logger.info("Interrupt received, shutting down pipeline.")
-            ingest_pipeline.stop()
-            ray.shutdown()
-            logger.info("Ray shutdown complete.")
+            try:
+                strategy.stop(pipeline_handle)
+            except Exception:
+                pass
         except Exception as e:
             logger.error(f"Unexpected error during pipeline run: {e}", exc_info=True)
             try:
-                ingest_pipeline.stop()
-            finally:
-                if ray.is_initialized():
-                    ray.shutdown()
+                strategy.stop(pipeline_handle)
+            except Exception:
+                pass
             raise
 
         # Record execution times
@@ -391,8 +351,9 @@ def launch_pipeline(
         return None, total_elapsed
     else:
         # Non-blocking - return the pipeline interface
-        # Access the internal RayPipeline from IngestPipelineBuilder
-        return ingest_pipeline._pipeline, None
+        # For Ray, expose the internal RayPipeline from IngestPipelineBuilder; otherwise return the handle
+        exposed = getattr(pipeline_handle, "_pipeline", pipeline_handle)
+        return exposed, None
 
 
 def run_pipeline_process(
@@ -436,7 +397,7 @@ def run_pipeline_process(
     # Install signal handlers for graceful shutdown in the subprocess
     def _handle_signal(signum, frame):
         try:
-            _safe_log(logging.INFO, f"Received signal {signum}; shutting down Ray and exiting...")
+            _safe_log(logging.INFO, f"Received signal {signum}; shutting down and exiting...")
             if ray.is_initialized():
                 ray.shutdown()
         finally:
@@ -459,14 +420,23 @@ def run_pipeline_process(
     # If requested, start the simple broker inside this subprocess so it shares the process group
     broker_proc = None
     try:
-        if os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1":
+        env_in_subproc = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS")
+        _safe_log(logging.INFO, f"Subprocess broker gate: NV_INGEST_BROKER_IN_SUBPROCESS={env_in_subproc}")
+        if env_in_subproc == "1":
             try:
-                # Only launch if the config requests it
-                if getattr(pipeline_config, "pipeline", None) and getattr(
-                    pipeline_config.pipeline, "launch_simple_broker", False
-                ):
-                    _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
-                    broker_proc = start_simple_message_broker({})
+                # Only launch if the config requests it via service_broker
+                if getattr(pipeline_config, "pipeline", None):
+                    sb = getattr(pipeline_config.pipeline, "service_broker", None)
+                    if sb is not None and getattr(sb, "enabled", False):
+                        broker_client = getattr(sb, "broker_client", {}) or {}
+                        _safe_log(logging.INFO, "Starting SimpleMessageBroker inside subprocess")
+                        broker_proc = start_simple_message_broker(broker_client)
+                        if broker_proc is None:
+                            _safe_log(logging.INFO, "Subprocess broker spawn skipped (port open idempotency guard)")
+                        else:
+                            _safe_log(
+                                logging.INFO, f"Subprocess SimpleMessageBroker pid={getattr(broker_proc, 'pid', None)}"
+                            )
             except Exception as e:
                 _safe_log(logging.ERROR, f"Failed to start SimpleMessageBroker in subprocess: {e}")
                 # Continue without broker; launch will fail fast if required

@@ -10,36 +10,62 @@ from uuid import uuid4
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient, SimpleMessageBroker
 
 HOST = "127.0.0.1"
-PORT = 9999  # Use an available port
 MAX_QUEUE_SIZE = 10
 
 PUSH_TIMEOUT_MSG = "PUSH operation timed out."
 
 
-@pytest.fixture(scope="module")
-def broker_server():
-    """Fixture to start and stop the SimpleMessageBroker server."""
-    server = SimpleMessageBroker(HOST, PORT, MAX_QUEUE_SIZE)
-    server_thread = threading.Thread(target=server.serve_forever)
-    server_thread.daemon = True  # Allows program to exit even if thread is running
+@pytest.fixture(scope="session")
+def broker():
+    """Start broker on ephemeral port and yield (server, host, port)."""
+    server = SimpleMessageBroker(HOST, 0, MAX_QUEUE_SIZE)
+    host, port = server.server_address
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
-    time.sleep(1)  # Give the server a moment to start
-    yield
-    server.shutdown()
-    server.server_close()
-    server_thread.join()
+    # small wait to ensure bound
+    time.sleep(0.2)
+    try:
+        yield server, host, port
+    finally:
+        # Best-effort shutdown without risking indefinite hang
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        try:
+            server.server_close()
+        except Exception:
+            pass
+        # Avoid unbounded join in case shutdown misbehaves
+        try:
+            server_thread.join(timeout=2.0)
+        except Exception:
+            pass
+        # Clear any process-wide singleton to avoid lingering references
+        try:
+            setattr(SimpleMessageBroker, "_instance", None)
+        except Exception:
+            pass
 
 
 @pytest.fixture
-def client():
-    """Fixture to provide a SimpleClient instance."""
-    return SimpleClient(HOST, PORT)
+def broker_addr(broker):
+    """Return (host, port) for the running broker."""
+    _, host, port = broker
+    return host, port
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_message_ordering():
+@pytest.fixture
+def client(broker_addr):
+    """Fixture to provide a SimpleClient instance using explicit socket interface."""
+    host, port = broker_addr
+    return SimpleClient(host, port, connection_timeout=5, interface_type="socket")
+
+
+def test_message_ordering(broker_addr):
     """Test that messages are popped in the same order they were pushed (FIFO)."""
-    client = SimpleClient(HOST, PORT)
+    host, port = broker_addr
+    client = SimpleClient(host, port, connection_timeout=5, interface_type="socket")
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(5)]
 
@@ -58,10 +84,10 @@ def test_message_ordering():
     assert popped_messages == messages, "Messages popped are not in the same order as they were pushed."
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_to_full_queue():
+def test_push_to_full_queue(broker_addr):
     """Test pushing messages to a full queue."""
-    client = SimpleClient(HOST, PORT)
+    host, port = broker_addr
+    client = SimpleClient(host, port, connection_timeout=5, interface_type="socket")
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(MAX_QUEUE_SIZE)]
 
@@ -76,10 +102,10 @@ def test_push_to_full_queue():
     assert response.response_reason == PUSH_TIMEOUT_MSG
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_invalid_inputs():
+def test_invalid_inputs(broker_addr):
     """Test that the client handles invalid inputs properly."""
-    client = SimpleClient(HOST, PORT)
+    host, port = broker_addr
+    client = SimpleClient(host, port, connection_timeout=5, interface_type="socket")
 
     # Test with empty queue name
     response = client.submit_message("", "Test Message")
@@ -114,7 +140,7 @@ def test_invalid_inputs():
 
 def test_server_unavailable():
     """Test client's behavior when the server is unavailable."""
-    client = SimpleClient(HOST, 9991)
+    client = SimpleClient(HOST, 9991, connection_timeout=2, interface_type="socket")
     queue_name = f"test_queue_{uuid4()}"
 
     # Do not start the broker_server fixture to simulate server unavailability
@@ -124,10 +150,10 @@ def test_server_unavailable():
     assert "Job not ready." in response.response_reason
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_operation_timeout():
+def test_operation_timeout(broker_addr):
     """Test client's behavior when an operation times out."""
-    client = SimpleClient(HOST, PORT, connection_timeout=1)
+    host, port = broker_addr
+    client = SimpleClient(host, port, connection_timeout=2, interface_type="socket")
     queue_name = f"test_queue_{uuid4()}"
 
     # Fill the queue
@@ -140,7 +166,6 @@ def test_operation_timeout():
     assert PUSH_TIMEOUT_MSG in response.response_reason
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_pop_success(client):
     """Test successful POP operation."""
     queue_name = f"test_queue_{uuid4()}"
@@ -157,7 +182,6 @@ def test_pop_success(client):
     assert pop_response.transaction_id is not None
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_size_command(client):
     """Test SIZE command."""
     queue_name = f"test_queue_{uuid4()}"
@@ -174,19 +198,18 @@ def test_size_command(client):
     assert size_response.response == str(len(messages))
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_large_message(client):
+def test_push_large_message(broker_addr):
     """Test pushing a large message."""
     queue_name = f"test_queue_{uuid4()}"
     message = "A" * (5 * 1024 * 1024)  # 5MB message
-
-    response = client.submit_message(queue_name, message)
+    host, port = broker_addr
+    client = SimpleClient(host, port, connection_timeout=10, interface_type="socket")
+    response = client.submit_message(queue_name, message, timeout=(5, None))
     assert response.response_code == 0
     assert response.response == "Data stored."
     assert response.transaction_id is not None
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_pop_empty_queue(client):
     """Test popping from an empty queue."""
     queue_name = f"test_queue_{uuid4()}"
@@ -196,7 +219,6 @@ def test_pop_empty_queue(client):
     assert "Job not ready" in response.response_reason
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_push_with_timeout(client):
     """Test PUSH operation with a timeout."""
     queue_name = f"test_queue_{uuid4()}"
@@ -208,7 +230,6 @@ def test_push_with_timeout(client):
     assert response.transaction_id is not None
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_pop_with_timeout(client):
     """Test POP operation with a timeout."""
     queue_name = f"test_queue_{uuid4()}"
@@ -225,7 +246,6 @@ def test_pop_with_timeout(client):
     assert pop_response.transaction_id is not None
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_push_error_handling(client):
     """Test error handling during PUSH."""
     queue_name = f"test_queue_{uuid4()}"
@@ -240,7 +260,6 @@ def test_push_error_handling(client):
     assert response.response == "Data stored."
 
 
-@pytest.mark.usefixtures("broker_server")
 def test_pop_error_handling(client):
     """Test error handling during POP."""
     queue_name = f"test_queue_{uuid4()}"
@@ -254,12 +273,12 @@ def test_pop_error_handling(client):
     assert "Job not ready." in response.response_reason
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_multiple_clients(client):
+def test_multiple_clients(broker_addr):
     """Test multiple clients interacting with the server."""
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(5)]
-    clients = [SimpleClient(HOST, PORT, connection_timeout=5) for _ in range(5)]
+    host, port = broker_addr
+    clients = [SimpleClient(host, port, connection_timeout=5, interface_type="socket") for _ in range(5)]
 
     # Each client pushes a message
     for i, c in enumerate(clients):
@@ -277,15 +296,15 @@ def test_multiple_clients(client):
     assert sorted(popped_messages) == sorted(messages)
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_concurrent_push_pop(client):
+def test_concurrent_push_pop(broker_addr):
     """Test concurrent PUSH and POP operations."""
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(10)]
     results = []
     lock = threading.Lock()
-    push_client = SimpleClient(HOST, PORT, connection_timeout=5)
-    pop_client = SimpleClient(HOST, PORT, connection_timeout=5)
+    host, port = broker_addr
+    push_client = SimpleClient(host, port, connection_timeout=5, interface_type="socket")
+    pop_client = SimpleClient(host, port, connection_timeout=5, interface_type="socket")
 
     def push(msg):
         response = push_client.submit_message(queue_name, msg)

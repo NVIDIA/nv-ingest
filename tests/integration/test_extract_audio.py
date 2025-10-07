@@ -56,7 +56,10 @@ def test_audio_extract_only(
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
-        message_client_hostname="localhost",
+        message_client_hostname="127.0.0.1",
+        message_client_kwargs={
+            "interface_type": "socket",
+        },
     )
 
     ingestor = Ingestor(client=client).files("./data/multimodal_test.wav").extract()

@@ -22,6 +22,17 @@ CGROUP_V2_MEMORY_FILE = "/sys/fs/cgroup/memory.max"  # v2 unified hierarchy
 CGROUP_V2_MEMORY_CURRENT = "/sys/fs/cgroup/memory.current"  # Current usage in v2
 
 
+def _env_flag_true(name: str) -> bool:
+    """Return True if environment variable 'name' is set to a truthy value."""
+    try:
+        val = os.environ.get(name)
+        if val is None:
+            return False
+        return str(val).strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        return False
+
+
 class SystemResourceProbe:
     """
     Detects the effective CPU core count available to the current process,
@@ -330,7 +341,7 @@ class SystemResourceProbe:
                 memory = psutil.virtual_memory()
                 total_bytes = memory.total
                 if total_bytes and total_bytes > 0:
-                    logger.debug(f"Detected {total_bytes / (1024**3):.2f} GB system memory via psutil.")
+                    logger.debug(f"Detected {total_bytes / (1024 ** 3):.2f} GB system memory via psutil.")
                     return total_bytes
             except Exception as e:
                 logger.warning(f"psutil.virtual_memory() failed: {e}. Falling back to /proc/meminfo.")
@@ -347,7 +358,7 @@ class SystemResourceProbe:
                                 total_kb = int(parts[1])
                                 total_bytes = total_kb * 1024
                                 logger.debug(
-                                    f"Detected {total_bytes / (1024**3):.2f} GB system memory via /proc/meminfo."
+                                    f"Detected {total_bytes / (1024 ** 3):.2f} GB system memory via /proc/meminfo."
                                 )
                                 return total_bytes
                             break
@@ -373,7 +384,7 @@ class SystemResourceProbe:
                 else:
                     limit_bytes = int(content)
                     self.cgroup_memory_limit_bytes = limit_bytes
-                    logger.debug(f"Cgroup v2 memory limit: {limit_bytes / (1024**3):.2f} GB")
+                    logger.debug(f"Cgroup v2 memory limit: {limit_bytes / (1024 ** 3):.2f} GB")
 
                     # Also try to read current usage
                     usage_content = self._read_file_str(CGROUP_V2_MEMORY_CURRENT)
@@ -381,7 +392,7 @@ class SystemResourceProbe:
                         try:
                             usage_bytes = int(usage_content)
                             self.cgroup_memory_usage_bytes = usage_bytes
-                            logger.debug(f"Cgroup v2 memory usage: {usage_bytes / (1024**3):.2f} GB")
+                            logger.debug(f"Cgroup v2 memory usage: {usage_bytes / (1024 ** 3):.2f} GB")
                         except ValueError:
                             logger.debug(f"Could not parse memory.current: '{usage_content}'")
 
@@ -412,11 +423,11 @@ class SystemResourceProbe:
                 return True
             else:
                 self.cgroup_memory_limit_bytes = limit_bytes
-                logger.debug(f"Cgroup v1 memory limit: {limit_bytes / (1024**3):.2f} GB")
+                logger.debug(f"Cgroup v1 memory limit: {limit_bytes / (1024 ** 3):.2f} GB")
 
                 if usage_bytes is not None:
                     self.cgroup_memory_usage_bytes = usage_bytes
-                    logger.debug(f"Cgroup v1 memory usage: {usage_bytes / (1024**3):.2f} GB")
+                    logger.debug(f"Cgroup v1 memory usage: {usage_bytes / (1024 ** 3):.2f} GB")
 
                 return True
 
@@ -441,12 +452,12 @@ class SystemResourceProbe:
             # Use the smaller of cgroup limit and system memory
             self.effective_memory_bytes = min(self.cgroup_memory_limit_bytes, self.os_total_memory_bytes)
             self.memory_detection_method = "cgroup_limited"
-            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024**3):.2f} GB (cgroup limited)")
+            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024 ** 3):.2f} GB (cgroup limited)")
         elif self.os_total_memory_bytes is not None:
             # No cgroup limit, use system memory
             self.effective_memory_bytes = self.os_total_memory_bytes
             self.memory_detection_method = "system_memory"
-            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024**3):.2f} GB (system memory)")
+            logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024 ** 3):.2f} GB (system memory)")
         else:
             logger.error("Could not determine effective memory limit")
             self.memory_detection_method = "failed"
@@ -457,6 +468,46 @@ class SystemResourceProbe:
 
         # 1. Get OS level counts first
         self.os_logical_cores, self.os_physical_cores = self._get_os_cpu_counts()
+
+        # Optional fast path: skip any cgroup/memory probing when NV_INGEST_FAST_PROBE is enabled.
+        # This avoids potential hangs in constrained or unusual environments.
+        if _env_flag_true("NV_INGEST_FAST_PROBE"):
+            logger.debug("NV_INGEST_FAST_PROBE enabled: skipping cgroup/memory probing.")
+            # Get OS Affinity quickly (Linux only)
+            self.os_sched_affinity_cores = self._get_os_affinity()
+
+            # Determine raw limit from affinity first, then OS logical cores, else fallback
+            raw_limit = float("inf")
+            raw_method = "unknown"
+
+            if self.os_sched_affinity_cores is not None and self.os_sched_affinity_cores > 0:
+                raw_limit = float(self.os_sched_affinity_cores)
+                raw_method = "sched_affinity"
+            elif self.os_logical_cores is not None and self.os_logical_cores > 0:
+                raw_limit = float(self.os_logical_cores)
+                raw_method = "os_logical_count"
+            else:
+                raw_limit = 1.0
+                raw_method = "fallback_default"
+
+            self.raw_limit_value = raw_limit
+            self.raw_limit_method = raw_method
+
+            # Apply weighting if raw limit is effectively an integer and not from cgroup
+            final_effective_cores = raw_limit
+            final_method = raw_method
+            if abs(raw_limit - round(raw_limit)) < 1e-9 and raw_limit > 0:
+                logical_limit_int = int(round(raw_limit))
+                weighted_value = self._apply_hyperthread_weight(logical_limit_int)
+                final_effective_cores = weighted_value
+                if abs(weighted_value - raw_limit) > 1e-9:
+                    final_method = f"{raw_method}_weighted"
+
+            self.effective_cores = final_effective_cores
+            self.detection_method = final_method
+
+            # Skip memory detection in fast mode
+            return
 
         # 2. Try Cgroup v2
         cgroup_detected = self._read_cgroup_v2()

@@ -15,8 +15,8 @@ def test_dependency_on_non_existent_stage_raises_error():
         name="test_pipeline",
         description="A test pipeline",
         stages=[
-            StageConfig(name="stage_a", phase=0, actor="some.module:actor", runs_after=["stage_b"]),
-            StageConfig(name="stage_c", phase=0, actor="some.module:actor"),  # Dummy stage for a valid edge
+            StageConfig(name="stage_a", phase=0, stage_impl="some.module:actor", runs_after=["stage_b"]),
+            StageConfig(name="stage_c", phase=0, stage_impl="some.module:actor"),  # Dummy stage for a valid edge
         ],
         edges=[EdgeConfig(**{"from": "stage_c", "to": "stage_a"})],
     )
@@ -31,8 +31,8 @@ def test_direct_circular_dependency_raises_error():
         name="test_pipeline",
         description="A test pipeline",
         stages=[
-            StageConfig(name="stage_a", phase=0, actor="some.module:actor", runs_after=["stage_b"]),
-            StageConfig(name="stage_b", phase=0, actor="some.module:actor", runs_after=["stage_a"]),
+            StageConfig(name="stage_a", phase=0, stage_impl="some.module:actor", runs_after=["stage_b"]),
+            StageConfig(name="stage_b", phase=0, stage_impl="some.module:actor", runs_after=["stage_a"]),
         ],
         edges=[EdgeConfig(**{"from": "stage_a", "to": "stage_b"})],
     )
@@ -47,9 +47,9 @@ def test_indirect_circular_dependency_raises_error():
         name="test_pipeline",
         description="A test pipeline",
         stages=[
-            StageConfig(name="stage_a", phase=0, actor="some.module:actor", runs_after=["stage_b"]),
-            StageConfig(name="stage_b", phase=0, actor="some.module:actor", runs_after=["stage_c"]),
-            StageConfig(name="stage_c", phase=0, actor="some.module:actor", runs_after=["stage_a"]),
+            StageConfig(name="stage_a", phase=0, stage_impl="some.module:actor", runs_after=["stage_b"]),
+            StageConfig(name="stage_b", phase=0, stage_impl="some.module:actor", runs_after=["stage_c"]),
+            StageConfig(name="stage_c", phase=0, stage_impl="some.module:actor", runs_after=["stage_a"]),
         ],
         edges=[EdgeConfig(**{"from": "stage_a", "to": "stage_b"})],
     )
@@ -69,10 +69,10 @@ def test_valid_diamond_dependency_passes(monkeypatch):
         name="test_pipeline",
         description="A test pipeline",
         stages=[
-            StageConfig(name="stage_a", phase=0, actor="some.module:actor_a"),
-            StageConfig(name="stage_b", phase=1, actor="some.module:actor_b", runs_after=["stage_a"]),
-            StageConfig(name="stage_c", phase=1, actor="some.module:actor_c", runs_after=["stage_a"]),
-            StageConfig(name="stage_d", phase=2, actor="some.module:actor_d", runs_after=["stage_b", "stage_c"]),
+            StageConfig(name="stage_a", phase=0, stage_impl="some.module:actor_a"),
+            StageConfig(name="stage_b", phase=1, stage_impl="some.module:actor_b", runs_after=["stage_a"]),
+            StageConfig(name="stage_c", phase=1, stage_impl="some.module:actor_c", runs_after=["stage_a"]),
+            StageConfig(name="stage_d", phase=2, stage_impl="some.module:actor_d", runs_after=["stage_b", "stage_c"]),
         ],
         edges=[
             EdgeConfig(**{"from": "stage_a", "to": "stage_b"}),
