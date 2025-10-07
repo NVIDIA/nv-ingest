@@ -13,14 +13,16 @@ These variables can be set in the environment before running the pipeline. These
 - MIN_CONTENT_LENGTH: Minimum content length to summarize (default: 50)
 - MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
 TODO: Implement this
-- NUM_FIRST_LAST_PAGES: (Optional) Number of first and last pages to summarize. default=1
+- NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
 """
 
 import logging
 import os
 import time
-import yaml
-from pathlib import Path
+
+# REMOVE BEFORE MERGING
+# import yaml
+# from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
@@ -107,32 +109,32 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     _store_summary(df, summary, model_name)
 
     ###
-    ## REMOVE
+    ## REMOVE BEFORE MERGING
     # Log the current directory
-    logger.info(f"Current working directory: {os.getcwd()}")
+    # logger.info(f"Current working directory: {os.getcwd()}")
 
-    # Create "prompt_dumps" directory if it doesn't exist
-    doc_stats_dir = Path("doc_stats") / _safe_model_name(model_name)
-    if not doc_stats_dir.exists():
-        doc_stats_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created directory: {doc_stats_dir.absolute()}")
+    # # Create "prompt_dumps" directory if it doesn't exist
+    # doc_stats_dir = Path("doc_stats") / _safe_model_name(model_name)
+    # if not doc_stats_dir.exists():
+    #     doc_stats_dir.mkdir(parents=True, exist_ok=True)
+    #     logger.info(f"Created directory: {doc_stats_dir.absolute()}")
 
-    doc_name = Path(df.iloc[0]["metadata"]["source_metadata"]["source_name"].split("/")[-1])
-    filename = doc_stats_dir / doc_name.with_suffix(".yaml")
-    # Write the contents of for_randy as a YAML file named after the 'doc' field
-    experiment_stats = {
-        "doc": str(doc_name),
-        "prompt": PROMPT.format(content=content),
-        "tokens": stats["tokens"],
-        "duration": duration,
-        "tokens/s": stats["tokens"] / duration,
-        "summary": summary,
-        "model": model_name,
-    }
-    with open(filename, "w") as f:
-        logger.info(f"Dumping prompt to {filename}")
-        yaml.dump(experiment_stats, f, indent=2)
-    1  # END
+    # doc_name = Path(df.iloc[0]["metadata"]["source_metadata"]["source_name"].split("/")[-1])
+    # filename = doc_stats_dir / doc_name.with_suffix(".yaml")
+    # # Write the contents of for_randy as a YAML file named after the 'doc' field
+    # experiment_stats = {
+    #     "doc": str(doc_name),
+    #     "prompt": PROMPT.format(content=content),
+    #     "tokens": stats["tokens"],
+    #     "duration": duration,
+    #     "tokens/s": stats["tokens"] / duration,
+    #     "summary": summary,
+    #     "model": model_name,
+    # }
+    # with open(filename, "w") as f:
+    #     logger.info(f"Dumping prompt to {filename}")
+    #     yaml.dump(experiment_stats, f, indent=2)
+    # END
     ###
 
     logger.info(f"LLM summarization complete:\n" f"\tFailed={summary is None},\n" f"\tmodel={model_name}\n")
