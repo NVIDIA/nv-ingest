@@ -1,11 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2024, NVIDIA
 
 from __future__ import annotations
 
 import json
 import logging
 import time
+import os
+import io
+import base64
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
@@ -13,11 +17,8 @@ from tqdm import tqdm
 
 # Reuse existing CLI utilities to avoid duplicating behavior
 from concurrent.futures import as_completed
-from nv_ingest_client.cli.util.processing import (
-    save_response_data,
-    process_response,
-)
-from nv_ingest_client.util.processing import handle_future_result
+from nv_ingest_client.util.util import check_ingest_result
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +57,37 @@ class IngestJobHandler:
         self.show_telemetry = show_telemetry
         self.job_queue_id = job_queue_id
         self._pbar = None
+        # Internal state used across iterations
+        self._retry_job_ids: List[str] = []
+        self._processed: int = 0
+        self._job_ids_batch: List[str] = []
+        self._job_id_map: Dict[str, str] = {}
+        self._trace_times: Dict[str, List[float]] = defaultdict(list)
+        # Constants
+        self._IMAGE_TYPES: set = {"png", "bmp", "jpeg", "jpg", "tiff"}
 
-    def _generate_job_batch_for_iteration(
-        self,
-        processed: int,
-        batch_size: int,
-        retry_job_ids: List[str],
-    ) -> Tuple[List[str], Dict[str, str], int]:
+    # ---------------------------
+    # Progress bar helpers
+    # ---------------------------
+    def _init_progress_bar(self, total: int) -> None:
+        if self.show_progress:
+            self._pbar = tqdm(total=total, desc="Processing files", unit="file")
+        else:
+            self._pbar = None
+
+    def _update_progress(self, n: int = 1, pages_per_sec: float | None = None) -> None:
+        if not self._pbar:
+            return
+        if pages_per_sec is not None:
+            self._pbar.set_postfix(pages_per_sec=f"{pages_per_sec:.2f}")
+        self._pbar.update(n)
+
+    def _close_progress_bar(self) -> None:
+        if self._pbar:
+            self._pbar.close()
+            self._pbar = None
+
+    def _generate_job_batch_for_iteration(self) -> None:
         """
         Build the next batch of jobs for processing and submit newly created jobs.
 
@@ -72,29 +97,12 @@ class IngestJobHandler:
         job indices for this iteration. It also updates the internal progress bar
         when configured and advances the processed-file counter.
 
-        Parameters
-        ----------
-        processed : int
-            The number of files already considered in prior iterations. Used to
-            compute the next slice of files for which to create jobs.
-        batch_size : int
-            Maximum number of jobs to include in this iteration. Retry jobs are
-            inserted first; any remaining capacity is filled by new jobs.
-        retry_job_ids : List[str]
-            Job indices to retry due to prior timeouts or transient errors. These
-            are inserted at the front of the batch.
-
-        Returns
-        -------
-        job_indices : List[str]
-            Ordered list of job indices to process this iteration. Contains
-            ``retry_job_ids`` first, followed by any newly created job indices.
-        job_index_map_updates : Dict[str, str]
-            Mapping from job index to the source file path used to create the job.
-            Only includes entries for newly created jobs from this iteration.
-        processed : int
-            Updated number of files considered after creating new jobs in this
-            iteration.
+        Side Effects
+        ------------
+        - Populates/overwrites ``self._job_ids_batch`` with the ordered job indices to
+          process this iteration (``retry`` first, then newly created jobs).
+        - Updates ``self._job_id_map`` with any new mappings from job index to source file path
+          for jobs created in this iteration.
 
         Raises
         ------
@@ -120,23 +128,21 @@ class IngestJobHandler:
         --------
         >>> handler = IngestJobHandler(client, files, tasks, "/tmp/out", batch_size=32)
         >>> retry_ids = []
-        >>> job_ids, idx_map, processed = handler._generate_job_batch_for_iteration(
-        ...     processed=0, batch_size=32, retry_job_ids=retry_ids
-        ... )
-        >>> len(job_ids) <= 32
+        >>> handler._generate_job_batch_for_iteration()
+        >>> len(handler._job_ids_batch) <= 32
         True
         """
         job_indices: List[str] = []
         job_index_map_updates: Dict[str, str] = {}
         cur_job_count: int = 0
 
-        if retry_job_ids:
-            job_indices.extend(retry_job_ids)
+        if self._retry_job_ids:
+            job_indices.extend(self._retry_job_ids)
             cur_job_count = len(job_indices)
 
-        if (cur_job_count < batch_size) and (processed < len(self.files)):
-            new_job_count: int = min(batch_size - cur_job_count, len(self.files) - processed)
-            batch_files: List[str] = self.files[processed : processed + new_job_count]
+        if (cur_job_count < self.batch_size) and (self._processed < len(self.files)):
+            new_job_count: int = min(self.batch_size - cur_job_count, len(self.files) - self._processed)
+            batch_files: List[str] = self.files[self._processed : self._processed + new_job_count]
 
             new_job_indices: List[str] = self.client.create_jobs_for_batch(batch_files, self.tasks)
             if len(new_job_indices) != new_job_count:
@@ -153,43 +159,167 @@ class IngestJobHandler:
                     self._pbar.update(missing_jobs)
 
             job_index_map_updates = {job_index: file for job_index, file in zip(new_job_indices, batch_files)}
-            processed += new_job_count
+            self._processed += new_job_count
             # Submit newly created jobs asynchronously to the configured queue
             _ = self.client.submit_job_async(new_job_indices, self.job_queue_id)
             job_indices.extend(new_job_indices)
 
-        return job_indices, job_index_map_updates, processed
+        # Save into class state
+        self._job_ids_batch = job_indices
+        # Merge new mappings (do not drop existing entries for retry jobs)
+        self._job_id_map.update(job_index_map_updates)
+
+    def _handle_future_result(self, future, timeout: int = 10):
+        """
+        Handle the result of a completed future job and process annotations.
+
+        Parameters
+        ----------
+        future : concurrent.futures.Future
+            Future representing an asynchronous job.
+        timeout : int, optional
+            Maximum seconds to wait for the future result.
+
+        Returns
+        -------
+        Tuple[Dict[str, Any], str]
+            The decoded result dictionary and the trace_id for the job.
+
+        Raises
+        ------
+        RuntimeError
+            If the job result indicates failure per check_ingest_result.
+        """
+        result, _, trace_id = future.result(timeout=timeout)[0]
+        if ("annotations" in result) and result["annotations"]:
+            annotations = result["annotations"]
+            for key, value in annotations.items():
+                logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
+
+        failed, description = check_ingest_result(result)
+        if failed:
+            raise RuntimeError(f"Ingest job failed: {description}")
+
+        return result, trace_id
+
+    def _process_response(self, response: Dict[str, Any]) -> None:
+        """
+        Extract trace timing entries from a response and accumulate per-stage elapsed times
+        into ``self._trace_times``.
+
+        Parameters
+        ----------
+        response : Dict[str, Any]
+            Full response payload containing an optional ``trace`` dictionary with
+            entry/exit timestamps.
+        """
+        trace_data: Dict[str, Any] = response.get("trace", {})
+        for key, entry_time in trace_data.items():
+            if "entry" in key:
+                exit_key: str = key.replace("entry", "exit")
+                exit_time: Any = trace_data.get(exit_key)
+                if exit_time:
+                    stage_parts = key.split("::")
+                    if len(stage_parts) >= 3:
+                        stage_name: str = stage_parts[2]
+                        elapsed_time: int = exit_time - entry_time
+                        self._trace_times[stage_name].append(elapsed_time)
+
+    def _save_response_data(
+        self, response: Dict[str, Any], output_directory: str, images_to_disk: bool = False
+    ) -> None:
+        """
+        Save the response data into categorized metadata JSON files and optionally save images to disk.
+
+        Parameters
+        ----------
+        response : Dict[str, Any]
+            Full response payload with a "data" list of documents.
+        output_directory : str
+            Output directory where per-type metadata JSON files (and any media) are written.
+        images_to_disk : bool, optional
+            If True, decode and write image contents to disk and replace content with a file URL.
+        """
+        if ("data" not in response) or (not response["data"]):
+            logger.debug("Data is not in the response or response.data is empty")
+            return
+
+        response_data = response["data"]
+        if not isinstance(response_data, list) or len(response_data) == 0:
+            logger.debug("Response data is not a list or the list is empty.")
+            return
+
+        doc_meta_base = response_data[0]["metadata"]
+        source_meta = doc_meta_base["source_metadata"]
+        doc_name = source_meta["source_id"]
+        clean_doc_name = os.path.basename(doc_name)
+        output_name = f"{clean_doc_name}.metadata.json"
+
+        # Organize by document type
+        doc_map: Dict[str, List[Dict[str, Any]]] = {}
+        for document in response_data:
+            meta: Dict[str, Any] = document.get("metadata", {})
+            content_meta: Dict[str, Any] = meta.get("content_metadata", {})
+            doc_type: str = content_meta.get("type", "unknown")
+            doc_map.setdefault(doc_type, []).append(document)
+
+        for doc_type, documents in doc_map.items():
+            doc_type_path = os.path.join(output_directory, doc_type)
+            os.makedirs(doc_type_path, exist_ok=True)
+
+            if doc_type in ("image", "structured") and images_to_disk:
+                for i, doc in enumerate(documents):
+                    meta: Dict[str, Any] = doc.get("metadata", {})
+                    image_content = meta.get("content")
+                    image_type = (
+                        meta.get("image_metadata", {}).get("image_type", "png").lower()
+                        if doc_type == "image"
+                        else "png"
+                    )
+
+                    if image_content and image_type in self._IMAGE_TYPES:
+                        try:
+                            image_data = base64.b64decode(image_content)
+                            image = Image.open(io.BytesIO(image_data))
+
+                            image_ext = "jpg" if image_type == "jpeg" else image_type
+                            image_filename = f"{clean_doc_name}_{i}.{image_ext}"
+                            image_output_path = os.path.join(doc_type_path, "media", image_filename)
+                            os.makedirs(os.path.dirname(image_output_path), exist_ok=True)
+                            image.save(image_output_path, format=image_ext.upper())
+
+                            meta["content"] = ""
+                            meta["content_url"] = os.path.realpath(image_output_path)
+                            logger.debug(f"Saved image to {image_output_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to save image {i} for {clean_doc_name}: {e}")
+
+            # Write the metadata JSON file for this type
+            with open(os.path.join(doc_type_path, output_name), "w") as f:
+                f.write(json.dumps(documents, indent=2))
 
     def run(self) -> Tuple[int, Dict[str, List[float]], int, Dict[str, str]]:
         total_files: int = len(self.files)
         total_pages_processed: int = 0
-        trace_times: Dict[str, List[float]] = defaultdict(list)
         trace_ids: Dict[str, str] = defaultdict(list)  # type: ignore
         failed_jobs: List[str] = []
-        retry_job_ids: List[str] = []
-        job_id_map: Dict[str, str] = {}
         retry_counts: Dict[str, int] = defaultdict(int)
 
         start_time_ns: int = time.time_ns()
-        progress_ctx = tqdm(total=total_files, desc="Processing files", unit="file") if self.show_progress else None
-        self._pbar = progress_ctx
+        self._init_progress_bar(total_files)
         try:
-            processed: int = 0
-            while (processed < len(self.files)) or retry_job_ids:
+            self._processed = 0
+            while (self._processed < len(self.files)) or self._retry_job_ids:
                 # Create a batch (retries first, then new jobs up to batch_size)
-                job_ids, job_id_map_updates, processed = self._generate_job_batch_for_iteration(
-                    processed,
-                    self.batch_size,
-                    retry_job_ids,
-                )
-                job_id_map.update(job_id_map_updates)
-                retry_job_ids = []
+                self._generate_job_batch_for_iteration()
+                job_id_map = self._job_id_map
+                self._retry_job_ids = []
 
-                futures_dict: Dict[Any, str] = self.client.fetch_job_result_async(job_ids, data_only=False)
+                futures_dict: Dict[Any, str] = self.client.fetch_job_result_async(self._job_ids_batch, data_only=False)
                 for future in as_completed(futures_dict.keys()):
                     try:
                         # Block as each future completes; this mirrors CLI behavior
-                        future_response, trace_id = handle_future_result(future)
+                        future_response, trace_id = self._handle_future_result(future)
                         job_id: str = futures_dict[future]
                         trace_ids[job_id_map[job_id]] = trace_id
 
@@ -201,7 +331,7 @@ class IngestJobHandler:
                         }
 
                         if self.output_directory:
-                            save_response_data(
+                            self._save_response_data(
                                 future_response,
                                 self.output_directory,
                                 images_to_disk=self.save_images_separately,
@@ -209,17 +339,18 @@ class IngestJobHandler:
 
                         total_pages_processed += file_page_counts[list(file_page_counts.keys())[0]]
                         elapsed_time: float = (time.time_ns() - start_time_ns) / 1e9
-                        if self._pbar and elapsed_time > 0:
+                        if elapsed_time > 0:
                             pages_per_sec: float = total_pages_processed / elapsed_time
-                            self._pbar.set_postfix(pages_per_sec=f"{pages_per_sec:.2f}")
+                        else:
+                            pages_per_sec = None
 
-                        process_response(future_response, trace_times)
+                        self._process_response(future_response)
 
                     except TimeoutError:
                         job_id = futures_dict[future]
                         src_name = job_id_map[job_id]
                         retry_counts[src_name] += 1
-                        retry_job_ids.append(job_id)
+                        self._retry_job_ids.append(job_id)
                     except json.JSONDecodeError as e:
                         job_id = futures_dict[future]
                         src_name = job_id_map[job_id]
@@ -236,14 +367,11 @@ class IngestJobHandler:
                         logger.exception(f"Unhandled error while processing {job_id}({src_name}): {e}")
                         failed_jobs.append(f"{job_id}::{src_name}")
                     finally:
-                        if self._pbar:
-                            # Do not update the pbar if this job is going to be retried
-                            if futures_dict[future] not in retry_job_ids:
-                                self._pbar.update(1)
+                        # Do not update the pbar if this job is going to be retried
+                        if futures_dict[future] not in self._retry_job_ids:
+                            self._update_progress(1, pages_per_sec)
         finally:
-            if self._pbar:
-                self._pbar.close()
-                self._pbar = None
+            self._close_progress_bar()
 
         # Optionally print telemetry summary
         if self.show_telemetry and hasattr(self.client, "summarize_telemetry"):
@@ -253,4 +381,4 @@ class IngestJobHandler:
             except Exception:
                 pass
 
-        return total_files, trace_times, total_pages_processed, trace_ids
+        return total_files, self._trace_times, total_pages_processed, trace_ids
