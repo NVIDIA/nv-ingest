@@ -48,7 +48,7 @@ def test_text_embedding_schema_accepts_custom_values():
     assert schema.raise_on_failure is True
     assert schema.truncate == "START"
     assert schema.custom_content_field == "custom_content"
-    assert result_target_field == "custom_content_embeddings"
+    assert schema.result_target_field == "custom_content_embeddings"
 
 
 def test_text_embedding_schema_rejects_extra_fields():
