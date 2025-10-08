@@ -411,7 +411,7 @@ def _get_pandas_custom_content(row, custom_content_field):
     custom_content = row.get("content_metadata", {}).get(custom_content_field)
     if custom_content is None:
         logger.warning(f"Custom content field: {custom_content_field} not found")
-    return custom_content
+    return str(custom_content)
 
 
 # ------------------------------------------------------------------------------
