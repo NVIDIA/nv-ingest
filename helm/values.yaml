@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.6.2"
+  tag: "latest"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -791,7 +791,7 @@ riva-nim:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/nvidia/riva-asr
+    repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
     tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
@@ -821,7 +821,7 @@ riva-nim:
     - name: NIM_HTTP_API_PORT
       value: "9000"
     - name: NIM_TAGS_SELECTOR
-      value: "name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"
+      value: "name=parakeet-1-1b-ctc-en-us,mode=ofl"
 
 
 ## @section Milvus Deployment parameters
@@ -1014,7 +1014,6 @@ prometheus:
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
-## @param envVars.INSTALL_AUDIO_EXTRACTION_DEPS [default: "true"] Install required libraries for audio processing
 envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   INGEST_LOG_LEVEL: "DEFAULT"
@@ -1068,7 +1067,6 @@ envVars:
 
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
-  INSTALL_AUDIO_EXTRACTION_DEPS: "true"
 
 ## @section Open Telemetry
 ## @descriptionStart

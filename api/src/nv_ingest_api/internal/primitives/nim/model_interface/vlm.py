@@ -93,7 +93,14 @@ class VLMModelInterface(ModelInterface):
         for batch in batches:
             # Create one message per image in the batch.
             messages = [
-                {"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{img}" />'} for img in batch
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"{prompt}"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
+                    ],
+                }
+                for img in batch
             ]
             payload = {
                 "model": kwargs.get("model_name"),

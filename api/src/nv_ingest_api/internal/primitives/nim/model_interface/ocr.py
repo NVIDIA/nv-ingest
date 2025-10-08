@@ -16,225 +16,20 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import (
-    multiprocessing_cache,
-)
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
-    preprocess_image_for_ocr,
-)
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
-    preprocess_image_for_paddle,
-)
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
-from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_OCR_MODEL_NAME = "paddle"
-NEMORETRIEVER_OCR_EA_MODEL_NAME = "scene_text"
 NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
 
 logger = logging.getLogger(__name__)
 
 
-class OCRModelInterface(ModelInterface):
-    """
-    An interface for handling inference with a OCR model, supporting both gRPC and HTTP protocols.
-    """
+class OCRModelInterfaceBase(ModelInterface):
 
-    def name(self) -> str:
-        """
-        Get the name of the model interface.
-
-        Returns
-        -------
-        str
-            The name of the model interface.
-        """
-        return "OCR"
-
-    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Decode one or more base64-encoded images into NumPy arrays, storing them
-        alongside their dimensions in `data`.
-
-        Parameters
-        ----------
-        data : dict of str -> Any
-            The input data containing either:
-             - 'base64_image': a single base64-encoded image, or
-             - 'base64_images': a list of base64-encoded images.
-
-        Returns
-        -------
-        dict of str -> Any
-            The updated data dictionary with the following keys added:
-            - "image_arrays": List of decoded NumPy arrays of shape (H, W, C).
-            - "image_dims": List of (height, width) tuples for each decoded image.
-
-        Raises
-        ------
-        KeyError
-            If neither 'base64_image' nor 'base64_images' is found in `data`.
-        ValueError
-            If 'base64_images' is present but is not a list.
-        """
-        if "base64_images" in data:
-            base64_list = data["base64_images"]
-            if not isinstance(base64_list, list):
-                raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
-
-            image_arrays: List[np.ndarray] = []
-            for b64 in base64_list:
-                img = base64_to_numpy(b64)
-                image_arrays.append(img)
-
-            data["image_arrays"] = image_arrays
-
-        elif "base64_image" in data:
-            # Single-image fallback
-            img = base64_to_numpy(data["base64_image"])
-            data["image_arrays"] = [img]
-
-        else:
-            raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
-
-        return data
-
-    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
-        """
-        Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
-
-        Parameters
-        ----------
-        data : dict of str -> Any
-            The input data dictionary, expected to contain "image_arrays" (list of np.ndarray)
-            and "image_dims" (list of (height, width) tuples), as produced by prepare_data_for_inference.
-        protocol : str
-            The inference protocol, either "grpc" or "http".
-        max_batch_size : int
-            The maximum batch size for batching.
-
-        Returns
-        -------
-        tuple
-            A tuple (formatted_batches, formatted_batch_data) where:
-              - formatted_batches is a list of batches ready for inference.
-              - formatted_batch_data is a list of scratch-pad dictionaries corresponding to each batch,
-                containing the keys "image_arrays" and "image_dims" for later post-processing.
-
-        Raises
-        ------
-        KeyError
-            If either "image_arrays" or "image_dims" is not found in `data`.
-        ValueError
-            If an invalid protocol is specified.
-        """
-
-        images = data["image_arrays"]
-
-        dims: List[Dict[str, Any]] = []
-        data["image_dims"] = dims
-
-        # Helper function to split a list into chunks of size up to chunk_size.
-        def chunk_list(lst, chunk_size):
-            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-        if "image_arrays" not in data or "image_dims" not in data:
-            raise KeyError("Expected 'image_arrays' and 'image_dims' in data. Call prepare_data_for_inference first.")
-
-        images = data["image_arrays"]
-        dims = data["image_dims"]
-
-        model_name = kwargs.get("model_name", DEFAULT_OCR_MODEL_NAME)
-        merge_level = kwargs.get("merge_level", "paragraph")
-
-        if protocol == "grpc":
-            logger.debug("Formatting input for gRPC OCR model (batched).")
-            processed: List[np.ndarray] = []
-
-            max_length = max(max(img.shape[:2]) for img in images)
-            max_length = min(max_length, 65500)  # Maximum supported image dimension for JPEG is 65500 pixels.
-
-            for img in images:
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    arr, _dims = preprocess_image_for_paddle(img)
-                elif model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME:
-                    arr, _dims = preprocess_image_for_ocr(
-                        img,
-                        target_height=max_length,
-                        target_width=max_length,
-                        pad_how="bottom_right",
-                    )
-                elif model_name == NEMORETRIEVER_OCR_MODEL_NAME:
-                    arr = img
-                    _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
-                else:
-                    raise ValueError(f"Unknown model name: {model_name}")
-
-                dims.append(_dims)
-
-                if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
-                    arr = np.array([numpy_to_base64(arr, format="JPEG")], dtype=np.object_)
-                else:
-                    arr = arr.astype(np.float32)
-
-                arr = np.expand_dims(arr, axis=0)
-
-                processed.append(arr)
-
-            batches = []
-            batch_data_list = []
-            for proc_chunk, orig_chunk, dims_chunk in zip(
-                chunk_list(processed, max_batch_size),
-                chunk_list(images, max_batch_size),
-                chunk_list(dims, max_batch_size),
-            ):
-                batched_input = np.concatenate(proc_chunk, axis=0)
-
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    batches.append(batched_input)
-                else:
-                    merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
-                    batches.append([batched_input, merge_levels])
-
-                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
-            return batches, batch_data_list
-
-        elif protocol == "http":
-            logger.debug("Formatting input for HTTP OCR model (batched).")
-            if "base64_images" in data:
-                base64_list = data["base64_images"]
-            else:
-                base64_list = [data["base64_image"]]
-
-            input_list: List[Dict[str, Any]] = []
-            for b64, img in zip(base64_list, images):
-                image_url = f"data:image/png;base64,{b64}"
-                image_obj = {"type": "image_url", "url": image_url}
-                input_list.append(image_obj)
-                _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
-                dims.append(_dims)
-
-            batches = []
-            batch_data_list = []
-            for input_chunk, orig_chunk, dims_chunk in zip(
-                chunk_list(input_list, max_batch_size),
-                chunk_list(images, max_batch_size),
-                chunk_list(dims, max_batch_size),
-            ):
-                if model_name == DEFAULT_OCR_MODEL_NAME:
-                    payload = {"input": input_chunk}
-                else:
-                    payload = {
-                        "input": input_chunk,
-                        "merge_levels": [merge_level] * len(input_chunk),
-                    }
-                batches.append(payload)
-                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
-
-            return batches, batch_data_list
-
-        else:
-            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+    NUM_CHANNELS = 3
+    BYTES_PER_ELEMENT = 4  # For float32
 
     def parse_output(
         self,
@@ -301,6 +96,25 @@ class OCRModelInterface(ModelInterface):
             as the table content (or content list).
         """
         return output
+
+    def does_item_fit_in_batch(self, current_batch, next_request, memory_budget_bytes: int) -> bool:
+        """
+        Estimates the memory of a potential batch of padded images and checks it
+        against the configured budget.
+        """
+        all_requests = current_batch + [next_request]
+        all_dims = [req.dims for req in all_requests]
+
+        potential_max_h = max(d[0] for d in all_dims)
+        potential_max_w = max(d[1] for d in all_dims)
+
+        potential_batch_size = len(all_requests)
+
+        potential_memory_bytes = (
+            potential_batch_size * potential_max_h * potential_max_w * self.NUM_CHANNELS * self.BYTES_PER_ELEMENT
+        )
+
+        return potential_memory_bytes <= memory_budget_bytes
 
     def _prepare_ocr_payload(self, base64_img: str) -> Dict[str, Any]:
         """
@@ -462,7 +276,7 @@ class OCRModelInterface(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=False if model_name == NEMORETRIEVER_OCR_EA_MODEL_NAME else True,
+                scale_coordinates=True,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])
@@ -546,6 +360,383 @@ class OCRModelInterface(ModelInterface):
             confs.append(conf)
 
         return bboxes, texts, confs
+
+
+class PaddleOCRModelInterface(OCRModelInterfaceBase):
+    """
+    An interface for handling inference with a legacy OCR model, supporting both gRPC and HTTP protocols.
+    """
+
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+        return "PaddleOCR"
+
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Decode one or more base64-encoded images into NumPy arrays, storing them
+        alongside their dimensions in `data`.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data containing either:
+             - 'base64_image': a single base64-encoded image, or
+             - 'base64_images': a list of base64-encoded images.
+
+        Returns
+        -------
+        dict of str -> Any
+            The updated data dictionary with the following keys added:
+            - "images": List of decoded NumPy arrays of shape (H, W, C).
+            - "image_dims": List of (height, width) tuples for each decoded image.
+
+        Raises
+        ------
+        KeyError
+            If neither 'base64_image' nor 'base64_images' is found in `data`.
+        ValueError
+            If 'base64_images' is present but is not a list.
+        """
+        if "base64_images" in data:
+            base64_list = data["base64_images"]
+            if not isinstance(base64_list, list):
+                raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
+
+            images: List[np.ndarray] = []
+            for b64 in base64_list:
+                img = base64_to_numpy(b64)
+                images.append(img)
+
+            data["images"] = images
+
+        elif "base64_image" in data:
+            # Single-image fallback
+            img = base64_to_numpy(data["base64_image"])
+            data["images"] = [img]
+
+        else:
+            raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
+
+        return data
+
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
+        """
+        Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data dictionary, expected to contain "images" (list of np.ndarray)
+            and "image_dims" (list of (height, width) tuples), as produced by prepare_data_for_inference.
+        protocol : str
+            The inference protocol, either "grpc" or "http".
+        max_batch_size : int
+            The maximum batch size for batching.
+
+        Returns
+        -------
+        tuple
+            A tuple (formatted_batches, formatted_batch_data) where:
+              - formatted_batches is a list of batches ready for inference.
+              - formatted_batch_data is a list of scratch-pad dictionaries corresponding to each batch,
+                containing the keys "images" and "image_dims" for later post-processing.
+
+        Raises
+        ------
+        KeyError
+            If either "images" or "image_dims" is not found in `data`.
+        ValueError
+            If an invalid protocol is specified.
+        """
+
+        images = data["images"]
+
+        dims: List[Dict[str, Any]] = []
+        data["image_dims"] = dims
+
+        # Helper function to split a list into chunks of size up to chunk_size.
+        def chunk_list(lst, chunk_size):
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+        if "images" not in data or "image_dims" not in data:
+            raise KeyError("Expected 'images' and 'image_dims' in data. Call prepare_data_for_inference first.")
+
+        images = data["images"]
+        dims = data["image_dims"]
+
+        if protocol == "grpc":
+            logger.debug("Formatting input for gRPC OCR model (batched).")
+            processed: List[np.ndarray] = []
+
+            for img in images:
+                arr, _dims = preprocess_image_for_paddle(img)
+                dims.append(_dims)
+                arr = arr.astype(np.float32)
+                arr = np.expand_dims(arr, axis=0)
+                processed.append(arr)
+
+            batches = []
+            batch_data_list = []
+            for proc_chunk, orig_chunk, dims_chunk in zip(
+                chunk_list(processed, max_batch_size),
+                chunk_list(images, max_batch_size),
+                chunk_list(dims, max_batch_size),
+            ):
+                batched_input = np.concatenate(proc_chunk, axis=0)
+                batches.append(batched_input)
+                batch_data_list.append({"images": orig_chunk, "image_dims": dims_chunk})
+            return batches, batch_data_list
+
+        elif protocol == "http":
+            logger.debug("Formatting input for HTTP OCR model (batched).")
+            if "base64_images" in data:
+                base64_list = data["base64_images"]
+            else:
+                base64_list = [data["base64_image"]]
+
+            input_list: List[Dict[str, Any]] = []
+            for b64, img in zip(base64_list, images):
+                image_url = f"data:image/png;base64,{b64}"
+                image_obj = {"type": "image_url", "url": image_url}
+                input_list.append(image_obj)
+                _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
+                dims.append(_dims)
+
+            batches = []
+            batch_data_list = []
+            for input_chunk, orig_chunk, dims_chunk in zip(
+                chunk_list(input_list, max_batch_size),
+                chunk_list(images, max_batch_size),
+                chunk_list(dims, max_batch_size),
+            ):
+                payload = {"input": input_chunk}
+                batches.append(payload)
+                batch_data_list.append({"images": orig_chunk, "image_dims": dims_chunk})
+
+            return batches, batch_data_list
+
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+
+class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
+    """
+    An interface for handling inference with NemoRetrieverOCR model, supporting both gRPC and HTTP protocols.
+    """
+
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+        return "NemoRetrieverOCR"
+
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Decode one or more base64-encoded images into NumPy arrays, storing them
+        alongside their dimensions in `data`.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data containing either:
+             - 'base64_image': a single base64-encoded image, or
+             - 'base64_images': a list of base64-encoded images.
+
+        Returns
+        -------
+        dict of str -> Any
+            The updated data dictionary with the following keys added:
+            - "images": List of decoded NumPy arrays of shape (H, W, C).
+            - "image_dims": List of (height, width) tuples for each decoded image.
+
+        Raises
+        ------
+        KeyError
+            If neither 'base64_image' nor 'base64_images' is found in `data`.
+        ValueError
+            If 'base64_images' is present but is not a list.
+        """
+        if "base64_images" in data:
+            base64_list = data["base64_images"]
+            if not isinstance(base64_list, list):
+                raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
+
+            images: List[np.ndarray] = []
+            for b64 in base64_list:
+                img = base64_to_numpy(b64)
+                images.append(img)
+
+            data["images"] = images
+
+        elif "base64_image" in data:
+            # Single-image fallback
+            img = base64_to_numpy(data["base64_image"])
+            data["images"] = [img]
+
+        else:
+            raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
+
+        return data
+
+    def coalesce_requests_to_batch(
+        self,
+        requests: List[np.ndarray],
+        original_image_shapes: List[Tuple[int, int]],
+        protocol: str,
+        **kwargs,
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
+        """
+        Takes a list of individual data items (NumPy image arrays) and combines them
+        into a single formatted batch ready for inference.
+
+        This method mirrors the logic of `format_input` but operates on an already-formed
+        batch from the dynamic batcher, so it does not perform any chunking.
+
+        Parameters
+        ----------
+        requests : List[np.ndarray]
+            A list of single data items, which are NumPy arrays representing images.
+        protocol : str
+            The inference protocol, either "grpc" or "http".
+        **kwargs : Any
+            Additional keyword arguments, such as `model_name` and `merge_level`.
+
+        Returns
+        -------
+        Tuple[List[Any], List[Dict[str, Any]]]
+            A tuple containing two lists, each with a single element:
+            - The first list contains the single formatted batch.
+            - The second list contains the single scratch-pad dictionary for that batch.
+        """
+        if not requests:
+            return None, {}
+
+        return self._format_single_batch(requests, original_image_shapes, protocol, **kwargs)
+
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
+        """
+        Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data dictionary, expected to contain "images" (list of np.ndarray)
+            and "image_dims" (list of (height, width) tuples), as produced by prepare_data_for_inference.
+        protocol : str
+            The inference protocol, either "grpc" or "http".
+        max_batch_size : int
+            The maximum batch size for batching.
+
+        Returns
+        -------
+        tuple
+            A tuple (formatted_batches, formatted_batch_data) where:
+              - formatted_batches is a list of batches ready for inference.
+              - formatted_batch_data is a list of scratch-pad dictionaries corresponding to each batch,
+                containing the keys "images" and "image_dims" for later post-processing.
+
+        Raises
+        ------
+        KeyError
+            If either "images" or "image_dims" is not found in `data`.
+        ValueError
+            If an invalid protocol is specified.
+        """
+
+        # Helper function to split a list into chunks of size up to chunk_size.
+        def chunk_list(lst, chunk_size):
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+        if "images" not in data:
+            raise KeyError("Expected 'images' in data. Call prepare_data_for_inference first.")
+
+        images = data["base64_images"]
+        dims = [img.shape[:2] for img in data["images"]]
+
+        formatted_batches = []
+        formatted_batch_data = []
+
+        image_chunks = chunk_list(images, max_batch_size)
+        dims_chunks = chunk_list(dims, max_batch_size)
+        for image_chunk, dims_chunk in zip(image_chunks, dims_chunks):
+            final_batch, batch_data = self._format_single_batch(image_chunk, dims_chunk, protocol, **kwargs)
+            formatted_batches.append(final_batch)
+            formatted_batch_data.append(batch_data)
+
+        all_dims = [item for d in formatted_batch_data for item in d.get("image_dims", [])]
+        data["image_dims"] = all_dims
+
+        return formatted_batches, formatted_batch_data
+
+    def _format_single_batch(
+        self,
+        batch_images: List[str],
+        batch_dims: List[Tuple[int, int]],
+        protocol: str,
+        **kwargs,
+    ) -> Tuple[Any, Dict[str, Any]]:
+        dims: List[Dict[str, Any]] = []
+
+        merge_level = kwargs.get("merge_level", "paragraph")
+
+        if protocol == "grpc":
+            logger.debug("Formatting input for gRPC OCR model (batched).")
+            processed: List[np.ndarray] = []
+
+            for img, shape in zip(batch_images, batch_dims):
+                _dims = {"new_width": shape[1], "new_height": shape[0]}
+                dims.append(_dims)
+
+                arr = np.array([img], dtype=np.object_)
+                arr = np.expand_dims(arr, axis=0)
+                processed.append(arr)
+
+            batched_input = np.concatenate(processed, axis=0)
+
+            batch_size = batched_input.shape[0]
+
+            merge_levels_list = [[merge_level] for _ in range(batch_size)]
+            merge_levels = np.array(merge_levels_list, dtype="object")
+
+            final_batch = [batched_input, merge_levels]
+            batch_data = {"image_dims": dims}
+
+            return final_batch, batch_data
+
+        elif protocol == "http":
+            logger.debug("Formatting input for HTTP OCR model (batched).")
+
+            input_list: List[Dict[str, Any]] = []
+            for b64, shape in zip(batch_images, batch_dims):
+                image_url = f"data:image/png;base64,{b64}"
+                image_obj = {"type": "image_url", "url": image_url}
+                input_list.append(image_obj)
+                _dims = {"new_width": shape[1], "new_height": shape[0]}
+                dims.append(_dims)
+
+            payload = {
+                "input": input_list,
+                "merge_levels": [merge_level] * len(input_list),
+            }
+
+            batch_data = {"image_dims": dims}
+
+            return payload, batch_data
+
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff

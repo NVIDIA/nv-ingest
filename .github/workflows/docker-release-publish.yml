@@ -20,6 +20,10 @@ jobs:
           BRANCH_NAME=${GITHUB_REF#refs/heads/release/}
           echo "SHORT_BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
 
+      # Set up QEMU emulation for arm64
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       # Set up Docker Buildx, useful for building multi-platform images
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -31,8 +35,5 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }} .
-
-      # Push the container to NGC
-      - name: Upload nv-ingest container
-        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }}
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }} .
