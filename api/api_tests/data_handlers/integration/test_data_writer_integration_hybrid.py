@@ -18,6 +18,8 @@ from nv_ingest_api.data_handlers.data_writer import (
 )
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
+pytestmark = pytest.mark.integration_full
+
 
 # ---------- Redis env helpers ----------
 

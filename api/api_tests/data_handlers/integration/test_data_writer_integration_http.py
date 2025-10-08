@@ -12,6 +12,8 @@ from nv_ingest_api.data_handlers.data_writer import (
     HttpDestinationConfig,
 )
 
+pytestmark = pytest.mark.integration_full
+
 
 def _require_http_or_skip():
     base = os.getenv("INGEST_INTEGRATION_TEST_HTTP")

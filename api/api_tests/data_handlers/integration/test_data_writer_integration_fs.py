@@ -15,6 +15,8 @@ from nv_ingest_api.data_handlers.data_writer import (
     FilesystemDestinationConfig,
 )
 
+pytestmark = pytest.mark.integration_full
+
 
 @pytest.fixture(autouse=True)
 def reset_writer_singleton():

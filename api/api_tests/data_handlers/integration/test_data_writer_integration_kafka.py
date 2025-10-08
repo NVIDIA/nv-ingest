@@ -13,6 +13,8 @@ from nv_ingest_api.data_handlers.data_writer import (
     KafkaDestinationConfig,
 )
 
+pytestmark = pytest.mark.integration_full
+
 
 def _parse_kafka_env(value: str):
     """Parse INGEST_INTEGRATION_TEST_KAFKA env like 'host:9092' or 'h1:9092,h2:9092'."""

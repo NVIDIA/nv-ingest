@@ -14,6 +14,8 @@ from nv_ingest_api.data_handlers.data_writer import (
 )
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
+pytestmark = pytest.mark.integration_full
+
 
 def _parse_redis_env(value: str):
     """Parse INGEST_INTEGRATION_TEST_REDIS env value like 'host:port' or 'host:port/db'."""
