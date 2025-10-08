@@ -85,6 +85,7 @@ class _ConcurrentProcessor:
         completion_callback: Optional[Callable[[Dict[str, Any], str], None]],
         fail_on_submit_error: bool,
         stream_to_callback_only: bool,
+        return_full_response: bool,
         verbose: bool = False,
     ):
         """
@@ -139,6 +140,7 @@ class _ConcurrentProcessor:
         self.completion_callback = completion_callback
         self.fail_on_submit_error = fail_on_submit_error
         self.stream_to_callback_only = stream_to_callback_only
+        self.return_full_response = return_full_response
         self.verbose = verbose
 
         # State variables managed across batch cycles
@@ -243,7 +245,8 @@ class _ConcurrentProcessor:
         elif self.stream_to_callback_only:
             self.results.append(job_index)
         else:
-            self.results.append(result_data.get("data"))
+            # When requested, return the full response envelope (includes 'trace' and 'annotations')
+            self.results.append(result_data if self.return_full_response else result_data.get("data"))
 
         # Cleanup retry count if it exists
         if job_index in self.retry_counts:
@@ -1278,6 +1281,7 @@ class NvIngestClient:
         return_failures: bool = False,
         data_only: bool = True,
         stream_to_callback_only: bool = False,
+        return_full_response: bool = False,
         verbose: bool = False,
     ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
         """
@@ -1309,6 +1313,9 @@ class NvIngestClient:
             If True, return (results, failures). Default is False.
         data_only : bool, optional
             If True, return only payload 'data'. Default is True.
+        return_full_response : bool, optional
+            If True, results contain the full response envelopes (including 'trace' and 'annotations').
+            Ignored when stream_to_callback_only=True. Default is False.
         verbose : bool, optional
             If True, enable debug logging. Default is False.
 
@@ -1351,6 +1358,7 @@ class NvIngestClient:
             completion_callback=completion_callback,
             fail_on_submit_error=fail_on_submit_error,
             stream_to_callback_only=stream_to_callback_only,
+            return_full_response=return_full_response,
             verbose=verbose,
         )
 

@@ -404,10 +404,11 @@ class Ingestor:
         save_to_disk: bool = False,
         **kwargs: Any,
     ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
+        List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
+        List[Dict[str, Any]],  # In-memory: Full response envelopes when return_full_response=True
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
         Tuple[
-            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
             List[Tuple[str, str]],
         ],
     ]:  # noqa: E501
@@ -423,13 +424,16 @@ class Ingestor:
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'verbose'. Unrecognized keys are passed through to
-            process_jobs_concurrently.
+            'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
+            through to process_jobs_concurrently.
 
         Returns
         -------
-        results : list of dict
-            List of successful job results when `return_failures` is False.
+        results : list
+            When `return_failures` is False:
+            - Default: List of response['data'] per job (list[list[dict]]).
+            - If `return_full_response=True`: List of full response envelopes (each dict
+              contains keys like 'data', 'trace', 'annotations').
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
         """
