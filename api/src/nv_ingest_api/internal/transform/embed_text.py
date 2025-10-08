@@ -302,8 +302,8 @@ def _add_custom_embeddings(row, embeddings, result_target_field):
     """
     embedding = embeddings.get(row.name, None)
 
-    # Always set embedding, even if None
-    row["metadata"]["content_metadata"][result_target_field] = embedding
+    if embedding is not None:
+        row["metadata"]["custom_content"][result_target_field] = embedding
 
     return row
 
@@ -408,10 +408,16 @@ def _get_pandas_audio_content(row, modality="text"):
 
 
 def _get_pandas_custom_content(row, custom_content_field):
-    custom_content = row.get("content_metadata", {}).get(custom_content_field)
+    custom_content = row.get("custom_content", {}).get(custom_content_field)
     if custom_content is None:
         logger.warning(f"Custom content field: {custom_content_field} not found")
-    return str(custom_content)
+        return None
+
+    try:
+        return str(custom_content)
+    except (TypeError, ValueError):
+        logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
+        return None
 
 
 # ------------------------------------------------------------------------------
@@ -659,7 +665,7 @@ def transform_create_text_embeddings_internal(
 
         valid_custom_content_mask = extracted_custom_content.notna()
         if valid_custom_content_mask.any():
-            custom_content_list = extracted_custom_content.loc[valid_content_mask].to_list()
+            custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
             custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
 
             custom_content_embeddings = _async_runner(
