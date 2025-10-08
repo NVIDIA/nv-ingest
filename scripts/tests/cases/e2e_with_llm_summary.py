@@ -202,6 +202,10 @@ def main() -> int:
     }
     print(f"{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
+    
+    print(f"Removing spill directory: {spill_dir}")
+    os.rmdir(spill_dir)
+
     return 0
 
 
