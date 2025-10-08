@@ -128,6 +128,7 @@ Specific metadata for tabular content.
 
 ### `ChartMetadataSchema`
 Specific metadata for chart content. (Currently identical in structure to `TableMetadataSchema` but semantically distinct).
+**Note:** The entries refer to tables despite being in the ChartMetadataSchema as charts and tables were originally grouped into a single output in the metadata spec.
 
 | Field                             | Type                                  | Default Value       | Description                                                                                             |
 |-----------------------------------|---------------------------------------|---------------------|---------------------------------------------------------------------------------------------------------|
