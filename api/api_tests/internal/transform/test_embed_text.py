@@ -89,7 +89,9 @@ def test_transform_create_text_embeddings_internal_happy_path(mock_async_runner,
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_runner")
-def test_transform_create_text_embeddings_internal_custom_embedding(mock_async_runner, dummy_df, dummy_task_config_custom_embedding):
+def test_transform_create_text_embeddings_internal_custom_embedding(
+    mock_async_runner, dummy_df, dummy_task_config_custom_embedding
+):
     # Mock embeddings response
     mock_async_runner.side_effect = lambda *args, **kwargs: {
         "embeddings": [[0.1, 0.2, 0.3]] * len(args[0]),
@@ -116,7 +118,7 @@ def test_transform_create_text_embeddings_internal_custom_embedding(mock_async_r
     assert "trace_info" in trace
 
     # Validate custom embedding in custom content
-    print (result_df.iloc[0]["metadata"])
+    print(result_df.iloc[0]["metadata"])
     assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_embedding"] == [0.1, 0.2, 0.3]
 
 
