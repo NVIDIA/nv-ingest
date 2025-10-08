@@ -22,6 +22,7 @@ def dummy_df():
                 "metadata": {
                     "content": "Example text content",
                     "content_metadata": {"type": "text"},
+                    "custom_content": {"custom_content_field": "custom_text"},
                 },
                 "document_type": "TEXT",
             },
@@ -43,6 +44,16 @@ def dummy_task_config():
         "api_key": "dummy_key",
         "endpoint_url": "http://dummy-endpoint",
         "model_name": "dummy_model",
+    }
+
+
+@pytest.fixture
+def dummy_task_config_custom_embedding():
+    return {
+        "api_key": "dummy_key",
+        "endpoint_url": "http://dummy-endpoint",
+        "model_name": "dummy_model",
+        "custom_content_field": "custom_content_field",
     }
 
 
@@ -75,6 +86,38 @@ def test_transform_create_text_embeddings_internal_happy_path(mock_async_runner,
 
     # Validate trace structure
     assert "trace_info" in trace
+
+
+@patch(f"{MODULE_UNDER_TEST}._async_runner")
+def test_transform_create_text_embeddings_internal_custom_embedding(mock_async_runner, dummy_df, dummy_task_config_custom_embedding):
+    # Mock embeddings response
+    mock_async_runner.side_effect = lambda *args, **kwargs: {
+        "embeddings": [[0.1, 0.2, 0.3]] * len(args[0]),
+        "info_msgs": [None] * len(args[0]),
+    }
+
+    result_df, trace = module_under_test.transform_create_text_embeddings_internal(
+        dummy_df.copy(),
+        dummy_task_config_custom_embedding,
+    )
+
+    # Validate async_runner call
+    mock_async_runner.assert_called()
+
+    # Validate TEXT row has expected embedding
+    assert result_df.iloc[0]["metadata"]["embedding"] == [0.1, 0.2, 0.3]
+    assert bool(result_df.iloc[0]["_contains_embeddings"])
+
+    # Validate STRUCTURED row also has expected embedding (since it's supported)
+    assert result_df.iloc[1]["metadata"]["embedding"] == [0.1, 0.2, 0.3]
+    assert bool(result_df.iloc[1]["_contains_embeddings"])
+
+    # Validate trace structure
+    assert "trace_info" in trace
+
+    # Validate custom embedding in custom content
+    print (result_df.iloc[0]["metadata"])
+    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_embedding"] == [0.1, 0.2, 0.3]
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_runner")
