@@ -653,7 +653,7 @@ def transform_create_text_embeddings_internal(
 
         extracted_custom_content = (
             combined_df["metadata"]
-            .apply(partial(_get_pandas_custom_content, custom_content_field))
+            .apply(partial(_get_pandas_custom_content, custom_content_field=custom_content_field))
             .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
         )
 
@@ -679,7 +679,7 @@ def transform_create_text_embeddings_internal(
                 )
             )
         else:
-            embeddings_dict = {}
+            custom_embeddings_dict = {}
 
         combined_df = combined_df.apply(
             _add_custom_embeddings, embeddings=custom_embeddings_dict, result_target_field=result_target_field, axis=1
