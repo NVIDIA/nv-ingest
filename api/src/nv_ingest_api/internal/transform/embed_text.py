@@ -293,12 +293,13 @@ def _add_custom_embeddings(row, embeddings, result_target_field):
         A row of the DataFrame.
     embeddings : dict
         Dictionary mapping row indices to embeddings.
+    result_target_field: str
+        The field in custom_content to output the embeddings to
 
     Returns
     -------
     pandas.Series
-        The updated row with 'embedding', 'info_message_metadata', and
-        '_contains_embeddings' appropriately set.
+        The updated row
     """
     embedding = embeddings.get(row.name, None)
 
