@@ -402,7 +402,6 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
-        include_parent_trace_ids: bool = False,
         **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
@@ -427,29 +426,24 @@ class Ingestor:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
             'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
             through to process_jobs_concurrently.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers gathered during ingestion.
 
         Returns
         -------
-        results : list
-            When `return_failures` is False and `include_parent_trace_ids` is False:
-            - Default: List of response['data'] per job (list[list[dict]]).
-            - If `return_full_response=True`: List of full response envelopes (each dict
-              contains keys like 'data', 'trace', 'annotations').
+        results : list of dict
+            List of successful job results when `return_failures` is False.
 
         results, failures : tuple (list of dict, list of tuple of str)
-            Results and failure information when `return_failures` is True and
-            `include_parent_trace_ids` is False.
+            Tuple containing successful results and failure information when `return_failures` is True.
 
-        results, parent_trace_ids : tuple (list of dict, list of str)
-            Results along with parent trace IDs when `return_failures` is False and
-            `include_parent_trace_ids` is True.
-
-        results, failures, parent_trace_ids : tuple (list, list, list)
-            Results, failures, and parent trace IDs when both `return_failures`
-            and `include_parent_trace_ids` are True.
+        If `include_parent_trace_ids=True` is provided via kwargs, an additional
+        list of parent trace IDs is appended to the return value.
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
+
+        include_parent_trace_ids = bool(kwargs.pop("include_parent_trace_ids", False))
 
         self._prepare_ingest_run()
 
