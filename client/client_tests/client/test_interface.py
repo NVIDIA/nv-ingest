@@ -367,7 +367,9 @@ def test_ingest(ingestor, mock_client):
     ingestor._output_conig = None
 
     # Act
-    result = ingestor.ingest(timeout=30)  # timeout=30 is passed to process_jobs_concurrently
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    result = ingestor.ingest(timeout=30)
 
     # Assert
     # Verify add_job was called (if ingestor is responsible for it)
@@ -413,6 +415,7 @@ def test_ingest_return_failures(ingestor, mock_client):
         expected_results,
         expected_failures,
     )
+    mock_client.consume_completed_parent_trace_ids.return_value = ["parent-trace-123"]
 
     # Store expected arguments used in process_jobs_concurrently
     expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
@@ -422,7 +425,7 @@ def test_ingest_return_failures(ingestor, mock_client):
     ingestor._output_conig = None
 
     # Act
-    results, failures = ingestor.ingest(timeout=30, return_failures=True)  # Pass return_failures=True
+    results, failures = ingestor.ingest(timeout=30, return_failures=True)
 
     # Assert
     # Verify add_job was called (if applicable)
@@ -1061,3 +1064,28 @@ def test_vdb_upload_return_failures_true_with_tuple_return(workspace, monkeypatc
         mock_vdb_op.run.assert_called_once()
         called_args = mock_vdb_op.run.call_args[0][0]
         assert called_args == successful_results  # Should be raw data when save_to_disk() is not used
+
+
+def test_ingest_with_parent_trace_ids(ingestor, mock_client):
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [])
+    mock_client.consume_completed_parent_trace_ids.return_value = ["trace-1"]
+
+    results, parent_trace_ids = ingestor.ingest(include_parent_trace_ids=True)
+
+    assert results == [{"result": "ok"}]
+    assert parent_trace_ids == ["trace-1"]
+
+
+def test_ingest_return_failures_with_parent_trace_ids(ingestor, mock_client):
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [("job-2", "err")])
+    mock_client.consume_completed_parent_trace_ids.return_value = ["trace-2"]
+
+    results, failures, parent_trace_ids = ingestor.ingest(return_failures=True, include_parent_trace_ids=True)
+
+    assert results == [{"result": "ok"}]
+    assert failures == [("job-2", "err")]
+    assert parent_trace_ids == ["trace-2"]

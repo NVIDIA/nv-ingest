@@ -28,9 +28,9 @@ def mock_ingest_service():
 def sample_subjob_descriptors():
     """Sample subjob descriptors for testing aggregation logic."""
     return [
-        {"job_id": "parent-uuid_chunk-1", "chunk_index": 1},
-        {"job_id": "parent-uuid_chunk-2", "chunk_index": 2},
-        {"job_id": "parent-uuid_chunk-3", "chunk_index": 3},
+        {"job_id": "parent-uuid_chunk-1", "chunk_index": 1, "start_page": 1, "end_page": 8},
+        {"job_id": "parent-uuid_chunk-2", "chunk_index": 2, "start_page": 9, "end_page": 16},
+        {"job_id": "parent-uuid_chunk-3", "chunk_index": 3, "start_page": 17, "end_page": 24},
     ]
 
 

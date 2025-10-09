@@ -88,15 +88,28 @@ def load_env_file(env_file: str | None):
                 os.environ.setdefault(k.strip(), v.strip())
 
 
-def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> int:
+def run_case(
+    case_name: str,
+    stdout_path: str,
+    doc_analysis: bool = False,
+    trace_debug: bool = False,
+    trace_artifacts: bool = False,
+) -> int:
     """Run a test case as a subprocess to keep runner simple and capture output."""
     case_path = os.path.join(os.path.dirname(__file__), "cases", f"{case_name}.py")
 
     # Set LOG_PATH to artifacts directory for kv_event_log
     env = os.environ.copy()
-    env["LOG_PATH"] = os.path.dirname(stdout_path)
+    artifact_root = os.path.dirname(stdout_path)
+    env["LOG_PATH"] = artifact_root
     if doc_analysis:
         env["DOC_ANALYSIS"] = "true"
+    if trace_debug:
+        env["TRACE_DEBUG"] = "true"
+    if trace_artifacts:
+        traces_dir = os.path.join(artifact_root, "traces")
+        os.makedirs(traces_dir, exist_ok=True)
+        env["TRACE_ARTIFACT_DIR"] = traces_dir
 
     proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True, env=env)
     # Echo to console and also save to file
@@ -131,7 +144,29 @@ def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> in
 @click.option("--no-build", is_flag=True, help="Skip building Docker images")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
-def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no_build, keep_up, doc_analysis):
+@click.option(
+    "--trace-debug",
+    is_flag=True,
+    help="Print detailed trace and annotation diagnostics (currently only dc20_v2_e2e)",
+)
+@click.option(
+    "--trace-artifacts",
+    is_flag=True,
+    help="Store full trace payloads under the artifacts directory (currently only dc20_v2_e2e)",
+)
+def main(
+    case,
+    managed,
+    profiles,
+    readiness_timeout,
+    artifacts_dir,
+    env_file,
+    no_build,
+    keep_up,
+    doc_analysis,
+    trace_debug,
+    trace_artifacts,
+):
 
     # Resolve env file: explicit flag wins; otherwise try .env then env.example in this folder
     if env_file:
@@ -190,7 +225,7 @@ def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no
 
         # Run case
         if case in ["dc20_e2e", "e2e", "dc20_v2_e2e"]:
-            rc = run_case(case, stdout_path, doc_analysis)
+            rc = run_case(case, stdout_path, doc_analysis, trace_debug, trace_artifacts)
         else:
             print(f"Unknown case: {case}")
             rc = 2

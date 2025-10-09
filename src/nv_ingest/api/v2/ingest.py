@@ -16,7 +16,6 @@ import uuid
 from fastapi import APIRouter, Request, Response
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-from opentelemetry import trace
 from redis import RedisError
 
 from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
@@ -36,13 +35,14 @@ from ..v1.ingest import (
     STATE_SUBMITTED,
     INTERMEDIATE_STATES,
 )
+from .. import traced_endpoint
+from opentelemetry import trace
 
 logger = logging.getLogger("uvicorn")
-tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
-DEFAULT_PDF_SPLIT_PAGE_COUNT = 64
+DEFAULT_PDF_SPLIT_PAGE_COUNT = 32
 
 
 def get_pdf_split_page_count() -> int:
@@ -396,6 +396,21 @@ async def _fetch_all_subjob_results(
     return subjob_results
 
 
+def _extract_ray_telemetry(result: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Return the trace and annotation dictionaries emitted by the sink stage."""
+
+    if not isinstance(result, dict):
+        return None, None
+
+    trace = result.get("trace")
+    annotations = result.get("annotations")
+
+    trace_dict = trace if isinstance(trace, dict) else None
+    annotations_dict = annotations if isinstance(annotations, dict) else None
+
+    return trace_dict, annotations_dict
+
+
 def _build_aggregated_response(
     parent_job_id: str,
     subjob_results: List[Optional[Dict[str, Any]]],
@@ -443,6 +458,8 @@ def _build_aggregated_response(
             "failed_subjobs": failed_subjobs,
             "subjob_ids": subjob_ids,
             "chunks": [],
+            "trace_segments": [],
+            "annotation_segments": [],
         },
     }
 
@@ -454,6 +471,32 @@ def _build_aggregated_response(
                 aggregated_result["data"].extend(result["data"])
             chunk_entry = dict(descriptor)
             aggregated_result["metadata"]["chunks"].append(chunk_entry)
+
+            trace_data, annotation_data = _extract_ray_telemetry(result)
+            start_page = descriptor.get("start_page")
+            end_page = descriptor.get("end_page")
+
+            if trace_data:
+                aggregated_result["metadata"]["trace_segments"].append(
+                    {
+                        "job_id": descriptor.get("job_id"),
+                        "chunk_index": descriptor.get("chunk_index"),
+                        "start_page": start_page,
+                        "end_page": end_page,
+                        "trace": trace_data,
+                    }
+                )
+
+            if annotation_data:
+                aggregated_result["metadata"]["annotation_segments"].append(
+                    {
+                        "job_id": descriptor.get("job_id"),
+                        "chunk_index": descriptor.get("chunk_index"),
+                        "start_page": start_page,
+                        "end_page": end_page,
+                        "annotations": annotation_data,
+                    }
+                )
         else:
             # Note failed page
             logger.warning(f"Page {page_num} failed or missing")
@@ -473,110 +516,126 @@ def _build_aggregated_response(
     summary="submit jobs to the core nv ingestion service for processing with PDF splitting",
     operation_id="submit_job_v2",
 )
+@traced_endpoint("http-submit-job-v2")
 async def submit_job_v2(
     request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T
 ):
-    with tracer.start_as_current_span("http-submit-job-v2") as span:
-        try:
-            # Add custom attributes to the span
-            span.set_attribute("http.method", request.method)
-            span.set_attribute("http.url", str(request.url))
-            span.add_event("Submitting file for processing (V2)")
+    span = trace.get_current_span()
+    try:
+        span.add_event("Submitting file for processing (V2)")
 
-            current_trace_id = span.get_span_context().trace_id
-            parent_job_id = trace_id_to_uuid(current_trace_id)
+        current_trace_id = span.get_span_context().trace_id
+        parent_job_id = trace_id_to_uuid(current_trace_id)
 
-            # Parse job spec
-            job_spec_dict = json.loads(job_spec.payload)
+        # Parse job spec
+        job_spec_dict = json.loads(job_spec.payload)
 
-            # Extract document type and payload from the proper structure
-            job_payload = job_spec_dict.get("job_payload", {})
-            document_types = job_payload.get("document_type", [])
-            payloads = job_payload.get("content", [])
+        # Extract document type and payload from the proper structure
+        job_payload = job_spec_dict.get("job_payload", {})
+        document_types = job_payload.get("document_type", [])
+        payloads = job_payload.get("content", [])
 
-            # Check if this is a PDF that needs splitting
-            if document_types and payloads and document_types[0].lower() == "pdf":
-                # Decode the payload to check page count
-                pdf_content = base64.b64decode(payloads[0])
-                page_count = get_pdf_page_count(pdf_content)
-                pages_per_chunk = get_pdf_split_page_count()
+        # Resolve original source metadata up front for logging / subjob naming
+        source_ids = job_payload.get("source_id", ["unknown_source.pdf"])
+        source_names = job_payload.get("source_name", ["unknown_source.pdf"])
+        original_source_id = source_ids[0] if source_ids else "unknown_source.pdf"
+        original_source_name = source_names[0] if source_names else "unknown_source.pdf"
 
-                # Split if the document has more pages than our chunk size
-                if page_count > pages_per_chunk:
-                    logger.debug(
-                        "Splitting PDF with %s pages into chunks of %s",
-                        page_count,
-                        pages_per_chunk,
+        # Check if this is a PDF that needs splitting
+        if document_types and payloads and document_types[0].lower() == "pdf":
+            # Decode the payload to check page count
+            pdf_content = base64.b64decode(payloads[0])
+            page_count = get_pdf_page_count(pdf_content)
+            pages_per_chunk = get_pdf_split_page_count()
+
+            # Split if the document has more pages than our chunk size
+            if page_count > pages_per_chunk:
+                logger.warning(
+                    "[dev-reload-check] Splitting PDF %s into %s-page chunks (total pages: %s)",
+                    original_source_name,
+                    pages_per_chunk,
+                    page_count,
+                )
+
+                chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
+
+                subjob_ids: List[str] = []
+                subjob_descriptors: List[Dict[str, Any]] = []
+                submission_tasks = []
+
+                try:
+                    parent_uuid = uuid.UUID(parent_job_id)
+                except ValueError:
+                    logger.warning(
+                        "Parent job id %s is not a valid UUID; generating fallback namespace for subjobs",
+                        parent_job_id,
+                    )
+                    parent_uuid = uuid.uuid4()
+
+                for chunk in chunks:
+                    subjob_id, subjob_wrapper = _prepare_chunk_submission(
+                        job_spec_dict,
+                        chunk,
+                        parent_uuid=parent_uuid,
+                        parent_job_id=parent_job_id,
+                        current_trace_id=current_trace_id,
+                        original_source_id=original_source_id,
+                        original_source_name=original_source_name,
+                    )
+                    submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
+                    subjob_ids.append(subjob_id)
+                    subjob_descriptors.append(
+                        {
+                            "job_id": subjob_id,
+                            "chunk_index": len(subjob_descriptors) + 1,
+                            "start_page": chunk.get("start_page"),
+                            "end_page": chunk.get("end_page"),
+                            "page_count": chunk.get("page_count"),
+                        }
                     )
 
-                    chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
+                if submission_tasks:
+                    await asyncio.gather(*submission_tasks)
 
-                    subjob_ids: List[str] = []
-                    submission_tasks = []
-                    source_ids = job_payload.get("source_id", ["unknown_source.pdf"])
-                    source_names = job_payload.get("source_name", ["unknown_source.pdf"])
-                    original_source_id = source_ids[0] if source_ids else "unknown_source.pdf"
-                    original_source_name = source_names[0] if source_names else "unknown_source.pdf"
+                parent_metadata: Dict[str, Any] = {
+                    "total_pages": page_count,
+                    "original_source_id": original_source_id,
+                    "original_source_name": original_source_name,
+                    "document_type": document_types[0] if document_types else "pdf",
+                    "subjob_order": subjob_ids,
+                }
 
-                    try:
-                        parent_uuid = uuid.UUID(parent_job_id)
-                    except ValueError:
-                        logger.warning(
-                            "Parent job id %s is not a valid UUID; generating fallback namespace for subjobs",
-                            parent_job_id,
-                        )
-                        parent_uuid = uuid.uuid4()
+                await ingest_service.set_parent_job_mapping(
+                    parent_job_id,
+                    subjob_ids,
+                    parent_metadata,
+                    subjob_descriptors=subjob_descriptors,
+                )
 
-                    for chunk in chunks:
-                        subjob_id, subjob_wrapper = _prepare_chunk_submission(
-                            job_spec_dict,
-                            chunk,
-                            parent_uuid=parent_uuid,
-                            parent_job_id=parent_job_id,
-                            current_trace_id=current_trace_id,
-                            original_source_id=original_source_id,
-                            original_source_name=original_source_name,
-                        )
-                        submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
-                        subjob_ids.append(subjob_id)
+                await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
 
-                    if submission_tasks:
-                        await asyncio.gather(*submission_tasks)
+                span.add_event(f"Split into {len(subjob_ids)} subjobs")
+                response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+                return parent_job_id
 
-                    parent_metadata: Dict[str, Any] = {
-                        "total_pages": page_count,
-                        "original_source_id": original_source_id,
-                        "original_source_name": original_source_name,
-                        "document_type": document_types[0] if document_types else "pdf",
-                        "subjob_order": subjob_ids,
-                    }
+        # For non-PDFs or cases where splitting is not required, submit as normal
+        if "tracing_options" not in job_spec_dict:
+            job_spec_dict["tracing_options"] = {"trace": True}
+        job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
+        updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
-                    await ingest_service.set_parent_job_mapping(parent_job_id, subjob_ids, parent_metadata)
+        span.add_event("Submitting as single job (no split needed)")
 
-                    await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
+        # Submit the job to the pipeline task queue
+        await ingest_service.submit_job(updated_job_spec, parent_job_id)
+        await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
 
-                    span.add_event(f"Split into {len(subjob_ids)} subjobs")
-                    response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
-                    return parent_job_id
+        response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+        return parent_job_id
 
-            # For non-PDFs or cases where splitting is not required, submit as normal
-            if "tracing_options" not in job_spec_dict:
-                job_spec_dict["tracing_options"] = {"trace": True}
-            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
-            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
-
-            span.add_event("Submitting as single job (no split needed)")
-
-            # Submit the job to the pipeline task queue
-            await ingest_service.submit_job(updated_job_spec, parent_job_id)
-            await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
-
-            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
-            return parent_job_id
-
-        except Exception as ex:
-            logger.exception(f"Error submitting job: {str(ex)}")
-            raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+    except Exception as ex:
+        logger.exception(f"Error submitting job: {str(ex)}")
+        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
 # GET /v2/fetch_job
@@ -708,9 +767,21 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             logger.debug(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
 
             # Build ordered descriptors for subjobs
+            stored_descriptors = subjob_info.get("subjob_descriptors") or []
+            descriptor_lookup = {entry.get("job_id"): entry for entry in stored_descriptors if isinstance(entry, dict)}
+
             ordered_descriptors: List[Dict[str, Any]] = []
             for idx, subjob_id in enumerate(subjob_ids, 1):
-                ordered_descriptors.append({"job_id": subjob_id, "chunk_index": idx})
+                descriptor = descriptor_lookup.get(subjob_id, {})
+                ordered_descriptors.append(
+                    {
+                        "job_id": subjob_id,
+                        "chunk_index": descriptor.get("chunk_index", idx),
+                        "start_page": descriptor.get("start_page"),
+                        "end_page": descriptor.get("end_page"),
+                        "page_count": descriptor.get("page_count"),
+                    }
+                )
 
             # Calculate max parallel operations (stay within Redis connection pool)
             max_parallel_ops = max(

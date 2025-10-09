@@ -396,6 +396,7 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
+        include_parent_trace_ids: bool = False,
         **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
@@ -423,9 +424,20 @@ class Ingestor:
         Returns
         -------
         results : list of dict
-            List of successful job results when `return_failures` is False.
+            List of successful job results when `return_failures` is False and
+            `include_parent_trace_ids` is False.
+
         results, failures : tuple (list of dict, list of tuple of str)
-            Tuple containing successful results and failure information when `return_failures` is True.
+            Results and failure information when `return_failures` is True and
+            `include_parent_trace_ids` is False.
+
+        results, parent_trace_ids : tuple (list of dict, list of str)
+            Results along with parent trace IDs when `return_failures` is False and
+            `include_parent_trace_ids` is True.
+
+        results, failures, parent_trace_ids : tuple (list, list, list)
+            Results, failures, and parent trace IDs when both `return_failures`
+            and `include_parent_trace_ids` are True.
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
@@ -600,7 +612,15 @@ class Ingestor:
                     logger.info("Purging saved results from disk after successful VDB upload.")
                     self._purge_saved_results(results)
 
-        return (results, failures) if return_failures else results
+        parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+
+        if return_failures and include_parent_trace_ids:
+            return results, failures, parent_trace_ids
+        if return_failures:
+            return results, failures
+        if include_parent_trace_ids:
+            return results, parent_trace_ids
+        return results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """

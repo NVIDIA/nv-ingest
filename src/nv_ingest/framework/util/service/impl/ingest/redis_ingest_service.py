@@ -410,7 +410,14 @@ class RedisIngestService(IngestServiceMeta):
         """
         return self._fetch_mode
 
-    async def set_parent_job_mapping(self, parent_job_id: str, subjob_ids: List[str], metadata: Dict[str, Any]) -> None:
+    async def set_parent_job_mapping(
+        self,
+        parent_job_id: str,
+        subjob_ids: List[str],
+        metadata: Dict[str, Any],
+        *,
+        subjob_descriptors: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
         """
         Store parent-subjob mapping in Redis for V2 PDF splitting.
 
@@ -422,6 +429,8 @@ class RedisIngestService(IngestServiceMeta):
             List of subjob identifiers
         metadata : Dict[str, Any]
             Metadata about the parent job (total_pages, original_source_id, etc.)
+        subjob_descriptors : List[Dict[str, Any]], optional
+            Detailed descriptors (job_id, chunk_index, start/end pages) for subjobs
         """
         parent_key = f"parent:{parent_job_id}:subjobs"
         metadata_key = f"parent:{parent_job_id}:metadata"
@@ -444,6 +453,9 @@ class RedisIngestService(IngestServiceMeta):
                     parent_job_id,
                 )
                 metadata_to_store.pop("subjob_order", None)
+
+            if subjob_descriptors:
+                metadata_to_store["subjob_descriptors"] = json.dumps(subjob_descriptors)
 
             await self._run_bounded_to_thread(
                 self._ingest_client.get_client().hset,
@@ -540,9 +552,24 @@ class RedisIngestService(IngestServiceMeta):
                 remaining_ids = sorted(subjob_id_set - set(ordered_ids))
                 ordered_ids.extend(remaining_ids)
 
+            subjob_descriptors: Optional[List[Dict[str, Any]]] = None
+            stored_descriptors = metadata.pop("subjob_descriptors", None)
+            if stored_descriptors:
+                try:
+                    decoded = json.loads(stored_descriptors)
+                    if isinstance(decoded, list):
+                        subjob_descriptors = decoded
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "Failed to parse stored subjob descriptors for parent %s: %s",
+                        parent_job_id,
+                        exc,
+                    )
+
             return {
                 "subjob_ids": ordered_ids,
                 "metadata": metadata,
+                "subjob_descriptors": subjob_descriptors or [],
             }
 
         except Exception as err:

@@ -4,6 +4,9 @@ import time
 import json
 import logging
 from datetime import datetime
+from typing import Optional
+
+import requests
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -143,13 +146,15 @@ def main() -> int:
         .save_to_disk(output_directory=spill_dir)
     )
 
-    results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
+    results, failures, parent_trace_ids = ingestor.ingest(
+        show_progress=True,
+        return_failures=True,
+        save_to_disk=True,
+        include_parent_trace_ids=True,
+    )
     ingestion_time = time.time() - ingestion_start
     if not results:
         raise AssertionError("Ingestion returned zero results; expected at least one chunk.")
-
-    if failures:
-        raise AssertionError(f"Ingestion produced {len(failures)} failures: {failures}")
 
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
@@ -160,6 +165,58 @@ def main() -> int:
     if total_pages > 0 and ingestion_time > 0:
         pages_per_second = total_pages / ingestion_time
         kv_event_log("pages_per_second", pages_per_second, log_path)
+
+    enable_trace_debug = (os.getenv("TRACE_DEBUG") or "false").lower() == "true"
+
+    # Fetch the parent job response to inspect aggregated telemetry (trace debug only)
+    parent_job_ids: list[str] = list(parent_trace_ids)
+    if enable_trace_debug and parent_job_ids:
+        print(f"\nDiscovered parent job candidates: {parent_job_ids}")
+
+        artifacts_dir_env = os.getenv("TRACE_ARTIFACT_DIR")
+        artifacts_dir: Optional[str] = None
+        if artifacts_dir_env:
+            artifacts_dir = os.path.join(artifacts_dir_env, "parents") if len(parent_job_ids) > 1 else artifacts_dir_env
+            os.makedirs(artifacts_dir, exist_ok=True)
+
+        for parent_job_id in parent_job_ids:
+            try:
+                parent_response = requests.get(
+                    f"http://{hostname}:7670/v2/fetch_job/{parent_job_id}",
+                    timeout=30,
+                )
+                print(f"\nParent job fetch status: {parent_response.status_code} (job_id={parent_job_id})")
+
+                if parent_response.ok:
+                    parent_payload = parent_response.json()
+                    parent_metadata = parent_payload.get("metadata", {})
+
+                    trace_segments = parent_metadata.get("trace_segments")
+                    annotation_segments = parent_metadata.get("annotation_segments")
+
+                    trace_count = len(trace_segments) if isinstance(trace_segments, list) else "n/a"
+                    annotation_count = len(annotation_segments) if isinstance(annotation_segments, list) else "n/a"
+                    print(f"Parent trace segments: {trace_count}")
+                    print(f"Parent annotation segments: {annotation_count}")
+
+                    if isinstance(trace_segments, list) and trace_segments:
+                        print(f"Sample parent trace segment: {trace_segments[0]}")
+                    if isinstance(annotation_segments, list) and annotation_segments:
+                        print(f"Sample parent annotation segment: {annotation_segments[0]}")
+
+                    if artifacts_dir:
+                        output_path = os.path.join(artifacts_dir, f"{parent_job_id}_fetch.json")
+                        with open(output_path, "w", encoding="utf-8") as fp:
+                            json.dump(parent_payload, fp, indent=2)
+                        print(f"Persisted parent fetch payload to {output_path}")
+
+                else:
+                    print(f"Parent job fetch failed: {parent_response.text}")
+            except Exception as exc:  # pragma: no cover - diagnostic only
+                print(f"Failed to retrieve parent job telemetry for {parent_job_id}: {exc}")
+
+    if failures:
+        raise AssertionError(f"Ingestion produced {len(failures)} failures: {failures}")
 
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)

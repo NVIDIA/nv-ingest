@@ -11,6 +11,15 @@ The V2 API introduces automatic PDF splitting at the REST layer to improve proce
 3. **Transparent Aggregation**: Results are automatically aggregated when fetching parent jobs
 4. **Backward Compatible**: PDFs with page counts ≤ `PDF_SPLIT_PAGE_COUNT` behave identical to V1
 
+## Tracing & Aggregated Metadata
+
+- V2 endpoints open an OpenTelemetry span using the shared `traced_endpoint` decorator. The span name defaults to the function name, or can be overridden when applying the decorator.
+- `submit_job_v2` records the parent span's `trace_id` into each subjob's `tracing_options`, enabling downstream Ray stages (e.g., the message broker sink) to attach chunk-level telemetry consistently.
+- Response headers still return `x-trace-id` derived from the active span context, allowing clients to correlate downstream work.
+- When `/v2/fetch_job/{parent_id}` aggregates completed chunks, it captures any `trace` / `annotations` dictionaries emitted by the sink for each subjob and includes them in the response payload (see "Aggregated response" below).
+
+This behaviour matches the V1 tracing model and sets the foundation for adding W3C `traceparent` propagation in future changes.
+
 ## How It Works
 
 1. **Submit**: When a PDF with pages exceeding `PDF_SPLIT_PAGE_COUNT` is submitted to `/v2/submit_job`:
@@ -27,6 +36,60 @@ The V2 API introduces automatic PDF splitting at the REST layer to improve proce
    - Pending work returns 202 (processing)
    - Failed chunks are noted without failing the entire job; metadata records which chunks failed
 
+### Aggregated response
+
+The fetch endpoint returns a JSON body shaped like the following:
+
+```
+{
+  "data": [...],
+  "status": "success",
+  "metadata": {
+    "parent_job_id": "<uuid>",
+    "total_pages": 320,
+    "pages_per_chunk": 32,
+    "original_source_id": "document.pdf",
+    "subjob_ids": ["...", "..."],
+    "subjobs_failed": 0,
+    "failed_subjobs": [],
+    "chunks": [
+      {
+        "job_id": "...",
+        "chunk_index": 1,
+        "start_page": 1,
+        "end_page": 32,
+        "page_count": 32
+      }
+      // ... additional chunks ...
+    ],
+    "trace_segments": [
+      {
+        "job_id": "...",
+        "chunk_index": 1,
+        "start_page": 1,
+        "end_page": 32,
+        "trace": {"trace::sink_push": 1.7285796e+18, ...}
+      }
+      // ...
+    ],
+    "annotation_segments": [
+      {
+        "job_id": "...",
+        "chunk_index": 1,
+        "start_page": 1,
+        "end_page": 32,
+        "annotations": {"annotation::stage": "sink", ...}
+      }
+      // ...
+    ]
+  }
+}
+```
+
+- `trace_segments` and `annotation_segments` appear only when the sink emits telemetry for a given chunk.
+- Clients can correlate chunk data by matching `job_id` or `chunk_index` across `chunks`, `trace_segments`, and `annotation_segments`.
+- Failed chunk entries remain in `failed_subjobs`; if a chunk is missing from the telemetry arrays, the sink did not emit trace/annotation payloads for that chunk.
+
 ## Testing
 
 Use the V2 test script with environment variable:
@@ -39,7 +102,3 @@ Or set the API version for any existing code:
 ```bash
 export NV_INGEST_API_VERSION=v2
 ```
-
-## Performance
-
-Initial testing shows improved pages/second processing time due to parallel page processing in Ray.
