@@ -650,6 +650,10 @@ class RedisClient(MessageBrokerClientBase):
             except Exception as e:
                 logger.exception(f"{log_prefix}: Cache read error: {e}. Trying Redis.")
 
+        # If caller requests non-blocking behavior (timeout <= 0), do not block.
+        if timeout is not None and timeout <= 0:
+            raise TimeoutError("Non-blocking fetch requested (timeout<=0): no wait performed")
+
         while True:
             try:
                 fetch_result: Union[Dict[str, Any], List[Dict[str, Any]]]

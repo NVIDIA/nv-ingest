@@ -30,6 +30,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+from nv_ingest_api.util.message_brokers.fair_scheduler import FairScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +90,18 @@ class MessageBrokerTaskSourceConfig(BaseModel):
 
     # Use the discriminated union for broker_client
     broker_client: Union[RedisClientConfig, SimpleClientConfig] = Field(..., discriminator="client_type")
-    task_queue: str = Field(..., description="The name of the queue to fetch tasks from.")
+    task_queue: str = Field(
+        ..., description="The base name of the queue to fetch tasks from. Derives sub-queues for fair scheduling."
+    )
     poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
+    starvation_cycles: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "Number of empty scheduling cycles before a non-empty queue is"
+            " considered starved and forced to be served (except when immediate has items)."
+        ),
+    )
 
 
 @ray.remote
@@ -134,7 +145,21 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._current_backoff_sleep: float = 0.0
         self._last_backoff_log_time: float = 0.0
 
-        self._logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
+        # Initialize fair scheduler with derived queues
+        self.scheduler = FairScheduler(self.task_queue, starvation_cycles=self.config.starvation_cycles)
+
+        self._logger.info(
+            "MessageBrokerTaskSourceStage initialized. Base task queue: %s | Derived queues: %s",
+            self.task_queue,
+            {
+                "immediate": f"{self.task_queue}_immediate",
+                "micro": f"{self.task_queue}_micro",
+                "small": f"{self.task_queue}_small",
+                "medium": f"{self.task_queue}_medium",
+                "large": f"{self.task_queue}_large",
+                "default": f"{self.task_queue}",
+            },
+        )
 
     # --- Private helper methods ---
     def _create_client(self):
@@ -265,14 +290,21 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         return control_message
 
-    def _fetch_message(self, timeout=100):
+    def _fetch_message(self, timeout=0):
         """
-        Fetch a message from the message broker.
+        Fetch a message from the message broker using fair scheduling across derived queues.
+        This is a non-blocking sweep across all queues for the current scheduling cycle. If no
+        message is found across any queue, return None so the caller can sleep briefly.
         """
         try:
-            job = self.client.fetch_message(self.task_queue, timeout)
+            # Non-blocking check across all queues; do not block on any single queue.
+            job = self.scheduler.fetch_next(self.client, timeout=0.0)
             if job is None:
-                self._logger.debug("No message received from '%s'", self.task_queue)
+                self._logger.debug(
+                    "No message received from derived queues for base "
+                    "'%s' (immediate, micro, small, medium, large, default)",
+                    self.task_queue,
+                )
                 # Do not treat normal empty polls as failures
                 self._fetch_failure_count = 0
                 self._current_backoff_sleep = 0.0
@@ -336,7 +368,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         Instead of reading from an input edge, fetch a message from the broker.
         """
         self._logger.debug("read_input: calling _fetch_message()")
-        job = self._fetch_message(timeout=100)
+        # Perform a non-blocking sweep across all queues for this cycle
+        job = self._fetch_message(timeout=0)
         if job is None:
             # Sleep for either the configured poll interval or the current backoff, whichever is larger
             sleep_time = max(self.config.poll_interval, getattr(self, "_current_backoff_sleep", 0.0))
