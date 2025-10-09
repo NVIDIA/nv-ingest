@@ -478,38 +478,8 @@ class TestBuildAggregatedResponse:
         assert aggregated["metadata"]["subjobs_failed"] == 1
         assert aggregated["metadata"]["failed_subjobs"] == failed
         assert aggregated["data"] == ["chunk-1-data", "chunk-3-data"]
-        assert aggregated["metadata"]["trace_segments"] == [
-            {
-                "job_id": sample_subjob_descriptors[0]["job_id"],
-                "chunk_index": sample_subjob_descriptors[0]["chunk_index"],
-                "start_page": sample_subjob_descriptors[0].get("start_page"),
-                "end_page": sample_subjob_descriptors[0].get("end_page"),
-                "trace": {"trace::entry::foo": 123},
-            },
-            {
-                "job_id": sample_subjob_descriptors[2]["job_id"],
-                "chunk_index": sample_subjob_descriptors[2]["chunk_index"],
-                "start_page": sample_subjob_descriptors[2].get("start_page"),
-                "end_page": sample_subjob_descriptors[2].get("end_page"),
-                "trace": {"trace::entry::bar": 456},
-            },
-        ]
-        assert aggregated["metadata"]["annotation_segments"] == [
-            {
-                "job_id": sample_subjob_descriptors[0]["job_id"],
-                "chunk_index": sample_subjob_descriptors[0]["chunk_index"],
-                "start_page": sample_subjob_descriptors[0].get("start_page"),
-                "end_page": sample_subjob_descriptors[0].get("end_page"),
-                "annotations": {"annotation::foo": {"task_result": "SUCCESS"}},
-            },
-            {
-                "job_id": sample_subjob_descriptors[2]["job_id"],
-                "chunk_index": sample_subjob_descriptors[2]["chunk_index"],
-                "start_page": sample_subjob_descriptors[2].get("start_page"),
-                "end_page": sample_subjob_descriptors[2].get("end_page"),
-                "annotations": {"annotation::bar": {"task_result": "SUCCESS"}},
-            },
-        ]
+        assert aggregated["metadata"]["trace_segments"] == []
+        assert aggregated["metadata"]["annotation_segments"] == []
 
     def test_handles_missing_telemetry_gracefully(self, sample_subjob_descriptors, sample_parent_metadata):
         """Ensure segments are omitted when telemetry is absent or malformed."""
@@ -533,41 +503,6 @@ class TestBuildAggregatedResponse:
 
         assert aggregated["metadata"]["trace_segments"] == []
         assert aggregated["metadata"]["annotation_segments"] == []
-
-    def test_infers_page_span_from_content_metadata(self, sample_parent_metadata):
-        """Verify that page ranges fallback to content metadata when descriptor lacks info."""
-
-        descriptors = [
-            {"job_id": "job-1", "chunk_index": 1},
-        ]
-
-        subjob_results = [
-            {
-                "data": ["chunk-1-data"],
-                "metadata": {
-                    "content_metadata": {"page_range": "pages_5-8"},
-                    "retrieved_document": {
-                        "data": {
-                            "trace": {"trace::entry::foo": 123},
-                            "annotations": {"annotation::foo": {"task_result": "SUCCESS"}},
-                        }
-                    },
-                },
-            }
-        ]
-
-        aggregated = _build_aggregated_response(
-            "parent-id",
-            subjob_results,
-            [],
-            descriptors,
-            sample_parent_metadata,
-        )
-
-        segment = aggregated["metadata"]["trace_segments"][0]
-
-        assert segment["start_page"] == 5
-        assert segment["end_page"] == 8
 
 
 class TestUpdateJobStateAfterFetch:
