@@ -118,7 +118,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     return control_message
 
 
-def _extract_content(row, min_content_length: int, max_content_length: int, stats: dict) -> str:
+def _extract_content(row, stats: dict, min_content_length: int = 50, max_content_length: int = 12000) -> str | None:
     """Extract text content from row"""
     metadata = row.get("metadata")
 
@@ -127,13 +127,20 @@ def _extract_content(row, min_content_length: int, max_content_length: int, stat
         if content is not None:
             content = content.strip()
             if len(content) < min_content_length:
-                stats["skipped"] += 1
+                stats["skipped"] = True
                 logger.warning(f"Content less than min={min_content_length}. Skipping...")
+                content = ""
             elif len(content) > max_content_length:
                 logger.warning(f"Truncating content to {max_content_length} characters")
                 content = content[:max_content_length]
         else:
-            stats["skipped"] += 1
+            stats["skipped"] = True
+            content = ""
+
+    else:
+        stats["skipped"] = True
+        logger.warning("No metadata found. Skipping...")
+        content = ""
 
     return content
 
@@ -147,6 +154,7 @@ def _generate_llm_summary(
 ) -> tuple[str | None, float]:
     """Ask an LLM to summarize content extracted from doc."""
 
+    start_time = time.time()
     try:
         from openai import OpenAI
 
