@@ -658,6 +658,7 @@ def test_save_to_disk_config_structure(ingestor, tmp_path):
     expected_config = {
         "output_directory": output_dir_str,
         "cleanup": True,
+        "compression": "gzip",
     }
     assert ingestor._output_config == expected_config
 
@@ -704,14 +705,14 @@ def test_lazy_list_core_functionality(create_jsonl_file):
     ]
     filepath = create_jsonl_file(data=default_data)
 
-    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
+    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3, compression=None)
     assert len(lazy_list_prelen) == 3
     assert list(lazy_list_prelen) == default_data
     assert lazy_list_prelen[1] == default_data[1]
     assert lazy_list_prelen[-1] == default_data[-1]
     assert "len=3" in repr(lazy_list_prelen)
 
-    lazy_list_ondemand = LazyLoadedList(filepath)
+    lazy_list_ondemand = LazyLoadedList(filepath, compression=None)
     assert lazy_list_ondemand._len is None
     assert len(lazy_list_ondemand) == 3
     assert lazy_list_ondemand._len == 3  # Check caching
@@ -754,7 +755,36 @@ def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
     assert not os.path.exists(user_dir), "User-provided directory should be removed when cleanup=True"
 
 
-def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
+def test_save_to_disk_defaults_to_gzip_compression(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "default_compression_output")
+
+    with patch(ENSURE_DIR_PATH):
+        ingestor.save_to_disk(output_directory=output_dir_str)
+
+    expected_config = {
+        "output_directory": output_dir_str,
+        "cleanup": True,
+        "compression": "gzip",
+    }
+    assert ingestor._output_config == expected_config
+
+
+def test_save_to_disk_can_disable_compression(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "no_compression_output")
+
+    with patch(ENSURE_DIR_PATH):
+        ingestor.save_to_disk(output_directory=output_dir_str, compression=None)
+
+    expected_config = {
+        "output_directory": output_dir_str,
+        "cleanup": True,
+        "compression": None,
+    }
+    assert ingestor._output_config == expected_config
+
+
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch, compression):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
     monkeypatch.setattr(
@@ -766,7 +796,10 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     results_dir = os.path.join(test_workspace, "vdb_purge_test")
     os.makedirs(results_dir)
 
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     def fake_processor(completion_callback=None, **kwargs):
         if completion_callback:
@@ -779,7 +812,7 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=compression)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
         ingestor.ingest(show_progress=False)
 
@@ -789,7 +822,8 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     assert os.path.exists(results_dir)
 
 
-def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch):
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch, compression):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
     monkeypatch.setattr(
@@ -800,7 +834,10 @@ def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch)
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_preserve_test")
     os.makedirs(results_dir)
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     def fake_processor(completion_callback=None, **kwargs):
         if completion_callback:
@@ -855,7 +892,7 @@ def test_vdb_upload_with_failures_return_failures_true(workspace, monkeypatch, c
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=None)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Should return results and failures when return_failures=True
@@ -924,7 +961,8 @@ def test_vdb_upload_with_failures_return_failures_false(workspace, monkeypatch):
         mock_vdb_op.run.assert_not_called()
 
 
-def test_vdb_upload_with_no_failures(workspace, monkeypatch):
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_with_no_failures(workspace, monkeypatch, compression):
     """Test VDB upload with no failures.
 
     Should work normally regardless of return_failures setting.
@@ -939,7 +977,10 @@ def test_vdb_upload_with_no_failures(workspace, monkeypatch):
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_success_test")
     os.makedirs(results_dir)
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     # Mock only successful results, no failures
     successful_results = [[{"data": "embedding1"}], [{"data": "embedding2"}]]
@@ -958,7 +999,7 @@ def test_vdb_upload_with_no_failures(workspace, monkeypatch):
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=compression)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Test with return_failures=False (should return only results)
@@ -1004,7 +1045,7 @@ def test_vdb_upload_with_all_failures_return_failures_true(workspace, monkeypatc
     mock_client.process_jobs_concurrently.side_effect = fake_processor
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=None)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Should return empty results and all failures when return_failures=True

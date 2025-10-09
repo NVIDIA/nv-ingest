@@ -6,6 +6,7 @@
 
 import collections
 import glob
+import gzip
 import json
 import logging
 import os
@@ -93,17 +94,20 @@ def ensure_job_specs(func):
 
 
 class LazyLoadedList(collections.abc.Sequence):
-    def __init__(self, filepath: str, expected_len: Optional[int] = None):
+    def __init__(self, filepath: str, expected_len: Optional[int] = None, compression: Optional[str] = None):
         self.filepath = filepath
         self._len: Optional[int] = expected_len  # Store pre-calculated length
         self._offsets: Optional[List[int]] = None
+        self.compression = compression
 
         if self._len == 0:
             self._offsets = []
 
+        self._open = gzip.open if self.compression == "gzip" else open
+
     def __iter__(self) -> Iterator[Any]:
         try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
+            with self._open(self.filepath, "rt", encoding="utf-8") as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -120,7 +124,7 @@ class LazyLoadedList(collections.abc.Sequence):
         self._offsets = []
         line_count = 0
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 while True:
                     current_pos = f.tell()
                     line = f.readline()
@@ -144,10 +148,12 @@ class LazyLoadedList(collections.abc.Sequence):
     def __len__(self) -> int:
         if self._len is not None:
             return self._len
+
         if self._offsets is not None:
             self._len = len(self._offsets)
             return self._len
         self._build_index()
+
         return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
@@ -170,7 +176,7 @@ class LazyLoadedList(collections.abc.Sequence):
             raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 f.seek(self._offsets[idx])
                 line_bytes = f.readline()
                 return json.loads(line_bytes.decode("utf-8"))
@@ -399,10 +405,11 @@ class Ingestor:
         include_parent_trace_ids: bool = False,
         **kwargs: Any,
     ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
+        List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
+        List[Dict[str, Any]],  # In-memory: Full response envelopes when return_full_response=True
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
         Tuple[
-            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
             List[Tuple[str, str]],
         ],
     ]:  # noqa: E501
@@ -418,14 +425,16 @@ class Ingestor:
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'verbose'. Unrecognized keys are passed through to
-            process_jobs_concurrently.
+            'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
+            through to process_jobs_concurrently.
 
         Returns
         -------
-        results : list of dict
-            List of successful job results when `return_failures` is False and
-            `include_parent_trace_ids` is False.
+        results : list
+            When `return_failures` is False and `include_parent_trace_ids` is False:
+            - Default: List of response['data'] per job (list[list[dict]]).
+            - If `return_full_response=True`: List of full response envelopes (each dict
+              contains keys like 'data', 'trace', 'annotations').
 
         results, failures : tuple (list of dict, list of tuple of str)
             Results and failure information when `return_failures` is True and
@@ -467,6 +476,8 @@ class Ingestor:
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
                 file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+                if self._output_config["compression"] == "gzip":
+                    file_suffix += ".gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
@@ -474,10 +485,13 @@ class Ingestor:
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
+                    compression=self._output_config["compression"],
                 )
 
                 if num_items_saved > 0:
-                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    results = LazyLoadedList(
+                        jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
+                    )
                     if results_lock:
                         with results_lock:
                             final_results_payload_list.append(results)
@@ -550,6 +564,22 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
+        # Telemetry controls (optional)
+        enable_telemetry: Optional[bool] = kwargs.pop("enable_telemetry", None)
+        show_telemetry: Optional[bool] = kwargs.pop("show_telemetry", None)
+        if show_telemetry is None:
+            # Fallback to env NV_INGEST_CLIENT_SHOW_TELEMETRY (0/1), default off
+            try:
+                show_telemetry = bool(int(os.getenv("NV_INGEST_CLIENT_SHOW_TELEMETRY", "0")))
+            except ValueError:
+                show_telemetry = False
+        # If user explicitly wants to show telemetry but did not specify enable_telemetry,
+        # ensure collection is enabled so summary isn't empty.
+        if enable_telemetry is None and show_telemetry:
+            enable_telemetry = True
+        if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
+            self._client.enable_telemetry(bool(enable_telemetry))
+
         results, failures = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
@@ -611,6 +641,16 @@ class Ingestor:
                 if self._purge_results_after_vdb_upload:
                     logger.info("Purging saved results from disk after successful VDB upload.")
                     self._purge_saved_results(results)
+
+        # Print telemetry summary if requested
+        if show_telemetry:
+            try:
+                summary = self._client.summarize_telemetry()
+                # Print to stdout and log for convenience
+                print("NvIngestClient Telemetry Summary:", json.dumps(summary, indent=2))
+                logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
+            except Exception:
+                pass
 
         parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
 
@@ -1088,6 +1128,7 @@ class Ingestor:
         self,
         output_directory: Optional[str] = None,
         cleanup: bool = True,
+        compression: Optional[str] = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
@@ -1112,6 +1153,12 @@ class Ingestor:
             when the Ingestor's context is exited (i.e., when used in a `with`
             statement).
             Defaults to True.
+        compression : str, optional
+            The compression algorithm to use for the saved result files.
+            Currently, the only supported value is `'gzip'`. To disable
+            compression, set this parameter to `None`. Defaults to `'gzip'`,
+            which significantly reduces the disk space required for results.
+            When enabled, files are saved with a `.gz` suffix (e.g., `results.jsonl.gz`).
 
         Returns
         -------
@@ -1127,6 +1174,7 @@ class Ingestor:
         self._output_config = {
             "output_directory": output_directory,
             "cleanup": cleanup,
+            "compression": compression,
         }
         ensure_directory_with_permissions(output_directory)
 

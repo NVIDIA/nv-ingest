@@ -72,7 +72,7 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
 
     def test_preprocess_image_default_dimension(self):
         """Test image preprocessing with default max dimension."""
-        result, metadata = preprocess_image_for_ocr(self.sample_image)
+        result, metadata = preprocess_image_for_ocr(self.sample_image, channel_first=True)
 
         # Check that the result has the correct shape (channel, height, width)
         self.assertEqual(result.shape[0], 3)  # 3 channels

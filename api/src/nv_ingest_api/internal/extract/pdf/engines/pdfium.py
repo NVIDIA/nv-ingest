@@ -332,6 +332,7 @@ def _extract_page_elements(
 
         # Process each extracted element based on extraction flags
         for page_idx, page_element in page_element_results:
+            page_reading_index = page_idx + 1
             # Skip elements that shouldn't be extracted based on flags
             if (not extract_tables) and (page_element.type_string == "table"):
                 continue
@@ -347,7 +348,7 @@ def _extract_page_elements(
             # Construct metadata for the page element
             page_element_meta = construct_page_element_metadata(
                 page_element,
-                page_idx,
+                page_reading_index,
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -357,13 +358,6 @@ def _extract_page_elements(
     except Exception as e:
         logger.exception(f"Error in page element extraction: {str(e)}")
         raise
-    finally:
-        # Ensure client is closed properly
-        if yolox_client:
-            try:
-                yolox_client.close()
-            except Exception as e:
-                logger.warning(f"Error closing YOLOX client: {str(e)}")
 
     return extracted_page_elements
 
@@ -480,6 +474,7 @@ def pdfium_extractor(
         for page_idx in range(page_count):
             page = doc.get_page(page_idx)
             page_width, page_height = page.get_size()
+            page_reading_index = page_idx + 1
 
             # Text extraction
             if extract_text:
@@ -488,7 +483,7 @@ def pdfium_extractor(
                     text_meta = construct_text_metadata(
                         [page_text],
                         pdf_metadata.keywords,
-                        page_idx,
+                        page_reading_index,
                         -1,
                         -1,
                         -1,
@@ -506,7 +501,7 @@ def pdfium_extractor(
                 image_data = _extract_page_images(
                     extract_images_method,
                     page,
-                    page_idx,
+                    page_reading_index,
                     page_width,
                     page_height,
                     page_count,
@@ -525,7 +520,7 @@ def pdfium_extractor(
                     base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
                 image_meta = construct_image_metadata_from_base64(
                     base64_image,
-                    page_idx,
+                    page_reading_index,
                     page_count,
                     source_metadata,
                     base_unified_metadata,

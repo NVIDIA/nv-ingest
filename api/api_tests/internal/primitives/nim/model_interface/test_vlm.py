@@ -101,8 +101,12 @@ class TestVLMModelInterface(unittest.TestCase):
         # Check message format
         message = payloads[0]["messages"][0]
         self.assertEqual(message["role"], "user")
-        self.assertTrue(self.sample_prompt in message["content"])
-        self.assertTrue(f'<img src="data:image/png;base64,{self.sample_image}"' in message["content"])
+        self.assertIsInstance(message["content"], list)
+        self.assertEqual(len(message["content"]), 2)
+        self.assertEqual(message["content"][0]["type"], "text")
+        self.assertEqual(message["content"][0]["text"], self.sample_prompt)
+        self.assertEqual(message["content"][1]["type"], "image_url")
+        self.assertEqual(message["content"][1]["image_url"]["url"], f"data:image/png;base64,{self.sample_image}")
 
         # Check default parameters
         self.assertEqual(payloads[0]["max_tokens"], 512)
@@ -135,8 +139,14 @@ class TestVLMModelInterface(unittest.TestCase):
         # Check each message
         for i, message in enumerate(messages):
             self.assertEqual(message["role"], "user")
-            self.assertTrue(self.sample_prompt in message["content"])
-            self.assertTrue(f'<img src="data:image/png;base64,{self.sample_images[i]}"' in message["content"])
+            self.assertIsInstance(message["content"], list)
+            self.assertEqual(len(message["content"]), 2)
+            self.assertEqual(message["content"][0]["type"], "text")
+            self.assertEqual(message["content"][0]["text"], self.sample_prompt)
+            self.assertEqual(message["content"][1]["type"], "image_url")
+            self.assertEqual(
+                message["content"][1]["image_url"]["url"], f"data:image/png;base64,{self.sample_images[i]}"
+            )
 
         # Check batch data
         self.assertEqual(len(batch_data), 1)
