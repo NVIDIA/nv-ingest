@@ -650,9 +650,21 @@ class RedisClient(MessageBrokerClientBase):
             except Exception as e:
                 logger.exception(f"{log_prefix}: Cache read error: {e}. Trying Redis.")
 
-        # If caller requests non-blocking behavior (timeout <= 0), do not block.
+        # If caller requests non-blocking behavior (timeout <= 0), attempt immediate pop.
         if timeout is not None and timeout <= 0:
-            raise TimeoutError("Non-blocking fetch requested (timeout<=0): no wait performed")
+            try:
+                client = self.get_client()
+                popped = client.lpop(channel_name)
+                if popped is None:
+                    return None
+                try:
+                    return json.loads(popped)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to decode JSON from non-blocking LPOP on '{channel_name}': {e}")
+                    return None
+            except Exception as e:
+                logger.warning(f"Non-blocking LPOP failed for '{channel_name}': {e}")
+                return None
 
         while True:
             try:
