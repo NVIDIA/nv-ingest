@@ -17,7 +17,7 @@ from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from functools import wraps
-from typing import Any
+from typing import Any, Union, List, Dict, Tuple, Optional
 from collections.abc import Callable
 from collections.abc import Iterator
 from urllib.parse import urlparse
