@@ -25,10 +25,10 @@ from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
 from nv_ingest_client.cli.util.click import click_validate_file_exists
 from nv_ingest_client.cli.util.click import click_validate_task
-from nv_ingest_client.cli.util.processing import create_and_process_jobs
 from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.client.ingest_job_handler import IngestJobHandler
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 from nv_ingest_client.util.system import ensure_directory_with_permissions
@@ -290,15 +290,18 @@ def main(
             )
 
             start_time_ns = time.time_ns()
-            (total_files, trace_times, pages_processed, trace_ids) = create_and_process_jobs(
-                files=docs,
+            handler = IngestJobHandler(
                 client=ingest_client,
+                files=docs,
                 tasks=task,
                 output_directory=output_directory,
                 batch_size=batch_size,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
+                show_progress=True,
+                show_telemetry=True,
             )
+            (total_files, trace_times, pages_processed, trace_ids) = handler.run()
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
 
