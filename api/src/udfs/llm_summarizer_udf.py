@@ -65,11 +65,10 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", 60))
 
     stats = {
-        "processed": 0,
-        "summarized": 0,
-        "skipped": 0,
-        "failed": 0,
+        "skipped": False,
+        "failed": False,
         "tokens": 0,
+        "duration": 0.0,
     }
 
     if not api_key:
@@ -82,65 +81,40 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         logger.warning("No payload found. Nothing to summarize.")
         return control_message
 
-    logger.info(f"Processing {len(df)} chunks for LLM summarization")
+    # Select first and last chunk for summarization
+    # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
+    # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
+    # pages, it must require parsing the payload to see which chunks correspond to which pages
     if len(df) > 1:
-        # Select first and last chunk for summarization
         # TODO: add feature to select N first and last chunks
-        # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
-        # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
-        # pages, it must require parsing the payload to see which chunks correspond to which pages and then selecting
-        # from there
         df = df.iloc[[0, -1]]
     else:
         logger.info("Document has only one chunk")
 
     # Combine all content into a single string
-    content = " ".join(
-        df.apply(
-            _extract_content,
-            axis=1,
-            min_content_length=min_content_length,
-            max_content_length=max_content_length,
-            stats=stats,
-        )
+    content_list = df.apply(
+        _extract_content,
+        axis=1,
+        min_content_length=min_content_length,
+        max_content_length=max_content_length,
+        stats=stats,
     )
-    stats["tokens"] = _estimate_tokens(content)
-    summary, duration = _generate_llm_summary(content, model_name, base_url, api_key, timeout)
-    _store_summary(df, summary, model_name)
+    content = " ".join(content_list)
 
-    ###
-    ## REMOVE BEFORE MERGING
-    # Log the current directory
-    # logger.info(f"Current working directory: {os.getcwd()}")
+    # Nicely ask LLM to summarize content
+    summary, stats["duration"] = _generate_llm_summary(content, model_name, base_url, api_key, timeout)
 
-    # # Create "prompt_dumps" directory if it doesn't exist
-    # doc_stats_dir = Path("doc_stats") / _safe_model_name(model_name)
-    # if not doc_stats_dir.exists():
-    #     doc_stats_dir.mkdir(parents=True, exist_ok=True)
-    #     logger.info(f"Created directory: {doc_stats_dir.absolute()}")
+    stats["failed"] = summary is None
+    if not stats["failed"]:
+        stats["tokens"] = _estimate_tokens(content)
+        logger.info("Summarized %d tokens in %f seconds using %s", stats["tokens"], stats["duration"], model_name)
+        _store_summary(df, summary, model_name)
 
-    # doc_name = Path(df.iloc[0]["metadata"]["source_metadata"]["source_name"].split("/")[-1])
-    # filename = doc_stats_dir / doc_name.with_suffix(".yaml")
-    # # Write the contents of for_randy as a YAML file named after the 'doc' field
-    # experiment_stats = {
-    #     "doc": str(doc_name),
-    #     "prompt": PROMPT.format(content=content),
-    #     "tokens": stats["tokens"],
-    #     "duration": duration,
-    #     "tokens/s": stats["tokens"] / duration,
-    #     "summary": summary,
-    #     "model": model_name,
-    # }
-    # with open(filename, "w") as f:
-    #     logger.info(f"Dumping prompt to {filename}")
-    #     yaml.dump(experiment_stats, f, indent=2)
-    # END
-    ###
+        # Update the control message with modified DataFrame
+        control_message.payload(df)
+    else:
+        logger.warning("%s failed to summarize content", model_name)
 
-    logger.info(f"LLM summarization complete:\n" f"\tFailed={summary is None},\n" f"\tmodel={model_name}\n")
-
-    # Update the control message with modified DataFrame
-    control_message.payload(df)
     return control_message
 
 
@@ -208,7 +182,6 @@ def _store_summary(df, summary: str, model_name: str):
     # and is modified in place
     metadata = row_0.get("metadata")
 
-    logger.info("Adding summary to row 0")
     if metadata.get("custom_content") is None:
         metadata["custom_content"] = {}
     metadata["custom_content"]["llm_summarizer_udf"] = {"summary": summary, "model": model_name}
