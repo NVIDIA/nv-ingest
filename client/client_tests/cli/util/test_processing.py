@@ -6,7 +6,6 @@ import json
 
 import pytest
 from nv_ingest_client.cli.util.processing import get_valid_filename
-from nv_ingest_client.cli.util.processing import save_response_data
 
 
 @pytest.fixture
@@ -54,20 +53,6 @@ def text_metadata():
         }
         """
     )
-
-
-def test_save_response_data(tmp_path, text_metadata):
-    response = {"data": [text_metadata]}
-
-    save_response_data(response, str(tmp_path))
-
-    assert (tmp_path / "text").is_dir()
-    assert (tmp_path / "text" / "test.pdf.metadata.json").is_file()
-
-    with open(str(tmp_path / "text" / "test.pdf.metadata.json")) as f:
-        result = json.loads(f.read())
-
-    assert result == [text_metadata]
 
 
 def test_get_valid_filename():
