@@ -1051,7 +1051,7 @@ def write_to_nvingest_collection(
         if not local_index:
             # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
             # know how long this should take, it is num_elements dependent.
-            wait_for_index(collection_name, num_elements, client, local_index=local_index)
+            wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         bucket_name = bucket_name if bucket_name else ClientConfigSchema().minio_bucket_name
