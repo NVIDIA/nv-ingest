@@ -244,8 +244,7 @@ class TableMetadataSchema(BaseModelNoExt):
 
 class ChartMetadataSchema(BaseModelNoExt):
     """
-    The schema for extracted chart content. Note: The entries refer to tables despite being in the ChartMetadataSchema
-    as charts and tables were originally grouped into a single output in the metadata spec.
+    The schema for table content extracted from charts.
     """
 
     caption: str = ""
