@@ -22,7 +22,10 @@ def dummy_df():
                 "metadata": {
                     "content": "Example text content",
                     "content_metadata": {"type": "text"},
-                    "custom_content": {"custom_content_field": "custom_text"},
+                    "custom_content": {
+                        "custom_content_field_1": "custom_text",
+                        "custom_content_field_2": {"nested_content_field": "custom_text_2"},
+                    },
                 },
                 "document_type": "TEXT",
             },
@@ -53,7 +56,17 @@ def dummy_task_config_custom_embedding():
         "api_key": "dummy_key",
         "endpoint_url": "http://dummy-endpoint",
         "model_name": "dummy_model",
-        "custom_content_field": "custom_content_field",
+        "custom_content_field": "custom_content_field_1",
+    }
+
+
+@pytest.fixture
+def dummy_task_config_custom_embedding_nested():
+    return {
+        "api_key": "dummy_key",
+        "endpoint_url": "http://dummy-endpoint",
+        "model_name": "dummy_model",
+        "custom_content_field": "custom_content_field_2.nested_content_field",
     }
 
 
@@ -118,8 +131,31 @@ def test_transform_create_text_embeddings_internal_custom_embedding(
     assert "trace_info" in trace
 
     # Validate custom embedding in custom content
-    print(result_df.iloc[0]["metadata"])
-    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_embedding"] == [0.1, 0.2, 0.3]
+    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_1_embedding"] == [0.1, 0.2, 0.3]
+
+
+@patch(f"{MODULE_UNDER_TEST}._async_runner")
+def test_transform_create_text_embeddings_internal_custom_embedding_nested(
+    mock_async_runner, dummy_df, dummy_task_config_custom_embedding_nested
+):
+    # Mock embeddings response
+    mock_async_runner.side_effect = lambda *args, **kwargs: {
+        "embeddings": [[0.1, 0.2, 0.3]] * len(args[0]),
+        "info_msgs": [None] * len(args[0]),
+    }
+
+    result_df, trace = module_under_test.transform_create_text_embeddings_internal(
+        dummy_df.copy(),
+        dummy_task_config_custom_embedding_nested,
+    )
+
+    # Validate async_runner call
+    mock_async_runner.assert_called()
+
+    # Validate nested custom embedding in custom content
+    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_2"][
+        "nested_content_field_embedding"
+    ] == [0.1, 0.2, 0.3]
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_runner")
