@@ -121,19 +121,17 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time
+import time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import wait_for_pipeline
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
 # Start the pipeline subprocess for library mode
-config = PipelineCreationSchema()
-
-run_pipeline(config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
+run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=False)
+wait_for_pipeline("localhost", 7671, timeout=120.0)
 
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
@@ -184,7 +182,8 @@ t1 = time.time()
 print(f"Total time: {t1 - t0} seconds")
 
 # results blob is directly inspectable
-print(ingest_json_results_to_blob(results[0]))
+if results:
+    print(ingest_json_results_to_blob(results[0]))
 
 # (optional) Review any failures that were returned
 if failures:

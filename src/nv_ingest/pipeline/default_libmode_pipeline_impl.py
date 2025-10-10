@@ -200,8 +200,8 @@ stages:
     config:
       endpoint_config:
         ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
-          $OCR_HTTP_ENDPOINT|""
+          $OCR_GRPC_ENDPOINT|"",
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""

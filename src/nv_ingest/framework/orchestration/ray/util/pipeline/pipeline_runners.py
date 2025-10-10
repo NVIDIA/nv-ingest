@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import socket
+import time
 from typing import Union, Optional, TextIO
 
 
@@ -98,3 +100,20 @@ def run_pipeline(
 
     # Return in expected format
     return result.get_return_value()
+
+
+def wait_for_pipeline(host: str, port: int, timeout: float = 120.0, interval: float = 0.5) -> None:
+    """
+    Wait until a TCP port on a host is accepting connections or raise TimeoutError.
+    This makes the tests robust against pipeline warm-up variability.
+    """
+    deadline = time.time() + timeout
+    last_err: Exception | None = None
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1.0):
+                return
+        except Exception as e:
+            last_err = e
+            time.sleep(interval)
+    raise TimeoutError(f"Port {host}:{port} not ready after {timeout}s: {last_err}")
