@@ -917,7 +917,9 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
                 if new_indexed_rows == indexed_rows:
-                    pos_movement = -1
+                    pos_movement -= 1
+                else:
+                    pos_movement = 10
                 # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
                 if pos_movement == 0:
                     raise ValueError("Rows are not getting indexed as expected")
@@ -1046,9 +1048,10 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
-        # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
-        # know how long this should take, it is num_elements dependent.
-        wait_for_index(collection_name, num_elements, client)
+        if not local_index:
+            # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
+            # know how long this should take, it is num_elements dependent.
+            wait_for_index(collection_name, num_elements, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         bucket_name = bucket_name if bucket_name else ClientConfigSchema().minio_bucket_name
