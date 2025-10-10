@@ -45,6 +45,7 @@ class FairScheduler:
         total_buffer_capacity: int = 16,
         num_prefetch_threads: int = 5,
         prefetch_poll_interval: float = 0.005,
+        prefetch_non_immediate: bool = False,
     ) -> None:
         self.base_queue = base_queue
         self.starvation_cycles = max(1, int(starvation_cycles))
@@ -95,7 +96,19 @@ class FairScheduler:
         self._prefetch_threads: List[threading.Thread] = []
         self._prefetch_client: Any = None
         self._prefetch_poll_interval: float = float(prefetch_poll_interval)
+        self._prefetch_non_immediate: bool = bool(prefetch_non_immediate)
         self._state_lock = threading.Lock()  # guards quotas/starvation/attempted/served
+
+        # Fixed queue assignment per thread: each thread pulls from one queue only
+        # Order: immediate, micro, small, medium, large, default (wrap if more threads)
+        self._thread_categories: List[str] = []
+        _order = ["immediate", "micro", "small", "medium", "large", "default"]
+        for i in range(self._num_prefetch_threads):
+            self._thread_categories.append(_order[i % len(_order)])
+        # Inverse mapping: category -> list of buffer indices
+        self._category_to_buffer_indices: Dict[str, List[int]] = {k: [] for k in _order}
+        for idx, cat in enumerate(self._thread_categories):
+            self._category_to_buffer_indices[cat].append(idx)
 
     # Context manager helpers for clean shutdown
     def __enter__(self) -> "FairScheduler":
@@ -141,7 +154,7 @@ class FairScheduler:
             remaining = self._cycle_quotas.get(category, 0)
             if remaining <= 0:
                 continue
-            # Try once for this category; if empty, move on (do not block)
+            # Try once for this category (serves prefetched first inside), else move on
             job = self._try_fetch_category(client, category, timeout)
             self._logger.debug("FairScheduler.fetch_next: poll category=%s -> %s", category, bool(job))
             if job is not None:
@@ -169,6 +182,32 @@ class FairScheduler:
             self._end_cycle_update()
         return None
 
+    def _serve_prefetched_category(self, category: str) -> Optional[dict]:
+        """Serve an item from prefetched buffers for the given category, obeying quotas.
+
+        This preserves per-cycle ordering by only consuming during the fair-scan/starvation paths.
+        """
+        if category not in self._cycle_quotas or self._cycle_quotas.get(category, 0) <= 0:
+            return None
+        # Immediate is handled by dedicated buffer and path
+        if category == "immediate":
+            return None
+        with self._buffer_cond:
+            indices = self._category_to_buffer_indices.get(category, [])
+            for idx in indices:
+                if self._buffers[idx]:
+                    item = self._buffers[idx].popleft()
+                    self._buffer_cond.notify_all()
+                    # Mark served/attempted and decrement quota
+                    if category in self._attempted_this_cycle:
+                        self._attempted_this_cycle[category] = True
+                    if category in self._served_this_cycle:
+                        self._served_this_cycle[category] = True
+                    if category in self._cycle_quotas:
+                        self._cycle_quotas[category] = max(0, self._cycle_quotas[category] - 1)
+                    return item
+        return None
+
     # ---------------------------- Internal helpers ----------------------------
     def _drain_immediate(self, client, timeout: float) -> Optional[dict]:
         # Legacy helper retained for compatibility (unused in BLPOP path)
@@ -182,6 +221,10 @@ class FairScheduler:
         # Mark attempted this cycle
         if category in self._attempted_this_cycle:
             self._attempted_this_cycle[category] = True
+        # If we have prefetched items for this category, consume them first
+        item = self._serve_prefetched_category(category)
+        if item is not None:
+            return item
         try:
             job = client.fetch_message(self.queues[category], timeout)
         except TimeoutError:
@@ -199,7 +242,9 @@ class FairScheduler:
     def _prefetch_loop(self, buffer_index: int) -> None:
         client = self._prefetch_client
         idle_backoff: float = self._prefetch_poll_interval
-        max_backoff: float = 0.05
+        # Immediate thread should be more responsive than others
+        assigned_category = self._thread_categories[buffer_index]
+        max_backoff: float = 0.01 if assigned_category == "immediate" else 0.05
         while not self._stop_event.is_set():
             # Wait if our buffer is at capacity
             with self._buffer_cond:
@@ -207,25 +252,34 @@ class FairScheduler:
                     self._buffer_cond.wait(timeout=idle_backoff)
                     continue
 
-            # Try to fetch one item using non-blocking fairness logic
+            # Each thread fetches from a fixed assigned category
+            assigned_category = self._thread_categories[buffer_index]
+            # Unless explicitly enabled, only immediate is prefetched; others idle quickly
+            if assigned_category != "immediate" and not self._prefetch_non_immediate:
+                with self._buffer_cond:
+                    self._buffer_cond.wait(timeout=idle_backoff)
+                idle_backoff = min(max_backoff, idle_backoff * 1.5)
+                continue
             job: Optional[dict] = None
-            # We decide starvation/quotas under the state lock, but perform network calls outside it
-            # Immediate first (not quota limited)
             try:
-                job = client.fetch_message(self.queues["immediate"], 0.0)
+                job = client.fetch_message(self.queues[assigned_category], 0.0)
             except TimeoutError:
                 job = None
             if job is not None:
                 with self._buffer_cond:
-                    self._immediate_buffer.append(job)
+                    if assigned_category == "immediate":
+                        # Immediate items go to dedicated buffer to preserve strict priority
+                        self._immediate_buffer.append(job)
+                    else:
+                        # Per-thread buffer acts as the prefetch queue for that category
+                        self._buffers[buffer_index].append(job)
                     self._buffer_cond.notify_all()
                 idle_backoff = self._prefetch_poll_interval
                 continue
 
-            # Do not prefetch non-immediate categories to preserve cycle ordering/quotas
+            # Nothing fetched; brief wait with exponential-ish backoff
             with self._buffer_cond:
                 self._buffer_cond.wait(timeout=idle_backoff)
-            # Exponential-ish backoff up to max_backoff
             idle_backoff = min(max_backoff, idle_backoff * 1.5)
 
     def _prefetch_one_locked(self, client) -> Optional[dict]:

@@ -146,7 +146,15 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._last_backoff_log_time: float = 0.0
 
         # Initialize fair scheduler with derived queues
-        self.scheduler = FairScheduler(self.task_queue, starvation_cycles=self.config.starvation_cycles)
+        # Tune for high throughput while preserving fairness (fixed-queue prefetch threads)
+        self.scheduler = FairScheduler(
+            self.task_queue,
+            starvation_cycles=self.config.starvation_cycles,
+            num_prefetch_threads=6,  # one per category
+            total_buffer_capacity=96,  # e.g., ~16 per thread
+            prefetch_poll_interval=0.002,  # faster polling for responsiveness
+            prefetch_non_immediate=True,  # enable prefetch for non-immediate categories
+        )
 
         self._logger.info(
             "MessageBrokerTaskSourceStage initialized. Base task queue: %s | Derived queues: %s",
