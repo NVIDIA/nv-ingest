@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
 
+from glom import glom
 import pandas as pd
 from openai import OpenAI
 
@@ -409,13 +410,15 @@ def _get_pandas_audio_content(row, modality="text"):
 
 
 def _get_pandas_custom_content(row, custom_content_field):
-    custom_content = row.get("custom_content", {}).get(custom_content_field)
-    if custom_content is None:
+    custom_content = row.get("custom_content", {})
+    content = glom(custom_content, custom_content_field, default=None)
+    if content is None:
         logger.warning(f"Custom content field: {custom_content_field} not found")
         return None
 
     try:
-        return str(custom_content)
+        logger.warning(content)
+        return str(content)
     except (TypeError, ValueError):
         logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
         return None
