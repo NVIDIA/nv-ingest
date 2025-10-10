@@ -17,14 +17,9 @@ from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from functools import wraps
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import Iterator
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from typing import Any, Union, List, Dict, Tuple, Optional
+from collections.abc import Callable
+from collections.abc import Iterator
 from urllib.parse import urlparse
 
 import fsspec
@@ -85,7 +80,7 @@ def ensure_job_specs(func):
         if self._job_specs is None:
             raise ValueError(
                 "Job specifications are not initialized because some files are "
-                "remote or not accesible locally. Ensure file paths are correct, "
+                "remote or not accessible locally. Ensure file paths are correct, "
                 "and call `.load()` first if files are remote."
             )
         return func(self, *args, **kwargs)
@@ -94,11 +89,10 @@ def ensure_job_specs(func):
 
 
 class LazyLoadedList(collections.abc.Sequence):
-    def __init__(self, filepath: str, expected_len: Optional[int] = None, compression: Optional[str] = None):
+    def __init__(self, filepath: str, expected_len: int | None = None):
         self.filepath = filepath
-        self._len: Optional[int] = expected_len  # Store pre-calculated length
-        self._offsets: Optional[List[int]] = None
-        self.compression = compression
+        self._len: int | None = expected_len  # Store pre-calculated length
+        self._offsets: list[int] | None = None
 
         if self._len == 0:
             self._offsets = []
@@ -107,7 +101,7 @@ class LazyLoadedList(collections.abc.Sequence):
 
     def __iter__(self) -> Iterator[Any]:
         try:
-            with self._open(self.filepath, "rt", encoding="utf-8") as f:
+            with open(self.filepath, encoding="utf-8") as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -197,7 +191,7 @@ class LazyLoadedList(collections.abc.Sequence):
             f"len={self.__len__() if self._len is not None else '?'}>"
         )
 
-    def get_all_items(self) -> List[Any]:
+    def get_all_items(self) -> list[Any]:
         return list(self.__iter__())
 
 
@@ -218,8 +212,8 @@ class Ingestor:
 
     def __init__(
         self,
-        documents: Optional[List[str]] = None,
-        client: Optional[NvIngestClient] = None,
+        documents: list[str] | None = None,
+        client: NvIngestClient | None = None,
         job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
         **kwargs,
     ):
@@ -330,7 +324,7 @@ class Ingestor:
 
         return True
 
-    def files(self, documents: Union[str, List[str]]) -> "Ingestor":
+    def files(self, documents: str | list[str]) -> "Ingestor":
         """
         Add documents (local paths, globs, or remote URIs) for processing.
 
@@ -447,13 +441,13 @@ class Ingestor:
             raise RuntimeError("Job specs missing.")
         self._job_ids = self._client.add_job(self._job_specs)
 
-        final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
+        final_results_payload_list: list[list[dict[str, Any]]] | list[LazyLoadedList] = []
 
         # Lock for thread-safe appending to final_results_payload_list by I/O tasks
         results_lock = threading.Lock() if self._output_config else None
 
-        io_executor: Optional[ThreadPoolExecutor] = None
-        io_futures: List[Future] = []
+        io_executor: ThreadPoolExecutor | None = None
+        io_futures: list[Future] = []
 
         if self._output_config:
             io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="IngestorDiskIO")
@@ -493,7 +487,7 @@ class Ingestor:
                 )
 
         def _disk_save_callback(
-            results_data: Dict[str, Any],
+            results_data: dict[str, Any],
             job_id: str,
         ):
             source_name = "unknown_source_in_callback"
@@ -523,14 +517,14 @@ class Ingestor:
                 pbar.update(1)
 
         def _in_memory_callback(
-            results_data: Dict[str, Any],
+            results_data: dict[str, Any],
             job_id: str,
         ):
             if pbar:
                 pbar.update(1)
 
         pbar = tqdm(total=len(self._job_ids), desc="Processing", unit="doc") if show_progress else None
-        callback: Optional[Callable] = None
+        callback: Callable | None = None
 
         if self._output_config:
             callback = _disk_save_callback
@@ -805,6 +799,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
+
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
@@ -1004,9 +999,9 @@ class Ingestor:
     def udf(
         self,
         udf_function: str,
-        udf_function_name: Optional[str] = None,
-        phase: Optional[Union[PipelinePhase, int, str]] = None,
-        target_stage: Optional[str] = None,
+        udf_function_name: str | None = None,
+        phase: PipelinePhase | int | str | None = None,
+        target_stage: str | None = None,
         run_before: bool = False,
         run_after: bool = False,
     ) -> "Ingestor":
@@ -1107,9 +1102,9 @@ class Ingestor:
 
     def save_to_disk(
         self,
-        output_directory: Optional[str] = None,
+        output_directory: str | None = None,
         cleanup: bool = True,
-        compression: Optional[str] = "gzip",
+        compression: str | None = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
@@ -1161,7 +1156,7 @@ class Ingestor:
 
         return self
 
-    def _purge_saved_results(self, saved_results: List[LazyLoadedList]):
+    def _purge_saved_results(self, saved_results: list[LazyLoadedList]):
         """
         Deletes the .jsonl files associated with the results and the temporary
         output directory if it was created by this Ingestor instance.

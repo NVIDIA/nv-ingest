@@ -218,7 +218,7 @@ def kv_event_log(key, val, log_path: str = "test_results"):
     data = {}
     if os.path.exists(log_file):
         try:
-            with open(log_file, "r") as fp:
+            with open(log_file) as fp:
                 data = json.load(fp)
         except (json.JSONDecodeError, FileNotFoundError):
             data = {}

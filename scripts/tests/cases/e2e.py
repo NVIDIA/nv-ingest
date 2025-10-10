@@ -1,17 +1,16 @@
+import json
+import logging
 import os
 import sys
 import time
-import json
-import logging
-from datetime import datetime
 
 from nv_ingest_client.client import Ingestor
-from nv_ingest_client.util.milvus import nvingest_retrieval
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
+from nv_ingest_client.util.milvus import nvingest_retrieval
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
+from interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -24,33 +23,12 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-
-def _now_timestr() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M")
-
-
-def _get_env(name: str, default: str | None = None) -> str | None:
-    val = os.environ.get(name)
-    if val is None or val == "":
-        return default
-    return val
-
-
-def _default_collection_name() -> str:
-    # Derive test name from dataset directory or use explicit TEST_NAME
-    dataset_dir = _get_env("DATASET_DIR", "")
-    if dataset_dir:
-        dataset_name = os.path.basename(dataset_dir.rstrip("/"))
-    else:
-        dataset_name = "e2e"
-
-    test_name = _get_env("TEST_NAME", dataset_name)
-    return f"{test_name}_{_now_timestr()}"
+from utils import default_collection_name
 
 
 def main() -> int:
     # Dataset-agnostic: no hardcoded paths, configurable via environment
-    data_dir = _get_env("DATASET_DIR")
+    data_dir = os.getenv("DATASET_DIR")
     if not data_dir:
         print("ERROR: DATASET_DIR environment variable is required")
         print("Example: DATASET_DIR=/datasets/bo20 python e2e.py")
@@ -61,29 +39,29 @@ def main() -> int:
         print("Please check the DATASET_DIR path and ensure it's accessible")
         return 2
 
-    spill_dir = _get_env("SPILL_DIR", "/tmp/spill")
+    spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = _get_env("COLLECTION_NAME", _default_collection_name())
-    hostname = _get_env("HOSTNAME", "localhost")
-    sparse = _get_env("SPARSE", "true").lower() == "true"
-    gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
+    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
+    hostname = os.getenv("HOSTNAME", "localhost")
+    sparse = os.getenv("SPARSE", "true").lower() == "true"
+    gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
 
     # Extraction configuration (core testing variables)
-    extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
-    extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
-    extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
-    extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
-    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
-    text_depth = _get_env("TEXT_DEPTH", "page")
-    table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
+    extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
+    extract_tables = os.getenv("EXTRACT_TABLES", "true").lower() == "true"
+    extract_charts = os.getenv("EXTRACT_CHARTS", "true").lower() == "true"
+    extract_images = os.getenv("EXTRACT_IMAGES", "false").lower() == "true"
+    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+    text_depth = os.getenv("TEXT_DEPTH", "page")
+    table_output_format = os.getenv("TABLE_OUTPUT_FORMAT", "markdown")
 
     # Optional pipeline steps (for special testing scenarios)
-    enable_caption = _get_env("ENABLE_CAPTION", "false").lower() == "true"
-    enable_split = _get_env("ENABLE_SPLIT", "false").lower() == "true"
+    enable_caption = os.getenv("ENABLE_CAPTION", "false").lower() == "true"
+    enable_split = os.getenv("ENABLE_SPLIT", "false").lower() == "true"
 
     # Logging configuration
-    log_path = _get_env("LOG_PATH", "test_results")
+    log_path = os.getenv("LOG_PATH", "test_results")
 
     model_name, dense_dim = embed_info()
 
@@ -147,6 +125,12 @@ def main() -> int:
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
+    total_pages = pdf_page_count(data_dir)
+    pages_per_second = None
+    if total_pages > 0 and ingestion_time > 0:
+        pages_per_second = total_pages / ingestion_time
+        kv_event_log("pages_per_second", pages_per_second, log_path)
+
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)
     text_results, table_results, chart_results = segment_results(results)
@@ -155,7 +139,7 @@ def main() -> int:
     kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
 
     # Document-level analysis
-    if _get_env("DOC_ANALYSIS", "false").lower() == "true":
+    if os.getenv("DOC_ANALYSIS", "false").lower() == "true":
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
@@ -193,7 +177,7 @@ def main() -> int:
 
     # Summarize
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
-    test_name = _get_env("TEST_NAME", dataset_name)
+    test_name = os.getenv("TEST_NAME", dataset_name)
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
@@ -209,6 +193,10 @@ def main() -> int:
     }
     print(f"{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
+
+    print(f"Removing spill directory: {spill_dir}")
+    os.rmdir(spill_dir)
+
     return 0
 
 

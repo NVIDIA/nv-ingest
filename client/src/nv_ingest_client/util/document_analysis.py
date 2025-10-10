@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def analyze_document_chunks(
-    results: Union[List[List[Dict[str, Any]]], List[Dict[str, Any]]]
+    results: Union[List[List[Dict[str, Any]]], List[Dict[str, Any]]],
 ) -> Dict[str, Dict[str, Dict[str, int]]]:
     """
     Analyze ingestor results to count elements by type and page for each document.
