@@ -462,3 +462,72 @@ def test_skips_multiple_empty_and_selects_default():
 
         # Next call ends cycle (no more work)
         assert scheduler.fetch_next(client) is None
+
+
+def test_constructor_params_and_shutdown_idempotent():
+    base = "jobs"
+    # Use direct constructor to verify configurable params
+    with FairScheduler(
+        base_queue=base,
+        starvation_cycles=5,
+        total_buffer_capacity=7,
+        num_prefetch_threads=3,
+        prefetch_poll_interval=0.01,
+    ) as scheduler:
+        # Params reflected
+        assert scheduler._total_buffer_capacity == 7
+        assert scheduler._num_prefetch_threads == 3
+        assert sum(scheduler._per_thread_caps) == scheduler._total_buffer_capacity
+
+        # Threads start lazily on first fetch
+        assert len(scheduler._prefetch_threads) == 0
+        client = FakeClient({})
+        _ = scheduler.fetch_next(client)
+        assert len(scheduler._prefetch_threads) >= 1
+
+    # Close is idempotent
+    fs = FairScheduler(base_queue=base)
+    fs.close()
+    fs.close()
+
+
+def test_immediate_arrival_preempts_within_bounded_pulls():
+    base = "jobs"
+    q = make_queues(base)
+    # Start with micro items only
+    client = FakeClient({q["micro"]: [("micro", i) for i in range(8)], q["immediate"]: []})
+
+    with mk_scheduler(base, starvation_cycles=5) as scheduler:
+        time.sleep(0.005)
+        # Pull one micro first
+        first = scheduler.fetch_next(client)
+        assert first and first[0] == "micro"
+
+        # Mid-cycle, an immediate job arrives
+        client.queues[q["immediate"]] = [("immediate", 999)]
+
+        # Within bounded pulls, we should observe the immediate item
+        seen_immediate = False
+        for _ in range(20):
+            nxt = scheduler.fetch_next(client)
+            if nxt is None:
+                time.sleep(0.002)
+                continue
+            if nxt[0] == "immediate":
+                seen_immediate = True
+                break
+        assert seen_immediate
+
+
+def test_returns_none_when_all_empty():
+    base = "jobs"
+    client = FakeClient({})
+    with mk_scheduler(base, starvation_cycles=5) as scheduler:
+        # Should return None promptly when there is no work at all
+        none_seen = False
+        for _ in range(5):
+            if scheduler.fetch_next(client) is None:
+                none_seen = True
+                break
+            time.sleep(0.002)
+        assert none_seen
