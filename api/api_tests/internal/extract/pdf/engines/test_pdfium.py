@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import base64
 import io
+import os
 
 import numpy as np
 import pytest
@@ -13,6 +14,7 @@ from nv_ingest_api.internal.extract.pdf.engines.pdfium import (
     _extract_page_elements_using_image_ensemble,
 )
 from nv_ingest_api.util.metadata.aggregators import CroppedImageWithContent
+from api.api_tests.utilities_for_test import get_project_root
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -69,14 +71,16 @@ def dummy_extractor_config():
 
 @pytest.fixture
 def pdf_stream_test_page_form_pdf():
-    with open("data/test-page-form.pdf", "rb") as f:
+    data_path = os.path.join(get_project_root(__file__), "data", "test-page-form.pdf")
+    with open(data_path, "rb") as f:
         pdf_stream = io.BytesIO(f.read())
     return pdf_stream
 
 
 @pytest.fixture
 def pdf_stream_test_shapes_pdf():
-    with open("data/test-shapes.pdf", "rb") as f:
+    data_path = os.path.join(get_project_root(__file__), "data", "test-shapes.pdf")
+    with open(data_path, "rb") as f:
         pdf_stream = io.BytesIO(f.read())
     return pdf_stream
 
