@@ -6,23 +6,13 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 import logging
+import time
 
 
 class FairScheduler:
     """
-    Simplified scheduler with support for multiple Redis queues derived from a base name.
-
-    Queues supported (derived from `base_queue`):
-    - default: `<base_queue>`
-    - immediate: `<base_queue>_immediate` (always highest priority)
-    - micro: `<base_queue>_micro`
-    - small: `<base_queue>_small`
-    - medium: `<base_queue>_medium`
-    - large: `<base_queue>_large`
-
-    Current behavior intentionally remains the same as before: only pulls from the
-    default queue via `fetch_next()`. A multi-queue aware method `fetch_next_multi()`
-    is provided but not used by default.
+    Simplified scheduler that fetches jobs from the default queue only.
+    Uses the provided timeout value when polling the broker.
     """
 
     def __init__(
@@ -74,54 +64,35 @@ class FairScheduler:
     # ---------------------------- Public API ----------------------------
     def fetch_next(self, client, timeout: float = 0.0) -> Optional[dict]:
         """
-        Fetch from default queue only - reproduces original behavior.
+        Non-blocking sweep across queues in priority order (default last).
+        If no job is found on a full sweep:
+        - If timeout <= 0: return None immediately.
+        - Else: sleep in 0.5s increments and retry until accumulated elapsed time >= timeout.
         """
-        try:
-            job = client.fetch_message(self.queues["default"], timeout)
-        except TimeoutError:
-            job = None
-        return job
+        start = time.monotonic()
+        while True:
+            # Probe all queues without blocking (immediate -> micro -> small -> medium -> large -> default)
+            for qname in ("immediate", "micro", "small", "medium", "large", "default"):
+                try:
+                    job = client.fetch_message(self.queues[qname], 0)
+                    if job is not None:
+                        return job
+                except TimeoutError:
+                    # Treat as no job available for this queue right now
+                    continue
 
-    def fetch_next_multi(self, client, timeout: float = 0.0) -> Optional[dict]:
-        """
-        Multi-queue aware fetch that prioritizes the immediate queue first, then
-        walks other queues by priority. This method is provided for future use
-        and is not invoked by default callers.
+            # No job found in this sweep
+            if timeout <= 0:
+                return None
 
-        Parameters
-        ----------
-        client : Any
-            Broker client with a fetch_message(queue, timeout) API.
-        timeout : float, optional
-            Total timeout budget to apply when polling the highest-priority queue.
-            Lower-priority queues use non-blocking checks (timeout=0) to avoid
-            starving the immediate queue.
-        """
-        # Always give the immediate queue first chance with the provided timeout
-        try:
-            job = client.fetch_message(self.queues["immediate"], timeout)
-            if job is not None:
-                return job
-        except TimeoutError:
-            # No immediate job within timeout; continue to best-effort checks
-            pass
+            elapsed = time.monotonic() - start
+            if elapsed >= timeout:
+                return None
 
-        # Best-effort/non-blocking checks for other queues in priority order
-        for qname in self._priority_order:
-            if qname in ("immediate",):
-                continue  # already handled
-            try:
-                job = client.fetch_message(self.queues[qname], 0)
-                if job is not None:
-                    return job
-            except TimeoutError:
-                continue
-
-        return None
-
-    def close(self) -> None:
-        """Cleanly stop - no-op since no threads."""
-        pass
-
-    def get_cycle_quotas(self) -> Dict[str, int]:
-        return {}
+            # Sleep up to 0.5s, but not beyond remaining timeout
+            remaining = timeout - elapsed
+            sleep_time = 0.5 if remaining > 0.5 else remaining
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            else:
+                return None
