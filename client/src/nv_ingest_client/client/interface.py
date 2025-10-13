@@ -1237,6 +1237,47 @@ class Ingestor:
 
         return self
 
+    @ensure_job_specs
+    def pdf_split_config(self, pages_per_chunk: int = 32) -> "Ingestor":
+        """
+        Configure PDF splitting behavior for V2 API.
+
+        Parameters
+        ----------
+        pages_per_chunk : int, optional
+            Number of pages per PDF chunk (default: 32)
+            Server enforces boundaries: min=1, max=128
+
+        Returns
+        -------
+        Ingestor
+            Self for method chaining
+
+        Notes
+        -----
+        - Only affects V2 API endpoints with PDF splitting support
+        - Server will clamp values outside [1, 128] range
+        - Smaller chunks = more parallelism but more overhead
+        - Larger chunks = less overhead but reduced concurrency
+        """
+        MIN_PAGES = 1
+        MAX_PAGES = 128
+
+        # Warn if value will be clamped by server
+        if pages_per_chunk < MIN_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} is below minimum. Server will clamp to {MIN_PAGES}.")
+        elif pages_per_chunk > MAX_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} exceeds maximum. Server will clamp to {MAX_PAGES}.")
+
+        # Store in extended_options to be included in job spec
+        for job_spec in self._job_specs._file_type_to_job_spec.values():
+            for spec in job_spec:
+                if "pdf_config" not in spec._extended_options:
+                    spec._extended_options["pdf_config"] = {}
+                spec._extended_options["pdf_config"]["split_page_count"] = pages_per_chunk
+
+        return self
+
     def _count_job_states(self, job_states: set[JobStateEnum]) -> int:
         """
         Counts the jobs in specified states.

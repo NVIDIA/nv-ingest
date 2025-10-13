@@ -100,7 +100,7 @@ class JobSpec:
         Dict
             A dictionary representation of the job specification.
         """
-        return {
+        result = {
             "job_payload": {
                 "source_name": [self._source_name],
                 "source_id": [self._source_id],
@@ -111,6 +111,12 @@ class JobSpec:
             "tasks": [task.to_dict() for task in self._tasks],
             "tracing_options": self._extended_options.get("tracing_options", {}),
         }
+
+        # Include pdf_config if present
+        if "pdf_config" in self._extended_options:
+            result["pdf_config"] = self._extended_options["pdf_config"]
+
+        return result
 
     @property
     def payload(self) -> Dict:

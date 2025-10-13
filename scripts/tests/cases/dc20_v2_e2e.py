@@ -91,6 +91,15 @@ def main() -> int:
     table_output_format = os.getenv("TABLE_OUTPUT_FORMAT") or "markdown"
     extract_infographics = (os.getenv("EXTRACT_INFOGRAPHICS") or "true").lower() == "true"
 
+    # PDF splitting configuration (only override if explicitly set)
+    pdf_split_page_count = os.getenv("PDF_SPLIT_PAGE_COUNT")
+    if pdf_split_page_count:
+        try:
+            pdf_split_page_count = int(pdf_split_page_count)
+        except ValueError:
+            print(f"Warning: Invalid PDF_SPLIT_PAGE_COUNT value, ignoring: {pdf_split_page_count}")
+            pdf_split_page_count = None
+
     # Logging configuration
     log_path = os.getenv("LOG_PATH") or "test_results"
 
@@ -112,20 +121,38 @@ def main() -> int:
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+
+    ## Displaying service side logic for PDF splitting for V2
+    if pdf_split_page_count:
+        # Show clamping info if value is out of bounds
+        clamped_value = max(1, min(pdf_split_page_count, 128))
+        if clamped_value != pdf_split_page_count:
+            print(f"PDF split page count: {pdf_split_page_count} (will be clamped to {clamped_value} by server)")
+        else:
+            print(f"PDF split page count: {pdf_split_page_count}")
+    else:
+        print("PDF split page count: Using server default (32)")
+
     print(f"Assert V1 baseline counts: {assert_v1_baseline}")
     print("==============================")
 
     ingestion_start = time.time()
 
     # Create Ingestor with V2 API endpoints
+    ingestor = Ingestor(
+        message_client_hostname=hostname,
+        message_client_port=7670,
+        # The API version is set via environment variable above
+    ).files(data_dir)
+
+    # Optional: Configure PDF splitting (comment out to use server default)
+    # Set via environment variable OR uncomment line below for quick testing
+    if pdf_split_page_count:
+        ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
+    ingestor = ingestor.pdf_split_config(pages_per_chunk=2)  # Uncomment to override
+
     ingestor = (
-        Ingestor(
-            message_client_hostname=hostname,
-            message_client_port=7670,
-            # The API version is set via environment variable above
-        )
-        .files(data_dir)
-        .extract(
+        ingestor.extract(
             extract_text=extract_text,
             extract_tables=extract_tables,
             extract_charts=extract_charts,
