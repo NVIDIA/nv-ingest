@@ -30,6 +30,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+from nv_ingest_api.util.message_brokers.fair_scheduler import FairScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,6 @@ class MessageBrokerTaskSourceConfig(BaseModel):
 class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
     Ray actor source stage for a message broker task source.
-
     Fetches messages from a broker, processes them, and writes to the output queue.
     """
 
@@ -118,6 +118,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         # Create the client using validated config
         self.client = self._create_client()
+
+        # Initialize FairScheduler (central implementation) using the task queue
+        self.scheduler = FairScheduler(base_queue=self.task_queue)
 
         # Other initializations
         self._message_count = 0
@@ -270,7 +273,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         Fetch a message from the message broker.
         """
         try:
-            job = self.client.fetch_message(self.task_queue, timeout)
+            job = self.scheduler.fetch_next(self.client, timeout)
             if job is None:
                 self._logger.debug("No message received from '%s'", self.task_queue)
                 # Do not treat normal empty polls as failures
