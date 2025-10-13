@@ -149,7 +149,7 @@ def main() -> int:
     # Set via environment variable OR uncomment line below for quick testing
     if pdf_split_page_count:
         ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
-    ingestor = ingestor.pdf_split_config(pages_per_chunk=2)  # Uncomment to override
+    # ingestor = ingestor.pdf_split_config(pages_per_chunk=2)  # Uncomment to override
 
     ingestor = (
         ingestor.extract(
