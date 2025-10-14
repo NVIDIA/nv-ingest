@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 import sys
 import time
 
@@ -169,7 +170,7 @@ def main() -> int:
     print(json.dumps(summary, indent=2))
 
     print(f"Removing spill directory: {spill_dir}")
-    os.rmdir(spill_dir)
+    shutil.rmtree(spill_dir)
 
     return 0
 
