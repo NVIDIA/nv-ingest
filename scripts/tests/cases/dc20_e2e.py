@@ -1,16 +1,17 @@
-import json
-import logging
 import os
 import sys
 import time
+import json
+import logging
+from datetime import datetime
 
 from nv_ingest_client.client import Ingestor
-from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
+from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, kv_event_log, milvus_chunks, segment_results
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -23,12 +24,27 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-from utils import default_collection_name
+
+def _now_timestr() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M")
+
+
+def _get_env(name: str, default: str | None = None) -> str | None:
+    val = os.environ.get(name)
+    if val is None or val == "":
+        return default
+    return val
+
+
+def _default_collection_name() -> str:
+    # Make collection name configurable via TEST_NAME env var, default to dc20
+    test_name = _get_env("TEST_NAME", "dc20")
+    return f"{test_name}_{_now_timestr()}"
 
 
 def main() -> int:
     # Dataset-agnostic: no hardcoded paths, configurable via environment
-    data_dir = os.getenv("DATASET_DIR")
+    data_dir = _get_env("DATASET_DIR")
     if not data_dir:
         print("ERROR: DATASET_DIR environment variable is required")
         print("Example: DATASET_DIR=/datasets/bo20 python dc20_e2e.py")
@@ -39,25 +55,25 @@ def main() -> int:
         print("Please check the DATASET_DIR path and ensure it's accessible")
         return 2
 
-    spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
+    spill_dir = _get_env("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
-    hostname = os.getenv("HOSTNAME", "localhost")
-    sparse = os.getenv("SPARSE", "true").lower() == "true"
-    gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
+    collection_name = _get_env("COLLECTION_NAME", _default_collection_name())
+    hostname = _get_env("HOSTNAME", "localhost")
+    sparse = _get_env("SPARSE", "true").lower() == "true"
+    gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
 
     # Extraction configuration from environment variables
-    extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
-    extract_tables = os.getenv("EXTRACT_TABLES", "true").lower() == "true"
-    extract_charts = os.getenv("EXTRACT_CHARTS", "true").lower() == "true"
-    extract_images = os.getenv("EXTRACT_IMAGES", "false").lower() == "true"
-    text_depth = os.getenv("TEXT_DEPTH", "page")
-    table_output_format = os.getenv("TABLE_OUTPUT_FORMAT", "markdown")
-    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+    extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
+    extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
+    extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
+    extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
+    text_depth = _get_env("TEXT_DEPTH", "page")
+    table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
+    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
 
     # Logging configuration
-    log_path = os.getenv("LOG_PATH", "test_results")
+    log_path = _get_env("LOG_PATH", "test_results")
 
     model_name, dense_dim = embed_info()
 
@@ -114,7 +130,7 @@ def main() -> int:
     kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
 
     # Document-level analysis
-    if os.getenv("DOC_ANALYSIS", "false").lower() == "true":
+    if _get_env("DOC_ANALYSIS", "false").lower() == "true":
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
@@ -151,7 +167,7 @@ def main() -> int:
     kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
-    test_name = os.getenv("TEST_NAME", "dc20")
+    test_name = _get_env("TEST_NAME", "dc20")
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
@@ -167,10 +183,6 @@ def main() -> int:
     }
     print(f"{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
-
-    print(f"Removing spill directory: {spill_dir}")
-    os.rmdir(spill_dir)
-
     return 0
 
 
