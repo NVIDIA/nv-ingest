@@ -2,8 +2,9 @@
 """
 LLM Content Summarizer UDF for NV-Ingest Pipeline
 
-This UDF uses an LLM to generate concise summaries of text content chunks. These summaries are added to the metadata
-for enhanced downstream processing and search capabilities.
+Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline
+payload, run custom code (summarization), and inject results into the metadata for downstream usecases (such as
+retrieval).
 
 These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
 - NVIDIA_API_KEY: API key for NVIDIA NIM endpoints (required)
@@ -14,6 +15,8 @@ These variables can be set in the environment before running the pipeline. These
 - MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
 TODO: Implement this
 - NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
+
+More info can be found in `/nv-ingest/examples/udfs/README.md`
 """
 
 import logging
@@ -60,11 +63,11 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # api_key = os.getenv("NVIDIA_API_KEY")
     # model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
     # base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    
+
     api_key = "no-key-needed"
     model_name = "nvidia/nvidia-nemotron-nano-9b-v2"
     base_url = "http://determined_ptolemy:8000/v1"
-    
+
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
     max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", 60))
