@@ -86,7 +86,7 @@ class ExtractTask(Task):
         extract_page_as_image: bool = False,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
-        table_output_format: str = "pseudo_markdown",
+        table_output_format: str = "markdown",
     ) -> None:
         """
         Setup Extract Task Config

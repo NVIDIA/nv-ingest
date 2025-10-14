@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch, call
 import numpy as np
 import requests
 
+from tritonclient.grpc import InferenceServerException
+
 from nv_ingest_api.internal.primitives.nim.nim_client import NimClient
 
 
@@ -55,6 +57,75 @@ class TestNimClientGrpc(unittest.TestCase):
         self.assertEqual(len(last_call_args[1]["outputs"]), 2)
         self.assertEqual(last_call_args[1]["outputs"][0].name(), "output1")
         self.assertEqual(last_call_args[1]["outputs"][1].name(), "output2")
+
+
+class TestNimClientGrpcRetry(unittest.TestCase):
+    def setUp(self):
+        self.model_interface = MockModelInterface()
+        self.endpoints = ("localhost:8001", "http://localhost:8000")
+        # Configure client with specific retry counts for testing
+        self.client = NimClient(self.model_interface, "grpc", self.endpoints, max_429_retries=4)
+
+    @patch("tritonclient.grpc.InferenceServerClient")
+    @patch("time.sleep", return_value=None)  # Mock time.sleep to speed up tests
+    def test_grpc_infer_retries_and_succeeds(self, mock_sleep, mock_grpc_client):
+        """
+        Tests that _grpc_infer retries on 'queue full' error and eventually succeeds.
+        """
+        retryable_error = InferenceServerException(msg="Exceeds maximum queue size", status="StatusCode.UNAVAILABLE")
+
+        mock_success_response = MagicMock()
+        test_output = np.array([1.0, 2.0], dtype=np.float32)
+        mock_success_response.as_numpy.return_value = test_output
+
+        self.client.client.infer = MagicMock(side_effect=[retryable_error, retryable_error, mock_success_response])
+
+        test_input = np.array([1.0, 2.0], dtype=np.float32)
+        result = self.client._grpc_infer(test_input, "test_model")
+
+        np.testing.assert_array_equal(result, test_output)
+        self.assertEqual(self.client.client.infer.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+        mock_sleep.assert_has_calls([call(1.0), call(2.0)])
+
+    @patch("tritonclient.grpc.InferenceServerClient")
+    @patch("time.sleep", return_value=None)
+    def test_grpc_infer_fails_after_max_retries(self, mock_sleep, mock_grpc_client):
+        """
+        Tests that _grpc_infer fails after exhausting all retries for 'queue full' errors.
+        """
+        retryable_error = InferenceServerException(msg="Exceeds maximum queue size", status="StatusCode.UNAVAILABLE")
+
+        self.client.client.infer = MagicMock(side_effect=retryable_error)
+
+        with self.assertRaises(InferenceServerException) as context:
+            test_input = np.array([1.0], dtype=np.float32)
+            self.client._grpc_infer(test_input, "test_model")
+
+        self.assertIn("Exceeds maximum queue size", context.exception.message())
+        self.assertEqual(context.exception.status(), "StatusCode.UNAVAILABLE")
+
+        self.assertEqual(self.client.client.infer.call_count, 4)
+        self.assertEqual(mock_sleep.call_count, 3)
+
+    @patch("tritonclient.grpc.InferenceServerClient")
+    @patch("time.sleep", return_value=None)
+    def test_grpc_infer_fails_immediately_on_non_retryable_error(self, mock_sleep, mock_grpc_client):
+        """
+        Tests that _grpc_infer fails immediately for a gRPC error that is not 'queue full'.
+        """
+        non_retryable_error = InferenceServerException(msg="Model not found", status="StatusCode.NOT_FOUND")
+
+        self.client.client.infer = MagicMock(side_effect=non_retryable_error)
+
+        with self.assertRaises(InferenceServerException) as context:
+            test_input = np.array([1.0], dtype=np.float32)
+            self.client._grpc_infer(test_input, "test_model")
+
+        self.assertEqual(context.exception.status(), "StatusCode.NOT_FOUND")
+
+        self.client.client.infer.assert_called_once()
+        mock_sleep.assert_not_called()
 
 
 class TestNimClientHttp(unittest.TestCase):

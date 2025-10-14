@@ -121,9 +121,6 @@ class NimClient:
         if model_name == "yolox_ensemble":
             model_name = "yolox"
 
-        if model_name == "scene_text_ensemble":
-            model_name = "scene_text_pre"
-
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
 
@@ -326,16 +323,52 @@ class NimClient:
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
 
-        response = self.client.infer(
-            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
-        )
+        base_delay = 0.5
+        attempt = 0
+        retries_429 = 0
+        max_grpc_retries = self.max_429_retries
 
-        logger.debug(f"gRPC inference response: {response}")
+        while attempt < self.max_retries:
+            try:
+                response = self.client.infer(
+                    model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
+                )
 
-        if len(outputs) == 1:
-            return response.as_numpy(outputs[0].name())
-        else:
-            return [response.as_numpy(output.name()) for output in outputs]
+                logger.debug(f"gRPC inference response: {response}")
+
+                if len(outputs) == 1:
+                    return response.as_numpy(outputs[0].name())
+                else:
+                    return [response.as_numpy(output.name()) for output in outputs]
+
+            except grpcclient.InferenceServerException as e:
+                status = e.status()
+                if status == "StatusCode.UNAVAILABLE" and "Exceeds maximum queue size".lower() in e.message().lower():
+                    retries_429 += 1
+                    logger.warning(
+                        f"Received gRPC {status} for model '{model_name}'. "
+                        f"Attempt {retries_429} of {max_grpc_retries}."
+                    )
+                    if retries_429 >= max_grpc_retries:
+                        logger.error(f"Max retries for gRPC {status} exceeded for model '{model_name}'.")
+                        raise
+
+                    backoff_time = base_delay * (2**retries_429)
+                    time.sleep(backoff_time)
+                    continue
+
+                else:
+                    # For other server-side errors (e.g., INVALID_ARGUMENT, NOT_FOUND),
+                    # retrying will not help. We should fail fast.
+                    logger.error(
+                        f"Received non-retryable gRPC error from Triton for model '{model_name}': {e.message()}"
+                    )
+                    raise
+
+            except Exception as e:
+                # Catch any other unexpected exceptions (e.g., network issues not caught by Triton client)
+                logger.error(f"An unexpected error occurred during gRPC inference for model '{model_name}': {e}")
+                raise
 
     def _http_infer(self, formatted_input: dict) -> dict:
         """

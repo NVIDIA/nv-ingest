@@ -239,6 +239,9 @@ class _ConcurrentProcessor:
 
         is_failed, description = check_ingest_result(result_data)
 
+        if trace_id:
+            self.client.register_parent_trace_id(trace_id)
+
         if is_failed:
             failed_job_spec = self.client._job_index_to_job_spec.get(job_index)
             self.failures.append((f"{job_index}:{failed_job_spec.source_id}", description))
@@ -293,7 +296,7 @@ class _ConcurrentProcessor:
                 logger.warning("Could not reliably extract job indices from results for final check.")
 
     # --------------------------------------------------------------------------
-    # Declarative Helper Methods (behavior preserved)
+    # Public Methods
     # --------------------------------------------------------------------------
 
     def _collect_retry_jobs_for_batch(self) -> List[str]:
@@ -722,6 +725,7 @@ class NvIngestClient:
         except ValueError:
             self._telemetry_max_calls = 10000
         self._telemetry = {}
+        self._completed_parent_trace_ids: List[str] = []  # 1054
         self.reset_telemetry()
 
     def __str__(self) -> str:
@@ -1794,3 +1798,19 @@ class NvIngestClient:
             job_ids.append(job_id)
 
         return job_ids
+
+    def register_parent_trace_id(self, trace_id: Optional[str]) -> None:
+        """Record a parent trace identifier once its aggregation completed."""
+
+        if not trace_id:
+            return
+
+        if trace_id not in self._completed_parent_trace_ids:
+            self._completed_parent_trace_ids.append(trace_id)
+
+    def consume_completed_parent_trace_ids(self) -> List[str]:
+        """Return and clear the set of completed parent trace identifiers."""
+
+        trace_ids = list(self._completed_parent_trace_ids)
+        self._completed_parent_trace_ids.clear()
+        return trace_ids
