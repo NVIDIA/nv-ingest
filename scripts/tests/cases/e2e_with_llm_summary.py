@@ -1,16 +1,17 @@
+import os
 import json
 import logging
-import os
 import sys
 import time
+from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
-from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
+from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, kv_event_log, milvus_chunks, segment_results
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -23,7 +24,7 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-from utils import default_collection_name
+from utils import default_collection_name, get_repo_root
 
 
 def main() -> int:
@@ -31,7 +32,7 @@ def main() -> int:
     data_dir = os.getenv("DATASET_DIR")
     if not data_dir:
         print("ERROR: DATASET_DIR environment variable is required")
-        print("Example: DATASET_DIR=/datasets/bo20 python dc20_e2e.py")
+        print("Example: DATASET_DIR=/datasets/bo20 python e2e.py")
         return 2
 
     if not os.path.isdir(data_dir):
@@ -47,17 +48,26 @@ def main() -> int:
     sparse = os.getenv("SPARSE", "true").lower() == "true"
     gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
 
-    # Extraction configuration from environment variables
+    # Extraction configuration (core testing variables)
     extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
     extract_tables = os.getenv("EXTRACT_TABLES", "true").lower() == "true"
     extract_charts = os.getenv("EXTRACT_CHARTS", "true").lower() == "true"
     extract_images = os.getenv("EXTRACT_IMAGES", "false").lower() == "true"
+    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
     text_depth = os.getenv("TEXT_DEPTH", "page")
     table_output_format = os.getenv("TABLE_OUTPUT_FORMAT", "markdown")
-    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+
+    # Optional pipeline steps (for special testing scenarios)
+    enable_caption = os.getenv("ENABLE_CAPTION", "false").lower() == "true"
+    enable_split = os.getenv("ENABLE_SPLIT", "false").lower() == "true"
 
     # Logging configuration
     log_path = os.getenv("LOG_PATH", "test_results")
+
+    # UDF and LLM Summaries
+    udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
+    print(f"Path to User-Defined Function: {str(udf_path)}")
+    llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
 
     model_name, dense_dim = embed_info()
 
@@ -65,17 +75,22 @@ def main() -> int:
     print("=== Configuration ===")
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
-    print(f"Spill: {spill_dir}")
     print(f"Hostname: {hostname}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
+    print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    if enable_caption:
+        print("Caption: enabled")
+    if enable_split:
+        print("Split: enabled")
     print("====================")
 
     ingestion_start = time.time()
 
+    # Build ingestor pipeline (simplified)
     ingestor = (
         Ingestor(message_client_hostname=hostname, message_client_port=7670)
         .files(data_dir)
@@ -88,7 +103,20 @@ def main() -> int:
             table_output_format=table_output_format,
             extract_infographics=extract_infographics,
         )
-        .embed(model_name=model_name)
+        .udf(udf_function=str(udf_path), target_stage="text_splitter", run_after=True)
+    )
+
+    # Optional pipeline steps
+    if enable_caption:
+        ingestor = ingestor.caption()
+
+    if enable_split:
+        ingestor = ingestor.split()
+
+    # Embed and upload (core pipeline)
+    print("Uploading to collection:", collection_name)
+    ingestor = (
+        ingestor.embed(model_name=model_name)
         .vdb_upload(
             collection_name=collection_name,
             dense_dim=dense_dim,
@@ -105,6 +133,12 @@ def main() -> int:
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
+
+    total_pages = pdf_page_count(data_dir)
+    pages_per_second = None
+    if total_pages > 0 and ingestion_time > 0:
+        pages_per_second = total_pages / ingestion_time
+        kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)
@@ -151,7 +185,8 @@ def main() -> int:
     kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
-    test_name = os.getenv("TEST_NAME", "dc20")
+    dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
+    test_name = os.getenv("TEST_NAME", dataset_name)
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
@@ -169,7 +204,7 @@ def main() -> int:
     print(json.dumps(summary, indent=2))
 
     print(f"Removing spill directory: {spill_dir}")
-    os.rmdir(spill_dir)
+    # os.rmdir(spill_dir)
 
     return 0
 
