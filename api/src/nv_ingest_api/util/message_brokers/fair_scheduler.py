@@ -7,6 +7,109 @@ from __future__ import annotations
 from typing import Dict, Optional
 import logging
 import time
+import random
+
+
+class _SchedulingStrategy:
+    """
+    Base scheduling strategy interface. Implementations must provide a non-blocking
+    single-sweep attempt over non-immediate queues and return a job or None.
+    """
+
+    def try_once(self, client, queues: Dict[str, str], order: list[str]) -> Optional[dict]:
+        raise NotImplementedError
+
+
+class _LotteryStrategy(_SchedulingStrategy):
+    """
+    Lottery scheduling with fixed weights.
+    Weights: micro=4, small=2, large=1, medium=1, default=1
+    """
+
+    def __init__(self) -> None:
+        self._weights: Dict[str, int] = {
+            "micro": 4,
+            "small": 2,
+            "large": 1,
+            "medium": 1,
+            "default": 1,
+        }
+
+    def try_once(self, client, queues: Dict[str, str], order: list[str]) -> Optional[dict]:
+        candidates = list(order)
+        weights = [self._weights[q] for q in candidates]
+        while candidates:
+            try:
+                chosen = random.choices(candidates, weights=weights, k=1)[0]
+                job = client.fetch_message(queues[chosen], 0)
+                if job is not None:
+                    return job
+            except TimeoutError:
+                pass
+            finally:
+                idx = candidates.index(chosen)
+                del candidates[idx]
+                del weights[idx]
+        return None
+
+
+class _RoundRobinStrategy(_SchedulingStrategy):
+    """
+    Simple round-robin over non-immediate queues. Maintains rotation across calls.
+    """
+
+    def __init__(self, order: list[str]) -> None:
+        self._order = list(order)
+        self._len = len(self._order)
+        self._idx = 0
+
+    def try_once(self, client, queues: Dict[str, str], order: list[str]) -> Optional[dict]:
+        start_idx = self._idx
+        for step in range(self._len):
+            i = (start_idx + step) % self._len
+            qname = self._order[i]
+            try:
+                job = client.fetch_message(queues[qname], 0)
+                if job is not None:
+                    # advance rotation to the position after the chosen one
+                    self._idx = (i + 1) % self._len
+                    return job
+            except TimeoutError:
+                continue
+        return None
+
+
+class _WeightedRoundRobinStrategy(_SchedulingStrategy):
+    """
+    Smooth Weighted Round Robin (SWRR) using weights micro=4, small=2, large=1, medium=1, default=1.
+    Maintains current weights across calls.
+    """
+
+    def __init__(self) -> None:
+        self._weights: Dict[str, int] = {
+            "micro": 4,
+            "small": 2,
+            "large": 1,
+            "medium": 1,
+            "default": 1,
+        }
+        self._current: Dict[str, int] = {k: 0 for k in self._weights.keys()}
+        self._total: int = sum(self._weights.values())
+
+    def try_once(self, client, queues: Dict[str, str], order: list[str]) -> Optional[dict]:
+        # Attempt up to len(order) selections per sweep
+        for _ in range(len(order)):
+            for q in order:
+                self._current[q] += self._weights[q]
+            chosen = max(order, key=lambda q: self._current[q])
+            self._current[chosen] -= self._total
+            try:
+                job = client.fetch_message(queues[chosen], 0)
+                if job is not None:
+                    return job
+            except TimeoutError:
+                continue
+        return None
 
 
 class FairScheduler:
@@ -22,6 +125,7 @@ class FairScheduler:
         num_prefetch_threads: int = 0,
         prefetch_poll_interval: float = 0.0,
         prefetch_non_immediate: bool = False,
+        strategy: str = "lottery",
     ) -> None:
         self.base_queue = base_queue
 
@@ -45,6 +149,9 @@ class FairScheduler:
             "default",
         ]
 
+        # Non-immediate queue order reference
+        self._non_immediate_order = ["micro", "small", "large", "medium", "default"]
+
         # Logger
         self._logger = logging.getLogger(__name__)
 
@@ -53,6 +160,14 @@ class FairScheduler:
         self._num_prefetch_threads: int = int(num_prefetch_threads)
         self._prefetch_poll_interval: float = float(prefetch_poll_interval)
         self._prefetch_non_immediate: bool = bool(prefetch_non_immediate)
+
+        # Strategy selection
+        if strategy == "round_robin":
+            self._strategy_impl: _SchedulingStrategy = _RoundRobinStrategy(self._non_immediate_order)
+        elif strategy == "weighted_round_robin":
+            self._strategy_impl = _WeightedRoundRobinStrategy()
+        else:
+            self._strategy_impl = _LotteryStrategy()
 
     # Context manager helpers for clean shutdown
     def __enter__(self) -> "FairScheduler":
@@ -64,22 +179,29 @@ class FairScheduler:
     # ---------------------------- Public API ----------------------------
     def fetch_next(self, client, timeout: float = 0.0) -> Optional[dict]:
         """
-        Non-blocking sweep across queues in priority order (default last).
-        If no job is found on a full sweep:
-        - If timeout <= 0: return None immediately.
-        - Else: sleep in 0.5s increments and retry until accumulated elapsed time >= timeout.
+        Immediate-first, then strategy-based scheduling among non-immediate queues.
+
+        Behavior:
+        - Always check 'immediate' first (non-blocking). If present, return immediately.
+        - If not, select using the configured strategy (lottery, round_robin, weighted_round_robin).
+        - If no job is found in a full pass:
+          - If timeout <= 0: return None.
+          - Else: sleep in 0.5s increments and retry until accumulated elapsed time >= timeout.
         """
         start = time.monotonic()
         while True:
-            # Probe all queues without blocking (immediate -> micro -> small -> medium -> large -> default)
-            for qname in ("immediate", "micro", "small", "medium", "large", "default"):
-                try:
-                    job = client.fetch_message(self.queues[qname], 0)
-                    if job is not None:
-                        return job
-                except TimeoutError:
-                    # Treat as no job available for this queue right now
-                    continue
+            # 1) Immediate always first, non-blocking
+            try:
+                job = client.fetch_message(self.queues["immediate"], 0)
+                if job is not None:
+                    return job
+            except TimeoutError:
+                pass
+
+            # 2) Strategy-based attempt over non-immediate queues (non-blocking)
+            job = self._strategy_impl.try_once(client, self.queues, self._non_immediate_order)
+            if job is not None:
+                return job
 
             # No job found in this sweep
             if timeout <= 0:
