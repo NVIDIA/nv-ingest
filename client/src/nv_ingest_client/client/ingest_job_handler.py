@@ -307,6 +307,7 @@ class IngestJobHandler:
 
         start_time_ns: int = time.time_ns()
         self._init_progress_bar(total_files)
+        pages_per_sec: float = None
         try:
             self._processed = 0
             while (self._processed < len(self.files)) or self._retry_job_ids:
