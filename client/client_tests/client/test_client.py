@@ -654,3 +654,62 @@ def test_create_jobs_for_batch_without_pdf_split_config(nv_ingest_client, tasks,
 
     # Check that no PDF split config was added
     assert "pdf_config" not in mock_job_spec._extended_options
+
+
+# Test API version configuration integration
+class TestNvIngestClientApiVersionConfiguration:
+    """Test suite for API version configuration through NvIngestClient"""
+
+    def test_default_creates_v1_client(self):
+        """Test that NvIngestClient creates RestClient with v1 by default"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+        )
+
+        # Access the underlying RestClient
+        rest_client = client._message_client
+        assert rest_client._api_version == "v1"
+        assert rest_client._submit_endpoint == "/v1/submit_job"
+        assert rest_client._fetch_endpoint == "/v1/fetch_job"
+
+    def test_explicit_v2_via_message_client_kwargs(self):
+        """Test that NvIngestClient can be configured to use v2 explicitly"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={"api_version": "v2"},
+        )
+
+        # Access the underlying RestClient
+        rest_client = client._message_client
+        assert rest_client._api_version == "v2"
+        assert rest_client._submit_endpoint == "/v2/submit_job"
+        assert rest_client._fetch_endpoint == "/v2/fetch_job"
+
+    def test_explicit_v1_via_message_client_kwargs(self):
+        """Test that v1 can be explicitly configured (for clarity)"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={"api_version": "v1"},
+        )
+
+        rest_client = client._message_client
+        assert rest_client._api_version == "v1"
+
+    def test_other_kwargs_pass_through(self):
+        """Test that other message_client_kwargs pass through correctly"""
+        custom_headers = {"X-Custom-Header": "test"}
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={
+                "api_version": "v2",
+                "headers": custom_headers,
+            },
+        )
+
+        rest_client = client._message_client
+        assert rest_client._api_version == "v2"
+        assert rest_client._headers == custom_headers

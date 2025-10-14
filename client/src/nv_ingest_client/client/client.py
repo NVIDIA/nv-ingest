@@ -692,11 +692,12 @@ class NvIngestClient:
         message_client_port : int, optional
             Port of the REST/message service. Defaults to 7670.
         message_client_kwargs : dict, optional
-            Extra keyword arguments passed to the client allocator.
+            Extra keyword arguments passed to the client allocator. For RestClient,
+            can include 'api_version' (e.g., 'v1' or 'v2'). Defaults to 'v1'.
         msg_counter_id : str, optional
             Identifier for message counting. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
-            Number of workers in the thread pool. Defaults to 1.
+            Number of workers in the thread pool. Defaults to 8.
 
         Returns
         -------

@@ -58,10 +58,6 @@ def _assert_counts_match(expected: dict[str, int], actual: dict[str, int]) -> No
 
 
 def main() -> int:
-    # Set API version to V2 (can be overridden by environment)
-    if "NV_INGEST_API_VERSION" not in os.environ:
-        os.environ["NV_INGEST_API_VERSION"] = "v2"
-
     # Dataset-agnostic: no hardcoded paths, configurable via environment
     data_dir = os.getenv("DATASET_DIR")
     if not data_dir:
@@ -105,8 +101,8 @@ def main() -> int:
 
     model_name, dense_dim = embed_info()
 
-    # Get actual API version being used
-    actual_api_version = os.environ.get("NV_INGEST_API_VERSION", "v1")
+    # This test always uses V2 API
+    actual_api_version = "v2"
     assert_v1_baseline = (os.getenv("ASSERT_V1_BASELINE") or "false").lower() == "true"
 
     # Log configuration for transparency
@@ -138,11 +134,11 @@ def main() -> int:
 
     ingestion_start = time.time()
 
-    # Create Ingestor with V2 API endpoints
+    # Create Ingestor with V2 API endpoints (explicit configuration)
     ingestor = Ingestor(
         message_client_hostname=hostname,
         message_client_port=7670,
-        # The API version is set via environment variable above
+        message_client_kwargs={"api_version": "v1"},
     ).files(data_dir)
 
     # Optional: Configure PDF splitting (comment out to use server default)
