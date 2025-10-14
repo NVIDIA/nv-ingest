@@ -54,7 +54,7 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
-from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
 from nv_ingest_client.util.vdb import VDB, get_vdb_op_cls
 from tqdm import tqdm
 
@@ -1269,12 +1269,9 @@ class Ingestor:
         elif pages_per_chunk > MAX_PAGES:
             logger.warning(f"pages_per_chunk={pages_per_chunk} exceeds maximum. Server will clamp to {MAX_PAGES}.")
 
-        # Store in extended_options to be included in job spec
-        for job_spec in self._job_specs._file_type_to_job_spec.values():
-            for spec in job_spec:
-                if "pdf_config" not in spec._extended_options:
-                    spec._extended_options["pdf_config"] = {}
-                spec._extended_options["pdf_config"]["split_page_count"] = pages_per_chunk
+        # Flatten all job specs and apply PDF config using shared utility
+        all_job_specs = [spec for job_specs in self._job_specs._file_type_to_job_spec.values() for spec in job_specs]
+        apply_pdf_split_config_to_job_specs(all_job_specs, pages_per_chunk)
 
         return self
 

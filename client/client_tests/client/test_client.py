@@ -609,3 +609,48 @@ def test_create_jobs_for_batch_extract_mismatch(nv_ingest_client, mock_create_jo
     assert tasks["split"] in calls
     assert tasks["extract_pptx"] in calls
     assert tasks["extract_pdf"] not in calls, "extract_pdf should not have been added"
+
+
+def test_create_jobs_for_batch_with_pdf_split_config(nv_ingest_client, tasks, mock_create_job_specs_for_batch):
+    """Test that PDF split config is correctly applied to PDF job specs."""
+    mock_job_spec_pdf = Mock(spec=JobSpec)
+    mock_job_spec_pdf.document_type = "pdf"
+    mock_job_spec_pdf._extended_options = {}
+
+    mock_job_spec_txt = Mock(spec=JobSpec)
+    mock_job_spec_txt.document_type = "txt"
+    mock_job_spec_txt._extended_options = {}
+
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec_pdf, mock_job_spec_txt]
+
+    files = ["file1.pdf", "file2.txt"]
+    pdf_split_page_count = 64
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks, pdf_split_page_count=pdf_split_page_count)
+
+    assert job_ids == ["0", "1"]
+
+    # Check that PDF split config was applied only to PDF files
+    assert "pdf_config" in mock_job_spec_pdf._extended_options
+    assert mock_job_spec_pdf._extended_options["pdf_config"]["split_page_count"] == 64
+
+    # Check that non-PDF files don't have the config
+    assert "pdf_config" not in mock_job_spec_txt._extended_options
+
+
+def test_create_jobs_for_batch_without_pdf_split_config(nv_ingest_client, tasks, mock_create_job_specs_for_batch):
+    """Test that jobs work correctly when PDF split config is not provided."""
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_job_spec.document_type = "pdf"
+    mock_job_spec._extended_options = {}
+
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec]
+
+    files = ["file1.pdf"]
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks)
+
+    assert job_ids == ["0"]
+
+    # Check that no PDF split config was added
+    assert "pdf_config" not in mock_job_spec._extended_options

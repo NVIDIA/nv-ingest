@@ -350,6 +350,32 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
     return job_specs
 
 
+def apply_pdf_split_config_to_job_specs(job_specs: List[JobSpec], pages_per_chunk: int) -> None:
+    """
+    Apply PDF split configuration to a list of JobSpec objects.
+
+    Modifies job specs in-place by adding pdf_config to extended_options for PDF files only.
+
+    Parameters
+    ----------
+    job_specs : List[JobSpec]
+        List of job specifications to potentially modify
+    pages_per_chunk : int
+        Number of pages per PDF chunk (will be stored as-is; server performs clamping)
+
+    Notes
+    -----
+    - Only modifies job specs with document_type == "pdf" (case-insensitive)
+    - Modifies job specs in-place
+    - Safe to call on mixed document types (only PDFs are affected)
+    """
+    for job_spec in job_specs:
+        if job_spec.document_type.lower() == "pdf":
+            if "pdf_config" not in job_spec._extended_options:
+                job_spec._extended_options["pdf_config"] = {}
+            job_spec._extended_options["pdf_config"]["split_page_count"] = pages_per_chunk
+
+
 def filter_function_kwargs(func, **kwargs):
     """
     Filters and returns keyword arguments that match the parameters of a given function.
