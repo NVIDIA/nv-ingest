@@ -16,7 +16,7 @@ These variables can be set in the environment before running the pipeline. These
 TODO: Implement this
 - NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
 
-More info can be found in `/nv-ingest/examples/udfs/README.md`
+More info can be found in `examples/udfs/README.md`
 """
 
 import logging
