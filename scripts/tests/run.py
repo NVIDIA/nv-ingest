@@ -173,7 +173,29 @@ def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> in
 @click.option("--no-build", is_flag=True, help="Skip building Docker images")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
-def main(case, managed, profiles, readiness_timeout, artifacts_dir, env_file, no_build, keep_up, doc_analysis):
+@click.option(
+    "--trace-debug",
+    is_flag=True,
+    help="Print detailed trace and annotation diagnostics (currently only dc20_v2_e2e)",
+)
+@click.option(
+    "--trace-artifacts",
+    is_flag=True,
+    help="Store full trace payloads under the artifacts directory (currently only dc20_v2_e2e)",
+)
+def main(
+    case,
+    managed,
+    profiles,
+    readiness_timeout,
+    artifacts_dir,
+    env_file,
+    no_build,
+    keep_up,
+    doc_analysis,
+    trace_debug,
+    trace_artifacts,
+):
 
     # Resolve env file: explicit flag wins; otherwise try .env then env.example in this folder
     if env_file:

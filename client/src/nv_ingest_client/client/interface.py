@@ -420,19 +420,24 @@ class Ingestor:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
             'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
             through to process_jobs_concurrently.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers gathered during ingestion.
 
         Returns
         -------
-        results : list
-            When `return_failures` is False:
-            - Default: List of response['data'] per job (list[list[dict]]).
-            - If `return_full_response=True`: List of full response envelopes (each dict
-              contains keys like 'data', 'trace', 'annotations').
+        results : list of dict
+            List of successful job results when `return_failures` is False.
+
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
+
+        If `include_parent_trace_ids=True` is provided via kwargs, an additional
+        list of parent trace IDs is appended to the return value.
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
+
+        include_parent_trace_ids = bool(kwargs.pop("include_parent_trace_ids", False))
 
         self._prepare_ingest_run()
 
@@ -635,7 +640,15 @@ class Ingestor:
             except Exception:
                 pass
 
-        return (results, failures) if return_failures else results
+        parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+
+        if return_failures and include_parent_trace_ids:
+            return results, failures, parent_trace_ids
+        if return_failures:
+            return results, failures
+        if include_parent_trace_ids:
+            return results, parent_trace_ids
+        return results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
