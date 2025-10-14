@@ -14,7 +14,7 @@ User-Defined Functions (UDFs) let you inject custom processing logic into the NV
 - **Purpose**: Reusable UDFs that are part of the API library
 - **Audience**: Production deployments, advanced users
 - **Characteristics**: Robust error handling, configurable, tested for production use
-- **Example**: `llm_summarizer_udf.py` - AI summarization of extracted document contents
+- **Example**: `llm_summarizer_udf.py` - summarize extracted document content with an LLM
 
 > **💡 Placement Guide**: Put learning examples in `examples/udfs/`, put reusable production UDFs in `api/src/udfs/`
 
