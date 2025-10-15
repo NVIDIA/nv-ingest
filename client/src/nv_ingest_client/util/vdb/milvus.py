@@ -1352,7 +1352,7 @@ def nvingest_retrieval(
         nvidia_api_key=nvidia_api_key,
         input_type="query",
         output_names=["embeddings"],
-        grpc=not (urlparse(embedding_endpoint).scheme == "http"),
+        grpc=not ("http" in urlparse(embedding_endpoint).scheme),
     )
     client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     final_top_k = top_k
