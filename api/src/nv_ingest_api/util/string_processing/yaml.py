@@ -24,7 +24,7 @@ def _replacer(match: re.Match) -> str:
     # First try the primary env var
     value = os.environ.get(var_name)
     if value is not None:
-        return value  # empty string still "wins", matching existing behavior
+        return value
 
     # If primary is missing, try the default.
     resolved_default = _resolve_default_with_single_fallback(default_val)
