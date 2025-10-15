@@ -203,7 +203,7 @@ stages:
           $OCR_GRPC_ENDPOINT|"",
           $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
         ]
-        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
     replicas:
       min_replicas: 0

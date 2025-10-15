@@ -131,7 +131,7 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
 # Start the pipeline subprocess for library mode
 run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=False)
-wait_for_pipeline("localhost", 7671, timeout=120.0)
+wait_for_pipeline("localhost", 7671)
 
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
