@@ -404,10 +404,11 @@ class Ingestor:
         save_to_disk: bool = False,
         **kwargs: Any,
     ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
+        List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
+        List[Dict[str, Any]],  # In-memory: Full response envelopes when return_full_response=True
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
         Tuple[
-            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
             List[Tuple[str, str]],
         ],
     ]:  # noqa: E501
@@ -423,18 +424,26 @@ class Ingestor:
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'verbose'. Unrecognized keys are passed through to
-            process_jobs_concurrently.
+            'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
+            through to process_jobs_concurrently.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers gathered during ingestion.
 
         Returns
         -------
         results : list of dict
             List of successful job results when `return_failures` is False.
+
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
+
+        If `include_parent_trace_ids=True` is provided via kwargs, an additional
+        list of parent trace IDs is appended to the return value.
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
+
+        include_parent_trace_ids = bool(kwargs.pop("include_parent_trace_ids", False))
 
         self._prepare_ingest_run()
 
@@ -549,6 +558,22 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
+        # Telemetry controls (optional)
+        enable_telemetry: Optional[bool] = kwargs.pop("enable_telemetry", None)
+        show_telemetry: Optional[bool] = kwargs.pop("show_telemetry", None)
+        if show_telemetry is None:
+            # Fallback to env NV_INGEST_CLIENT_SHOW_TELEMETRY (0/1), default off
+            try:
+                show_telemetry = bool(int(os.getenv("NV_INGEST_CLIENT_SHOW_TELEMETRY", "0")))
+            except ValueError:
+                show_telemetry = False
+        # If user explicitly wants to show telemetry but did not specify enable_telemetry,
+        # ensure collection is enabled so summary isn't empty.
+        if enable_telemetry is None and show_telemetry:
+            enable_telemetry = True
+        if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
+            self._client.enable_telemetry(bool(enable_telemetry))
+
         results, failures = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
@@ -611,7 +636,25 @@ class Ingestor:
                     logger.info("Purging saved results from disk after successful VDB upload.")
                     self._purge_saved_results(results)
 
-        return (results, failures) if return_failures else results
+        # Print telemetry summary if requested
+        if show_telemetry:
+            try:
+                summary = self._client.summarize_telemetry()
+                # Print to stdout and log for convenience
+                print("NvIngestClient Telemetry Summary:", json.dumps(summary, indent=2))
+                logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
+            except Exception:
+                pass
+
+        parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+
+        if return_failures and include_parent_trace_ids:
+            return results, failures, parent_trace_ids
+        if return_failures:
+            return results, failures
+        if include_parent_trace_ids:
+            return results, parent_trace_ids
+        return results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
