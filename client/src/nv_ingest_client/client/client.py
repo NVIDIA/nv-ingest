@@ -36,7 +36,11 @@ from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result, IngestJobFailure
-from nv_ingest_client.util.util import create_job_specs_for_batch, check_ingest_result
+from nv_ingest_client.util.util import (
+    create_job_specs_for_batch,
+    check_ingest_result,
+    apply_pdf_split_config_to_job_specs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -688,11 +692,12 @@ class NvIngestClient:
         message_client_port : int, optional
             Port of the REST/message service. Defaults to 7670.
         message_client_kwargs : dict, optional
-            Extra keyword arguments passed to the client allocator.
+            Extra keyword arguments passed to the client allocator. For RestClient,
+            can include 'api_version' (e.g., 'v1' or 'v2'). Defaults to 'v1'.
         msg_counter_id : str, optional
             Identifier for message counting. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
-            Number of workers in the thread pool. Defaults to 1.
+            Number of workers in the thread pool. Defaults to 8.
 
         Returns
         -------
@@ -1707,7 +1712,9 @@ class NvIngestClient:
 
         return results
 
-    def create_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[str]:
+    def create_jobs_for_batch(
+        self, files_batch: List[str], tasks: Dict[str, Any], pdf_split_page_count: int = None
+    ) -> List[str]:
         """
         Create and submit job specifications (JobSpecs) for a batch of files, returning the job IDs.
         This function takes a batch of files, processes each file to extract its content and type,
@@ -1723,6 +1730,9 @@ class NvIngestClient:
             A dictionary of tasks to be added to each job. The keys represent task names, and the
             values represent task specifications or configurations. Standard tasks include "split",
             "extract", "store", "caption", "dedup", "filter", "embed".
+        pdf_split_page_count : int, optional
+            Number of pages per PDF chunk for splitting (1-128). If provided, this will be added
+            to the job spec's extended_options for PDF files.
 
         Returns
         -------
@@ -1768,6 +1778,10 @@ class NvIngestClient:
             raise ValueError("`tasks` must be a dictionary of task names -> task specifications.")
 
         job_specs = create_job_specs_for_batch(files_batch)
+
+        # Apply PDF split config if provided
+        if pdf_split_page_count is not None:
+            apply_pdf_split_config_to_job_specs(job_specs, pdf_split_page_count)
 
         job_ids = []
         for job_spec in job_specs:
