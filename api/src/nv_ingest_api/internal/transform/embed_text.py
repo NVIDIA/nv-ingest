@@ -18,7 +18,6 @@ from nv_ingest_api.internal.transform.embed_text import infer_microservice
 logger = logging.getLogger(__name__)
 
 # Reduce SDK HTTP logging verbosity so request/response logs are not emitted
-logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
