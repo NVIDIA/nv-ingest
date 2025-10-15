@@ -23,10 +23,6 @@ import logging
 import os
 import time
 
-# REMOVE BEFORE MERGING
-# import yaml
-# from pathlib import Path
-
 
 logger = logging.getLogger(__name__)
 
