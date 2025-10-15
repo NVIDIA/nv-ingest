@@ -138,7 +138,7 @@ def main() -> int:
     ingestor = Ingestor(
         message_client_hostname=hostname,
         message_client_port=7670,
-        message_client_kwargs={"api_version": "v1"},
+        message_client_kwargs={"api_version": "v2"},
     ).files(data_dir)
 
     # Optional: Configure PDF splitting (comment out to use server default)
