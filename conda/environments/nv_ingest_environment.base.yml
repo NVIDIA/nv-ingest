@@ -18,6 +18,7 @@ dependencies:
   - langdetect>=1.0.9
   - minio>=7.2.12
   - openai>=1.82.0
+  - opencv-python-headless
   - opentelemetry-api>=1.27.0
   - opentelemetry-exporter-otlp>=1.27.0
   - opentelemetry-sdk>=1.27.0
@@ -46,7 +47,6 @@ dependencies:
   - pip:
       - llama-index-embeddings-nvidia
       - milvus-lite==2.4.12
-      - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - prometheus-client
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
