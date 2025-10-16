@@ -43,10 +43,26 @@ def main() -> int:
     spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
+    collection_name = os.getenv("COLLECTION_NAME") or default_collection_name()
     hostname = os.getenv("HOSTNAME", "localhost")
     sparse = os.getenv("SPARSE", "true").lower() == "true"
     gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
+
+    # API version configuration (v1 = default, v2 = PDF splitting support)
+    api_version = os.getenv("API_VERSION", "v1").lower()
+
+    # PDF split configuration (V2 only - server-side page splitting)
+    pdf_split_page_count = os.getenv("PDF_SPLIT_PAGE_COUNT")
+    if pdf_split_page_count:
+        try:
+            pdf_split_page_count = int(pdf_split_page_count)
+            if api_version != "v2":
+                print(f"WARNING: PDF_SPLIT_PAGE_COUNT={pdf_split_page_count} is set but API_VERSION={api_version}")
+                print("         PDF splitting only works with API_VERSION=v2. This setting will be ignored.")
+                pdf_split_page_count = None
+        except ValueError:
+            print(f"WARNING: Invalid PDF_SPLIT_PAGE_COUNT value '{pdf_split_page_count}', ignoring")
+            pdf_split_page_count = None
 
     # Extraction configuration (core testing variables)
     extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
@@ -61,42 +77,77 @@ def main() -> int:
     enable_caption = os.getenv("ENABLE_CAPTION", "false").lower() == "true"
     enable_split = os.getenv("ENABLE_SPLIT", "false").lower() == "true"
 
+    # Text splitting configuration (client-side text chunking)
+    split_chunk_size = int(os.getenv("SPLIT_CHUNK_SIZE", "1024"))
+    split_chunk_overlap = int(os.getenv("SPLIT_CHUNK_OVERLAP", "150"))
+
     # Logging configuration
     log_path = os.getenv("LOG_PATH", "test_results")
 
     model_name, dense_dim = embed_info()
 
     # Log configuration for transparency
-    print("=== Configuration ===")
+    print("=== Test Configuration ===")
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
-    print(f"Hostname: {hostname}")
-    print(f"Embed model: {model_name}, dim: {dense_dim}")
-    print(f"Sparse: {sparse}, GPU search: {gpu_search}")
-    print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
-    print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
-    print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    print(f"Embed: {model_name} (dim={dense_dim}, sparse={sparse})")
+
+    # Extraction config
+    extractions = []
+    if extract_text:
+        extractions.append("text")
+    if extract_tables:
+        extractions.append("tables")
+    if extract_charts:
+        extractions.append("charts")
+    if extract_images:
+        extractions.append("images")
+    if extract_infographics:
+        extractions.append("infographics")
+    print(f"Extract: {', '.join(extractions)}")
+
+    # Pipeline options
+    pipeline_opts = []
+    if api_version == "v2" and pdf_split_page_count:
+        clamped_value = max(1, min(pdf_split_page_count, 128))
+        if clamped_value != pdf_split_page_count:
+            pipeline_opts.append(f"PDF split: {pdf_split_page_count} pages (clamped to {clamped_value})")
+        else:
+            pipeline_opts.append(f"PDF split: {pdf_split_page_count} pages")
+    elif api_version == "v2":
+        pipeline_opts.append("PDF split: 32 pages (default)")
+
     if enable_caption:
-        print("Caption: enabled")
+        pipeline_opts.append("caption")
     if enable_split:
-        print("Split: enabled")
-    print("====================")
+        pipeline_opts.append(f"text split: {split_chunk_size}/{split_chunk_overlap}")
+
+    if pipeline_opts:
+        print(f"Pipeline: {', '.join(pipeline_opts)}")
+    print("==========================")
 
     ingestion_start = time.time()
 
-    # Build ingestor pipeline (simplified)
-    ingestor = (
-        Ingestor(message_client_hostname=hostname, message_client_port=7670)
-        .files(data_dir)
-        .extract(
-            extract_text=extract_text,
-            extract_tables=extract_tables,
-            extract_charts=extract_charts,
-            extract_images=extract_images,
-            text_depth=text_depth,
-            table_output_format=table_output_format,
-            extract_infographics=extract_infographics,
-        )
+    # Build ingestor pipeline with API version configuration
+    ingestor_kwargs = {"message_client_hostname": hostname, "message_client_port": 7670}
+    if api_version == "v2":
+        ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
+
+    ingestor = Ingestor(**ingestor_kwargs).files(data_dir)
+
+    # V2-only: Configure PDF splitting (server-side page splitting)
+    if api_version == "v2" and pdf_split_page_count:
+        ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
+
+    # Extraction step
+    ingestor = ingestor.extract(
+        extract_text=extract_text,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_images=extract_images,
+        text_depth=text_depth,
+        table_output_format=table_output_format,
+        extract_infographics=extract_infographics,
     )
 
     # Optional pipeline steps
@@ -104,7 +155,10 @@ def main() -> int:
         ingestor = ingestor.caption()
 
     if enable_split:
-        ingestor = ingestor.split()
+        ingestor = ingestor.split(
+            chunk_size=split_chunk_size,
+            chunk_overlap=split_chunk_overlap,
+        )
 
     # Embed and upload (core pipeline)
     ingestor = (
@@ -174,28 +228,62 @@ def main() -> int:
         top_k=5,
         gpu_search=gpu_search,
     )
-    kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
+    retrieval_time = time.time() - querying_start
+    kv_event_log("retrieval_time_s", retrieval_time, log_path)
 
-    # Summarize
+    # Summarize - Build comprehensive results dict
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
     test_name = os.getenv("TEST_NAME", dataset_name)
-    summary = {
-        "test_name": test_name,
-        "dataset_dir": data_dir,
-        "collection_name": collection_name,
-        "hostname": hostname,
-        "model_name": model_name,
-        "dense_dim": dense_dim,
-        "sparse": sparse,
-        "gpu_search": gpu_search,
-        "ingestion_time_s": ingestion_time,
-        "result_count": len(results),
-        "failure_count": len(failures),
-    }
-    print(f"{test_name}_e2e summary:")
-    print(json.dumps(summary, indent=2))
 
-    print(f"Removing spill directory: {spill_dir}")
+    # Structure results for consolidation with runner metadata
+    test_results = {
+        "test_config": {
+            "test_name": test_name,
+            "api_version": api_version,
+            "dataset_dir": data_dir,
+            "collection_name": collection_name,
+            "hostname": hostname,
+            "model_name": model_name,
+            "dense_dim": dense_dim,
+            "sparse": sparse,
+            "gpu_search": gpu_search,
+            "extract_text": extract_text,
+            "extract_tables": extract_tables,
+            "extract_charts": extract_charts,
+            "extract_images": extract_images,
+            "extract_infographics": extract_infographics,
+            "text_depth": text_depth,
+            "table_output_format": table_output_format,
+            "enable_caption": enable_caption,
+            "enable_split": enable_split,
+        },
+        "results": {
+            "result_count": len(results),
+            "failure_count": len(failures),
+            "ingestion_time_s": ingestion_time,
+            "total_pages": total_pages,
+            "pages_per_second": pages_per_second,
+            "text_chunks": sum(len(x) for x in text_results),
+            "table_chunks": sum(len(x) for x in table_results),
+            "chart_chunks": sum(len(x) for x in chart_results),
+            "retrieval_time_s": retrieval_time,
+        },
+    }
+
+    # Add split config if enabled
+    if enable_split:
+        test_results["test_config"]["split_chunk_size"] = split_chunk_size
+        test_results["test_config"]["split_chunk_overlap"] = split_chunk_overlap
+
+    print(f"\n{test_name}_e2e summary:")
+    print(json.dumps(test_results, indent=2))
+
+    # Write test results for run.py to consolidate
+    results_file = os.path.join(log_path, "_test_results.json")
+    with open(results_file, "w") as f:
+        json.dump(test_results, f, indent=2)
+
+    print(f"\nRemoving spill directory: {spill_dir}")
     shutil.rmtree(spill_dir)
 
     return 0
