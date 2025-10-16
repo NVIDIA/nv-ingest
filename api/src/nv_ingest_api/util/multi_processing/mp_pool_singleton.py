@@ -5,8 +5,9 @@
 
 import logging
 import math
-import multiprocessing as mp
 import os
+import sys
+import multiprocessing as mp
 from threading import Lock
 from typing import Any, Callable, Optional
 
@@ -103,7 +104,12 @@ class ProcessWorkerPoolSingleton:
             The total number of worker processes to start.
         """
         self._total_workers = total_max_workers
-        self._context: mp.context.ForkContext = mp.get_context("fork")
+
+        start_method = "fork"
+        if sys.platform.lower() == "darwin":
+            start_method = "spawn"
+        self._context: mp.context.ForkContext = mp.get_context(start_method)
+
         # Bounded task queue: maximum tasks queued = 2 * total_max_workers.
         self._task_queue: mp.Queue = self._context.Queue(maxsize=2 * total_max_workers)
         self._next_task_id: int = 0
