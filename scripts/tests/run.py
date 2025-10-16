@@ -219,9 +219,14 @@ def main(
 
     out_dir = create_artifacts_dir(artifacts_dir, artifact_name)
     stdout_path = os.path.join(out_dir, "stdout.txt")
-    summary_path = os.path.join(out_dir, "summary.json")
 
+    # Display test runner info
+    api_version = os.environ.get("API_VERSION", "v1")
+    print("=" * 60)
+    print(f"Test Runner: {case} | API: {api_version} | Mode: {'managed' if managed else 'attach'}")
     print(f"Artifacts: {out_dir}")
+    print("=" * 60)
+    print()
 
     rc = 1
     try:
@@ -259,20 +264,50 @@ def main(
             print(f"Unknown case: {case}")
             rc = 2
 
-        # Write summary stub (case also prints its own JSON summary)
-        with open(summary_path, "w") as f:
-            json.dump(
-                {
-                    "case": case,
-                    "latest-commit": last_commit(),
-                    "infra": "managed" if managed else "attach",
-                    "profiles": profiles,
-                    "stdout": os.path.basename(stdout_path),
-                    "return_code": rc,
-                },
-                f,
-                indent=2,
-            )
+        # Consolidate runner metadata + test results into single results.json
+        api_version = os.environ.get("API_VERSION", "v1")
+        pdf_split_count = os.environ.get("PDF_SPLIT_PAGE_COUNT")
+        pdf_split_int = None
+        if pdf_split_count:
+            try:
+                pdf_split_int = int(pdf_split_count)
+            except ValueError:
+                pass
+
+        # Build consolidated results
+        consolidated = {
+            "case": case,
+            "timestamp": now_timestr(),
+            "latest_commit": last_commit(),
+            "infrastructure": "managed" if managed else "attach",
+            "api_version": api_version,
+            "pdf_split_page_count": pdf_split_int,
+            "return_code": rc,
+        }
+
+        if managed:
+            consolidated["profiles"] = profiles
+
+        # Merge test results if available
+        test_results_file = os.path.join(out_dir, "_test_results.json")
+        if os.path.exists(test_results_file):
+            try:
+                with open(test_results_file) as f:
+                    test_data = json.load(f)
+                    consolidated.update(test_data)
+                # Clean up intermediate file
+                os.remove(test_results_file)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Warning: Could not read test results: {e}")
+
+        # Write consolidated results.json
+        results_path = os.path.join(out_dir, "results.json")
+        with open(results_path, "w") as f:
+            json.dump(consolidated, f, indent=2)
+
+        print(f"\n{'='*60}")
+        print(f"Results written to: {results_path}")
+        print(f"{'='*60}")
 
         return rc
     finally:
