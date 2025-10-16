@@ -128,7 +128,7 @@ from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-if __name__ == "__main__":
+def main():
     # Start the pipeline subprocess for library mode
     run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
@@ -188,6 +188,9 @@ if __name__ == "__main__":
     # (optional) Review any failures that were returned
     if failures:
         print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 You can see the extracted text that represents the content of the ingested test document.
