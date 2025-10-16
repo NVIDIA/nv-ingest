@@ -218,12 +218,27 @@ class RedisIngestService(IngestServiceMeta):
             ttl_for_result: Optional[int] = (
                 self._result_data_ttl_seconds if self._fetch_mode == FetchMode.NON_DESTRUCTIVE else None
             )
+            # Determine target queue based on optional QoS hint
+            queue_hint = None
+            try:
+                queue_hint = (job_spec.get("tracing_options") or {}).get("queue_hint")
+            except Exception:
+                queue_hint = None
+            allowed = {"default", "immediate", "micro", "small", "medium", "large"}
+            if isinstance(queue_hint, str) and queue_hint in allowed:
+                if queue_hint == "default":
+                    channel_name = self._redis_task_queue
+                else:
+                    channel_name = f"{self._redis_task_queue}_{queue_hint}"
+            else:
+                channel_name = self._redis_task_queue
             logger.debug(
-                f"Submitting job {trace_id} to queue '{self._redis_task_queue}' with result TTL: {ttl_for_result}"
+                f"Submitting job {trace_id} to queue '{channel_name}' (hint={queue_hint}) "
+                f"with result TTL: {ttl_for_result}"
             )
             await self._run_bounded_to_thread(
                 self._ingest_client.submit_message,
-                channel_name=self._redis_task_queue,
+                channel_name=channel_name,
                 message=job_spec_json,
                 ttl_seconds=ttl_for_result,
             )

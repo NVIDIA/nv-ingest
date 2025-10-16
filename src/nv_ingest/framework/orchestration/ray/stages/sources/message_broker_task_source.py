@@ -30,7 +30,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
-from nv_ingest_api.util.message_brokers.fair_scheduler import FairScheduler
+from nv_ingest_api.util.message_brokers.qos_scheduler import QosScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +119,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         # Create the client using validated config
         self.client = self._create_client()
 
-        # Initialize FairScheduler (central implementation) using the task queue
-        self.scheduler = FairScheduler(base_queue=self.task_queue)
+        # Initialize QosScheduler (central implementation) using the task queue
+        self.scheduler = QosScheduler(base_queue=self.task_queue)
 
         # Other initializations
         self._message_count = 0

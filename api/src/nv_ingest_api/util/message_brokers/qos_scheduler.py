@@ -112,7 +112,7 @@ class _WeightedRoundRobinStrategy(_SchedulingStrategy):
         return None
 
 
-class FairScheduler:
+class QosScheduler:
     """
     Simplified scheduler that fetches jobs from the default queue only.
     Uses the provided timeout value when polling the broker.
@@ -170,7 +170,7 @@ class FairScheduler:
             self._strategy_impl = _LotteryStrategy()
 
     # Context manager helpers for clean shutdown
-    def __enter__(self) -> "FairScheduler":
+    def __enter__(self) -> "QosScheduler":
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
