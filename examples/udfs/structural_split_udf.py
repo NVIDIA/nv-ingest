@@ -11,7 +11,7 @@ import copy
 import logging
 import re
 import uuid
-from typing import List, Dict, Any
+from typing import Any
 
 
 def structural_split(control_message: "IngestControlMessage") -> "IngestControlMessage":
@@ -146,7 +146,7 @@ def structural_split(control_message: "IngestControlMessage") -> "IngestControlM
     return control_message
 
 
-def _split_by_markdown_headers(text: str, headers: List[str]) -> List[str]:
+def _split_by_markdown_headers(text: str, headers: list[str]) -> list[str]:
     """Split content by markdown headers."""
     if not text or not text.strip():
         return [text]
@@ -181,7 +181,7 @@ def _split_by_markdown_headers(text: str, headers: List[str]) -> List[str]:
     return chunks if chunks else [text]
 
 
-def _extract_header_info(lines: List[str], headers: List[str]) -> Dict[str, Any]:
+def _extract_header_info(lines: list[str], headers: list[str]) -> dict[str, Any]:
     """Extract hierarchical header information from chunk lines."""
     header_pattern = r"^(" + "|".join(re.escape(h) for h in headers) + r")\s+(.+)$"
 

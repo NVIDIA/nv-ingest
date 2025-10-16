@@ -6,7 +6,7 @@ making it easier to understand, parse, and validate test outputs.
 """
 
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -45,15 +45,15 @@ class DC20E2EResults(BaseModel):
     This captures the specific metrics from the DC20 end-to-end test case.
     """
 
-    result_count: Optional[int] = Field(None, description="Number of results processed")
-    failure_count: Optional[int] = Field(None, description="Number of failures encountered")
-    ingestion_time_s: Optional[float] = Field(None, description="Time spent on ingestion in seconds")
-    text_chunks: Optional[int] = Field(None, description="Number of text chunks extracted")
-    table_chunks: Optional[int] = Field(None, description="Number of table chunks extracted")
-    chart_chunks: Optional[int] = Field(None, description="Number of chart chunks extracted")
-    image_chunks: Optional[int] = Field(None, description="Number of image chunks extracted")
-    infographic_chunks: Optional[int] = Field(None, description="Number of infographic chunks extracted")
-    retrieval_time_s: Optional[float] = Field(None, description="Time spent on retrieval in seconds")
+    result_count: int | None = Field(None, description="Number of results processed")
+    failure_count: int | None = Field(None, description="Number of failures encountered")
+    ingestion_time_s: float | None = Field(None, description="Time spent on ingestion in seconds")
+    text_chunks: int | None = Field(None, description="Number of text chunks extracted")
+    table_chunks: int | None = Field(None, description="Number of table chunks extracted")
+    chart_chunks: int | None = Field(None, description="Number of chart chunks extracted")
+    image_chunks: int | None = Field(None, description="Number of image chunks extracted")
+    infographic_chunks: int | None = Field(None, description="Number of infographic chunks extracted")
+    retrieval_time_s: float | None = Field(None, description="Time spent on retrieval in seconds")
 
     @field_validator(
         "result_count",
@@ -89,8 +89,8 @@ class TestArtifacts(BaseModel):
 
     timestamp: str = Field(..., description="Timestamp directory name (YYYYMMDD_HHMMSS)")
     summary: TestSummary = Field(..., description="Test execution summary")
-    stdout_content: Optional[str] = Field(None, description="Content of stdout.txt file")
-    test_results: Optional[Dict[str, Any]] = Field(None, description="Test-specific results (e.g., dc20_e2e.json)")
+    stdout_content: str | None = Field(None, description="Content of stdout.txt file")
+    test_results: dict[str, Any] | None = Field(None, description="Test-specific results (e.g., dc20_e2e.json)")
 
     @field_validator("timestamp")
     @classmethod
@@ -125,7 +125,7 @@ def load_test_artifacts(artifacts_dir: str) -> TestArtifacts:
 
     # Load summary.json
     summary_path = os.path.join(artifacts_dir, "summary.json")
-    with open(summary_path, "r") as f:
+    with open(summary_path) as f:
         summary_data = json.load(f)
     summary = TestSummary(**summary_data)
 
@@ -133,7 +133,7 @@ def load_test_artifacts(artifacts_dir: str) -> TestArtifacts:
     stdout_path = os.path.join(artifacts_dir, "stdout.txt")
     stdout_content = None
     if os.path.exists(stdout_path):
-        with open(stdout_path, "r") as f:
+        with open(stdout_path) as f:
             stdout_content = f.read()
 
     # Load test-specific results
@@ -141,7 +141,7 @@ def load_test_artifacts(artifacts_dir: str) -> TestArtifacts:
     for filename in os.listdir(artifacts_dir):
         if filename.endswith(".json") and filename != "summary.json":
             filepath = os.path.join(artifacts_dir, filename)
-            with open(filepath, "r") as f:
+            with open(filepath) as f:
                 content = f.read()
 
             # Parse as JSON
@@ -151,7 +151,7 @@ def load_test_artifacts(artifacts_dir: str) -> TestArtifacts:
 
 
 # Example usage and validation functions
-def validate_dc20_results(results_dict: Dict[str, Any]) -> DC20E2EResults:
+def validate_dc20_results(results_dict: dict[str, Any]) -> DC20E2EResults:
     """
     Validate and parse DC20 E2E test results.
 

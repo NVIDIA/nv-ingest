@@ -62,6 +62,46 @@ class TestGetPdfSplitPageCount:
 
         monkeypatch.delenv("PDF_SPLIT_PAGE_COUNT", raising=False)
 
+    def test_client_override_within_bounds(self, monkeypatch):
+        """Client override within [1, 128] range should be used as-is."""
+        monkeypatch.delenv("PDF_SPLIT_PAGE_COUNT", raising=False)
+
+        pages_per_chunk = get_pdf_split_page_count(client_override=64)
+
+        assert pages_per_chunk == 64
+
+    def test_client_override_above_max_clamped(self, monkeypatch):
+        """Client override above 128 should be clamped to maximum."""
+        monkeypatch.delenv("PDF_SPLIT_PAGE_COUNT", raising=False)
+
+        pages_per_chunk = get_pdf_split_page_count(client_override=256)
+
+        assert pages_per_chunk == 128
+
+    def test_client_override_below_min_clamped(self, monkeypatch):
+        """Client override below 1 should be clamped to minimum."""
+        monkeypatch.delenv("PDF_SPLIT_PAGE_COUNT", raising=False)
+
+        pages_per_chunk = get_pdf_split_page_count(client_override=0)
+
+        assert pages_per_chunk == 1
+
+    def test_client_override_takes_precedence_over_env(self, monkeypatch):
+        """Client override should take precedence over environment variable."""
+        monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "50")
+
+        pages_per_chunk = get_pdf_split_page_count(client_override=16)
+
+        assert pages_per_chunk == 16
+
+    def test_no_override_uses_default(self, monkeypatch):
+        """When no client override or env var is set, should use default."""
+        monkeypatch.delenv("PDF_SPLIT_PAGE_COUNT", raising=False)
+
+        pages_per_chunk = get_pdf_split_page_count()
+
+        assert pages_per_chunk == DEFAULT_PDF_SPLIT_PAGE_COUNT
+
 
 class TestSplitPdfToChunks:
     """Tests for splitting a PDF into chunk descriptors."""

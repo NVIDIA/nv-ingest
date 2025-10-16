@@ -54,7 +54,7 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
-from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
 from nv_ingest_client.util.vdb import VDB, get_vdb_op_cls
 from tqdm import tqdm
 
@@ -1234,6 +1234,44 @@ class Ingestor:
         }
         caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
+
+        return self
+
+    @ensure_job_specs
+    def pdf_split_config(self, pages_per_chunk: int = 32) -> "Ingestor":
+        """
+        Configure PDF splitting behavior for V2 API.
+
+        Parameters
+        ----------
+        pages_per_chunk : int, optional
+            Number of pages per PDF chunk (default: 32)
+            Server enforces boundaries: min=1, max=128
+
+        Returns
+        -------
+        Ingestor
+            Self for method chaining
+
+        Notes
+        -----
+        - Only affects V2 API endpoints with PDF splitting support
+        - Server will clamp values outside [1, 128] range
+        - Smaller chunks = more parallelism but more overhead
+        - Larger chunks = less overhead but reduced concurrency
+        """
+        MIN_PAGES = 1
+        MAX_PAGES = 128
+
+        # Warn if value will be clamped by server
+        if pages_per_chunk < MIN_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} is below minimum. Server will clamp to {MIN_PAGES}.")
+        elif pages_per_chunk > MAX_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} exceeds maximum. Server will clamp to {MAX_PAGES}.")
+
+        # Flatten all job specs and apply PDF config using shared utility
+        all_job_specs = [spec for job_specs in self._job_specs._file_type_to_job_spec.values() for spec in job_specs]
+        apply_pdf_split_config_to_job_specs(all_job_specs, pages_per_chunk)
 
         return self
 

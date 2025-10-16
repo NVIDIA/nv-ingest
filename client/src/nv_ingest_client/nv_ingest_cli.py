@@ -75,6 +75,12 @@ logger = logging.getLogger(__name__)
 @click.option("--client_port", default=7670, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
 @click.option(
+    "--api_version",
+    default="v1",
+    type=click.Choice(["v1", "v2"], case_sensitive=False),
+    help="API version to use (v1 or v2). V2 required for PDF split page count feature.",
+)
+@click.option(
     "--client_type",
     default="rest",
     type=click.Choice(["rest", "simple"], case_sensitive=False),
@@ -119,6 +125,8 @@ Example:
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'embed'
   --task 'caption:{}'
+  --pdf_split_page_count 64  # Configure PDF splitting (requires --api_version v2)
+  --api_version v2           # Use V2 API for PDF splitting support
 
 \b
 Tasks and Options:
@@ -207,6 +215,12 @@ for locating portions of the system that might be bottlenecks for the overall ru
 )
 @click.option("--zipkin_host", default="localhost", help="DNS name or Zipkin API.")
 @click.option("--zipkin_port", default=9411, type=int, help="Port for the Zipkin trace API")
+@click.option(
+    "--pdf_split_page_count",
+    default=None,
+    type=int,
+    help="Number of pages per PDF chunk for splitting. Allows per-request tuning of PDF split size in v2 api.",
+)
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
@@ -215,6 +229,7 @@ def main(
     client_host: str,
     client_kwargs: str,
     client_port: int,
+    api_version: str,
     client_type: str,
     concurrency_n: int,
     dataset: str,
@@ -228,6 +243,7 @@ def main(
     collect_profiling_traces: bool,
     zipkin_host: str,
     zipkin_port: int,
+    pdf_split_page_count: int,
     task: [str],
     version: [bool],
 ):
@@ -268,6 +284,10 @@ def main(
                 _client_kwargs_obj = json.loads(client_kwargs)
             except Exception:
                 _client_kwargs_obj = {"raw": client_kwargs}
+
+            # Merge api_version into client_kwargs
+            _client_kwargs_obj["api_version"] = api_version
+
             _sanitized_client_kwargs = sanitize_for_logging(_client_kwargs_obj)
             logging.debug(
                 f"Creating message client: {client_host} and port: {client_port} -> "
@@ -285,7 +305,7 @@ def main(
                 message_client_allocator=client_allocator,
                 message_client_hostname=client_host,
                 message_client_port=client_port,
-                message_client_kwargs=json.loads(client_kwargs),
+                message_client_kwargs=_client_kwargs_obj,
                 worker_pool_size=concurrency_n,
             )
 
@@ -300,6 +320,7 @@ def main(
                 save_images_separately=save_images_separately,
                 show_progress=True,
                 show_telemetry=True,
+                pdf_split_page_count=pdf_split_page_count,
             )
             (total_files, trace_times, pages_processed, trace_ids) = handler.run()
 

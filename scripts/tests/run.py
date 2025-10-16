@@ -1,18 +1,17 @@
-import click
 import json
 import os
 import subprocess
 import sys
 import time
-from datetime import datetime
-
+import click
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 COMPOSE_FILE = os.path.join(REPO_ROOT, "docker-compose.yaml")
 
+from cases.utils import last_commit, now_timestr
 
-def now_timestr() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+CASES = ["dc20_e2e", "e2e", "e2e_with_llm_summary"]
 
 
 def run_cmd(cmd: list[str]) -> int:
@@ -21,9 +20,7 @@ def run_cmd(cmd: list[str]) -> int:
 
 
 def stop_services() -> int:
-    """
-    Simple cleanup of Docker services.
-    """
+    """Simple cleanup of Docker services"""
     print("Performing service cleanup...")
 
     # Stop all services with all profiles
@@ -88,41 +85,73 @@ def load_env_file(env_file: str | None):
                 os.environ.setdefault(k.strip(), v.strip())
 
 
-def run_case(
-    case_name: str,
-    stdout_path: str,
-    doc_analysis: bool = False,
-    trace_debug: bool = False,
-    trace_artifacts: bool = False,
-) -> int:
-    """Run a test case as a subprocess to keep runner simple and capture output."""
+def run_case(case_name: str, stdout_path: str, doc_analysis: bool = False) -> int:
+    """Run a test case directly in the same process with real-time output."""
+    import importlib.util
+
     case_path = os.path.join(os.path.dirname(__file__), "cases", f"{case_name}.py")
 
     # Set LOG_PATH to artifacts directory for kv_event_log
-    env = os.environ.copy()
-    artifact_root = os.path.dirname(stdout_path)
-    env["LOG_PATH"] = artifact_root
+    os.environ["LOG_PATH"] = os.path.dirname(stdout_path)
     if doc_analysis:
-        env["DOC_ANALYSIS"] = "true"
-    if trace_debug:
-        env["TRACE_DEBUG"] = "true"
-    if trace_artifacts:
-        traces_dir = os.path.join(artifact_root, "traces")
-        os.makedirs(traces_dir, exist_ok=True)
-        env["TRACE_ARTIFACT_DIR"] = traces_dir
+        os.environ["DOC_ANALYSIS"] = "true"
 
-    proc = subprocess.run([sys.executable, case_path], capture_output=True, text=True, env=env)
-    # Echo to console and also save to file
-    if proc.stdout:
-        print(proc.stdout, end="")
-    if proc.stderr:
-        print(proc.stderr, end="", file=sys.stderr)
-    with open(stdout_path, "w") as fp:
-        if proc.stdout:
-            fp.write(proc.stdout)
-        if proc.stderr:
-            fp.write(proc.stderr)
-    return proc.returncode
+    # Redirect stdout/stderr to both console and file
+    class TeeFile:
+        def __init__(self, file_path, original_stream):
+            self.file = open(file_path, "w")
+            self.original = original_stream
+
+        def write(self, data):
+            self.original.write(data)
+            self.file.write(data)
+
+        def flush(self):
+            self.original.flush()
+            self.file.flush()
+
+        def close(self):
+            self.file.close()
+
+    tee_stdout = TeeFile(stdout_path, sys.stdout)
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+
+    try:
+        sys.stdout = tee_stdout
+        sys.stderr = tee_stdout
+
+        # Add cases directory to sys.path so modules can import from utils
+        cases_dir = os.path.dirname(case_path)
+        if cases_dir not in sys.path:
+            sys.path.insert(0, cases_dir)
+
+        # Load and execute the test case module
+        spec = importlib.util.spec_from_file_location(case_name, case_path)
+        if spec is None or spec.loader is None:
+            print(f"Error: Could not load case {case_name} from {case_path}")
+            return 1
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[case_name] = module
+        spec.loader.exec_module(module)
+
+        # If the module has a main function, call it
+        if hasattr(module, "main"):
+            result = module.main()
+            return result if isinstance(result, int) else 0
+        return 0
+
+    except Exception as e:
+        print(f"Error running case {case_name}: {e}", file=sys.stderr)
+        import traceback
+
+        traceback.print_exc()
+        return 1
+    finally:
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+        tee_stdout.close()
 
 
 @click.command()
@@ -224,8 +253,8 @@ def main(
                 return 1
 
         # Run case
-        if case in ["dc20_e2e", "e2e", "dc20_v2_e2e"]:
-            rc = run_case(case, stdout_path, doc_analysis, trace_debug, trace_artifacts)
+        if case in CASES:
+            rc = run_case(case, stdout_path, doc_analysis)
         else:
             print(f"Unknown case: {case}")
             rc = 2
@@ -235,6 +264,7 @@ def main(
             json.dump(
                 {
                     "case": case,
+                    "latest-commit": last_commit(),
                     "infra": "managed" if managed else "attach",
                     "profiles": profiles,
                     "stdout": os.path.basename(stdout_path),

@@ -1,17 +1,18 @@
+import os
 import json
 import logging
-import os
 import shutil
 import sys
 import time
+from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
-from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
+from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -24,7 +25,7 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-from utils import default_collection_name
+from utils import default_collection_name, get_repo_root
 
 
 def main() -> int:
@@ -64,6 +65,11 @@ def main() -> int:
     # Logging configuration
     log_path = os.getenv("LOG_PATH", "test_results")
 
+    # UDF and LLM Summaries
+    udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
+    print(f"Path to User-Defined Function: {str(udf_path)}")
+    llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
+
     model_name, dense_dim = embed_info()
 
     # Log configuration for transparency
@@ -72,6 +78,7 @@ def main() -> int:
     print(f"Collection: {collection_name}")
     print(f"Hostname: {hostname}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
+    print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
@@ -97,6 +104,7 @@ def main() -> int:
             table_output_format=table_output_format,
             extract_infographics=extract_infographics,
         )
+        .udf(udf_function=str(udf_path), target_stage="text_splitter", run_after=True)
     )
 
     # Optional pipeline steps
@@ -107,6 +115,7 @@ def main() -> int:
         ingestor = ingestor.split()
 
     # Embed and upload (core pipeline)
+    print("Uploading to collection:", collection_name)
     ingestor = (
         ingestor.embed(model_name=model_name)
         .vdb_upload(
