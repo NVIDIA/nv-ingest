@@ -2,8 +2,9 @@
 """
 LLM Content Summarizer UDF for NV-Ingest Pipeline
 
-This UDF uses an LLM to generate concise summaries of text content chunks. These summaries are added to the metadata
-for enhanced downstream processing and search capabilities.
+Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline
+payload, run custom code (summarization), and inject results into the metadata for downstream usecases (such as
+retrieval).
 
 These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
 - NVIDIA_API_KEY: API key for NVIDIA NIM endpoints (required)
@@ -14,15 +15,13 @@ These variables can be set in the environment before running the pipeline. These
 - MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
 TODO: Implement this
 - NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
+
+More info can be found in `examples/udfs/README.md`
 """
 
 import logging
 import os
 import time
-
-# REMOVE BEFORE MERGING
-# import yaml
-# from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
