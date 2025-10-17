@@ -57,7 +57,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     logger.info("UDF: Starting LLM content summarization")
 
     api_key = os.getenv("NVIDIA_API_KEY")
-    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
+    model_name = "moonshotai/kimi-k2-instruct-0905"
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
     max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
@@ -84,6 +84,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
     # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
     # pages, it must require parsing the payload to see which chunks correspond to which pages
+    original_df = df.copy()
     if len(df) > 1:
         # TODO: add feature to select N first and last chunks
         df = df.iloc[[0, -1]]
@@ -107,10 +108,11 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     if not stats["failed"]:
         stats["tokens"] = _estimate_tokens(content)
         logger.info("Summarized %d tokens in %f seconds using %s", stats["tokens"], stats["duration"], model_name)
-        _store_summary(df, summary, model_name)
+        _store_summary(original_df, summary, model_name)
 
         # Update the control message with modified DataFrame
-        control_message.payload(df)
+        control_message.payload(original_df)
+
     else:
         logger.warning("%s failed to summarize content", model_name)
 
