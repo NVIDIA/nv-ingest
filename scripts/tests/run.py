@@ -12,7 +12,7 @@ from cases.utils import last_commit, now_timestr
 from config import load_config
 
 
-CASES = ["e2e", "e2e_with_llm_summary"]
+CASES = ["dc20_e2e", "e2e", "e2e_with_llm_summary"]
 
 
 def run_cmd(cmd: list[str]) -> int:
