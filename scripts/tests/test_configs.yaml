@@ -4,11 +4,11 @@
 # Active configuration (used by default when running tests)
 active:
   # Dataset configuration
-  dataset_dir: /path/to/your/dataset
-  test_name: null  # Auto-generated if null
+  dataset_dir: /raid/jioffe/projects/rapids-microbenchmarks/nv-ingest/repos/nv-ingest/data/splits
+  test_name: jensen  # Auto-generated if null
 
   # API configuration
-  api_version: v1  # v1 or v2
+  api_version: v2  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -22,6 +22,7 @@ active:
   sparse: true  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
+  llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization
 
   # Extraction configuration
   extract_text: true
