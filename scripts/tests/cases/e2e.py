@@ -27,53 +27,62 @@ except Exception:
 from utils import default_collection_name
 
 
-def main(config=None, log_path: str = "test_results") -> int:
-    """
-    Main test entry point.
-
-    Args:
-        config: TestConfig object with all settings
-        log_path: Path for logging output
-
-    Returns:
-        Exit code (0 = success)
-    """
-    # Backward compatibility: if no config provided, we should error
-    if config is None:
-        print("ERROR: No configuration provided")
-        print("This test case requires a config object from the test runner")
+def main() -> int:
+    # Dataset-agnostic: no hardcoded paths, configurable via environment
+    data_dir = os.getenv("DATASET_DIR")
+    if not data_dir:
+        print("ERROR: DATASET_DIR environment variable is required")
+        print("Example: DATASET_DIR=/datasets/bo20 python e2e.py")
         return 2
 
-    # Extract configuration from config object
-    data_dir = config.dataset_dir
-    spill_dir = config.spill_dir
+    if not os.path.isdir(data_dir):
+        print(f"ERROR: Dataset directory does not exist: {data_dir}")
+        print("Please check the DATASET_DIR path and ensure it's accessible")
+        return 2
+
+    spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = config.collection_name or default_collection_name()
-    hostname = config.hostname
-    sparse = config.sparse
-    gpu_search = config.gpu_search
+    collection_name = os.getenv("COLLECTION_NAME") or default_collection_name()
+    hostname = os.getenv("HOSTNAME", "localhost")
+    sparse = os.getenv("SPARSE", "true").lower() == "true"
+    gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
 
-    # API version configuration
-    api_version = config.api_version
-    pdf_split_page_count = config.pdf_split_page_count
+    # API version configuration (v1 = default, v2 = PDF splitting support)
+    api_version = os.getenv("API_VERSION", "v1").lower()
 
-    # Extraction configuration
-    extract_text = config.extract_text
-    extract_tables = config.extract_tables
-    extract_charts = config.extract_charts
-    extract_images = config.extract_images
-    extract_infographics = config.extract_infographics
-    text_depth = config.text_depth
-    table_output_format = config.table_output_format
+    # PDF split configuration (V2 only - server-side page splitting)
+    pdf_split_page_count = os.getenv("PDF_SPLIT_PAGE_COUNT")
+    if pdf_split_page_count:
+        try:
+            pdf_split_page_count = int(pdf_split_page_count)
+            if api_version != "v2":
+                print(f"WARNING: PDF_SPLIT_PAGE_COUNT={pdf_split_page_count} is set but API_VERSION={api_version}")
+                print("         PDF splitting only works with API_VERSION=v2. This setting will be ignored.")
+                pdf_split_page_count = None
+        except ValueError:
+            print(f"WARNING: Invalid PDF_SPLIT_PAGE_COUNT value '{pdf_split_page_count}', ignoring")
+            pdf_split_page_count = None
 
-    # Optional pipeline steps
-    enable_caption = config.enable_caption
-    enable_split = config.enable_split
+    # Extraction configuration (core testing variables)
+    extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
+    extract_tables = os.getenv("EXTRACT_TABLES", "true").lower() == "true"
+    extract_charts = os.getenv("EXTRACT_CHARTS", "true").lower() == "true"
+    extract_images = os.getenv("EXTRACT_IMAGES", "false").lower() == "true"
+    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+    text_depth = os.getenv("TEXT_DEPTH", "page")
+    table_output_format = os.getenv("TABLE_OUTPUT_FORMAT", "markdown")
 
-    # Text splitting configuration
-    split_chunk_size = config.split_chunk_size
-    split_chunk_overlap = config.split_chunk_overlap
+    # Optional pipeline steps (for special testing scenarios)
+    enable_caption = os.getenv("ENABLE_CAPTION", "false").lower() == "true"
+    enable_split = os.getenv("ENABLE_SPLIT", "false").lower() == "true"
+
+    # Text splitting configuration (client-side text chunking)
+    split_chunk_size = int(os.getenv("SPLIT_CHUNK_SIZE", "1024"))
+    split_chunk_overlap = int(os.getenv("SPLIT_CHUNK_OVERLAP", "150"))
+
+    # Logging configuration
+    log_path = os.getenv("LOG_PATH", "test_results")
 
     model_name, dense_dim = embed_info()
 
@@ -224,7 +233,7 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     # Summarize - Build comprehensive results dict
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
-    test_name = config.test_name or dataset_name
+    test_name = os.getenv("TEST_NAME", dataset_name)
 
     # Structure results for consolidation with runner metadata
     test_results = {
