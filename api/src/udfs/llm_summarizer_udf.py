@@ -57,7 +57,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     logger.info("UDF: Starting LLM content summarization")
 
     api_key = os.getenv("NVIDIA_API_KEY")
-    model_name = "moonshotai/kimi-k2-instruct-0905"
+    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
     max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
