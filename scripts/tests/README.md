@@ -138,7 +138,6 @@ python run.py --case=e2e --api-version=v2
 - `sparse` (boolean): Use sparse embeddings
 - `gpu_search` (boolean): Use GPU for search
 - `embedding_model` (string): Embedding model name (`auto` for auto-detection)
-- `llm_summarization_model` (string): LLM model for summarization (used by `e2e_with_llm_summary`)
 
 #### Storage Options
 - `spill_dir` (string): Temporary processing directory
@@ -202,8 +201,8 @@ DATASET_DIR=/custom/path python run.py --case=e2e
 
 | Name | Description | Status |
 |------|-------------|--------|
-| `e2e` | Dataset-agnostic E2E test | ✅ Primary (YAML config) |
-| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | ✅ Available (YAML config) |
+| `e2e` | Dataset-agnostic E2E test | ✅ Primary (migrated to YAML config) |
+| `e2e_with_llm_summary` | E2E with LLM summary | ⚠️ Available (uses env vars) |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
@@ -374,14 +373,12 @@ This provides:
   - Artifact collection and consolidation
 
 **3. Test Cases**
-- `cases/e2e.py` - Primary E2E test (✅ YAML-based)
+- `cases/e2e.py` - Primary test (✅ YAML-based)
   - Accepts config object directly
   - Type-safe parameter access
   - Full pipeline validation (extract → embed → VDB → retrieval)
   - Transparent configuration logging
-- `cases/e2e_with_llm_summary.py` - E2E with LLM (✅ YAML-based)
-  - Adds UDF-based LLM summarization
-  - Same config-based architecture as e2e.py
+- `cases/e2e_with_llm_summary.py` - LLM-enhanced test (⚠️ env vars)
 
 **4. Shared Utilities**
 - `interact.py` - Common testing utilities

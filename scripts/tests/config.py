@@ -38,7 +38,6 @@ class TestConfig:
     sparse: bool = True
     gpu_search: bool = False
     embedding_model: str = "auto"
-    llm_summarization_model: str = "nvdev/nvidia/llama-3.1-nemotron-70b-instruct"
 
     # Extraction configuration
     extract_text: bool = True
@@ -188,7 +187,6 @@ def _load_env_overrides() -> dict:
         "SPARSE": ("sparse", parse_bool),
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),
-        "LLM_SUMMARIZATION_MODEL": ("llm_summarization_model", str),
         "EXTRACT_TEXT": ("extract_text", parse_bool),
         "EXTRACT_TABLES": ("extract_tables", parse_bool),
         "EXTRACT_CHARTS": ("extract_charts", parse_bool),
