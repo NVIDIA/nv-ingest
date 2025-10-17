@@ -221,7 +221,9 @@ class RedisIngestService(IngestServiceMeta):
             # Determine target queue based on optional QoS hint
             queue_hint = None
             try:
-                queue_hint = (job_spec.get("tracing_options") or {}).get("queue_hint")
+                routing_opts = job_spec.get("routing_options") or {}
+                tracing_opts = job_spec.get("tracing_options") or {}
+                queue_hint = routing_opts.get("queue_hint") or tracing_opts.get("queue_hint")
             except Exception:
                 queue_hint = None
             allowed = {"default", "immediate", "micro", "small", "medium", "large"}
