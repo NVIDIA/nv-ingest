@@ -4,12 +4,12 @@
 # Active configuration (used by default when running tests)
 active:
   # Dataset configuration
-  dataset_dir: /raid/jioffe/bo20
-  test_name: yaml_test  # Auto-generated if null
+  dataset_dir: /path/to/your/dataset
+  test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v2 # v1 or v2
-  pdf_split_page_count: 8  # V2 only: pages per chunk (null = default 32)
+  api_version: v1  # v1 or v2
+  pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
   hostname: localhost
@@ -39,47 +39,13 @@ active:
   split_chunk_overlap: 150  # Overlap for text splitting
 
   # Storage configuration
-  spill_dir: /raid/jioffe/tmp/spill
+  spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (scripts/tests/artifacts)
   collection_name: null  # null = auto-generated
 
 # Dataset shortcuts for convenience
+# Add your commonly used dataset paths here
 datasets:
-  bo20: /raid/jioffe/bo20
-  bo767: /raid/jioffe/bo767
+  bo20: /path/to/bo20
+  bo767: /path/to/bo767
   single: data/multimodal_test.pdf
-
-# Optional: Preset configurations for quick resets
-# (You can add custom presets here)
-presets:
-  baseline_v1:
-    api_version: v1
-    extract_text: true
-    extract_tables: true
-    extract_charts: true
-    extract_infographics: true
-
-  v2_split_32:
-    api_version: v2
-    pdf_split_page_count: 32
-    extract_text: true
-    extract_tables: true
-    extract_charts: true
-
-  minimal:
-    api_version: v1
-    extract_text: true
-    extract_tables: false
-    extract_charts: false
-    extract_images: false
-    extract_infographics: false
-
-  comprehensive:
-    api_version: v2
-    pdf_split_page_count: 32
-    extract_text: true
-    extract_tables: true
-    extract_charts: true
-    extract_images: true
-    extract_infographics: true
-    enable_caption: true
