@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
 
+import glom
 import pandas as pd
 from openai import OpenAI
 
@@ -282,6 +283,33 @@ def _add_embeddings(row, embeddings, info_msgs):
     return row
 
 
+def _add_custom_embeddings(row, embeddings, result_target_field):
+    """
+    Updates a DataFrame row with embedding data and associated error info
+    based on a user supplied custom content field.
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A row of the DataFrame.
+    embeddings : dict
+        Dictionary mapping row indices to embeddings.
+    result_target_field: str
+        The field in custom_content to output the embeddings to
+
+    Returns
+    -------
+    pandas.Series
+        The updated row
+    """
+    embedding = embeddings.get(row.name, None)
+
+    if embedding is not None:
+        row["metadata"] = glom.assign(row["metadata"], "custom_content." + result_target_field, embedding, missing=dict)
+
+    return row
+
+
 def _format_image_input_string(image_b64: Optional[str]) -> str:
     if not image_b64:
         return
@@ -379,6 +407,20 @@ def _get_pandas_audio_content(row, modality="text"):
     A pandas UDF used to select extracted audio transcription to be used to create embeddings.
     """
     return row.get("audio_metadata", {}).get("audio_transcript")
+
+
+def _get_pandas_custom_content(row, custom_content_field):
+    custom_content = row.get("custom_content", {})
+    content = glom.glom(custom_content, custom_content_field, default=None)
+    if content is None:
+        logger.warning(f"Custom content field: {custom_content_field} not found")
+        return None
+
+    try:
+        return str(content)
+    except (TypeError, ValueError):
+        logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
+        return None
 
 
 # ------------------------------------------------------------------------------
@@ -519,6 +561,7 @@ def transform_create_text_embeddings_internal(
     api_key = task_config.get("api_key") or transform_config.api_key
     endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
     model_name = task_config.get("model_name") or transform_config.embedding_model
+    custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -612,4 +655,43 @@ def transform_create_text_embeddings_internal(
         content_masks.append(content_mask)
 
     combined_df = _concatenate_extractions_pandas(df_transform_ledger, embedding_dataframes, content_masks)
+
+    # Embed custom content
+    if custom_content_field is not None:
+        result_target_field = task_config.get("result_target_field") or custom_content_field + "_embedding"
+
+        extracted_custom_content = (
+            combined_df["metadata"]
+            .apply(partial(_get_pandas_custom_content, custom_content_field=custom_content_field))
+            .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
+        )
+
+        valid_custom_content_mask = extracted_custom_content.notna()
+        if valid_custom_content_mask.any():
+            custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
+            custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
+
+            custom_content_embeddings = _async_runner(
+                custom_content_batches,
+                api_key,
+                endpoint_url,
+                model_name,
+                transform_config.encoding_format,
+                transform_config.input_type,
+                transform_config.truncate,
+                False,
+            )
+            custom_embeddings_dict = dict(
+                zip(
+                    extracted_custom_content.loc[valid_custom_content_mask].index,
+                    custom_content_embeddings.get("embeddings", []),
+                )
+            )
+        else:
+            custom_embeddings_dict = {}
+
+        combined_df = combined_df.apply(
+            _add_custom_embeddings, embeddings=custom_embeddings_dict, result_target_field=result_target_field, axis=1
+        )
+
     return combined_df, {"trace_info": execution_trace_log}
