@@ -290,7 +290,7 @@ class _ConcurrentProcessor:
                 logger.warning("Could not reliably extract job indices from results for final check.")
 
     # --------------------------------------------------------------------------
-    # Declarative Helper Methods (behavior preserved)
+    # Public Methods
     # --------------------------------------------------------------------------
 
     def _collect_retry_jobs_for_batch(self) -> List[str]:

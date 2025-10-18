@@ -336,6 +336,30 @@ class RedisClient(MessageBrokerClientBase):
         first_message: Optional[Dict[str, Any]] = None
         accumulated_fetch_time: float = 0.0
 
+        # If timeout <= 0, use non-blocking LPOP to avoid any blocking per queue.
+        if timeout <= 0:
+            logger.debug(f"Destructive fetch (non-blocking): LPOP from '{channel_name}'")
+            item = self.get_client().lpop(channel_name)
+            if item is None:
+                # Align with BLPOP behavior: signal no message available now
+                raise TimeoutError("No message available (non-blocking).")
+            try:
+                first_message = json.loads(item)
+                expected_count = first_message.get("fragment_count", 1)
+                if expected_count != 1:
+                    # In rare cases of fragmentation, the non-blocking path returns only the first fragment.
+                    # The blocking path (timeout > 0) handles full fragment collection.
+                    logger.warning(
+                        "Non-blocking LPOP received fragmented message on '%s' (fragment_count=%s). "
+                        "Returning first fragment; consider using blocking fetch to collect all fragments.",
+                        channel_name,
+                        expected_count,
+                    )
+                return first_message
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode message from LPOP on '{channel_name}': {e}")
+                raise ValueError(f"Failed to decode message from LPOP: {e}")
+
         logger.debug(f"Destructive fetch: Popping first item from '{channel_name}' with timeout {timeout:.2f}s")
         start_pop_time: float = time.monotonic()
         response = self.get_client().blpop([channel_name], timeout=int(max(1, timeout)))
