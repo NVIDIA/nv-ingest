@@ -469,6 +469,9 @@ def _build_aggregated_response(
         "description": (
             "One or more subjobs failed to complete" if any_failed else "Aggregated result composed from subjob outputs"
         ),
+        # Top-level trace/annotations for V1 compatibility
+        "trace": {},
+        "annotations": {},
         "metadata": {
             "parent_job_id": parent_job_id,
             "total_pages": metadata.get("total_pages", len(subjob_ids)),
@@ -498,6 +501,7 @@ def _build_aggregated_response(
             end_page = descriptor.get("end_page")
 
             if trace_data:
+                # Add to trace_segments (detailed, per-chunk view)
                 aggregated_result["metadata"]["trace_segments"].append(
                     {
                         "job_id": descriptor.get("job_id"),
@@ -507,8 +511,14 @@ def _build_aggregated_response(
                         "trace": trace_data,
                     }
                 )
+                # Add to top-level trace with chunk prefix to avoid collisions
+                chunk_idx = descriptor.get("chunk_index")
+                for trace_key, trace_value in trace_data.items():
+                    prefixed_key = f"chunk_{chunk_idx}::{trace_key}"
+                    aggregated_result["trace"][prefixed_key] = trace_value
 
             if annotation_data:
+                # Add to annotation_segments (detailed, per-chunk view)
                 aggregated_result["metadata"]["annotation_segments"].append(
                     {
                         "job_id": descriptor.get("job_id"),
@@ -518,6 +528,8 @@ def _build_aggregated_response(
                         "annotations": annotation_data,
                     }
                 )
+                # Merge into top-level annotations (annotations have unique UUIDs, safe to merge)
+                aggregated_result["annotations"].update(annotation_data)
         else:
             # Note failed page
             logger.warning(f"Page {page_num} failed or missing")

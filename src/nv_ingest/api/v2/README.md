@@ -40,10 +40,22 @@ This behaviour matches the V1 tracing model and sets the foundation for adding W
 
 The fetch endpoint returns a JSON body shaped like the following:
 
-```
+```json
 {
   "data": [...],
   "status": "success",
+  "trace": {
+    "chunk_1::trace::entry::pdf_extractor": 1.7599622664469809e18,
+    "chunk_1::trace::exit::pdf_extractor": 1.7599622694636670e18,
+    "chunk_2::trace::entry::pdf_extractor": 1.7599622694636680e18,
+    "chunk_2::trace::exit::pdf_extractor": 1.7599622724803541e18
+    // ... all traces from all chunks with chunk_N:: prefix
+  },
+  "annotations": {
+    "annotation::uuid-1": {"task_id": "pdf_extractor", "task_result": "SUCCESS"},
+    "annotation::uuid-2": {"task_id": "table_extractor", "task_result": "SUCCESS"}
+    // ... all annotations from all chunks (annotations have unique UUIDs)
+  },
   "metadata": {
     "parent_job_id": "<uuid>",
     "total_pages": 320,
@@ -68,9 +80,9 @@ The fetch endpoint returns a JSON body shaped like the following:
         "chunk_index": 1,
         "start_page": 1,
         "end_page": 32,
-        "trace": {"trace::sink_push": 1.7285796e+18, ...}
+        "trace": {"trace::entry::pdf_extractor": 1.7599e18, ...}
       }
-      // ...
+      // ... per-chunk trace details
     ],
     "annotation_segments": [
       {
@@ -78,17 +90,24 @@ The fetch endpoint returns a JSON body shaped like the following:
         "chunk_index": 1,
         "start_page": 1,
         "end_page": 32,
-        "annotations": {"annotation::stage": "sink", ...}
+        "annotations": {"annotation::uuid": {...}, ...}
       }
-      // ...
+      // ... per-chunk annotation details
     ]
   }
 }
 ```
 
-- `trace_segments` and `annotation_segments` appear only when the sink emits telemetry for a given chunk.
-- Clients can correlate chunk data by matching `job_id` or `chunk_index` across `chunks`, `trace_segments`, and `annotation_segments`.
-- Failed chunk entries remain in `failed_subjobs`; if a chunk is missing from the telemetry arrays, the sink did not emit trace/annotation payloads for that chunk.
+**Top-level trace and annotations** (V1 compatibility):
+- `trace`: Aggregated trace timestamps from all chunks with `chunk_N::` prefix to avoid collisions
+- `annotations`: Merged annotations from all chunks (annotations have unique UUIDs so merge safely)
+- These fields match V1 structure, allowing existing client code to work without modification
+
+**Detailed metadata** (V2-specific):
+- `trace_segments`: Per-chunk trace data with page ranges for granular analysis
+- `annotation_segments`: Per-chunk annotation data with page ranges
+- Clients can correlate chunk data by matching `job_id` or `chunk_index` across arrays
+- Failed chunk entries remain in `failed_subjobs`; missing chunks indicate the sink did not emit telemetry
 
 ## Testing
 
