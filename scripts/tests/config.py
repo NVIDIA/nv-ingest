@@ -56,7 +56,7 @@ class TestConfig:
     split_chunk_overlap: int = 150
 
     # Storage configuration
-    spill_dir: str = "/raid/jioffe/tmp/spill"
+    spill_dir: str = "/tmp/spill"
     artifacts_dir: Optional[str] = None
     collection_name: Optional[str] = None
 

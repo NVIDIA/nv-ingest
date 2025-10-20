@@ -4,8 +4,8 @@
 # Active configuration (used by default when running tests)
 active:
   # Dataset configuration
-  dataset_dir: /raid/jioffe/projects/rapids-microbenchmarks/nv-ingest/repos/nv-ingest/data/splits
-  test_name: jensen  # Auto-generated if null
+  dataset_dir: /path/to/dataset
+  test_name: null  # Auto-generated if null
 
   # API configuration
   api_version: v2  # v1 or v2
