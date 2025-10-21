@@ -1201,8 +1201,8 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
-        if "yolox_ensemble" in model_names:
-            yolox_model_name = "yolox_ensemble"
+        if "pipeline" in model_names:
+            yolox_model_name = "pipeline"
         else:
             yolox_model_name = default_model_name
     except Exception:

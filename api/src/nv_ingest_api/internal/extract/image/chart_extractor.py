@@ -79,7 +79,7 @@ def _run_chart_inference(
 
     future_yolox_kwargs = dict(
         data=data_yolox,
-        model_name="yolox_ensemble",
+        model_name="pipeline",
         stage_name="chart_extraction",
         input_names=["INPUT_IMAGES", "THRESHOLDS"],
         dtypes=["BYTES", "FP32"],

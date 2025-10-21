@@ -80,7 +80,7 @@ def _run_inference(
         data_yolox = {"images": valid_arrays}
         future_yolox_kwargs = dict(
             data=data_yolox,
-            model_name="yolox_ensemble",
+            model_name="pipeline",
             stage_name="table_extraction",
             max_batch_size=8,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],

@@ -112,7 +112,7 @@ def yolox_grpc_infer_with_timing(
             infer_protocol="grpc",
             timeout=float(timeout),
         )
-        model_name = get_yolox_model_name(endpoint, default_model_name="yolox_ensemble")
+        model_name = get_yolox_model_name(endpoint, default_model_name="pipeline")
 
         data = {"images": [image_np for _ in range(max(1, batch_size))]}
 
