@@ -117,10 +117,6 @@ class NimClient:
 
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
-
-        if model_name == "pipeline":
-            model_name = "yolox"
-
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
 
