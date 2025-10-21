@@ -1261,7 +1261,7 @@ class Ingestor:
         - Larger chunks = less overhead but reduced concurrency
         """
         MIN_PAGES = 1
-        MAX_PAGES = 128
+        MAX_PAGES = 512
 
         # Warn if value will be clamped by server
         if pages_per_chunk < MIN_PAGES:

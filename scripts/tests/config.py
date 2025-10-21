@@ -71,8 +71,8 @@ class TestConfig:
                     f"pdf_split_page_count={self.pdf_split_page_count} requires api_version='v2', "
                     f"but got api_version='{self.api_version}'"
                 )
-            if not (1 <= self.pdf_split_page_count <= 128):
-                errors.append(f"pdf_split_page_count must be between 1 and 128, got {self.pdf_split_page_count}")
+            if not (1 <= self.pdf_split_page_count <= 512):
+                errors.append(f"pdf_split_page_count must be between 1 and 512, got {self.pdf_split_page_count}")
 
         # Check text_depth is valid (from TextTypeEnum)
         valid_text_depths = ["block", "body", "document", "header", "line", "nearby_block", "other", "page", "span"]
@@ -88,9 +88,11 @@ class TestConfig:
         if self.api_version not in ["v1", "v2"]:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
 
-        # Check dataset_dir exists
-        if not os.path.isdir(self.dataset_dir):
-            errors.append(f"dataset_dir does not exist: {self.dataset_dir}")
+        # Check dataset_dir exists (can be file or directory)
+        if not os.path.exists(self.dataset_dir):
+            errors.append(f"dataset path does not exist: {self.dataset_dir}")
+        elif not (os.path.isfile(self.dataset_dir) or os.path.isdir(self.dataset_dir)):
+            errors.append(f"dataset path must be a file or directory: {self.dataset_dir}")
 
         return errors
 
