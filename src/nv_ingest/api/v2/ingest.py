@@ -459,7 +459,7 @@ def _aggregate_parent_traces(chunk_traces: Dict[str, Any]) -> Dict[str, Any]:
             continue
 
         parts = key.split("::")
-        if len(parts) != 4:  # chunk_N::trace::entry/exit::stage_name
+        if len(parts) < 4:  # Minimum: chunk_N::trace::entry/exit::stage_name
             continue
 
         if parts[1] != "trace":  # Ensure it's a trace key
@@ -472,7 +472,10 @@ def _aggregate_parent_traces(chunk_traces: Dict[str, Any]) -> Dict[str, Any]:
             continue
 
         event_type = parts[2]  # "entry" or "exit"
-        stage_name = parts[3]  # "pdf_extractor"
+
+        # Stage name is everything after trace::entry:: or trace::exit::
+        # Handles both simple (pdf_extractor) and nested (pdf_extractor::pdf_extraction::pdfium_0)
+        stage_name = "::".join(parts[3:])  # Join remaining parts
 
         if event_type not in ("entry", "exit"):
             continue

@@ -737,3 +737,29 @@ class TestAggregateParentTraces:
         assert isinstance(result["trace::entry::stage"], float)
         assert isinstance(result["trace::exit::stage"], float)
         assert isinstance(result["trace::resident_time::stage"], float)
+
+    def test_handles_nested_stage_names(self):
+        """Verify aggregation works with arbitrary depth nested traces."""
+        chunk_traces = {
+            # Simple stage (4 parts)
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+            # Nested stage (7 parts)
+            "chunk_1::trace::entry::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 1010.0,
+            "chunk_1::trace::exit::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 1020.0,
+            "chunk_2::trace::entry::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 2010.0,
+            "chunk_2::trace::exit::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 2025.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        # Simple stage aggregated
+        assert result["trace::entry::pdf_extractor"] == 1000.0
+        assert result["trace::exit::pdf_extractor"] == 1100.0
+        assert result["trace::resident_time::pdf_extractor"] == 100.0
+
+        # Nested stage aggregated with full name preserved
+        nested_stage = "pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0"
+        assert result[f"trace::entry::{nested_stage}"] == 1010.0
+        assert result[f"trace::exit::{nested_stage}"] == 2025.0
+        assert result[f"trace::resident_time::{nested_stage}"] == 25.0  # sum(10, 15)

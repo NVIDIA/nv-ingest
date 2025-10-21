@@ -112,11 +112,15 @@ The fetch endpoint returns a JSON body shaped like the following:
 
 **Parent-Level Trace Aggregation:**
 
-For split PDFs, parent-level metrics are automatically computed for each stage:
+For split PDFs, parent-level metrics are automatically computed for each stage (including nested stages):
 
 - `trace::entry::<stage>` - Earliest entry time across all chunks (when first chunk entered stage)
 - `trace::exit::<stage>` - Latest exit time across all chunks (when last chunk exited stage)
 - `trace::resident_time::<stage>` - Sum of all chunk durations (total compute time in stage)
+
+**Supports arbitrary nesting depth:**
+- Simple: `trace::entry::pdf_extractor`
+- Nested: `trace::entry::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0`
 
 **Example:**
 ```json
