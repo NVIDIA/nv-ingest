@@ -80,6 +80,42 @@ nv-ingest-cli \
 ```
 
 
+### Example: PDF File With Custom Split Page Count
+
+To submit a PDF file with a custom split page count, use the `--pdf_split_page_count` option. 
+This allows you to control how many pages are included in each PDF chunk during processing.
+
+!!! note
+    The `--pdf_split_page_count` option requires using the V2 API (set via `--api_version v2` or environment variable `NV_INGEST_API_VERSION=v2`).
+    It accepts values between 1 and 128 pages per chunk (default is server default, typically 32).
+    Smaller chunks provide more parallelism but increase overhead, while larger chunks reduce overhead but limit concurrency.
+
+```bash
+nv-ingest-cli \
+  --doc ./data/test.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_text": "true"}' \
+  --pdf_split_page_count 64 \
+  --api_version v2 \
+  --client_host=localhost \
+  --client_port=7670
+```
+
+Alternatively, you can use an environment variable to set the API version:
+
+```bash
+export NV_INGEST_API_VERSION=v2
+
+nv-ingest-cli \
+  --doc ./data/test.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_text": "true"}' \
+  --pdf_split_page_count 64 \
+  --client_host=localhost \
+  --client_port=7670
+```
+
+
 ### Example: Process a Dataset
 
 To submit a dataset for processing, run the following code. 

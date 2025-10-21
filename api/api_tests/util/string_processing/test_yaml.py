@@ -76,6 +76,47 @@ class TestSubstituteEnvVarsInYamlContent:
             result = substitute_env_vars_in_yaml_content("key: $EXISTING_VAR and $MISSING_VAR|default")
             assert result == "key: existing and default"
 
+    def test_named_fallback_to_env_var_primary_wins(self):
+        with patch.dict(os.environ, {"NGC_API_KEY": "ngc", "NVIDIA_API_KEY": "alt"}):
+            result = substitute_env_vars_in_yaml_content("key: $NGC_API_KEY|$NVIDIA_API_KEY")
+            assert result == "key: ngc"
+
+    def test_named_fallback_to_env_var_secondary_used_when_primary_missing(self):
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "alt"}, clear=True):
+            result = substitute_env_vars_in_yaml_content("key: $NGC_API_KEY|$NVIDIA_API_KEY")
+            assert result == "key: alt"
+
+    def test_named_fallback_to_env_var_both_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result = substitute_env_vars_in_yaml_content("key: $NGC_API_KEY|$NVIDIA_API_KEY")
+            assert result == "key: "
+
+    def test_named_fallback_to_env_var_secondary_empty_string_counts_as_set(self):
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": ""}, clear=True):
+            result = substitute_env_vars_in_yaml_content("key: $NGC_API_KEY|$NVIDIA_API_KEY")
+            assert result == "key: "
+
+    def test_braced_fallback_to_env_var(self):
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "alt"}, clear=True):
+            result = substitute_env_vars_in_yaml_content("key: ${NGC_API_KEY|$NVIDIA_API_KEY}")
+            assert result == "key: alt"
+
+    def test_named_fallback_env_then_literal(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result = substitute_env_vars_in_yaml_content("key: $A|$B")
+            assert result == "key: "
+
+            result2 = substitute_env_vars_in_yaml_content('key: $A|"lit"')
+            assert result2 == 'key: "lit"'
+
+    def test_pipe_without_default_vs_env_fallback_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result1 = substitute_env_vars_in_yaml_content('key: $VAR|""')
+            assert result1 == 'key: ""'
+
+            result2 = substitute_env_vars_in_yaml_content("key: $VAR|$OTHER")
+            assert result2 == "key: "
+
     def test_complex_yaml_structure(self):
         """Test substitution in complex YAML structures."""
         yaml_content = """

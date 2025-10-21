@@ -758,8 +758,8 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MO
     if ocr_model_name is not None:
         return ocr_model_name
 
-    # 2. If no gRPC endpoint is provided, fall back to the default immediately.
-    if not ocr_grpc_endpoint:
+    # 2. If no gRPC endpoint is provided or the endpoint is a NVCF endpoint, fall back to the default immediately.
+    if (not ocr_grpc_endpoint) or ("grpc.nvcf.nvidia.com" in ocr_grpc_endpoint):
         logger.debug(f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'.")
         return default_model_name
 

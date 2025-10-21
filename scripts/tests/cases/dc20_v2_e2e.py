@@ -58,10 +58,6 @@ def _assert_counts_match(expected: dict[str, int], actual: dict[str, int]) -> No
 
 
 def main() -> int:
-    # Set API version to V2 (can be overridden by environment)
-    if "NV_INGEST_API_VERSION" not in os.environ:
-        os.environ["NV_INGEST_API_VERSION"] = "v2"
-
     # Dataset-agnostic: no hardcoded paths, configurable via environment
     data_dir = os.getenv("DATASET_DIR")
     if not data_dir:
@@ -91,13 +87,22 @@ def main() -> int:
     table_output_format = os.getenv("TABLE_OUTPUT_FORMAT") or "markdown"
     extract_infographics = (os.getenv("EXTRACT_INFOGRAPHICS") or "true").lower() == "true"
 
+    # PDF splitting configuration (only override if explicitly set)
+    pdf_split_page_count = os.getenv("PDF_SPLIT_PAGE_COUNT")
+    if pdf_split_page_count:
+        try:
+            pdf_split_page_count = int(pdf_split_page_count)
+        except ValueError:
+            print(f"Warning: Invalid PDF_SPLIT_PAGE_COUNT value, ignoring: {pdf_split_page_count}")
+            pdf_split_page_count = None
+
     # Logging configuration
     log_path = os.getenv("LOG_PATH") or "test_results"
 
     model_name, dense_dim = embed_info()
 
-    # Get actual API version being used
-    actual_api_version = os.environ.get("NV_INGEST_API_VERSION", "v1")
+    # This test always uses V2 API
+    actual_api_version = "v2"
     assert_v1_baseline = (os.getenv("ASSERT_V1_BASELINE") or "false").lower() == "true"
 
     # Log configuration for transparency
@@ -112,20 +117,38 @@ def main() -> int:
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+
+    ## Displaying service side logic for PDF splitting for V2
+    if pdf_split_page_count:
+        # Show clamping info if value is out of bounds
+        clamped_value = max(1, min(pdf_split_page_count, 128))
+        if clamped_value != pdf_split_page_count:
+            print(f"PDF split page count: {pdf_split_page_count} (will be clamped to {clamped_value} by server)")
+        else:
+            print(f"PDF split page count: {pdf_split_page_count}")
+    else:
+        print("PDF split page count: Using server default (32)")
+
     print(f"Assert V1 baseline counts: {assert_v1_baseline}")
     print("==============================")
 
     ingestion_start = time.time()
 
-    # Create Ingestor with V2 API endpoints
+    # Create Ingestor with V2 API endpoints (explicit configuration)
+    ingestor = Ingestor(
+        message_client_hostname=hostname,
+        message_client_port=7670,
+        message_client_kwargs={"api_version": "v2"},
+    ).files(data_dir)
+
+    # Optional: Configure PDF splitting (comment out to use server default)
+    # Set via environment variable OR uncomment line below for quick testing
+    if pdf_split_page_count:
+        ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
+    # ingestor = ingestor.pdf_split_config(pages_per_chunk=2)  # Uncomment to override
+
     ingestor = (
-        Ingestor(
-            message_client_hostname=hostname,
-            message_client_port=7670,
-            # The API version is set via environment variable above
-        )
-        .files(data_dir)
-        .extract(
+        ingestor.extract(
             extract_text=extract_text,
             extract_tables=extract_tables,
             extract_charts=extract_charts,

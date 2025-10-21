@@ -45,9 +45,30 @@ router = APIRouter()
 DEFAULT_PDF_SPLIT_PAGE_COUNT = 32
 
 
-def get_pdf_split_page_count() -> int:
-    """Resolve the configured page chunk size for PDF splitting."""
+def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
+    """
+    Resolve the page chunk size for PDF splitting with client override support.
 
+    Priority: client_override (clamped) > env var > default (32)
+    Enforces boundaries: min=1, max=128
+    """
+    MIN_PAGES = 1
+    MAX_PAGES = 128
+
+    # Client override takes precedence if provided
+    if client_override is not None:
+        clamped = max(MIN_PAGES, min(client_override, MAX_PAGES))
+        if clamped != client_override:
+            logger.warning(
+                "Client requested split_page_count=%s; clamped to %s (min=%s, max=%s)",
+                client_override,
+                clamped,
+                MIN_PAGES,
+                MAX_PAGES,
+            )
+        return clamped
+
+    # Fall back to environment variable
     raw_value = os.environ.get("PDF_SPLIT_PAGE_COUNT")
     if raw_value is None:
         return DEFAULT_PDF_SPLIT_PAGE_COUNT
@@ -530,6 +551,10 @@ async def submit_job_v2(
         # Parse job spec
         job_spec_dict = json.loads(job_spec.payload)
 
+        # Extract PDF configuration if provided by client
+        pdf_config = job_spec_dict.get("pdf_config", {})
+        client_split_page_count = pdf_config.get("split_page_count") if pdf_config else None
+
         # Extract document type and payload from the proper structure
         job_payload = job_spec_dict.get("job_payload", {})
         document_types = job_payload.get("document_type", [])
@@ -546,12 +571,12 @@ async def submit_job_v2(
             # Decode the payload to check page count
             pdf_content = base64.b64decode(payloads[0])
             page_count = get_pdf_page_count(pdf_content)
-            pages_per_chunk = get_pdf_split_page_count()
+            pages_per_chunk = get_pdf_split_page_count(client_override=client_split_page_count)
 
             # Split if the document has more pages than our chunk size
             if page_count > pages_per_chunk:
                 logger.warning(
-                    "[dev-reload-check] Splitting PDF %s into %s-page chunks (total pages: %s)",
+                    "Splitting PDF %s into %s-page chunks (total pages: %s)",
                     original_source_name,
                     pages_per_chunk,
                     page_count,
@@ -599,6 +624,7 @@ async def submit_job_v2(
 
                 parent_metadata: Dict[str, Any] = {
                     "total_pages": page_count,
+                    "pages_per_chunk": pages_per_chunk,
                     "original_source_id": original_source_id,
                     "original_source_name": original_source_name,
                     "document_type": document_types[0] if document_types else "pdf",

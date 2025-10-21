@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
 import re
 import time
 from typing import Any, Union, Tuple, Optional, Dict, Callable
@@ -104,6 +103,17 @@ class RestClient(MessageBrokerClientBase):
             Default timeout in seconds for waiting for data after connection. Default is None.
         http_allocator : Optional[Callable[[], Any]], optional
             A callable that returns an HTTP client instance. If None, `requests.Session()` is used.
+        **kwargs : dict
+            Additional keyword arguments. Supported keys:
+            - api_version : str, optional
+                API version to use ('v1' or 'v2'). Defaults to 'v1' if not specified.
+                Invalid versions will log a warning and fall back to 'v1'.
+            - base_url : str, optional
+                Override the generated base URL.
+            - headers : dict, optional
+                Additional headers to include in requests.
+            - auth : optional
+                Authentication configuration for requests.
 
         Returns
         -------
@@ -138,8 +148,19 @@ class RestClient(MessageBrokerClientBase):
                 )
                 self._client = requests.Session()
 
-        # Allow API version override via environment variable or kwargs
-        api_version = kwargs.get("api_version") or os.getenv("NV_INGEST_API_VERSION", "v1")
+        # Validate and normalize API version to prevent misconfiguration
+        # Default to v1 for backwards compatibility if not explicitly provided
+        VALID_API_VERSIONS = {"v1", "v2"}
+        raw_api_version = kwargs.get("api_version", "v1")
+        api_version = str(raw_api_version).strip().lower()
+
+        if api_version not in VALID_API_VERSIONS:
+            logger.warning(
+                f"Invalid API version '{raw_api_version}' specified. "
+                f"Valid versions are: {VALID_API_VERSIONS}. Falling back to 'v1'."
+            )
+            api_version = "v1"
+
         self._api_version = api_version
         self._submit_endpoint: str = f"/{api_version}/submit_job"
         self._fetch_endpoint: str = f"/{api_version}/fetch_job"

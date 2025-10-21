@@ -110,6 +110,7 @@ class JobSpec:
             "job_id": str(self._job_id),
             "tasks": [task.to_dict() for task in self._tasks],
             "tracing_options": self._extended_options.get("tracing_options", {}),
+            "pdf_config": self._extended_options.get("pdf_config", {}),
         }
 
     @property
