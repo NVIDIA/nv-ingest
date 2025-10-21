@@ -259,6 +259,59 @@ class IngestJobHandler:
         clean_doc_name = os.path.basename(doc_name)
         output_name = f"{clean_doc_name}.metadata.json"
 
+        # Additionally, write out parallel files for trace timings and annotations (if present)
+        try:
+            os.makedirs(output_directory, exist_ok=True)
+        except Exception:
+            # Best-effort; directory should generally exist already
+            pass
+
+        # Build primitive breakdown from response_data
+        primitive_total: int = 0
+        primitive_counts_by_type: Dict[str, int] = defaultdict(int)
+        structured_by_subtype: Dict[str, int] = defaultdict(int)
+        try:
+            for document in response_data:
+                # Each document is treated as one primitive
+                primitive_total += 1
+                meta: Dict[str, Any] = document.get("metadata", {})
+                content_meta: Dict[str, Any] = meta.get("content_metadata", {})
+                doc_type: str = content_meta.get("type", "unknown")
+                primitive_counts_by_type[doc_type] += 1
+                if doc_type == "structured":
+                    subtype: str = content_meta.get("subtype", "unknown")
+                    structured_by_subtype[subtype] += 1
+        except Exception:
+            # Be resilient; don't let counting failures block output
+            pass
+
+        # Merge trace (if any) with primitive counts and always write a traces file
+        try:
+            trace_obj = response.get("trace") or response.get("traces") or {}
+            trace_out = dict(trace_obj)
+            trace_out["primitive_counts"] = {
+                "total": primitive_total,
+                "by_type": dict(primitive_counts_by_type),
+                "structured_by_subtype": dict(structured_by_subtype),
+            }
+
+            trace_path = os.path.join(output_directory, f"{clean_doc_name}.traces.json")
+            with open(trace_path, "w") as f:
+                f.write(json.dumps(trace_out, indent=2))
+            logger.debug("Wrote trace output to %s", trace_path)
+        except Exception as e:
+            logger.error("Failed to write traces for %s: %s", clean_doc_name, e)
+
+        annotations_obj = response.get("annotations")
+        if annotations_obj:
+            try:
+                annotations_path = os.path.join(output_directory, f"{clean_doc_name}.annotations.json")
+                with open(annotations_path, "w") as f:
+                    f.write(json.dumps(annotations_obj, indent=2))
+                logger.debug("Wrote annotations output to %s", annotations_path)
+            except Exception as e:
+                logger.error("Failed to write annotations for %s: %s", clean_doc_name, e)
+
         # Organize by document type
         doc_map: Dict[str, List[Dict[str, Any]]] = {}
         for document in response_data:
