@@ -233,12 +233,11 @@ stages:
     replicas:
       min_replicas: 0
       max_replicas:
-        strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000
+        strategy: "static"
+        value: 1
       static_replicas:
-        strategy: "memory_static_global_percent"
-        memory_per_replica_mb: 10000
-        limit: 6
+        strategy: "static"
+        value: 1
 
   - name: "chart_extractor"
     type: "stage"
@@ -260,12 +259,11 @@ stages:
     replicas:
       min_replicas: 0
       max_replicas:
-        strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000
+        strategy: "static"
+        value: 1
       static_replicas:
-        strategy: "memory_static_global_percent"
-        memory_per_replica_mb: 10000
-        limit: 6
+        strategy: "static"
+        value: 1
 
   # Post-processing / Mutators
   - name: "image_filter"
