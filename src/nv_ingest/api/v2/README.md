@@ -45,11 +45,13 @@ The fetch endpoint returns a JSON body shaped like the following:
   "data": [...],
   "status": "success",
   "trace": {
-    "chunk_1::trace::entry::pdf_extractor": 1.7599622664469809e18,
-    "chunk_1::trace::exit::pdf_extractor": 1.7599622694636670e18,
-    "chunk_2::trace::entry::pdf_extractor": 1.7599622694636680e18,
-    "chunk_2::trace::exit::pdf_extractor": 1.7599622724803541e18
-    // ... all traces from all chunks with chunk_N:: prefix
+    "trace::entry::pdf_extractor": 1000,
+    "trace::exit::pdf_extractor": 2150,
+    "trace::resident_time::pdf_extractor": 250,
+    "trace::entry::table_extractor": 1200,
+    "trace::exit::table_extractor": 2300,
+    "trace::resident_time::table_extractor": 300
+    // ... parent-level aggregated traces only (clean, V1-compatible)
   },
   "annotations": {
     "annotation::uuid-1": {"task_id": "pdf_extractor", "task_result": "SUCCESS"},
@@ -99,15 +101,63 @@ The fetch endpoint returns a JSON body shaped like the following:
 ```
 
 **Top-level trace and annotations** (V1 compatibility):
-- `trace`: Aggregated trace timestamps from all chunks with `chunk_N::` prefix to avoid collisions
+- `trace`: Contains **only parent-level aggregated traces** for clean V1 compatibility
+  - `trace::entry::<stage>` - Earliest entry time across all chunks
+  - `trace::exit::<stage>` - Latest exit time across all chunks
+  - `trace::resident_time::<stage>` - Sum of all chunk durations (total compute time)
 - `annotations`: Merged annotations from all chunks (annotations have unique UUIDs so merge safely)
 - These fields match V1 structure, allowing existing client code to work without modification
 
+**Note:** Chunk-level trace details are available in `metadata.trace_segments[]` for granular analysis
+
+**Parent-Level Trace Aggregation:**
+
+For split PDFs, parent-level metrics are automatically computed for each stage:
+
+- `trace::entry::<stage>` - Earliest entry time across all chunks (when first chunk entered stage)
+- `trace::exit::<stage>` - Latest exit time across all chunks (when last chunk exited stage)
+- `trace::resident_time::<stage>` - Sum of all chunk durations (total compute time in stage)
+
+**Example:**
+```json
+{
+  "trace": {
+    "trace::entry::pdf_extractor": 1000,
+    "trace::exit::pdf_extractor": 2150,
+    "trace::resident_time::pdf_extractor": 250
+    // ... only parent-level aggregations (clean, concise)
+  },
+  "metadata": {
+    "trace_segments": [
+      {
+        "chunk_index": 1,
+        "start_page": 1,
+        "end_page": 32,
+        "trace": {
+          "trace::entry::pdf_extractor": 1000,
+          "trace::exit::pdf_extractor": 1100
+        }
+      },
+      {
+        "chunk_index": 2,
+        "trace": {
+          "trace::entry::pdf_extractor": 2000,
+          "trace::exit::pdf_extractor": 2150
+        }
+      }
+    ]
+  }
+}
+```
+
+**Note:** `resident_time` represents total compute time (sum of chunk durations), while `exit - entry` shows wall-clock span.
+
 **Detailed metadata** (V2-specific):
-- `trace_segments`: Per-chunk trace data with page ranges for granular analysis
+- `trace_segments`: **Chunk-level trace data** with page ranges for granular per-chunk analysis
 - `annotation_segments`: Per-chunk annotation data with page ranges
 - Clients can correlate chunk data by matching `job_id` or `chunk_index` across arrays
 - Failed chunk entries remain in `failed_subjobs`; missing chunks indicate the sink did not emit telemetry
+- **To access chunk traces:** Use `metadata.trace_segments[]` - each segment contains the full trace dict for that chunk
 
 ## Testing
 
