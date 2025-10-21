@@ -208,7 +208,7 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "static"
-        value: 2
+        value: 1
       static_replicas:
         strategy: "static"
         value: 1
