@@ -404,31 +404,7 @@ class Ingestor:
         save_to_disk: bool = False,
         return_traces: bool = False,
         **kwargs: Any,
-    ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
-        List[Dict[str, Any]],  # In-memory: Full response envelopes when return_full_response=True
-        List[LazyLoadedList],  # Disk: List of proxies, one per original doc
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
-            List[Tuple[str, str]],
-        ],  # (results, failures)
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
-            List[Tuple[str, str]],
-            List[Optional[Dict[str, Any]]],
-        ],  # (results, failures, traces)
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
-            List[Optional[Dict[str, Any]]],
-            List[str],
-        ],  # (results, traces, parent_trace_ids)
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
-            List[Tuple[str, str]],
-            List[Optional[Dict[str, Any]]],
-            List[str],
-        ],  # (results, failures, traces, parent_trace_ids)
-    ]:  # noqa: E501
+    ) -> Union[List[Any], Tuple[Any, ...]]:
         """
         Ingest documents by submitting jobs and fetching results concurrently.
 
@@ -442,70 +418,26 @@ class Ingestor:
             If True, save results to disk and return LazyLoadedList proxies. Default is False.
         return_traces : bool, optional
             If True, return trace metrics alongside results. Default is False.
-            When True, returns tuple with traces as additional element.
             Traces contain timing metrics (entry, exit, resident_time) for each stage.
-            For split PDFs, resident_time is computed by the server during parent aggregation.
-            For non-split jobs, resident_time is computed client-side for consistency.
         **kwargs : Any
-            Additional keyword arguments for the underlying client methods. Supported keys:
-            'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
-            through to process_jobs_concurrently.
+            Additional keyword arguments for the underlying client methods.
             Optional flags include `include_parent_trace_ids=True` to also return
-            parent job trace identifiers gathered during ingestion.
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        results : list of dict
-            List of successful job results when `return_failures` is False.
+        list or tuple
+            Returns vary based on flags:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+            - Additional combinations with include_parent_trace_ids kwarg
 
-        results, failures : tuple (list of dict, list of tuple of str)
-            Tuple containing successful results and failure information when `return_failures` is True.
-
-        results, traces : tuple (list of dict, list of dict)
-            Tuple containing successful results and trace dictionaries when `return_traces` is True.
-
-        results, failures, traces : tuple
-            Tuple containing results, failures, and traces when both `return_failures`
-            and `return_traces` are True.
-
-        results, traces, parent_trace_ids : tuple
-            Tuple containing results, traces, and parent trace IDs when both `return_traces`
-            and `include_parent_trace_ids` are True.
-
-        results, failures, traces, parent_trace_ids : tuple
-            Tuple containing all four elements when `return_failures`, `return_traces`,
-            and `include_parent_trace_ids` are all True.
-
-        Examples
-        --------
-        Basic usage with trace metrics:
-
-        >>> ingestor = Ingestor(...).files("/path/to/pdfs").extract().embed()
-        >>> results, traces = ingestor.ingest(return_traces=True)
-        >>> # Access trace metrics for first document (resident_time always available)
-        >>> pdf_time = traces[0]["trace::resident_time::pdf_extractor"] / 1e9
-        >>> table_time = traces[0]["trace::resident_time::table_extractor"] / 1e9
-        >>> print(f"PDF: {pdf_time:.2f}s, Tables: {table_time:.2f}s")
-
-        With failures and traces:
-
-        >>> results, failures, traces = ingestor.ingest(
-        ...     return_failures=True,
-        ...     return_traces=True
-        ... )
-        >>> for i, trace in enumerate(traces):
-        ...     if trace:
-        ...         total_time = trace["trace::resident_time::pdf_extractor"] / 1e9
-        ...         print(f"Document {i}: {total_time:.2f}s")
-
-        Works with save_to_disk:
-
-        >>> results, traces = ingestor.ingest(
-        ...     save_to_disk=True,
-        ...     return_traces=True
-        ... )
-        >>> # results are LazyLoadedList proxies, traces are in-memory dicts
+        Notes
+        -----
+        Trace metrics include timing data for each processing stage. For detailed
+        usage and examples, see src/nv_ingest/api/v2/README.md
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
