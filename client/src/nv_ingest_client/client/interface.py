@@ -441,9 +441,11 @@ class Ingestor:
         save_to_disk : bool, optional
             If True, save results to disk and return LazyLoadedList proxies. Default is False.
         return_traces : bool, optional
-            If True, return parent-level aggregated trace metrics alongside results. Default is False.
+            If True, return trace metrics alongside results. Default is False.
             When True, returns tuple with traces as additional element.
             Traces contain timing metrics (entry, exit, resident_time) for each stage.
+            For split PDFs, resident_time is computed by the server during parent aggregation.
+            For non-split jobs, resident_time is computed client-side for consistency.
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
@@ -481,9 +483,10 @@ class Ingestor:
 
         >>> ingestor = Ingestor(...).files("/path/to/pdfs").extract().embed()
         >>> results, traces = ingestor.ingest(return_traces=True)
-        >>> # Access parent-level aggregated traces for first document
+        >>> # Access trace metrics for first document (resident_time always available)
         >>> pdf_time = traces[0]["trace::resident_time::pdf_extractor"] / 1e9
-        >>> print(f"PDF extraction took {pdf_time:.2f}s")
+        >>> table_time = traces[0]["trace::resident_time::table_extractor"] / 1e9
+        >>> print(f"PDF: {pdf_time:.2f}s, Tables: {table_time:.2f}s")
 
         With failures and traces:
 

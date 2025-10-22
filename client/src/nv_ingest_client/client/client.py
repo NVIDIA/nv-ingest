@@ -44,6 +44,50 @@ from nv_ingest_client.util.util import (
 logger = logging.getLogger(__name__)
 
 
+def _compute_resident_times(trace_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compute resident_time entries from entry/exit pairs if not already present.
+
+    This ensures consistency between split jobs (where server computes resident_time)
+    and non-split jobs (where we compute it client-side).
+
+    Parameters
+    ----------
+    trace_dict : Dict[str, Any]
+        Trace dictionary with entry/exit pairs
+
+    Returns
+    -------
+    Dict[str, Any]
+        Trace dictionary with resident_time entries added
+    """
+    if not trace_dict or not isinstance(trace_dict, dict):
+        return trace_dict
+
+    # Check if resident_time already exists (server-computed for split jobs)
+    has_resident = any(k.startswith("trace::resident_time::") for k in trace_dict.keys())
+    if has_resident:
+        return trace_dict  # Already computed by server
+
+    # Compute resident_time from entry/exit pairs
+    result = dict(trace_dict)
+    stages = set()
+
+    # Find all unique stages
+    for key in trace_dict:
+        if key.startswith("trace::entry::"):
+            stages.add(key.replace("trace::entry::", ""))
+
+    # Compute resident_time for each stage
+    for stage in stages:
+        entry_key = f"trace::entry::{stage}"
+        exit_key = f"trace::exit::{stage}"
+        if entry_key in trace_dict and exit_key in trace_dict:
+            result[f"trace::resident_time::{stage}"] = trace_dict[exit_key] - trace_dict[entry_key]
+
+    return result
+
+
 class DataDecodeException(Exception):
     """
     Exception raised for errors in decoding data.
@@ -255,6 +299,9 @@ class _ConcurrentProcessor:
         # Extract trace data for all successful (non-failed) jobs
         if self.return_traces and not is_failed:
             trace_payload = result_data.get("trace") if result_data else None
+            # Compute resident_time if not already present (for consistency)
+            if trace_payload:
+                trace_payload = _compute_resident_times(trace_payload)
             self.traces.append(trace_payload if trace_payload else None)
 
         # Cleanup retry count if it exists

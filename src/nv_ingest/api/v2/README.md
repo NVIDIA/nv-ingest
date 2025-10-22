@@ -163,6 +163,53 @@ For split PDFs, parent-level metrics are automatically computed for each stage (
 - Failed chunk entries remain in `failed_subjobs`; missing chunks indicate the sink did not emit telemetry
 - **To access chunk traces:** Use `metadata.trace_segments[]` - each segment contains the full trace dict for that chunk
 
+## Client Library Features
+
+### Accessing Trace Metrics
+
+The Python client library provides convenient access to trace metrics via the `return_traces` parameter:
+
+```python
+from nv_ingest_client.client import Ingestor
+
+ingestor = Ingestor(
+    message_client_hostname="localhost",
+    message_client_port=7670,
+    message_client_kwargs={"api_version": "v2"}
+).files("/path/to/pdfs").extract().embed()
+
+# Get results with trace metrics
+results, traces = ingestor.ingest(return_traces=True)
+
+# Access timing for first document
+pdf_time = traces[0]["trace::resident_time::pdf_extractor"] / 1e9
+table_time = traces[0]["trace::resident_time::table_extractor"] / 1e9
+print(f"PDF: {pdf_time:.2f}s, Tables: {table_time:.2f}s")
+```
+
+**Note:** For split PDFs, `resident_time` represents aggregated compute time across all chunks. For non-split PDFs, it is computed client-side from entry/exit pairs.
+
+### Advanced: Accessing Full Metadata
+
+For advanced use cases requiring per-chunk trace breakdown or full metadata, use `include_parent_trace_ids`:
+
+```python
+results, traces, parent_trace_ids = ingestor.ingest(
+    return_traces=True,
+    include_parent_trace_ids=True
+)
+
+# Fetch full parent job metadata (including trace_segments)
+import requests
+response = requests.get(f"http://localhost:7670/v2/fetch_job/{parent_trace_ids[0]}")
+metadata = response.json()["metadata"]
+
+# Access per-chunk traces
+for segment in metadata["trace_segments"]:
+    print(f"Chunk {segment['chunk_index']}: pages {segment['start_page']}-{segment['end_page']}")
+    print(f"  Traces: {len(segment['trace'])} entries")
+```
+
 ## Testing
 
 Use the V2 test script with environment variable:
