@@ -30,7 +30,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
-from nv_ingest_api.util.message_brokers.fair_scheduler import FairScheduler
+from nv_ingest_api.util.message_brokers.qos_scheduler import QosScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -93,15 +93,7 @@ class MessageBrokerTaskSourceConfig(BaseModel):
     task_queue: str = Field(
         ..., description="The base name of the queue to fetch tasks from. Derives sub-queues for fair scheduling."
     )
-    poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
-    starvation_cycles: int = Field(
-        default=10,
-        ge=1,
-        description=(
-            "Number of empty scheduling cycles before a non-empty queue is"
-            " considered starved and forced to be served (except when immediate has items)."
-        ),
-    )
+    poll_interval: float = Field(default=0.0, gt=0, description="Polling interval in seconds.")
 
 
 @ray.remote
@@ -145,15 +137,15 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._current_backoff_sleep: float = 0.0
         self._last_backoff_log_time: float = 0.0
 
-        # Initialize fair scheduler with derived queues
-        # Tune for high throughput while preserving fairness (fixed-queue prefetch threads)
-        self.scheduler = FairScheduler(
+        # Initialize QoS scheduler. Use a simple base-queue strategy for SimpleClient.
+        strategy = "simple" if isinstance(self.client, SimpleClient) else "lottery"
+        self.scheduler = QosScheduler(
             self.task_queue,
-            starvation_cycles=self.config.starvation_cycles,
-            num_prefetch_threads=6,  # one per category
+            num_prefetch_threads=6,  # one per category (no-op for simple strategy)
             total_buffer_capacity=96,  # e.g., ~16 per thread
             prefetch_poll_interval=0.002,  # faster polling for responsiveness
             prefetch_non_immediate=True,  # enable prefetch for non-immediate categories
+            strategy=strategy,
         )
 
         self._logger.info(
@@ -305,8 +297,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         message is found across any queue, return None so the caller can sleep briefly.
         """
         try:
-            # Non-blocking check across all queues; do not block on any single queue.
-            job = self.scheduler.fetch_next(self.client, timeout=0.0)
+            # Use scheduler to fetch next. In simple strategy this will block up to poll_interval on base queue.
+            job = self.scheduler.fetch_next(self.client, timeout=self.config.poll_interval)
             if job is None:
                 self._logger.debug(
                     "No message received from derived queues for base "
