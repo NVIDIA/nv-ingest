@@ -44,6 +44,42 @@ router = APIRouter()
 
 DEFAULT_PDF_SPLIT_PAGE_COUNT = 32
 
+# Default QoS thresholds (pages). Tunable via environment variables:
+# QOS_MAX_PAGES_MICRO, QOS_MAX_PAGES_SMALL, QOS_MAX_PAGES_MEDIUM
+_QOS_DEFAULTS = {
+    "micro": 8,
+    "small": 64,
+    "medium": 256,
+}
+
+
+def get_qos_tier_for_page_count(page_count: int) -> str:
+    """
+    Select QoS tier for a document based on its total page count.
+    Tiers: 'micro', 'small', 'medium', 'large', 'default'
+    Thresholds can be tuned via environment variables:
+      - QOS_MAX_PAGES_MICRO (default: 4)
+      - QOS_MAX_PAGES_SMALL (default: 16)
+      - QOS_MAX_PAGES_MEDIUM (default: 64)
+    Anything above MEDIUM is 'large'. Non-positive page_count returns 'default'.
+    """
+    try:
+        micro_max = int(os.getenv("QOS_MAX_PAGES_MICRO", str(_QOS_DEFAULTS["micro"])))
+        small_max = int(os.getenv("QOS_MAX_PAGES_SMALL", str(_QOS_DEFAULTS["small"])))
+        medium_max = int(os.getenv("QOS_MAX_PAGES_MEDIUM", str(_QOS_DEFAULTS["medium"])))
+    except ValueError:
+        micro_max, small_max, medium_max = _QOS_DEFAULTS["micro"], _QOS_DEFAULTS["small"], _QOS_DEFAULTS["medium"]
+
+    if page_count <= 0:
+        return "default"
+    if page_count <= micro_max:
+        return "micro"
+    if page_count <= small_max:
+        return "small"
+    if page_count <= medium_max:
+        return "medium"
+    return "large"
+
 
 def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
     """
@@ -677,15 +713,17 @@ async def submit_job_v2(
             # Decode the payload to check page count
             pdf_content = base64.b64decode(payloads[0])
             page_count = get_pdf_page_count(pdf_content)
+            qos_tier = get_qos_tier_for_page_count(page_count)
             pages_per_chunk = get_pdf_split_page_count(client_override=client_split_page_count)
 
             # Split if the document has more pages than our chunk size
             if page_count > pages_per_chunk:
                 logger.warning(
-                    "Splitting PDF %s into %s-page chunks (total pages: %s)",
+                    "Splitting PDF %s into %s-page chunks (total pages: %s) -> (qos_tier: %s)",
                     original_source_name,
                     pages_per_chunk,
                     page_count,
+                    qos_tier,
                 )
 
                 chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
@@ -713,6 +751,18 @@ async def submit_job_v2(
                         original_source_id=original_source_id,
                         original_source_name=original_source_name,
                     )
+
+                    # Inject QoS routing hint into subjob routing_options (keeps API and service loosely coupled)
+                    try:
+                        sub_spec = json.loads(subjob_wrapper.payload)
+                        routing_opts = sub_spec.get("routing_options") or {}
+                        routing_opts["queue_hint"] = qos_tier
+                        sub_spec["routing_options"] = routing_opts
+                        subjob_wrapper = MessageWrapper(payload=json.dumps(sub_spec))
+                    except Exception:
+                        # Best-effort; if we cannot inject, fall back to default routing
+                        pass
+
                     submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
                     subjob_ids.append(subjob_id)
                     subjob_descriptors.append(
@@ -754,6 +804,16 @@ async def submit_job_v2(
         if "tracing_options" not in job_spec_dict:
             job_spec_dict["tracing_options"] = {"trace": True}
         job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
+        # If this was a PDF and we computed page_count, route the single job using the same QoS tier
+        try:
+            if (
+                document_types
+                and document_types[0].lower() == "pdf"
+                and "queue_hint" not in (job_spec_dict.get("routing_options") or {})
+            ):
+                job_spec_dict.setdefault("routing_options", {})["queue_hint"] = qos_tier
+        except Exception:
+            pass
         updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
         span.add_event("Submitting as single job (no split needed)")
