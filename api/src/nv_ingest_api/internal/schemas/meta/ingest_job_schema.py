@@ -32,6 +32,17 @@ class TracingOptionsSchema(BaseModelNoExt):
     total_pages: Optional[int] = None
 
 
+# PDF Configuration Schema
+class PdfConfigSchema(BaseModelNoExt):
+    """PDF-specific configuration options for job submission.
+
+    Note: split_page_count accepts any positive integer but will be clamped
+    to [1, 128] range by the server at runtime.
+    """
+
+    split_page_count: Annotated[int, Field(ge=1)] = 32
+
+
 # Ingest Task Schemas
 
 
@@ -270,6 +281,7 @@ class IngestJobSchema(BaseModelNoExt):
     job_id: Union[str, int]
     tasks: List[IngestTaskSchema]
     tracing_options: Optional[TracingOptionsSchema] = None
+    pdf_config: Optional[PdfConfigSchema] = None
 
 
 # ------------------------------------------------------------------------------

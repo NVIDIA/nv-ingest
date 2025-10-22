@@ -45,6 +45,7 @@ class IngestJobHandler:
         show_progress: bool = True,
         show_telemetry: bool = False,
         job_queue_id: str = "ingest_task_queue",
+        pdf_split_page_count: int = None,
     ) -> None:
         self.client = client
         self.files = files
@@ -56,6 +57,7 @@ class IngestJobHandler:
         self.show_progress = show_progress
         self.show_telemetry = show_telemetry
         self.job_queue_id = job_queue_id
+        self.pdf_split_page_count = pdf_split_page_count
         self._pbar = None
         # Internal state used across iterations
         self._retry_job_ids: List[str] = []
@@ -144,7 +146,9 @@ class IngestJobHandler:
             new_job_count: int = min(self.batch_size - cur_job_count, len(self.files) - self._processed)
             batch_files: List[str] = self.files[self._processed : self._processed + new_job_count]
 
-            new_job_indices: List[str] = self.client.create_jobs_for_batch(batch_files, self.tasks)
+            new_job_indices: List[str] = self.client.create_jobs_for_batch(
+                batch_files, self.tasks, pdf_split_page_count=self.pdf_split_page_count
+            )
             if len(new_job_indices) != new_job_count:
                 missing_jobs: int = new_job_count - len(new_job_indices)
                 error_msg: str = (
@@ -304,9 +308,11 @@ class IngestJobHandler:
         trace_ids: Dict[str, str] = defaultdict(list)  # type: ignore
         failed_jobs: List[str] = []
         retry_counts: Dict[str, int] = defaultdict(int)
+        pages_per_sec: float = None
 
         start_time_ns: int = time.time_ns()
         self._init_progress_bar(total_files)
+        pages_per_sec: float = None
         try:
             self._processed = 0
             while (self._processed < len(self.files)) or self._retry_job_ids:

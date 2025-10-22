@@ -111,7 +111,6 @@ def optimize_throughput(
     If --visualize-only is specified with a CSV file path, it will skip testing and only
     generate visualizations from the existing CSV file.
     """
-    global running
 
     # Check if we're only visualizing an existing CSV file
     if visualize_only:
@@ -321,7 +320,6 @@ def test_configuration_stability(
 
     Returns a dictionary with test results including stability status, response times, and status counts.
     """
-    global running
 
     # Initialize counters for this test
     start_time = time.time()

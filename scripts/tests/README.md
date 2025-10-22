@@ -245,19 +245,13 @@ Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
 ### Adding New Test Cases
 
 1. **Create test script** in `cases/` directory
-2. **Follow configuration pattern**:
-   ```python
-   def _get_env(name: str, default: str | None = None) -> str | None:
-       val = os.environ.get(name)
-       return val if val and val != "" else default
-   ```
-3. **Add transparent logging**:
+2 **Add transparent logging**:
    ```python
    print(f"=== Configuration ===")
    print(f"Dataset: {dataset_dir}")
    # ... log all parameters
    ```
-4. **Use structured logging**:
+3. **Use structured logging**:
    ```python
    kv_event_log("metric_name", value, log_path)
    ```
@@ -267,9 +261,8 @@ Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
 To add new configurable parameters:
 
 1. **Add to `env.example`** with documentation
-2. **Read in test script** using `_get_env()`
-3. **Add to configuration logging**
-4. **Update this README** with parameter description
+2. **Add to configuration logging**
+3. **Update this README** with parameter description
 
 ### Testing Different Datasets
 
