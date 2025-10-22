@@ -138,14 +138,28 @@ class _WeightedRoundRobinStrategy(_SchedulingStrategy):
                     return job
             except TimeoutError:
                 pass
-        # Attempt up to len(order) selections per sweep
+        # Attempt up to len(order) selections per sweep, excluding queues that prove empty
+        active = list(order)
         for _ in range(len(order)):
-            for q in order:
+            if not active:
+                break
+            for q in active:
                 self._current[q] += self._weights[q]
-            chosen = max(order, key=lambda q: self._current[q])
+            chosen = max(active, key=lambda q: self._current[q])
             self._current[chosen] -= self._total
             try:
                 job = client.fetch_message(queues[chosen], 0)
+                if job is not None:
+                    return job
+            except TimeoutError:
+                job = None
+            # If no job available from chosen, exclude it for the remainder of this sweep
+            if job is None and chosen in active:
+                active.remove(chosen)
+        # Fallback: single non-blocking attempt for each queue in order
+        for q in order:
+            try:
+                job = client.fetch_message(queues[q], 0)
                 if job is not None:
                     return job
             except TimeoutError:
@@ -223,6 +237,13 @@ class QosScheduler:
         self.close()
 
     # ---------------------------- Public API ----------------------------
+    def close(self) -> None:
+        """
+        Cleanly close the scheduler. No-op for the current implementation
+        since we do not spin background threads.
+        """
+        return None
+
     def fetch_next(self, client, timeout: float = 0.0) -> Optional[dict]:
         """
         Immediate-first, then strategy-based scheduling among non-immediate queues.
