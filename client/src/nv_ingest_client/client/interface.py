@@ -402,6 +402,7 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
+        return_traces: bool = False,
         **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
@@ -410,7 +411,23 @@ class Ingestor:
         Tuple[
             Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
             List[Tuple[str, str]],
-        ],
+        ],  # (results, failures)
+        Tuple[
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
+            List[Tuple[str, str]],
+            List[Optional[Dict[str, Any]]],
+        ],  # (results, failures, traces)
+        Tuple[
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
+            List[Optional[Dict[str, Any]]],
+            List[str],
+        ],  # (results, traces, parent_trace_ids)
+        Tuple[
+            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
+            List[Tuple[str, str]],
+            List[Optional[Dict[str, Any]]],
+            List[str],
+        ],  # (results, failures, traces, parent_trace_ids)
     ]:  # noqa: E501
         """
         Ingest documents by submitting jobs and fetching results concurrently.
@@ -421,6 +438,12 @@ class Ingestor:
             Whether to display a progress bar. Default is False.
         return_failures : bool, optional
             If True, return a tuple (results, failures); otherwise, return only results. Default is False.
+        save_to_disk : bool, optional
+            If True, save results to disk and return LazyLoadedList proxies. Default is False.
+        return_traces : bool, optional
+            If True, return parent-level aggregated trace metrics alongside results. Default is False.
+            When True, returns tuple with traces as additional element.
+            Traces contain timing metrics (entry, exit, resident_time) for each stage.
         **kwargs : Any
             Additional keyword arguments for the underlying client methods. Supported keys:
             'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
@@ -437,8 +460,49 @@ class Ingestor:
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
 
-        If `include_parent_trace_ids=True` is provided via kwargs, an additional
-        list of parent trace IDs is appended to the return value.
+        results, traces : tuple (list of dict, list of dict)
+            Tuple containing successful results and trace dictionaries when `return_traces` is True.
+
+        results, failures, traces : tuple
+            Tuple containing results, failures, and traces when both `return_failures`
+            and `return_traces` are True.
+
+        results, traces, parent_trace_ids : tuple
+            Tuple containing results, traces, and parent trace IDs when both `return_traces`
+            and `include_parent_trace_ids` are True.
+
+        results, failures, traces, parent_trace_ids : tuple
+            Tuple containing all four elements when `return_failures`, `return_traces`,
+            and `include_parent_trace_ids` are all True.
+
+        Examples
+        --------
+        Basic usage with trace metrics:
+
+        >>> ingestor = Ingestor(...).files("/path/to/pdfs").extract().embed()
+        >>> results, traces = ingestor.ingest(return_traces=True)
+        >>> # Access parent-level aggregated traces for first document
+        >>> pdf_time = traces[0]["trace::resident_time::pdf_extractor"] / 1e9
+        >>> print(f"PDF extraction took {pdf_time:.2f}s")
+
+        With failures and traces:
+
+        >>> results, failures, traces = ingestor.ingest(
+        ...     return_failures=True,
+        ...     return_traces=True
+        ... )
+        >>> for i, trace in enumerate(traces):
+        ...     if trace:
+        ...         total_time = trace["trace::resident_time::pdf_extractor"] / 1e9
+        ...         print(f"Document {i}: {total_time:.2f}s")
+
+        Works with save_to_disk:
+
+        >>> results, traces = ingestor.ingest(
+        ...     save_to_disk=True,
+        ...     return_traces=True
+        ... )
+        >>> # results are LazyLoadedList proxies, traces are in-memory dicts
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
@@ -574,7 +638,7 @@ class Ingestor:
         if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
             self._client.enable_telemetry(bool(enable_telemetry))
 
-        results, failures = self._client.process_jobs_concurrently(
+        results, failures, traces_list = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
@@ -583,6 +647,7 @@ class Ingestor:
             return_failures=True,
             stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
+            return_traces=True,  # Always collect traces, conditionally return them
             **proc_kwargs,
         )
 
@@ -648,13 +713,24 @@ class Ingestor:
 
         parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
 
-        if return_failures and include_parent_trace_ids:
+        # Build return tuple based on requested outputs (most specific combinations first)
+        # Order: results, failures (if requested), traces (if requested), parent_trace_ids (if requested)
+        if return_failures and return_traces and include_parent_trace_ids:
+            return results, failures, traces_list, parent_trace_ids
+        elif return_failures and return_traces:
+            return results, failures, traces_list
+        elif return_failures and include_parent_trace_ids:
             return results, failures, parent_trace_ids
-        if return_failures:
+        elif return_traces and include_parent_trace_ids:
+            return results, traces_list, parent_trace_ids
+        elif return_failures:
             return results, failures
-        if include_parent_trace_ids:
+        elif return_traces:
+            return results, traces_list
+        elif include_parent_trace_ids:
             return results, parent_trace_ids
-        return results
+        else:
+            return results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
