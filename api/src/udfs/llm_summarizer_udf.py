@@ -84,6 +84,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
     # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
     # pages, it must require parsing the payload to see which chunks correspond to which pages
+    original_df = df.copy()
     if len(df) > 1:
         # TODO: add feature to select N first and last chunks
         df = df.iloc[[0, -1]]
@@ -107,10 +108,11 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     if not stats["failed"]:
         stats["tokens"] = _estimate_tokens(content)
         logger.info("Summarized %d tokens in %f seconds using %s", stats["tokens"], stats["duration"], model_name)
-        _store_summary(df, summary, model_name)
+        _store_summary(original_df, summary, model_name)
 
         # Update the control message with modified DataFrame
-        control_message.payload(df)
+        control_message.payload(original_df)
+
     else:
         logger.warning("%s failed to summarize content", model_name)
 
