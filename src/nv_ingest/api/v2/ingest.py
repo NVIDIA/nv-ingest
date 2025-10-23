@@ -432,6 +432,88 @@ def _extract_ray_telemetry(result: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
     return trace_dict, annotations_dict
 
 
+def _aggregate_parent_traces(chunk_traces: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Aggregate chunk-level traces into parent-level metrics.
+
+    For each stage found in chunk traces:
+    - trace::entry::<stage> = min(all chunk entries) - earliest start
+    - trace::exit::<stage> = max(all chunk exits) - latest finish
+    - trace::resident_time::<stage> = sum(chunk durations) - total compute
+
+    Parameters
+    ----------
+    chunk_traces : Dict[str, Any]
+        Trace dict with chunk-prefixed keys (chunk_N::trace::entry::stage_name)
+
+    Returns
+    -------
+    Dict[str, Any]
+        Parent-level aggregated traces (trace::entry::stage_name, etc.)
+    """
+    # Group by stage: {stage_name: {chunk_idx: {entry: float, exit: float}}}
+    stage_data: Dict[str, Dict[int, Dict[str, Any]]] = {}
+
+    for key, value in chunk_traces.items():
+        if not key.startswith("chunk_"):
+            continue
+
+        parts = key.split("::")
+        if len(parts) < 4:  # Minimum: chunk_N::trace::entry/exit::stage_name
+            continue
+
+        if parts[1] != "trace":  # Ensure it's a trace key
+            continue
+
+        chunk_idx_str = parts[0].split("_")[1]  # "chunk_1" -> "1"
+        try:
+            chunk_idx = int(chunk_idx_str)
+        except ValueError:
+            continue
+
+        event_type = parts[2]  # "entry" or "exit"
+
+        # Stage name is everything after trace::entry:: or trace::exit::
+        # Handles both simple (pdf_extractor) and nested (pdf_extractor::pdf_extraction::pdfium_0)
+        stage_name = "::".join(parts[3:])  # Join remaining parts
+
+        if event_type not in ("entry", "exit"):
+            continue
+
+        if stage_name not in stage_data:
+            stage_data[stage_name] = {}
+        if chunk_idx not in stage_data[stage_name]:
+            stage_data[stage_name][chunk_idx] = {}
+
+        stage_data[stage_name][chunk_idx][event_type] = value
+
+    # Compute aggregated metrics
+    parent_traces: Dict[str, Any] = {}
+
+    for stage_name, chunks in stage_data.items():
+        entries = []
+        exits = []
+        durations = []
+
+        for chunk_data in chunks.values():
+            entry = chunk_data.get("entry")
+            exit_time = chunk_data.get("exit")
+
+            # Both entry and exit must exist for valid pair
+            if entry is not None and exit_time is not None:
+                entries.append(entry)
+                exits.append(exit_time)
+                durations.append(exit_time - entry)
+
+        # Only add parent traces if we have valid data
+        if entries and exits:
+            parent_traces[f"trace::entry::{stage_name}"] = min(entries)
+            parent_traces[f"trace::exit::{stage_name}"] = max(exits)
+            parent_traces[f"trace::resident_time::{stage_name}"] = sum(durations)
+
+    return parent_traces
+
+
 def _build_aggregated_response(
     parent_job_id: str,
     subjob_results: List[Optional[Dict[str, Any]]],
@@ -469,6 +551,9 @@ def _build_aggregated_response(
         "description": (
             "One or more subjobs failed to complete" if any_failed else "Aggregated result composed from subjob outputs"
         ),
+        # Top-level trace/annotations for V1 compatibility
+        "trace": {},
+        "annotations": {},
         "metadata": {
             "parent_job_id": parent_job_id,
             "total_pages": metadata.get("total_pages", len(subjob_ids)),
@@ -498,6 +583,7 @@ def _build_aggregated_response(
             end_page = descriptor.get("end_page")
 
             if trace_data:
+                # Add to trace_segments (detailed, per-chunk view)
                 aggregated_result["metadata"]["trace_segments"].append(
                     {
                         "job_id": descriptor.get("job_id"),
@@ -507,8 +593,10 @@ def _build_aggregated_response(
                         "trace": trace_data,
                     }
                 )
+                # Chunk traces stay in metadata.trace_segments only (not in top-level)
 
             if annotation_data:
+                # Add to annotation_segments (detailed, per-chunk view)
                 aggregated_result["metadata"]["annotation_segments"].append(
                     {
                         "job_id": descriptor.get("job_id"),
@@ -518,9 +606,27 @@ def _build_aggregated_response(
                         "annotations": annotation_data,
                     }
                 )
+                # Merge into top-level annotations (annotations have unique UUIDs, safe to merge)
+                aggregated_result["annotations"].update(annotation_data)
         else:
             # Note failed page
             logger.warning(f"Page {page_num} failed or missing")
+
+    # Compute parent-level trace aggregations from trace_segments
+    trace_segments = aggregated_result["metadata"]["trace_segments"]
+    if trace_segments:
+        # Build a temporary chunk trace dict for aggregation
+        temp_chunk_traces = {}
+        for segment in trace_segments:
+            chunk_idx = segment.get("chunk_index")
+            chunk_trace = segment.get("trace", {})
+            for trace_key, trace_value in chunk_trace.items():
+                prefixed_key = f"chunk_{chunk_idx}::{trace_key}"
+                temp_chunk_traces[prefixed_key] = trace_value
+
+        # Aggregate and set as top-level trace (only parent traces, no chunk traces)
+        parent_level_traces = _aggregate_parent_traces(temp_chunk_traces)
+        aggregated_result["trace"] = parent_level_traces
 
     return aggregated_result
 
