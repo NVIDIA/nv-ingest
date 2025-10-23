@@ -11,6 +11,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+import base64
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
@@ -18,6 +19,7 @@ from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExt
 from nv_ingest_api.internal.schemas.meta.metadata_schema import MetadataSchema, AudioMetadataSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest_api.interface.utility import read_file_as_base64
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +57,10 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         logger.error("Row does not contain 'metadata'.")
         raise ValueError("Row does not contain 'metadata'.")
 
-    base64_audio = metadata.pop("content")
+    base64_file_path = metadata.pop("content")
+    base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
+
+    base64_audio = read_file_as_base64(base64_file_path)
     content_metadata = metadata.get("content_metadata", {})
 
     # Only extract transcript if content type is audio
@@ -69,7 +74,7 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         trace_info=trace_info,  # traceable_func arg
         stage_name="audio_extraction",
     )
-
+    # raise ValueError(f"SEGMENTS: {segments}, TRANSCRIPT: {transcript}")
     extracted_data = []
     if segment_audio:
         for segment in segments:
@@ -166,6 +171,10 @@ def extract_text_from_audio_internal(
         )
 
         # Apply the _extract_from_audio_partial function to each row in the DataFrame
+        logger.info(
+            f"Extracting audio data from {len(df_extraction_ledger)}"
+            f"rows and {len(df_extraction_ledger.columns)} columns"
+        )
         extraction_series = df_extraction_ledger.apply(_extract_from_audio_partial, axis=1)
 
         # Explode the results if the extraction returns lists.

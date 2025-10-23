@@ -657,6 +657,8 @@ def _insert_location_into_content_metadata(
     elif element["document_type"] == "image" and enable_images:
         location = element["metadata"]["image_metadata"]["image_location"]
         max_dimensions = element["metadata"]["image_metadata"]["image_location_max_dimensions"]
+    if element["document_type"] == "mp3":
+        location = element["metadata"]
     if (not location) and (element["document_type"] != "text"):
         source_name = element["metadata"]["source_metadata"]["source_name"]
         pg_num = element["metadata"]["content_metadata"].get("page_number")

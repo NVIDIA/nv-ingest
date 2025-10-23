@@ -157,6 +157,14 @@ class DocumentTypeEnum(str, Enum):
         MP3 audio format.
     WAV: str
         WAV audio format.
+    MP4: str
+        MP4 video format.
+    MOV: str
+        MOV video format.
+    AVI: str
+        AVI video format.
+    MKV: str
+        MKV video format.
     """
 
     BMP: str = "bmp"
@@ -172,6 +180,10 @@ class DocumentTypeEnum(str, Enum):
     MD: str = "text"
     MP3: str = "mp3"
     WAV: str = "wav"
+    MP4: str = "mp4"
+    MOV: str = "mov"
+    AVI: str = "avi"
+    MKV: str = "mkv"
     UNKNOWN: str = "unknown"
 
 

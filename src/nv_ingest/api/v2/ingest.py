@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Request, Response
 from fastapi import HTTPException
@@ -20,6 +21,8 @@ from redis import RedisError
 
 from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
 from nv_ingest_api.util.service_clients.client_base import FetchMode
+from nv_ingest_api.util.dataloader.dataloader import DataLoader
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import DocumentTypeEnum
 
 # For PDF splitting
 import pypdfium2 as pdfium
@@ -130,46 +133,21 @@ def get_pdf_page_count(pdf_content: bytes) -> int:
         return 1  # Assume single page on error
 
 
-def _prepare_chunk_submission(
+def _create_subjob_dict(
+    job_id: str,
+    job_payload: Dict[str, Any],
     job_spec_template: Dict[str, Any],
-    chunk: Dict[str, Any],
-    *,
-    parent_uuid: uuid.UUID,
-    parent_job_id: str,
     current_trace_id: int,
-    original_source_id: str,
-    original_source_name: str,
-) -> Tuple[str, MessageWrapper]:
-    """Create a subjob MessageWrapper for a PDF chunk and return its identifier."""
-
-    chunk_number = chunk["chunk_index"] + 1
-    start_page = chunk["start_page"]
-    end_page = chunk["end_page"]
-
-    subjob_spec = {
+    parent_job_id: str,
+    start_key: Dict[str, Any],
+) -> Dict[str, Any]:
+    job_spec = {
         key: value
         for key, value in job_spec_template.items()
         if key not in {"job_payload", "job_id", "tracing_options"}
     }
-
-    subjob_payload_template = job_spec_template.get("job_payload", {})
-    subjob_payload = {
-        key: value
-        for key, value in subjob_payload_template.items()
-        if key not in {"content", "source_id", "source_name"}
-    }
-
-    chunk_bytes = chunk["bytes"]
-    subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
-
-    page_suffix = f"page_{start_page}" if start_page == end_page else f"pages_{start_page}-{end_page}"
-    subjob_payload["source_id"] = [f"{original_source_id}#{page_suffix}"]
-    subjob_payload["source_name"] = [f"{original_source_name}#{page_suffix}"]
-
-    subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
-    subjob_id = str(subjob_uuid)
-    subjob_spec["job_payload"] = subjob_payload
-    subjob_spec["job_id"] = subjob_id
+    job_spec["job_payload"] = job_payload
+    job_spec["job_id"] = job_id
 
     base_tracing_options = job_spec_template.get("tracing_options") or {}
     tracing_options = dict(base_tracing_options)
@@ -177,9 +155,90 @@ def _prepare_chunk_submission(
     tracing_options["trace_id"] = str(current_trace_id)
     tracing_options["ts_send"] = int(time.time() * 1000)
     tracing_options["parent_job_id"] = parent_job_id
-    tracing_options["page_num"] = start_page
+    for key, value in start_key.items():
+        tracing_options[key] = value
 
-    subjob_spec["tracing_options"] = tracing_options
+    job_spec["tracing_options"] = tracing_options
+    return job_spec
+
+
+def _create_payload_dict(
+    job_spec_template: Dict[str, Any],
+    content: str,
+    source_id: str,
+    source_name: str,
+    document_type: str,
+) -> Dict[str, Any]:
+    subjob_payload_template = job_spec_template.get("job_payload", {})
+    subjob_payload = {
+        key: value
+        for key, value in subjob_payload_template.items()
+        if key not in {"content", "source_id", "source_name"}
+    }
+
+    subjob_payload["content"] = [content]
+
+    subjob_payload["source_id"] = [source_id]
+    subjob_payload["source_name"] = [source_name]
+    subjob_payload["document_type"] = [document_type]
+    return subjob_payload
+
+
+def _prepare_chunk_submission(
+    job_spec_template: Dict[str, Any],
+    chunk: Dict[str, Any],
+    *,
+    parent_uuid: uuid.UUID,
+    parent_job_id: str,
+    current_trace_id: int,
+    source_id: str,
+    source_name: str,
+    document_type: str,
+) -> Tuple[str, MessageWrapper]:
+    """Create a subjob MessageWrapper for a PDF chunk and return its identifier."""
+
+    chunk_number = chunk["chunk_index"] + 1
+
+    subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
+    subjob_id = str(subjob_uuid)
+    # subjob_spec = {
+    #     key: value
+    #     for key, value in job_spec_template.items()
+    #     if key not in {"job_payload", "job_id", "tracing_options"}
+    # }
+
+    # subjob_payload = {
+    #     key: value
+    #     for key, value in subjob_payload_template.items()
+    #     if key not in {"content", "source_id", "source_name"}
+    # }
+    # if isinstance(chunk["bytes"], bytes):
+    chunk_bytes = base64.b64encode(chunk["bytes"]).decode("utf-8")
+    # else:
+    # chunk_bytes = chunk["bytes"]
+    # subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
+    subjob_payload_template = job_spec_template.get("job_payload", {})
+    # start_page = chunk["start_page"]
+    # end_page = chunk["end_page"]
+
+    subjob_payload = _create_payload_dict(subjob_payload_template, chunk_bytes, source_id, source_name, document_type)
+    start = chunk["start_page"] if "start_page" in chunk else chunk["start"]
+
+    # subjob_spec["job_payload"] = subjob_payload
+    # subjob_spec["job_id"] = subjob_id
+
+    # base_tracing_options = job_spec_template.get("tracing_options") or {}
+    # tracing_options = dict(base_tracing_options)
+    # tracing_options.setdefault("trace", True)
+    # tracing_options["trace_id"] = str(current_trace_id)
+    # tracing_options["ts_send"] = int(time.time() * 1000)
+    # tracing_options["parent_job_id"] = parent_job_id
+    # tracing_options["page_num"] = start_page
+
+    # subjob_spec["tracing_options"] = tracing_options
+    subjob_spec = _create_subjob_dict(
+        subjob_id, subjob_payload, job_spec_template, current_trace_id, parent_job_id, {"page_num": start}
+    )
 
     return subjob_id, MessageWrapper(payload=json.dumps(subjob_spec))
 
@@ -529,7 +588,6 @@ async def submit_job_v2(
 
         # Parse job spec
         job_spec_dict = json.loads(job_spec.payload)
-
         # Extract document type and payload from the proper structure
         job_payload = job_spec_dict.get("job_payload", {})
         document_types = job_payload.get("document_type", [])
@@ -540,7 +598,18 @@ async def submit_job_v2(
         source_names = job_payload.get("source_name", ["unknown_source.pdf"])
         original_source_id = source_ids[0] if source_ids else "unknown_source.pdf"
         original_source_name = source_names[0] if source_names else "unknown_source.pdf"
-
+        submission_tasks = []
+        subjob_ids: List[str] = []
+        subjob_descriptors: List[Dict[str, Any]] = []
+        parent_metadata: Dict[str, Any] = {}
+        try:
+            parent_uuid = uuid.UUID(parent_job_id)
+        except ValueError:
+            logger.warning(
+                "Parent job id %s is not a valid UUID; generating fallback namespace for subjobs",
+                parent_job_id,
+            )
+            parent_uuid = uuid.uuid4()
         # Check if this is a PDF that needs splitting
         if document_types and payloads and document_types[0].lower() == "pdf":
             # Decode the payload to check page count
@@ -556,31 +625,23 @@ async def submit_job_v2(
                     pages_per_chunk,
                     page_count,
                 )
-
                 chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
 
-                subjob_ids: List[str] = []
-                subjob_descriptors: List[Dict[str, Any]] = []
-                submission_tasks = []
-
-                try:
-                    parent_uuid = uuid.UUID(parent_job_id)
-                except ValueError:
-                    logger.warning(
-                        "Parent job id %s is not a valid UUID; generating fallback namespace for subjobs",
-                        parent_job_id,
-                    )
-                    parent_uuid = uuid.uuid4()
-
                 for chunk in chunks:
+                    start = chunk["start"]
+                    end = chunk["end"]
+                    page_suffix = f"page_{start}" if start == end else f"pages_{start}-{end}"
+                    source_id = f"{original_source_id}#{page_suffix}"
+                    source_name = f"{original_source_name}#{page_suffix}"
                     subjob_id, subjob_wrapper = _prepare_chunk_submission(
                         job_spec_dict,
                         chunk,
+                        document_type=DocumentTypeEnum.PDF,
                         parent_uuid=parent_uuid,
                         parent_job_id=parent_job_id,
                         current_trace_id=current_trace_id,
-                        original_source_id=original_source_id,
-                        original_source_name=original_source_name,
+                        source_id=source_id,
+                        source_name=source_name,
                     )
                     submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
                     subjob_ids.append(subjob_id)
@@ -588,35 +649,88 @@ async def submit_job_v2(
                         {
                             "job_id": subjob_id,
                             "chunk_index": len(subjob_descriptors) + 1,
-                            "start_page": chunk.get("start_page"),
-                            "end_page": chunk.get("end_page"),
+                            "start_page": chunk.get("start"),
+                            "end_page": chunk.get("end"),
                             "page_count": chunk.get("page_count"),
                         }
                     )
+            parent_metadata = {"total_pages": page_count}
 
-                if submission_tasks:
-                    await asyncio.gather(*submission_tasks)
-
-                parent_metadata: Dict[str, Any] = {
-                    "total_pages": page_count,
-                    "original_source_id": original_source_id,
-                    "original_source_name": original_source_name,
-                    "document_type": document_types[0] if document_types else "pdf",
-                    "subjob_order": subjob_ids,
+        elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav"]:
+            # print("IN AUDIO/VIDEO BLOCK")
+            document_type = document_types[0]
+            upload_path = f"./{Path(original_source_id).name}"
+            # dump the payload to a file, just came from client
+            with open(upload_path, "wb") as f:
+                f.write(base64.b64decode(payloads[0]))
+            file_size = Path(upload_path).stat().st_size
+            # print("DATA:  file_size: {file_size}")
+            dataloader = DataLoader(
+                path=upload_path, output_dir="./audio_chunks/", audio_only=True, split_interval=file_size
+            )
+            # print("Finished dataloader")
+            document_type = DocumentTypeEnum.MP3
+            # chunks = dataloader.files_completed
+            parent_uuid = uuid.UUID(parent_job_id)
+            for task in job_spec_dict["tasks"]:
+                if "task_properties" in task and "document_type" in task["task_properties"]:
+                    task["task_properties"]["document_type"] = document_type
+            # logger.info(f"DATA:  dataloader.files_completed: {dataloader.files_completed}")
+            for idx, file_path in enumerate(dataloader.files_completed):
+                chunk = {
+                    "bytes": file_path.encode("utf-8"),
+                    "chunk_index": idx,
+                    "start": 1,
+                    "end": -1,
                 }
 
-                await ingest_service.set_parent_job_mapping(
-                    parent_job_id,
-                    subjob_ids,
-                    parent_metadata,
-                    subjob_descriptors=subjob_descriptors,
+                subjob_id, subjob_wrapper = _prepare_chunk_submission(
+                    job_spec_dict,
+                    chunk,
+                    parent_uuid=parent_uuid,
+                    parent_job_id=parent_job_id,
+                    current_trace_id=current_trace_id,
+                    source_id=file_path,
+                    source_name=upload_path,
+                    document_type=document_type,
                 )
 
-                await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
+                submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
+                # raise ValueError(subjob_wrapper)
+                subjob_ids.append(subjob_id)
+                subjob_descriptors.append(
+                    {
+                        "job_id": subjob_id,
+                        "chunk_index": idx + 1,
+                        "start_page": chunk.get("start"),
+                        "end_page": chunk.get("end"),
+                    }
+                )
 
-                span.add_event(f"Split into {len(subjob_ids)} subjobs")
-                response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
-                return parent_job_id
+        if submission_tasks:
+            await asyncio.gather(*submission_tasks)
+
+            parent_metadata.update(
+                {
+                    "original_source_id": original_source_id,
+                    "original_source_name": original_source_name,
+                    "document_type": document_type,
+                    "subjob_order": subjob_ids,
+                }
+            )
+
+            await ingest_service.set_parent_job_mapping(
+                parent_job_id,
+                subjob_ids,
+                parent_metadata,
+                subjob_descriptors=subjob_descriptors,
+            )
+
+            await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
+
+            span.add_event(f"Split into {len(subjob_ids)} subjobs")
+            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+            return parent_job_id
 
         # For non-PDFs or cases where splitting is not required, submit as normal
         if "tracing_options" not in job_spec_dict:

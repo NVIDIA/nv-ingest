@@ -51,6 +51,10 @@ EXTENSION_TO_DOCUMENT_TYPE = {
     "txt": DocumentTypeEnum.TXT,
     "mp3": DocumentTypeEnum.MP3,
     "wav": DocumentTypeEnum.WAV,
+    "mp4": DocumentTypeEnum.MP4,
+    "mov": DocumentTypeEnum.MOV,
+    "avi": DocumentTypeEnum.AVI,
+    "mkv": DocumentTypeEnum.MKV,
     # Add more as needed
 }
 
@@ -121,6 +125,9 @@ def detect_encoding_and_read_text_file(file_stream: BytesIO) -> str:
 def extract_file_content(path: str) -> Tuple[str, DocumentTypeEnum]:
     """Extracts content from a file, supporting different formats."""
     document_type = get_or_infer_file_type(path)
+
+    # if document_type in [DocumentTypeEnum.MP4, DocumentTypeEnum.MOV, DocumentTypeEnum.AVI, DocumentTypeEnum.MKV]:
+    #     return path, DocumentTypeEnum(document_type)
 
     with open(path, "rb") as file:
         file_stream = BytesIO(file.read())

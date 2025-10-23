@@ -139,7 +139,7 @@ class RestClient(MessageBrokerClientBase):
                 self._client = requests.Session()
 
         # Allow API version override via environment variable or kwargs
-        api_version = kwargs.get("api_version") or os.getenv("NV_INGEST_API_VERSION", "v1")
+        api_version = kwargs.get("api_version") or os.getenv("NV_INGEST_API_VERSION", "v2")
         self._api_version = api_version
         self._submit_endpoint: str = f"/{api_version}/submit_job"
         self._fetch_endpoint: str = f"/{api_version}/fetch_job"
