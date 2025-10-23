@@ -573,7 +573,8 @@ class Ingestor:
         if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
             self._client.enable_telemetry(bool(enable_telemetry))
 
-        results, failures, traces_list = self._client.process_jobs_concurrently(
+        # Call process_jobs_concurrently
+        proc_result = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
@@ -582,9 +583,16 @@ class Ingestor:
             return_failures=True,
             stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
-            return_traces=True,  # Always collect traces, conditionally return them
+            return_traces=return_traces,
             **proc_kwargs,
         )
+
+        # Unpack result based on return_traces flag
+        if return_traces:
+            results, failures, traces_list = proc_result
+        else:
+            results, failures = proc_result
+            traces_list = []  # Empty list when traces not requested
 
         if show_progress and pbar:
             pbar.close()
