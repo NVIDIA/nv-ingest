@@ -672,11 +672,15 @@ async def submit_job_v2(
         original_source_id = source_ids[0] if source_ids else "unknown_source.pdf"
         original_source_name = source_names[0] if source_names else "unknown_source.pdf"
 
+        # Track page count for all PDFs (used for both splitting logic and metadata)
+        pdf_page_count_cache = None
+
         # Check if this is a PDF that needs splitting
         if document_types and payloads and document_types[0].lower() == "pdf":
             # Decode the payload to check page count
             pdf_content = base64.b64decode(payloads[0])
             page_count = get_pdf_page_count(pdf_content)
+            pdf_page_count_cache = page_count  # Cache for later use
             pages_per_chunk = get_pdf_split_page_count(client_override=client_split_page_count)
 
             # Split if the document has more pages than our chunk size
@@ -761,6 +765,34 @@ async def submit_job_v2(
         # Submit the job to the pipeline task queue
         await ingest_service.submit_job(updated_job_spec, parent_job_id)
         await ingest_service.set_job_state(parent_job_id, STATE_SUBMITTED)
+
+        # If this was a PDF (even if not split), store page count metadata for tracking
+        if pdf_page_count_cache is not None:
+            try:
+                # Use cached page count from earlier check to avoid re-decoding
+                # Store minimal metadata for non-split PDFs (consistent with split PDFs)
+                single_pdf_metadata: Dict[str, Any] = {
+                    "total_pages": pdf_page_count_cache,
+                    "pages_per_chunk": pdf_page_count_cache,  # Single chunk = entire document
+                    "original_source_id": original_source_id,
+                    "original_source_name": original_source_name,
+                    "document_type": document_types[0],
+                    "subjob_order": [],  # No subjobs for non-split PDFs
+                }
+
+                # Store as parent job metadata with empty subjob list for consistency
+                await ingest_service.set_parent_job_mapping(
+                    parent_job_id,
+                    [],  # Empty subjob list
+                    single_pdf_metadata,
+                    subjob_descriptors=[],
+                )
+                logger.debug(
+                    f"Stored page count metadata for non-split PDF {original_source_name}: {pdf_page_count_cache} pages"
+                )
+            except Exception as metadata_err:
+                # Don't fail the job if metadata storage fails
+                logger.warning(f"Failed to store page count metadata for {parent_job_id}: {metadata_err}")
 
         response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
         return parent_job_id
@@ -897,6 +929,32 @@ async def fetch_job_v2(job_id: str, ingest_service: INGEST_SERVICE_T):
             metadata = subjob_info.get("metadata", {})
 
             logger.debug(f"Parent job {job_id} has {len(subjob_ids)} subjobs")
+
+            # Special case: Non-split PDFs have metadata but no subjobs
+            # Fetch the result directly and augment with page count metadata
+            if len(subjob_ids) == 0:
+                logger.debug(f"Job {job_id} is a non-split PDF, fetching result directly")
+                try:
+                    job_response = await ingest_service.fetch_job(job_id)
+
+                    # Augment response with page count metadata
+                    if isinstance(job_response, dict):
+                        if "metadata" not in job_response:
+                            job_response["metadata"] = {}
+                        job_response["metadata"]["total_pages"] = metadata.get("total_pages")
+                        job_response["metadata"]["original_source_id"] = metadata.get("original_source_id")
+                        job_response["metadata"]["original_source_name"] = metadata.get("original_source_name")
+
+                    # Update job state after successful fetch
+                    await _update_job_state_after_fetch(job_id, ingest_service)
+
+                    return _stream_json_response(job_response)
+                except (TimeoutError, RedisError, ConnectionError):
+                    logger.debug(f"Job {job_id} (non-split PDF) not ready yet")
+                    raise HTTPException(status_code=202, detail="Job is processing. Retry later.")
+                except Exception as e:
+                    logger.exception(f"Error fetching non-split PDF job {job_id}: {e}")
+                    raise HTTPException(status_code=500, detail="Internal server error during job fetch.")
 
             # Build ordered descriptors for subjobs
             stored_descriptors = subjob_info.get("subjob_descriptors") or []
