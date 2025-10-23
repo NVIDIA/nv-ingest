@@ -161,6 +161,7 @@ class RestClient(MessageBrokerClientBase):
             )
             api_version = "v1"
 
+
         self._api_version = api_version
         self._submit_endpoint: str = f"/{api_version}/submit_job"
         self._fetch_endpoint: str = f"/{api_version}/fetch_job"

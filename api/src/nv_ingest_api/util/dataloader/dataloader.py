@@ -152,6 +152,7 @@ else:
             split_type: SplitType = SplitType.SIZE,
             cache_path: str = None,
             video_audio_separate: bool = False,
+            audio_only: bool = False,
         ):
             """
             Split a media file into smaller chunks of `split_interval` size. if
@@ -163,15 +164,19 @@ else:
             split_interval: the size of the chunk to split the media file into depending on the split type
             split_type: SplitType, type of split to perform, either size, time, or frame
             video_audio_separate: bool, whether to separate the video and audio files
+            audio_only: bool, whether to only return the audio files
             """
             import ffmpeg
 
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            if audio_only:
+                input_path = self.get_audio_from_video(input_path, output_dir / f"{input_path.stem}.mp3")
             path_file = Path(input_path)
             file_name = path_file.stem
             suffix = path_file.suffix
-            output_dir = Path(output_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
             output_pattern = output_dir / f"{file_name}_chunk_%04d{suffix}"
+
             num_splits = 0
             cache_path = cache_path if cache_path else output_dir
             try:
@@ -233,7 +238,12 @@ else:
             split_interval: int, size of the chunk to split the media file into depending on the split type
             split_type: SplitType, type of split to perform, either size, time, or frame
             """
+            print("DATA:  find_num_splits")
             if split_type == SplitType.SIZE:
+                logger.info(f"DATA:  file_size: {file_size}, split_interval: {split_interval}")
+                logger.info(
+                    f"DATA:  math.ceil(file_size / split_interval*10e6): {math.ceil(file_size / split_interval*10e6)}"
+                )
                 return math.ceil(file_size / split_interval)
             elif split_type == SplitType.TIME:
                 return math.ceil(duration / split_interval)
@@ -294,6 +304,7 @@ else:
             interface: LoaderInterface = None,
             size: int = 2,
             video_audio_separate: bool = False,
+            audio_only: bool = False,
         ):
             interface = interface if interface else MediaInterface()
             self.thread = None
@@ -306,16 +317,18 @@ else:
             self.files_completed = []
             self.split_type = split_type
             self.video_audio_separate = video_audio_separate
+            self.audio_only = audio_only
             # process the file immediately on instantiation
-            self._split()
+            self._process()
 
-        def _split(self):
+        def _process(self):
             self.files_completed = self.interface.split(
                 self.path,
                 self.output_dir,
                 split_interval=self.split_interval,
                 split_type=self.split_type,
                 video_audio_separate=self.video_audio_separate,
+                audio_only=self.audio_only,
             )
 
         def __next__(self):
