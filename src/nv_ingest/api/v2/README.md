@@ -209,16 +209,3 @@ for segment in metadata["trace_segments"]:
     print(f"Chunk {segment['chunk_index']}: pages {segment['start_page']}-{segment['end_page']}")
     print(f"  Traces: {len(segment['trace'])} entries")
 ```
-
-## Testing
-
-Use the V2 test script with environment variable:
-```bash
-# Run with V2 endpoints
-DATASET_DIR=/data/splits python scripts/tests/cases/dc20_v2_e2e.py
-```
-
-Or set the API version for any existing code:
-```bash
-export NV_INGEST_API_VERSION=v2
-```
