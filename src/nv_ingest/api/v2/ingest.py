@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import uuid
+import random
 
 from fastapi import APIRouter, Request, Response
 from fastapi import HTTPException
@@ -667,6 +668,51 @@ def _build_aggregated_response(
     return aggregated_result
 
 
+# ---------------------------------------------------------------------------
+# Bursty submission helpers (fairness without long-lived in-flight tasks)
+# ---------------------------------------------------------------------------
+
+
+def _get_submit_burst_params() -> Tuple[int, int, int]:
+    """
+    Returns (burst_size, pause_ms, jitter_ms) from environment with sane defaults.
+    - V2_SUBMIT_BURST_SIZE (default: 16)
+    - V2_SUBMIT_BURST_PAUSE_MS (default: 25)
+    - V2_SUBMIT_BURST_JITTER_MS (default: 10)
+    """
+    burst_size = int(os.getenv("V2_SUBMIT_BURST_SIZE", "16"))
+    pause_ms = int(os.getenv("V2_SUBMIT_BURST_PAUSE_MS", "25"))
+    jitter_ms = int(os.getenv("V2_SUBMIT_BURST_JITTER_MS", "10"))
+
+    return max(1, burst_size), max(0, pause_ms), max(0, jitter_ms)
+
+
+async def _submit_subjobs_in_bursts(
+    items: List[Tuple[str, MessageWrapper]],
+    ingest_service: "INGEST_SERVICE_T",
+    *,
+    burst_size: int,
+    pause_ms: int,
+    jitter_ms: int,
+) -> None:
+    """
+    Submit subjobs in sequential bursts and await each burst to completion.
+    This avoids keeping a large number of pending tasks in the REST handler
+    and allows other concurrent requests to interleave enqueue work between bursts.
+    """
+    for offset in range(0, len(items), burst_size):
+        burst = items[offset : offset + burst_size]
+        tasks = [ingest_service.submit_job(wrapper, subjob_id) for (subjob_id, wrapper) in burst]
+        # Propagate any errors from this burst
+        await asyncio.gather(*tasks)
+
+        # Pause with jitter to yield to other request handlers before next burst
+        if offset + burst_size < len(items):
+            delay_ms = pause_ms + (random.randint(0, jitter_ms) if jitter_ms > 0 else 0)
+            if delay_ms > 0:
+                await asyncio.sleep(delay_ms / 1000.0)
+
+
 # POST /v2/submit_job
 @router.post(
     "/submit_job",
@@ -734,7 +780,7 @@ async def submit_job_v2(
 
                 subjob_ids: List[str] = []
                 subjob_descriptors: List[Dict[str, Any]] = []
-                submission_tasks = []
+                submission_items: List[Tuple[str, MessageWrapper]] = []
 
                 try:
                     parent_uuid = uuid.UUID(parent_job_id)
@@ -767,7 +813,7 @@ async def submit_job_v2(
                         # Best-effort; if we cannot inject, fall back to default routing
                         pass
 
-                    submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
+                    submission_items.append((subjob_id, subjob_wrapper))
                     subjob_ids.append(subjob_id)
                     subjob_descriptors.append(
                         {
@@ -779,8 +825,15 @@ async def submit_job_v2(
                         }
                     )
 
-                if submission_tasks:
-                    await asyncio.gather(*submission_tasks)
+                if submission_items:
+                    burst_size, pause_ms, jitter_ms = _get_submit_burst_params()
+                    await _submit_subjobs_in_bursts(
+                        submission_items,
+                        ingest_service,
+                        burst_size=burst_size,
+                        pause_ms=pause_ms,
+                        jitter_ms=jitter_ms,
+                    )
 
                 parent_metadata: Dict[str, Any] = {
                     "total_pages": page_count,
