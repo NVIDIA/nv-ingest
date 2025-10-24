@@ -1,0 +1,1246 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest.framework.schemas package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest/nv_ingest.framework.schemas';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.schemas package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-framework-schemas-package">
+<h1>nv_ingest.framework.schemas package<a class="headerlink" href="#nv-ingest-framework-schemas-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_ingest_config_schema">
+<span id="nv-ingest-framework-schemas-framework-ingest-config-schema-module"></span><h2>nv_ingest.framework.schemas.framework_ingest_config_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_ingest_config_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_ingest_config_schema.</span></span><span class="sig-name descname"><span class="pre">PipelineConfigSchema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">*,</span> <span class="pre">audio_extractor_schema:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema</span> <span class="pre">=</span> <span class="pre">AudioExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=16,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">audio_extraction_config=None),</span> <span class="pre">chart_extractor_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema</span> <span class="pre">=</span> <span class="pre">ChartExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=2,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">endpoint_config=None),</span> <span class="pre">text_splitter_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema</span> <span class="pre">=</span> <span class="pre">TextSplitterSchema(tokenizer=None,</span> <span class="pre">chunk_size=1024,</span> <span class="pre">chunk_overlap=150,</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">embedding_storage_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.store.store_embedding_schema.EmbeddingStorageSchema</span> <span class="pre">=</span> <span class="pre">EmbeddingStorageSchema(raise_on_failure=False),</span> <span class="pre">embed_extractions_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema</span> <span class="pre">=</span> <span class="pre">TextEmbeddingSchema(api_key='api_key',</span> <span class="pre">batch_size=4,</span> <span class="pre">embedding_model='nvidia/llama-3.2-nv-embedqa-1b-v2',</span> <span class="pre">embedding_nim_endpoint='http://embedding:8000/v1',</span> <span class="pre">encoding_format='float',</span> <span class="pre">httpx_log_level=&lt;LogLevel.WARNING:</span> <span class="pre">'WARNING'&gt;,</span> <span class="pre">input_type='passage',</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">truncate='END',</span> <span class="pre">text_elements_modality='text',</span> <span class="pre">image_elements_modality='text',</span> <span class="pre">structured_elements_modality='text',</span> <span class="pre">audio_elements_modality='text'),</span> <span class="pre">image_caption_extraction_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema</span> <span class="pre">=</span> <span class="pre">ImageCaptionExtractionSchema(api_key='api_key',</span> <span class="pre">endpoint_url='https://integrate.api.nvidia.com/v1/chat/completions',</span> <span class="pre">prompt='Caption</span> <span class="pre">the</span> <span class="pre">content</span> <span class="pre">of</span> <span class="pre">this</span> <span class="pre">image:',</span> <span class="pre">model_name='nvidia/llama-3.1-nemotron-nano-vl-8b-v1',</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">image_dedup_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema.ImageDedupSchema</span> <span class="pre">=</span> <span class="pre">ImageDedupSchema(raise_on_failure=False),</span> <span class="pre">image_filter_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema</span> <span class="pre">=</span> <span class="pre">ImageFilterSchema(raise_on_failure=False,</span> <span class="pre">cpu_only=False),</span> <span class="pre">image_storage_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema</span> <span class="pre">=</span> <span class="pre">ImageStorageModuleSchema(structured=True,</span> <span class="pre">images=True,</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">infographic_extractor_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema</span> <span class="pre">=</span> <span class="pre">InfographicExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=2,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">endpoint_config=None),</span> <span class="pre">job_counter_module:</span> <span class="pre">~nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema</span> <span class="pre">=</span> <span class="pre">JobCounterSchema(name='job_counter',</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">metadata_injection_module:</span> <span class="pre">~nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema</span> <span class="pre">=</span> <span class="pre">MetadataInjectorSchema(raise_on_failure=False),</span> <span class="pre">otel_meter_module:</span> <span class="pre">~nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema</span> <span class="pre">=</span> <span class="pre">OpenTelemetryMeterSchema(broker_client=MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0),</span> <span class="pre">otel_endpoint='localhost:4317',</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">otel_tracer_module:</span> <span class="pre">~nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema</span> <span class="pre">=</span> <span class="pre">OpenTelemetryTracerSchema(otel_endpoint='localhost:4317',</span> <span class="pre">raise_on_failure=False),</span> <span class="pre">pdf_extractor_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema</span> <span class="pre">=</span> <span class="pre">PDFExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=16,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">pdfium_config=None,</span> <span class="pre">nemoretriever_parse_config=None),</span> <span class="pre">pptx_extractor_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema</span> <span class="pre">=</span> <span class="pre">PPTXExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=16,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">pptx_extraction_config=None),</span> <span class="pre">redis_task_sink:</span> <span class="pre">~nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema</span> <span class="pre">=</span> <span class="pre">MessageBrokerTaskSinkSchema(broker_client=MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0),</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">progress_engines=6),</span> <span class="pre">redis_task_source:</span> <span class="pre">~nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema</span> <span class="pre">=</span> <span class="pre">MessageBrokerTaskSourceSchema(broker_client=MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0),</span> <span class="pre">task_queue='ingest_task_queue',</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">progress_engines=6),</span> <span class="pre">table_extractor_module:</span> <span class="pre">~nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema</span> <span class="pre">=</span> <span class="pre">TableExtractorSchema(max_queue_size=1,</span> <span class="pre">n_workers=2,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">endpoint_config=None),</span> <span class="pre">vdb_task_sink:</span> <span class="pre">~nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema</span> <span class="pre">=</span> <span class="pre">VdbTaskSinkSchema(recreate=False,</span> <span class="pre">service='milvus',</span> <span class="pre">is_service_serialized=False,</span> <span class="pre">default_resource_name='nv_ingest_collection',</span> <span class="pre">resource_schemas={'nv_ingest_collection':</span> <span class="pre">{'index_conf':</span> <span class="pre">{'field_name':</span> <span class="pre">'vector',</span> <span class="pre">'metric_type':</span> <span class="pre">'L2',</span> <span class="pre">'index_type':</span> <span class="pre">'GPU_CAGRA',</span> <span class="pre">'params':</span> <span class="pre">{'intermediate_graph_degree':</span> <span class="pre">128,</span> <span class="pre">'graph_degree':</span> <span class="pre">64,</span> <span class="pre">'build_algo':</span> <span class="pre">'NN_DESCENT'}},</span> <span class="pre">'schema_conf':</span> <span class="pre">{'enable_dynamic_field':</span> <span class="pre">True,</span> <span class="pre">'schema_fields':</span> <span class="pre">[{'name':</span> <span class="pre">'pk',</span> <span class="pre">'description':</span> <span class="pre">'Primary</span> <span class="pre">key</span> <span class="pre">for</span> <span class="pre">the</span> <span class="pre">collection',</span> <span class="pre">'type':</span> <span class="pre">&lt;DataType.INT64:</span> <span class="pre">5&gt;,</span> <span class="pre">'is_primary':</span> <span class="pre">True,</span> <span class="pre">'auto_id':</span> <span class="pre">True},</span> <span class="pre">{'name':</span> <span class="pre">'text',</span> <span class="pre">'description':</span> <span class="pre">'Extracted</span> <span class="pre">content',</span> <span class="pre">'type':</span> <span class="pre">&lt;DataType.VARCHAR:</span> <span class="pre">21&gt;,</span> <span class="pre">'params':</span> <span class="pre">{'max_length':</span> <span class="pre">65535}},</span> <span class="pre">{'name':</span> <span class="pre">'vector',</span> <span class="pre">'description':</span> <span class="pre">'Embedding</span> <span class="pre">vectors',</span> <span class="pre">'type':</span> <span class="pre">&lt;DataType.FLOAT_VECTOR:</span> <span class="pre">101&gt;,</span> <span class="pre">'params':</span> <span class="pre">{'dim':</span> <span class="pre">1024}},</span> <span class="pre">{'name':</span> <span class="pre">'source',</span> <span class="pre">'description':</span> <span class="pre">'Source</span> <span class="pre">document</span> <span class="pre">and</span> <span class="pre">raw</span> <span class="pre">data</span> <span class="pre">extracted</span> <span class="pre">content',</span> <span class="pre">'type':</span> <span class="pre">&lt;DataType.JSON:</span> <span class="pre">23&gt;},</span> <span class="pre">{'name':</span> <span class="pre">'content_metadata',</span> <span class="pre">'description':</span> <span class="pre">'Content</span> <span class="pre">metadata',</span> <span class="pre">'type':</span> <span class="pre">&lt;DataType.JSON:</span> <span class="pre">23&gt;}],</span> <span class="pre">'description':</span> <span class="pre">'NV-INGEST</span> <span class="pre">collection</span> <span class="pre">schema'}}},</span> <span class="pre">resource_kwargs={},</span> <span class="pre">service_kwargs={},</span> <span class="pre">batch_size=5120,</span> <span class="pre">write_time_interval=1.0,</span> <span class="pre">retry_interval=60.0,</span> <span class="pre">raise_on_failure=False,</span> <span class="pre">progress_engines=1)</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_ingest_config_schema.html#PipelineConfigSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.audio_extractor_schema">
+<span class="sig-name descname"><span class="pre">audio_extractor_schema</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema"><span class="pre">AudioExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.audio_extractor_schema" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.chart_extractor_module">
+<span class="sig-name descname"><span class="pre">chart_extractor_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema"><span class="pre">ChartExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.chart_extractor_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embed_extractions_module">
+<span class="sig-name descname"><span class="pre">embed_extractions_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema" title="nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema"><span class="pre">TextEmbeddingSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embed_extractions_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embedding_storage_module">
+<span class="sig-name descname"><span class="pre">embedding_storage_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_embedding_schema.EmbeddingStorageSchema" title="nv_ingest_api.internal.schemas.store.store_embedding_schema.EmbeddingStorageSchema"><span class="pre">EmbeddingStorageSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embedding_storage_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_caption_extraction_module">
+<span class="sig-name descname"><span class="pre">image_caption_extraction_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema" title="nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema"><span class="pre">ImageCaptionExtractionSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_caption_extraction_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_dedup_module">
+<span class="sig-name descname"><span class="pre">image_dedup_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.mutate.html#nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema.ImageDedupSchema" title="nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema.ImageDedupSchema"><span class="pre">ImageDedupSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_dedup_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_filter_module">
+<span class="sig-name descname"><span class="pre">image_filter_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema" title="nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema"><span class="pre">ImageFilterSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_filter_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_storage_module">
+<span class="sig-name descname"><span class="pre">image_storage_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema" title="nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema"><span class="pre">ImageStorageModuleSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_storage_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.infographic_extractor_module">
+<span class="sig-name descname"><span class="pre">infographic_extractor_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema"><span class="pre">InfographicExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.infographic_extractor_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.job_counter_module">
+<span class="sig-name descname"><span class="pre">job_counter_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema" title="nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema"><span class="pre">JobCounterSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.job_counter_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.metadata_injection_module">
+<span class="sig-name descname"><span class="pre">metadata_injection_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema" title="nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema"><span class="pre">MetadataInjectorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.metadata_injection_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_meter_module">
+<span class="sig-name descname"><span class="pre">otel_meter_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema" title="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema"><span class="pre">OpenTelemetryMeterSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_meter_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_tracer_module">
+<span class="sig-name descname"><span class="pre">otel_tracer_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema" title="nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema"><span class="pre">OpenTelemetryTracerSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_tracer_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pdf_extractor_module">
+<span class="sig-name descname"><span class="pre">pdf_extractor_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema"><span class="pre">PDFExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pdf_extractor_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pptx_extractor_module">
+<span class="sig-name descname"><span class="pre">pptx_extractor_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema"><span class="pre">PPTXExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pptx_extractor_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_sink">
+<span class="sig-name descname"><span class="pre">redis_task_sink</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema" title="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema"><span class="pre">MessageBrokerTaskSinkSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_sink" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_source">
+<span class="sig-name descname"><span class="pre">redis_task_source</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema" title="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema"><span class="pre">MessageBrokerTaskSourceSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_source" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.table_extractor_module">
+<span class="sig-name descname"><span class="pre">table_extractor_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema" title="nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema"><span class="pre">TableExtractorSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.table_extractor_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.text_splitter_module">
+<span class="sig-name descname"><span class="pre">text_splitter_module</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema" title="nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema"><span class="pre">TextSplitterSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.text_splitter_module" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.vdb_task_sink">
+<span class="sig-name descname"><span class="pre">vdb_task_sink</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema" title="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema"><span class="pre">VdbTaskSinkSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.vdb_task_sink" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_job_counter_schema">
+<span id="nv-ingest-framework-schemas-framework-job-counter-schema-module"></span><h2>nv_ingest.framework.schemas.framework_job_counter_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_job_counter_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_job_counter_schema.</span></span><span class="sig-name descname"><span class="pre">JobCounterSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'job_counter'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_job_counter_schema.html#JobCounterSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_message_broker_sink_schema">
+<span id="nv-ingest-framework-schemas-framework-message-broker-sink-schema-module"></span><h2>nv_ingest.framework.schemas.framework_message_broker_sink_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_message_broker_sink_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_message_broker_sink_schema.</span></span><span class="sig-name descname"><span class="pre">MessageBrokerTaskSinkSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">broker_client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0)</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">progress_engines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_message_broker_sink_schema.html#MessageBrokerTaskSinkSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.broker_client">
+<span class="sig-name descname"><span class="pre">broker_client</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.broker_client" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.progress_engines">
+<span class="sig-name descname"><span class="pre">progress_engines</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.progress_engines" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_message_broker_source_schema">
+<span id="nv-ingest-framework-schemas-framework-message-broker-source-schema-module"></span><h2>nv_ingest.framework.schemas.framework_message_broker_source_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_message_broker_source_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_message_broker_source_schema.</span></span><span class="sig-name descname"><span class="pre">MessageBrokerTaskSourceSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">broker_client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0)</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_queue</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ingest_task_queue'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">progress_engines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_message_broker_source_schema.html#MessageBrokerTaskSourceSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.broker_client">
+<span class="sig-name descname"><span class="pre">broker_client</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.broker_client" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.progress_engines">
+<span class="sig-name descname"><span class="pre">progress_engines</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.progress_engines" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.task_queue">
+<span class="sig-name descname"><span class="pre">task_queue</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.task_queue" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_message_wrapper_schema">
+<span id="nv-ingest-framework-schemas-framework-message-wrapper-schema-module"></span><h2>nv_ingest.framework.schemas.framework_message_wrapper_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_message_wrapper_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_message_wrapper_schema.</span></span><span class="sig-name descname"><span class="pre">MessageWrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">payload</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_message_wrapper_schema.html#MessageWrapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.payload">
+<span class="sig-name descname"><span class="pre">payload</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.payload" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_metadata_injector_schema">
+<span id="nv-ingest-framework-schemas-framework-metadata-injector-schema-module"></span><h2>nv_ingest.framework.schemas.framework_metadata_injector_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_metadata_injector_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_metadata_injector_schema.</span></span><span class="sig-name descname"><span class="pre">MetadataInjectorSchema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_metadata_injector_schema.html#MetadataInjectorSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_otel_meter_schema">
+<span id="nv-ingest-framework-schemas-framework-otel-meter-schema-module"></span><h2>nv_ingest.framework.schemas.framework_otel_meter_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_otel_meter_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_otel_meter_schema.</span></span><span class="sig-name descname"><span class="pre">OpenTelemetryMeterSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">broker_client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">MessageBrokerClientSchema(host='redis',</span> <span class="pre">port=6379,</span> <span class="pre">client_type='redis',</span> <span class="pre">broker_params={},</span> <span class="pre">connection_timeout=300,</span> <span class="pre">max_backoff=300,</span> <span class="pre">max_retries=0)</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">otel_endpoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'localhost:4317'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_otel_meter_schema.html#OpenTelemetryMeterSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.broker_client">
+<span class="sig-name descname"><span class="pre">broker_client</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema" title="nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><span class="pre">MessageBrokerClientSchema</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.broker_client" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.otel_endpoint">
+<span class="sig-name descname"><span class="pre">otel_endpoint</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.otel_endpoint" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_otel_tracer_schema">
+<span id="nv-ingest-framework-schemas-framework-otel-tracer-schema-module"></span><h2>nv_ingest.framework.schemas.framework_otel_tracer_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_otel_tracer_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_otel_tracer_schema.</span></span><span class="sig-name descname"><span class="pre">OpenTelemetryTracerSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">otel_endpoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'localhost:4317'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_otel_tracer_schema.html#OpenTelemetryTracerSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.otel_endpoint">
+<span class="sig-name descname"><span class="pre">otel_endpoint</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.otel_endpoint" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_processing_job_schema">
+<span id="nv-ingest-framework-schemas-framework-processing-job-schema-module"></span><h2>nv_ingest.framework.schemas.framework_processing_job_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_processing_job_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_processing_job_schema.</span></span><span class="sig-name descname"><span class="pre">ConversionStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_processing_job_schema.html#ConversionStatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.FAILED">
+<span class="sig-name descname"><span class="pre">FAILED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'failed'</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.FAILED" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.IN_PROGRESS">
+<span class="sig-name descname"><span class="pre">IN_PROGRESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'in_progress'</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.IN_PROGRESS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.SUCCESS">
+<span class="sig-name descname"><span class="pre">SUCCESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'success'</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.SUCCESS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&quot;{'extra':</span> <span class="pre">'forbid'}&quot;</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.model_config" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_processing_job_schema.</span></span><span class="sig-name descname"><span class="pre">ProcessingJob</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">submitted_job_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raw_result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus" title="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus"><span class="pre">ConversionStatus</span></a></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">error</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_processing_job_schema.html#ProcessingJob"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.content">
+<span class="sig-name descname"><span class="pre">content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.content" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.error">
+<span class="sig-name descname"><span class="pre">error</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.error" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.filename">
+<span class="sig-name descname"><span class="pre">filename</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.filename" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.raw_result">
+<span class="sig-name descname"><span class="pre">raw_result</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.raw_result" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.status">
+<span class="sig-name descname"><span class="pre">status</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus" title="nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus"><span class="pre">ConversionStatus</span></a></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.status" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.submitted_job_id">
+<span class="sig-name descname"><span class="pre">submitted_job_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.submitted_job_id" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_task_injection_schema">
+<span id="nv-ingest-framework-schemas-framework-task-injection-schema-module"></span><h2>nv_ingest.framework.schemas.framework_task_injection_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_task_injection_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_task_injection_schema.</span></span><span class="sig-name descname"><span class="pre">TaskInjectionSchema</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_on_failure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_task_injection_schema.html#TaskInjectionSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas.framework_vdb_task_sink_schema">
+<span id="nv-ingest-framework-schemas-framework-vdb-task-sink-schema-module"></span><h2>nv_ingest.framework.schemas.framework_vdb_task_sink_schema module<a class="headerlink" href="#module-nv_ingest.framework.schemas.framework_vdb_task_sink_schema" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_vdb_task_sink_schema.</span></span><span class="sig-name descname"><span class="pre">VdbTaskSinkSchema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">recreate:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">service:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'milvus'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">is_service_serialized:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">default_resource_name:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'nv_ingest_collection'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">resource_schemas:</span> <span class="pre">dict</span> <span class="pre">=</span> <span class="pre">{'nv_ingest_collection':</span> <span class="pre">{'index_conf':</span> <span class="pre">{'field_name':</span> <span class="pre">'vector'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'index_type':</span> <span class="pre">'GPU_CAGRA'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'metric_type':</span> <span class="pre">'L2'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'params':</span> <span class="pre">{'build_algo':</span> <span class="pre">'NN_DESCENT'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'graph_degree':</span> <span class="pre">64</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'intermediate_graph_degree':</span> <span class="pre">128}}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'schema_conf':</span> <span class="pre">{'description':</span> <span class="pre">'NV-INGEST</span> <span class="pre">collection</span> <span class="pre">schema'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'enable_dynamic_field':</span> <span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'schema_fields':</span> <span class="pre">[{'auto_id':</span> <span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'description':</span> <span class="pre">'Primary</span> <span class="pre">key</span> <span class="pre">for</span> <span class="pre">the</span> <span class="pre">collection'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'is_primary':</span> <span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'name':</span> <span class="pre">'pk'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'type':</span> <span class="pre">DataType.INT64}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">{'description':</span> <span class="pre">'Extracted</span> <span class="pre">content'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'name':</span> <span class="pre">'text'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'params':</span> <span class="pre">{'max_length':</span> <span class="pre">65535}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'type':</span> <span class="pre">DataType.VARCHAR}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">{'description':</span> <span class="pre">'Embedding</span> <span class="pre">vectors'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'name':</span> <span class="pre">'vector'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'params':</span> <span class="pre">{'dim':</span> <span class="pre">1024}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'type':</span> <span class="pre">DataType.FLOAT_VECTOR}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">{'description':</span> <span class="pre">'Source</span> <span class="pre">document</span> <span class="pre">and</span> <span class="pre">raw</span> <span class="pre">data</span> <span class="pre">extracted</span> <span class="pre">content'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'name':</span> <span class="pre">'source'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'type':</span> <span class="pre">DataType.JSON}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">{'description':</span> <span class="pre">'Content</span> <span class="pre">metadata'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'name':</span> <span class="pre">'content_metadata'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">'type':</span> <span class="pre">DataType.JSON}]}}}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">resource_kwargs:</span> <span class="pre">dict</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">service_kwargs:</span> <span class="pre">dict</span> <span class="pre">=</span> <span class="pre">{}</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">batch_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">5120</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">write_time_interval:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">retry_interval:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">60.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">raise_on_failure:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">progress_engines:</span> <span class="pre">~typing.Annotated[int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">~annotated_types.Ge(ge=1)]</span> <span class="pre">=</span> <span class="pre">1</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_vdb_task_sink_schema.html#VdbTaskSinkSchema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.batch_size">
+<span class="sig-name descname"><span class="pre">batch_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.batch_size" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.default_resource_name">
+<span class="sig-name descname"><span class="pre">default_resource_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.default_resource_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.is_service_serialized">
+<span class="sig-name descname"><span class="pre">is_service_serialized</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.is_service_serialized" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ClassVar</span><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'extra':</span> <span class="pre">'forbid'}</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.model_config" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.progress_engines">
+<span class="sig-name descname"><span class="pre">progress_engines</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.progress_engines" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.raise_on_failure">
+<span class="sig-name descname"><span class="pre">raise_on_failure</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.raise_on_failure" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.recreate">
+<span class="sig-name descname"><span class="pre">recreate</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.recreate" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_kwargs">
+<span class="sig-name descname"><span class="pre">resource_kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_kwargs" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_schemas">
+<span class="sig-name descname"><span class="pre">resource_schemas</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_schemas" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.retry_interval">
+<span class="sig-name descname"><span class="pre">retry_interval</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.retry_interval" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service">
+<span class="sig-name descname"><span class="pre">service</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service_kwargs">
+<span class="sig-name descname"><span class="pre">service_kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service_kwargs" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_resource_name">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">validate_resource_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">to_validate</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_vdb_task_sink_schema.html#VdbTaskSinkSchema.validate_resource_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_resource_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_service">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">validate_service</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">to_validate</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_vdb_task_sink_schema.html#VdbTaskSinkSchema.validate_service"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_service" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.write_time_interval">
+<span class="sig-name descname"><span class="pre">write_time_interval</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.write_time_interval" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest.framework.schemas.framework_vdb_task_sink_schema.build_default_milvus_config">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.schemas.framework_vdb_task_sink_schema.</span></span><span class="sig-name descname"><span class="pre">build_default_milvus_config</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">embedding_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1024</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/schemas/framework_vdb_task_sink_schema.html#build_default_milvus_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.build_default_milvus_config" title="Link to this definition">#</a></dt>
+<dd><p>Builds the configuration for Milvus.</p>
+<p>This function creates a dictionary configuration for a Milvus collection.
+It includes the index configuration and the schema configuration, with
+various fields like id, title, link, summary, page_content, and embedding.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>embedding_size</strong> (<em>int</em>) – The size of the embedding vector.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dictionary containing the configuration settings for Milvus.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Dict</em>[str, Any]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.schemas">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest.framework.schemas" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_ingest_config_schema">nv_ingest.framework.schemas.framework_ingest_config_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema"><code class="docutils literal notranslate"><span class="pre">PipelineConfigSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.audio_extractor_schema"><code class="docutils literal notranslate"><span class="pre">audio_extractor_schema</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.chart_extractor_module"><code class="docutils literal notranslate"><span class="pre">chart_extractor_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embed_extractions_module"><code class="docutils literal notranslate"><span class="pre">embed_extractions_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.embedding_storage_module"><code class="docutils literal notranslate"><span class="pre">embedding_storage_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_caption_extraction_module"><code class="docutils literal notranslate"><span class="pre">image_caption_extraction_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_dedup_module"><code class="docutils literal notranslate"><span class="pre">image_dedup_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_filter_module"><code class="docutils literal notranslate"><span class="pre">image_filter_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.image_storage_module"><code class="docutils literal notranslate"><span class="pre">image_storage_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.infographic_extractor_module"><code class="docutils literal notranslate"><span class="pre">infographic_extractor_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.job_counter_module"><code class="docutils literal notranslate"><span class="pre">job_counter_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.metadata_injection_module"><code class="docutils literal notranslate"><span class="pre">metadata_injection_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_meter_module"><code class="docutils literal notranslate"><span class="pre">otel_meter_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.otel_tracer_module"><code class="docutils literal notranslate"><span class="pre">otel_tracer_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pdf_extractor_module"><code class="docutils literal notranslate"><span class="pre">pdf_extractor_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.pptx_extractor_module"><code class="docutils literal notranslate"><span class="pre">pptx_extractor_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_sink"><code class="docutils literal notranslate"><span class="pre">redis_task_sink</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.redis_task_source"><code class="docutils literal notranslate"><span class="pre">redis_task_source</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.table_extractor_module"><code class="docutils literal notranslate"><span class="pre">table_extractor_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.text_splitter_module"><code class="docutils literal notranslate"><span class="pre">text_splitter_module</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_ingest_config_schema.PipelineConfigSchema.vdb_task_sink"><code class="docutils literal notranslate"><span class="pre">vdb_task_sink</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_job_counter_schema">nv_ingest.framework.schemas.framework_job_counter_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema"><code class="docutils literal notranslate"><span class="pre">JobCounterSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.name"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_job_counter_schema.JobCounterSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_message_broker_sink_schema">nv_ingest.framework.schemas.framework_message_broker_sink_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema"><code class="docutils literal notranslate"><span class="pre">MessageBrokerTaskSinkSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.broker_client"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.progress_engines"><code class="docutils literal notranslate"><span class="pre">progress_engines</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_sink_schema.MessageBrokerTaskSinkSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_message_broker_source_schema">nv_ingest.framework.schemas.framework_message_broker_source_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema"><code class="docutils literal notranslate"><span class="pre">MessageBrokerTaskSourceSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.broker_client"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.progress_engines"><code class="docutils literal notranslate"><span class="pre">progress_engines</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_broker_source_schema.MessageBrokerTaskSourceSchema.task_queue"><code class="docutils literal notranslate"><span class="pre">task_queue</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_message_wrapper_schema">nv_ingest.framework.schemas.framework_message_wrapper_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper"><code class="docutils literal notranslate"><span class="pre">MessageWrapper</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_message_wrapper_schema.MessageWrapper.payload"><code class="docutils literal notranslate"><span class="pre">payload</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_metadata_injector_schema">nv_ingest.framework.schemas.framework_metadata_injector_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema"><code class="docutils literal notranslate"><span class="pre">MetadataInjectorSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_metadata_injector_schema.MetadataInjectorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_otel_meter_schema">nv_ingest.framework.schemas.framework_otel_meter_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema"><code class="docutils literal notranslate"><span class="pre">OpenTelemetryMeterSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.broker_client"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.otel_endpoint"><code class="docutils literal notranslate"><span class="pre">otel_endpoint</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_meter_schema.OpenTelemetryMeterSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_otel_tracer_schema">nv_ingest.framework.schemas.framework_otel_tracer_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema"><code class="docutils literal notranslate"><span class="pre">OpenTelemetryTracerSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.otel_endpoint"><code class="docutils literal notranslate"><span class="pre">otel_endpoint</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_otel_tracer_schema.OpenTelemetryTracerSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_processing_job_schema">nv_ingest.framework.schemas.framework_processing_job_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus"><code class="docutils literal notranslate"><span class="pre">ConversionStatus</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.FAILED"><code class="docutils literal notranslate"><span class="pre">FAILED</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.IN_PROGRESS"><code class="docutils literal notranslate"><span class="pre">IN_PROGRESS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.SUCCESS"><code class="docutils literal notranslate"><span class="pre">SUCCESS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ConversionStatus.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob"><code class="docutils literal notranslate"><span class="pre">ProcessingJob</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.content"><code class="docutils literal notranslate"><span class="pre">content</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.error"><code class="docutils literal notranslate"><span class="pre">error</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.filename"><code class="docutils literal notranslate"><span class="pre">filename</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.raw_result"><code class="docutils literal notranslate"><span class="pre">raw_result</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_processing_job_schema.ProcessingJob.submitted_job_id"><code class="docutils literal notranslate"><span class="pre">submitted_job_id</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_task_injection_schema">nv_ingest.framework.schemas.framework_task_injection_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema"><code class="docutils literal notranslate"><span class="pre">TaskInjectionSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_task_injection_schema.TaskInjectionSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas.framework_vdb_task_sink_schema">nv_ingest.framework.schemas.framework_vdb_task_sink_schema module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema"><code class="docutils literal notranslate"><span class="pre">VdbTaskSinkSchema</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.batch_size"><code class="docutils literal notranslate"><span class="pre">batch_size</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.default_resource_name"><code class="docutils literal notranslate"><span class="pre">default_resource_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.is_service_serialized"><code class="docutils literal notranslate"><span class="pre">is_service_serialized</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.model_config"><code class="docutils literal notranslate"><span class="pre">model_config</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.progress_engines"><code class="docutils literal notranslate"><span class="pre">progress_engines</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.recreate"><code class="docutils literal notranslate"><span class="pre">recreate</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_kwargs"><code class="docutils literal notranslate"><span class="pre">resource_kwargs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.resource_schemas"><code class="docutils literal notranslate"><span class="pre">resource_schemas</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.retry_interval"><code class="docutils literal notranslate"><span class="pre">retry_interval</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service"><code class="docutils literal notranslate"><span class="pre">service</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.service_kwargs"><code class="docutils literal notranslate"><span class="pre">service_kwargs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_resource_name"><code class="docutils literal notranslate"><span class="pre">validate_resource_name()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.validate_service"><code class="docutils literal notranslate"><span class="pre">validate_service()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.VdbTaskSinkSchema.write_time_interval"><code class="docutils literal notranslate"><span class="pre">write_time_interval</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.schemas.framework_vdb_task_sink_schema.build_default_milvus_config"><code class="docutils literal notranslate"><span class="pre">build_default_milvus_config()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.schemas">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

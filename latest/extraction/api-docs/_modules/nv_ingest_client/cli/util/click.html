@@ -1,0 +1,873 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_client.cli.util.click &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_client/cli/util/click';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_client.cli.util.click</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_client.cli.util.click</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pprint</span><span class="w"> </span><span class="kn">import</span> <span class="n">pprint</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">click</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_schema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaptionTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">DedupTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmbedTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilterTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">StoreEmbedTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">StoreTask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.caption</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaptionTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.dedup</span><span class="w"> </span><span class="kn">import</span> <span class="n">DedupTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.embed</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmbedTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.extract</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilterTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.split</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.store</span><span class="w"> </span><span class="kn">import</span> <span class="n">StoreEmbedTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks.store</span><span class="w"> </span><span class="kn">import</span> <span class="n">StoreTaskSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_matching_files</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="LogLevel">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.LogLevel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LogLevel</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for specifying logging levels.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    DEBUG : str</span>
+<span class="sd">        Debug logging level.</span>
+<span class="sd">    INFO : str</span>
+<span class="sd">        Informational logging level.</span>
+<span class="sd">    WARNING : str</span>
+<span class="sd">        Warning logging level.</span>
+<span class="sd">    ERROR : str</span>
+<span class="sd">        Error logging level.</span>
+<span class="sd">    CRITICAL : str</span>
+<span class="sd">        Critical logging level.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DEBUG</span> <span class="o">=</span> <span class="s2">&quot;DEBUG&quot;</span>
+    <span class="n">INFO</span> <span class="o">=</span> <span class="s2">&quot;INFO&quot;</span>
+    <span class="n">WARNING</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span>
+    <span class="n">ERROR</span> <span class="o">=</span> <span class="s2">&quot;ERROR&quot;</span>
+    <span class="n">CRITICAL</span> <span class="o">=</span> <span class="s2">&quot;CRITICAL&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ClientType">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.ClientType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ClientType</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for specifying client types.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    REST : str</span>
+<span class="sd">        Represents a REST client.</span>
+<span class="sd">    REDIS : str</span>
+<span class="sd">        Represents a Redis client.</span>
+<span class="sd">    KAFKA : str</span>
+<span class="sd">        Represents a Kafka client.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">REST</span> <span class="o">=</span> <span class="s2">&quot;REST&quot;</span>
+    <span class="n">REDIS</span> <span class="o">=</span> <span class="s2">&quot;REDIS&quot;</span>
+    <span class="n">KAFKA</span> <span class="o">=</span> <span class="s2">&quot;KAFKA&quot;</span></div>
+
+
+
+<span class="c1"># Example TaskId validation set</span>
+<span class="n">VALID_TASK_IDS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;task1&quot;</span><span class="p">,</span> <span class="s2">&quot;task2&quot;</span><span class="p">,</span> <span class="s2">&quot;task3&quot;</span><span class="p">}</span>
+
+<span class="n">_MODULE_UNDER_TEST</span> <span class="o">=</span> <span class="s2">&quot;nv_ingest_client.cli.util.click&quot;</span>
+
+
+<div class="viewcode-block" id="debug_print_click_options">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.debug_print_click_options">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">debug_print_click_options</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves all options from the Click context and pretty prints them.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ctx : click.Context</span>
+<span class="sd">        The Click context object from which to retrieve the command options.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">click_options</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">ctx</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">click</span><span class="o">.</span><span class="n">Option</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">click_options</span><span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="n">pprint</span><span class="p">(</span><span class="n">click_options</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="click_validate_file_exists">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.click_validate_file_exists">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">click_validate_file_exists</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Parameter</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates that the given file(s) exist.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ctx : click.Context</span>
+<span class="sd">        The Click context.</span>
+<span class="sd">    param : click.Parameter</span>
+<span class="sd">        The parameter associated with the file option.</span>
+<span class="sd">    value : Union[str, List[str], None]</span>
+<span class="sd">        A file path or a list of file paths.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[str]</span>
+<span class="sd">        A list of validated file paths.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    click.BadParameter</span>
+<span class="sd">        If any file path does not exist.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">BadParameter</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File does not exist: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+
+<span class="c1"># Define a union type for all supported task types.</span>
+<span class="n">TaskType</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span>
+    <span class="n">CaptionTask</span><span class="p">,</span>
+    <span class="n">DedupTask</span><span class="p">,</span>
+    <span class="n">EmbedTask</span><span class="p">,</span>
+    <span class="n">ExtractTask</span><span class="p">,</span>
+    <span class="n">FilterTask</span><span class="p">,</span>
+    <span class="n">SplitTask</span><span class="p">,</span>
+    <span class="n">StoreEmbedTask</span><span class="p">,</span>
+    <span class="n">StoreTask</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="parse_task_options">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.parse_task_options">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_task_options</span><span class="p">(</span><span class="n">task_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse the task options string as JSON.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    task_id : str</span>
+<span class="sd">        The identifier of the task for which options are being parsed.</span>
+<span class="sd">    options_str : str</span>
+<span class="sd">        The string containing JSON options.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Dict[str, Any]</span>
+<span class="sd">        The parsed options as a dictionary.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the JSON string is not well formatted. The error message will indicate the task,</span>
+<span class="sd">        the error details (e.g., expected property format), and show the input that was provided.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">options_str</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">error_message</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid JSON format for task &#39;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">msg</span><span class="si">}</span><span class="s2"> at line </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">lineno</span><span class="si">}</span><span class="s2"> column </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">colno</span><span class="si">}</span><span class="s2"> (char </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">pos</span><span class="si">}</span><span class="s2">). &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Input was: </span><span class="si">{</span><span class="n">options_str</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="click_validate_task">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.click_validate_task">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">click_validate_task</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Parameter</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TaskType</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates and processes task definitions provided as strings.</span>
+
+<span class="sd">    Each task definition should be in the format &quot;&lt;task_id&gt;:&lt;json_options&gt;&quot;.</span>
+<span class="sd">    If the separator &#39;:&#39; is missing, an empty JSON options dictionary is assumed.</span>
+<span class="sd">    The function uses a schema check (via check_schema) for validation and</span>
+<span class="sd">    instantiates the corresponding task.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ctx : click.Context</span>
+<span class="sd">        The Click context.</span>
+<span class="sd">    param : click.Parameter</span>
+<span class="sd">        The parameter associated with the task option.</span>
+<span class="sd">    value : List[str]</span>
+<span class="sd">        A list of task strings to validate.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Dict[str, TaskType]</span>
+<span class="sd">        A dictionary mapping task IDs to their corresponding task objects.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    click.BadParameter</span>
+<span class="sd">        If any task fails validation (including malformed JSON) or if duplicate tasks are detected.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">validated_tasks</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TaskType</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">validation_errors</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">task_str</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+        <span class="n">task_split</span> <span class="o">=</span> <span class="n">task_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">task_split</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span> <span class="o">=</span> <span class="n">task_str</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span> <span class="o">=</span> <span class="n">task_split</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">options</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">parse_task_options</span><span class="p">(</span><span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;split&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">SplitTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">SplitTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;extract&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">ExtractTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">task_options</span><span class="o">.</span><span class="n">document_type</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">ExtractTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;store&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">StoreTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">StoreTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;store_embedding&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">StoreEmbedTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">StoreEmbedTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;caption&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">CaptionTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">CaptionTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;dedup&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">DedupTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">DedupTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;filter&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">FilterTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">FilterTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">elif</span> <span class="n">task_id</span> <span class="o">==</span> <span class="s2">&quot;embed&quot;</span><span class="p">:</span>
+                <span class="n">task_options</span> <span class="o">=</span> <span class="n">check_schema</span><span class="p">(</span><span class="n">EmbedTaskSchema</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">json_options</span><span class="p">)</span>
+                <span class="n">new_task_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">new_task</span> <span class="o">=</span> <span class="p">[(</span><span class="n">new_task_id</span><span class="p">,</span> <span class="n">EmbedTask</span><span class="p">(</span><span class="o">**</span><span class="n">task_options</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()))]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported task type: </span><span class="si">{</span><span class="n">task_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">new_task_id</span> <span class="ow">in</span> <span class="n">validated_tasks</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duplicate task detected: </span><span class="si">{</span><span class="n">new_task_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adding task: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">new_task_id</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">task_tuple</span> <span class="ow">in</span> <span class="n">new_task</span><span class="p">:</span>
+                <span class="n">validated_tasks</span><span class="p">[</span><span class="n">task_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">task_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">validation_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">validation_errors</span><span class="p">:</span>
+        <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">validation_errors</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">BadParameter</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">validated_tasks</span></div>
+
+
+
+<div class="viewcode-block" id="click_validate_batch_size">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.click_validate_batch_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">click_validate_batch_size</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Parameter</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates that the batch size is at least 1.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ctx : click.Context</span>
+<span class="sd">        The Click context.</span>
+<span class="sd">    param : click.Parameter</span>
+<span class="sd">        The parameter associated with the batch size option.</span>
+<span class="sd">    value : int</span>
+<span class="sd">        The batch size value provided.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    int</span>
+<span class="sd">        The validated batch size.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    click.BadParameter</span>
+<span class="sd">        If the batch size is less than 1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">BadParameter</span><span class="p">(</span><span class="s2">&quot;Batch size must be &gt;= 1.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="pre_process_dataset">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.pre_process_dataset">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pre_process_dataset</span><span class="p">(</span><span class="n">dataset_json</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">shuffle_dataset</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads a dataset from a JSON file and optionally shuffles the list of files.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset_json : str</span>
+<span class="sd">        The path to the dataset JSON file.</span>
+<span class="sd">    shuffle_dataset : bool</span>
+<span class="sd">        Whether to shuffle the dataset before processing.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[str]</span>
+<span class="sd">        The list of file paths from the dataset. If &#39;shuffle_dataset&#39; is True,</span>
+<span class="sd">        the list will be shuffled.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    click.BadParameter</span>
+<span class="sd">        If the dataset file is not found or if its contents are not valid JSON.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dataset_json</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">file_source</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">BadParameter</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset JSON file not found: </span><span class="si">{</span><span class="n">dataset_json</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">BadParameter</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid JSON format in file: </span><span class="si">{</span><span class="n">dataset_json</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">file_source</span> <span class="o">=</span> <span class="n">file_source</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sampled_files&quot;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="k">if</span> <span class="n">shuffle_dataset</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">file_source</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">file_source</span></div>
+
+
+
+<div class="viewcode-block" id="click_match_and_validate_files">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.click.click_match_and_validate_files">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">click_match_and_validate_files</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Parameter</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Matches and validates files based on the provided file source patterns.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ctx : click.Context</span>
+<span class="sd">        The Click context.</span>
+<span class="sd">    param : click.Parameter</span>
+<span class="sd">        The parameter associated with the file matching option.</span>
+<span class="sd">    value : List[str]</span>
+<span class="sd">        A list of file source patterns to match against.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[str]</span>
+<span class="sd">        A list of matching file paths. If no files match, an empty list is returned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="n">matching_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">generate_matching_files</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">matching_files</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No files found matching the specified patterns.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">return</span> <span class="n">matching_files</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
