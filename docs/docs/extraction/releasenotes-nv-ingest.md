@@ -12,7 +12,7 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 The NeMo Retriever extraction 25.09 release adds new hardware and software support, and other improvements, including the following:
 
-- Add functional support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
+- Add functional support for [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/).
 - Add functional support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
 - Add support for [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1). For details, refer to [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md) and [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
 - Add support for [llama-3.2-nemoretriever-1b-vlm-embed-v1](https://build.nvidia.com/nvidia/llama-3_2-nemoretriever-1b-vlm-embed-v1).
