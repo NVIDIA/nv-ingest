@@ -386,6 +386,7 @@ def test_ingest(ingestor, mock_client):
         return_failures=True,
         stream_to_callback_only=False,
         verbose=expected_verbose,
+        return_traces=False,  # Default value
     )
     # Verify the result returned by ingestor matches the mocked result
     assert result == expected_results
@@ -443,6 +444,7 @@ def test_ingest_return_failures(ingestor, mock_client):
         # data_only=False, # Removed
         stream_to_callback_only=False,
         verbose=expected_verbose,
+        return_traces=False,  # Default value
     )
     # Verify the results and failures returned match the mocked tuple
     assert results == expected_results
@@ -1130,3 +1132,81 @@ def test_ingest_return_failures_with_parent_trace_ids(ingestor, mock_client):
     assert results == [{"result": "ok"}]
     assert failures == [("job-2", "err")]
     assert parent_trace_ids == ["trace-2"]
+
+
+def test_ingest_with_return_traces(ingestor, mock_client):
+    """Test that return_traces=True extracts and returns trace dictionaries."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+
+    # Mock traces returned from process_jobs_concurrently
+    trace_dict = {
+        "trace::entry::pdf_extractor": 1000,
+        "trace::exit::pdf_extractor": 2000,
+        "trace::resident_time::pdf_extractor": 1000,
+    }
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [], [trace_dict])
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    results, traces = ingestor.ingest(return_traces=True)
+
+    assert results == [{"result": "ok"}]
+    assert traces == [trace_dict]
+    assert "trace::resident_time::pdf_extractor" in traces[0]
+
+
+def test_ingest_with_return_failures_and_traces(ingestor, mock_client):
+    """Test that return_failures=True and return_traces=True return both."""
+    job_indices = ["job-1", "job-2"]
+    mock_client.add_job.return_value = job_indices
+
+    trace_dict = {"trace::entry::pdf_extractor": 1000, "trace::exit::pdf_extractor": 2000}
+    mock_client.process_jobs_concurrently.return_value = (
+        [{"result": "ok"}],
+        [("job-2", "error")],
+        [trace_dict],
+    )
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    results, failures, traces = ingestor.ingest(return_failures=True, return_traces=True)
+
+    assert results == [{"result": "ok"}]
+    assert failures == [("job-2", "error")]
+    assert traces == [trace_dict]
+
+
+def test_ingest_with_all_three_flags(ingestor, mock_client):
+    """Test return_failures, return_traces, and include_parent_trace_ids together."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+
+    trace_dict = {"trace::entry::pdf_extractor": 1000}
+    mock_client.process_jobs_concurrently.return_value = (
+        [{"result": "ok"}],
+        [],
+        [trace_dict],
+    )
+    mock_client.consume_completed_parent_trace_ids.return_value = ["parent-trace-1"]
+
+    results, failures, traces, parent_trace_ids = ingestor.ingest(
+        return_failures=True, return_traces=True, include_parent_trace_ids=True
+    )
+
+    assert results == [{"result": "ok"}]
+    assert failures == []
+    assert traces == [trace_dict]
+    assert parent_trace_ids == ["parent-trace-1"]
+
+
+def test_ingest_passes_return_traces_to_client(ingestor, mock_client):
+    """Test that return_traces parameter is passed to process_jobs_concurrently."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [], [])
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    ingestor.ingest(return_traces=True)
+
+    # Verify return_traces=True was passed to the client
+    call_kwargs = mock_client.process_jobs_concurrently.call_args[1]
+    assert call_kwargs["return_traces"] is True

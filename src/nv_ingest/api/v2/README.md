@@ -11,15 +11,6 @@ The V2 API introduces automatic PDF splitting at the REST layer to improve proce
 3. **Transparent Aggregation**: Results are automatically aggregated when fetching parent jobs
 4. **Backward Compatible**: PDFs with page counts ≤ `PDF_SPLIT_PAGE_COUNT` behave identical to V1
 
-## Tracing & Aggregated Metadata
-
-- V2 endpoints open an OpenTelemetry span using the shared `traced_endpoint` decorator. The span name defaults to the function name, or can be overridden when applying the decorator.
-- `submit_job_v2` records the parent span's `trace_id` into each subjob's `tracing_options`, enabling downstream Ray stages (e.g., the message broker sink) to attach chunk-level telemetry consistently.
-- Response headers still return `x-trace-id` derived from the active span context, allowing clients to correlate downstream work.
-- When `/v2/fetch_job/{parent_id}` aggregates completed chunks, it captures any `trace` / `annotations` dictionaries emitted by the sink for each subjob and includes them in the response payload (see "Aggregated response" below).
-
-This behaviour matches the V1 tracing model and sets the foundation for adding W3C `traceparent` propagation in future changes.
-
 ## How It Works
 
 1. **Submit**: When a PDF with pages exceeding `PDF_SPLIT_PAGE_COUNT` is submitted to `/v2/submit_job`:
@@ -35,6 +26,33 @@ This behaviour matches the V1 tracing model and sets the foundation for adding W
    - If all complete, results are aggregated in original page order
    - Pending work returns 202 (processing)
    - Failed chunks are noted without failing the entire job; metadata records which chunks failed
+
+
+## Client Library Features
+
+### Accessing Trace Metrics
+
+The Python client library provides convenient access to trace metrics via the `return_traces` parameter:
+
+```python
+from nv_ingest_client.client import Ingestor
+
+ingestor = Ingestor(
+    message_client_hostname="localhost",
+    message_client_port=7670,
+    message_client_kwargs={"api_version": "v2"}
+).files("/path/to/pdfs").extract().embed()
+
+# Get results with trace metrics
+results, traces = ingestor.ingest(return_traces=True)
+
+# Access timing for first document
+pdf_time = traces[0]["trace::resident_time::pdf_extractor"] / 1e9
+table_time = traces[0]["trace::resident_time::table_extractor"] / 1e9
+print(f"PDF: {pdf_time:.2f}s, Tables: {table_time:.2f}s")
+```
+
+**Note:** For split PDFs, `resident_time` represents aggregated compute time across all chunks. For non-split PDFs, it is computed client-side from entry/exit pairs.
 
 ### Aggregated response
 
@@ -163,15 +181,23 @@ For split PDFs, parent-level metrics are automatically computed for each stage (
 - Failed chunk entries remain in `failed_subjobs`; missing chunks indicate the sink did not emit telemetry
 - **To access chunk traces:** Use `metadata.trace_segments[]` - each segment contains the full trace dict for that chunk
 
-## Testing
+### Advanced: Accessing Full Metadata
 
-Use the V2 test script with environment variable:
-```bash
-# Run with V2 endpoints
-DATASET_DIR=/data/splits python scripts/tests/cases/dc20_v2_e2e.py
-```
+For advanced use cases requiring per-chunk trace breakdown or full metadata, use `include_parent_trace_ids`:
 
-Or set the API version for any existing code:
-```bash
-export NV_INGEST_API_VERSION=v2
+```python
+results, traces, parent_trace_ids = ingestor.ingest(
+    return_traces=True,
+    include_parent_trace_ids=True
+)
+
+# Fetch full parent job metadata (including trace_segments)
+import requests
+response = requests.get(f"http://localhost:7670/v2/fetch_job/{parent_trace_ids[0]}")
+metadata = response.json()["metadata"]
+
+# Access per-chunk traces
+for segment in metadata["trace_segments"]:
+    print(f"Chunk {segment['chunk_index']}: pages {segment['start_page']}-{segment['end_page']}")
+    print(f"  Traces: {len(segment['trace'])} entries")
 ```
