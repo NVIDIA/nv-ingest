@@ -1,0 +1,29 @@
+nv\_ingest.util.pdf package
+===========================
+
+Submodules
+----------
+
+nv\_ingest.util.pdf.metadata\_aggregators module
+------------------------------------------------
+
+.. automodule:: nv_ingest.util.pdf.metadata_aggregators
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.pdf.pdfium module
+---------------------------------
+
+.. automodule:: nv_ingest.util.pdf.pdfium
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.util.pdf
+   :members:
+   :show-inheritance:
+   :undoc-members:

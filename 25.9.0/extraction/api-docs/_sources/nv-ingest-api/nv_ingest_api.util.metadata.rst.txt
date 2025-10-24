@@ -1,0 +1,21 @@
+nv\_ingest\_api.util.metadata package
+=====================================
+
+Submodules
+----------
+
+nv\_ingest\_api.util.metadata.aggregators module
+------------------------------------------------
+
+.. automodule:: nv_ingest_api.util.metadata.aggregators
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.util.metadata
+   :members:
+   :undoc-members:
+   :show-inheritance:
