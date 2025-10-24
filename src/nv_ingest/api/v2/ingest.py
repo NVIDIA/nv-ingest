@@ -681,8 +681,8 @@ def _get_submit_burst_params() -> Tuple[int, int, int]:
     - V2_SUBMIT_BURST_JITTER_MS (default: 10)
     """
     burst_size = int(os.getenv("V2_SUBMIT_BURST_SIZE", "16"))
-    pause_ms = int(os.getenv("V2_SUBMIT_BURST_PAUSE_MS", "25"))
-    jitter_ms = int(os.getenv("V2_SUBMIT_BURST_JITTER_MS", "10"))
+    pause_ms = int(os.getenv("V2_SUBMIT_BURST_PAUSE_MS", "50"))
+    jitter_ms = int(os.getenv("V2_SUBMIT_BURST_JITTER_MS", "15"))
 
     return max(1, burst_size), max(0, pause_ms), max(0, jitter_ms)
 
