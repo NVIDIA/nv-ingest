@@ -53,7 +53,7 @@ def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
     Enforces boundaries: min=1, max=128
     """
     MIN_PAGES = 1
-    MAX_PAGES = 128
+    MAX_PAGES = 512
 
     # Client override takes precedence if provided
     if client_override is not None:

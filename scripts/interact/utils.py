@@ -312,29 +312,44 @@ def pdf_page_count_glob(pattern: str) -> int:
     return total_pages
 
 
-def pdf_page_count(directory: str) -> int:
-    """Count the total number of pages in all PDF files within a directory.
+def pdf_page_count(path: str) -> int:
+    """Count the total number of pages in PDF file(s).
 
-    This function scans a directory for PDF files and counts the total number
-    of pages across all PDF files found. If a PDF file cannot be processed,
-    an error message is printed and the file is skipped.
+    This function handles both single PDF files and directories containing PDFs.
+    For a file path, it counts pages in that specific PDF.
+    For a directory path, it scans for all PDF files and counts total pages.
+    If a PDF file cannot be processed, an error message is printed and the file is skipped.
 
     Args:
-        directory (str): The directory path to search for PDF files.
+        path (str): Path to a PDF file or directory containing PDF files.
 
     Returns:
-        int: The total number of pages across all PDF files in the directory.
+        int: The total number of pages across all PDF files.
     """
     total_pages = 0
-    for filename in os.listdir(directory):
-        if filename.endswith(".pdf"):
-            filepath = os.path.join(directory, filename)
+
+    # Handle single file
+    if os.path.isfile(path):
+        if path.lower().endswith(".pdf"):
             try:
-                pdf = pdfium.PdfDocument(filepath)
-                total_pages += len(pdf)
+                pdf = pdfium.PdfDocument(path)
+                total_pages = len(pdf)
             except Exception as e:
-                print(f"{filepath} failed: {e}")
-                continue
+                print(f"{path} failed: {e}")
+        return total_pages
+
+    # Handle directory
+    if os.path.isdir(path):
+        for filename in os.listdir(path):
+            if filename.endswith(".pdf"):
+                filepath = os.path.join(path, filename)
+                try:
+                    pdf = pdfium.PdfDocument(filepath)
+                    total_pages += len(pdf)
+                except Exception as e:
+                    print(f"{filepath} failed: {e}")
+                    continue
+
     return total_pages
 
 

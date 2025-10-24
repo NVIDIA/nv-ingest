@@ -234,3 +234,4 @@ scripts/tests/artifacts/
 
 # Ignore cursor rules
 .cursor
+scripts/tests/sweep_results/
