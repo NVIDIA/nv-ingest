@@ -170,6 +170,7 @@ else:
 
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
+            original_input_path = input_path
             if audio_only:
                 input_path = self.get_audio_from_video(input_path, output_dir / f"{input_path.stem}.mp3")
             path_file = Path(input_path)
@@ -208,7 +209,8 @@ else:
                 print(capture_output)
                 print(capture_error)
             except ffmpeg.Error as e:
-                logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
+                logging.error(f"FFmpeg error for file {original_input_path}: {e.stderr.decode()}")
+                return []
             files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
             if video_audio_separate and suffix in [".mp4", ".mov", ".avi", ".mkv"]:
                 video_audio_files = []
@@ -238,7 +240,6 @@ else:
             split_interval: int, size of the chunk to split the media file into depending on the split type
             split_type: SplitType, type of split to perform, either size, time, or frame
             """
-            print("DATA:  find_num_splits")
             if split_type == SplitType.SIZE:
                 logger.info(f"DATA:  file_size: {file_size}, split_interval: {split_interval}")
                 logger.info(

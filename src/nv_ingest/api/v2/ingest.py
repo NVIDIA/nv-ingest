@@ -861,6 +861,8 @@ async def submit_job_v2(
     request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T
 ):
     span = trace.get_current_span()
+    source_id = None
+    document_type = None
     try:
         span.add_event("Submitting file for processing (V2)")
 
@@ -935,8 +937,8 @@ async def submit_job_v2(
                     parent_uuid = uuid.uuid4()
 
                 for chunk in chunks:
-                    start = chunk["start"]
-                    end = chunk["end"]
+                    start = chunk["start_page"]
+                    end = chunk["end_page"]
                     page_suffix = f"page_{start}" if start == end else f"pages_{start}-{end}"
                     source_id = f"{original_source_id}#{page_suffix}"
                     source_name = f"{original_source_name}#{page_suffix}"
@@ -1000,14 +1002,11 @@ async def submit_job_v2(
             # dump the payload to a file, just came from client
             with open(upload_path, "wb") as f:
                 f.write(base64.b64decode(payloads[0]))
-            file_size = Path(upload_path).stat().st_size
-            # print("DATA:  file_size: {file_size}")
             dataloader = DataLoader(
-                path=upload_path, output_dir="./audio_chunks/", audio_only=True, split_interval=file_size
+                path=upload_path, output_dir="./audio_chunks/", audio_only=True, split_interval=100000000
             )
-            # print("Finished dataloader")
             document_type = DocumentTypeEnum.MP3
-            # chunks = dataloader.files_completed
+
             parent_uuid = uuid.UUID(parent_job_id)
             for task in job_spec_dict["tasks"]:
                 if "task_properties" in task and "document_type" in task["task_properties"]:
@@ -1041,6 +1040,7 @@ async def submit_job_v2(
                         "chunk_index": idx + 1,
                         "start_page": chunk.get("start"),
                         "end_page": chunk.get("end"),
+                        "page_count": chunk.get("page_count", 0),
                     }
                 )
 
@@ -1130,8 +1130,8 @@ async def submit_job_v2(
         return parent_job_id
 
     except Exception as ex:
-        logger.exception(f"Error submitting job: {str(ex)}")
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+        logger.exception(f"Error submitting job: {str(ex)}, {source_id}")
+        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}, for: \n{source_id}")
 
 
 # GET /v2/fetch_job

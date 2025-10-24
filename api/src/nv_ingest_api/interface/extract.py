@@ -550,7 +550,6 @@ def extract_primitives_from_audio(
         }
     )
 
-    raise Exception(f"DF_LEDGER: {df_ledger}")
     result, _ = extract_text_from_audio_internal(
         df_extraction_ledger=df_ledger,
         task_config=task_config,
