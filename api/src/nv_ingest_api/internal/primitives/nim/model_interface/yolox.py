@@ -177,6 +177,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         ValueError
             If the protocol is invalid.
         """
+        model_name = kwargs.get("model_name", "pipeline")
 
         # Helper functions to chunk a list into sublists of length up to chunk_size.
         def chunk_list(lst: list, chunk_size: int) -> List[list]:
@@ -204,9 +205,18 @@ class YoloxModelInterfaceBase(ModelInterface):
             formatted_batch_data = []
             for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
                 input_array = np.array(b64_chunk, dtype=np.object_)
+
+                if model_name == "pipeline":
+                    input_array = input_array.reshape(1, -1)
+
                 current_batch_size = input_array.shape[0]
-                single_threshold_pair = [self.conf_threshold, self.iou_threshold]
-                thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+
+                if model_name == "pipeline":
+                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+                else:
+                    thresholds = np.array([[self.conf_threshold, self.iou_threshold]], dtype=np.float32)
+
                 batched_inputs.append([input_array, thresholds])
                 formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
 
@@ -1201,8 +1211,8 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
-        if "yolox_ensemble" in model_names:
-            yolox_model_name = "yolox_ensemble"
+        if "pipeline" in model_names:
+            yolox_model_name = "pipeline"
         else:
             yolox_model_name = default_model_name
     except Exception:
