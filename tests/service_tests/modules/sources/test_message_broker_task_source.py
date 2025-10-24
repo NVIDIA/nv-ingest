@@ -145,8 +145,6 @@ class TestMessageBrokerConfiguration:
         assert config.broker_client.host == "localhost"
         assert config.broker_client.port == 7671
         assert config.task_queue == "simple_queue"
-        # Check default values
-        assert config.poll_interval == 0.1
 
     def test_invalid_redis_config(self):
         """

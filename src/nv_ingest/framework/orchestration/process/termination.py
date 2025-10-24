@@ -19,19 +19,44 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_log(level: int, msg: str) -> None:
-    """Best-effort logging that won't crash during interpreter shutdown."""
-    try:
-        logger.log(level, msg)
-    except Exception:
-        try:
-            # Fallback to stderr if available
-            import sys
+    """Best-effort logging that won't emit handler tracebacks on closed streams.
 
-            if hasattr(sys, "__stderr__") and sys.__stderr__:
-                sys.__stderr__.write(msg + "\n")
-                sys.__stderr__.flush()
+    Temporarily disables logging.raiseExceptions to prevent the logging module
+    from printing "--- Logging error ---" to stderr if a handler's stream is
+    already closed (common during process teardown). Falls back to writing to
+    sys.__stderr__ if available.
+    """
+    try:
+        import logging as _logging
+
+        prev = getattr(_logging, "raiseExceptions", True)
+        # Suppress handler errors being printed to stderr
+        _logging.raiseExceptions = False
+
+        # If there are no handlers, skip and use stderr fallback
+        if logger.handlers:
+            logger.log(level, msg)
+            return
+    except Exception:
+        # Intentionally ignore and try stderr fallback
+        pass
+    finally:
+        try:
+            import logging as _logging  # re-import safe even if earlier failed
+
+            _logging.raiseExceptions = prev  # type: ignore[name-defined]
         except Exception:
             pass
+
+    # Fallback to stderr if available
+    try:
+        import sys
+
+        if hasattr(sys, "__stderr__") and sys.__stderr__:
+            sys.__stderr__.write(msg + "\n")
+            sys.__stderr__.flush()
+    except Exception:
+        pass
 
 
 def kill_pipeline_process_group(process) -> None:
@@ -74,7 +99,17 @@ def kill_pipeline_process_group(process) -> None:
 
     try:
         # Send graceful termination to the entire process group
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
+        try:
+            pgid = os.getpgid(pid)
+        except Exception:
+            # Process already gone
+            _safe_log(logging.DEBUG, f"Process group for PID {pid} not found during SIGTERM phase")
+            return
+        try:
+            os.killpg(pgid, signal.SIGTERM)
+        except ProcessLookupError:
+            _safe_log(logging.DEBUG, f"Process group for PID {pid} no longer exists (SIGTERM)")
+            return
 
         # If we have a Process handle, give it a chance to exit cleanly
         if proc is not None and hasattr(proc, "join"):
@@ -95,7 +130,12 @@ def kill_pipeline_process_group(process) -> None:
         if still_alive:
             _safe_log(logging.WARNING, "Process group did not terminate gracefully, using SIGKILL")
             try:
-                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                try:
+                    pgid2 = os.getpgid(pid)
+                except Exception:
+                    _safe_log(logging.DEBUG, f"Process group for PID {pid} vanished before SIGKILL")
+                    return
+                os.killpg(pgid2, signal.SIGKILL)
             finally:
                 if proc is not None and hasattr(proc, "join"):
                     try:

@@ -323,6 +323,7 @@ class IngestJobHandler:
 
                 futures_dict: Dict[Any, str] = self.client.fetch_job_result_async(self._job_ids_batch, data_only=False)
                 for future in as_completed(futures_dict.keys()):
+                    pages_per_sec = None
                     try:
                         # Block as each future completes; this mirrors CLI behavior
                         future_response, trace_id = self._handle_future_result(future)

@@ -35,6 +35,7 @@ class SimpleClient(MessageBrokerClientBase):
         connection_timeout: int = 300,
         max_pool_size: int = 128,
         use_ssl: bool = False,
+        api_version: str = "v1",
     ):
         """
         Initialize the SimpleClient with configuration parameters.

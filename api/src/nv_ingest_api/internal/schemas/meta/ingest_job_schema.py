@@ -43,6 +43,24 @@ class PdfConfigSchema(BaseModelNoExt):
     split_page_count: Annotated[int, Field(ge=1)] = 32
 
 
+class RoutingOptionsSchema(BaseModelNoExt):
+    # Queue routing hint for QoS scheduler
+    queue_hint: Optional[str] = None
+
+    @field_validator("queue_hint")
+    @classmethod
+    def validate_queue_hint(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("queue_hint must be a string")
+        s = v.lower()
+        allowed = {"default", "immediate", "micro", "small", "medium", "large"}
+        if s not in allowed:
+            raise ValueError("queue_hint must be one of: default, immediate, micro, small, medium, large")
+        return s
+
+
 # Ingest Task Schemas
 
 
@@ -281,7 +299,26 @@ class IngestJobSchema(BaseModelNoExt):
     job_id: Union[str, int]
     tasks: List[IngestTaskSchema]
     tracing_options: Optional[TracingOptionsSchema] = None
+    routing_options: Optional[RoutingOptionsSchema] = None
     pdf_config: Optional[PdfConfigSchema] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_queue_hint(cls, values):
+        """
+        Backward-compatibility shim: if a legacy client sends
+        tracing_options.queue_hint, move it into routing_options.queue_hint.
+        """
+        try:
+            topt = values.get("tracing_options") or {}
+            ropt = values.get("routing_options") or {}
+            if isinstance(topt, dict) and "queue_hint" in topt and "queue_hint" not in ropt:
+                ropt["queue_hint"] = topt.pop("queue_hint")
+                values["routing_options"] = ropt
+                values["tracing_options"] = topt
+        except Exception:
+            pass
+        return values
 
 
 # ------------------------------------------------------------------------------
