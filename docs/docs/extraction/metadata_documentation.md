@@ -127,7 +127,7 @@ Specific metadata for tabular content.
 | `uploaded_image_uri`              | `str`                                 | `""`                | URI of an image representation of the table, if applicable.                                             |
 
 ### `ChartMetadataSchema`
-Specific metadata for chart content. (Currently identical in structure to `TableMetadataSchema` but semantically distinct).
+Metadata for table content extracted from charts.
 
 | Field                             | Type                                  | Default Value       | Description                                                                                             |
 |-----------------------------------|---------------------------------------|---------------------|---------------------------------------------------------------------------------------------------------|
