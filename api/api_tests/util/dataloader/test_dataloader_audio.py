@@ -5,7 +5,6 @@ import pytest
 import wave
 import tempfile
 from pathlib import Path
-from pathlib import Path as _Path
 import shutil
 from nv_ingest_api.util.dataloader import DataLoader, MediaInterface
 import subprocess
@@ -240,10 +239,10 @@ def test_dataloader_stop_drains_queue_and_joins_thread(temp_dir):
     # Use a lightweight fake interface to avoid invoking ffmpeg and keep the test fast/stable.
     class _FakeInterface:
         def split(self, input_path: str, output_dir: str, **kwargs):
-            out_dir = _Path(output_dir)
+            out_dir = Path(output_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
-            stem = _Path(input_path).stem
-            suffix = _Path(input_path).suffix or ".bin"
+            stem = Path(input_path).stem
+            suffix = Path(input_path).suffix or ".bin"
             files = []
             for i in range(3):
                 p = out_dir / f"{stem}_chunk_{i:04d}{suffix}"
@@ -295,10 +294,10 @@ def test_dataloader_stop_is_idempotent_and_cleans_multiple_times(temp_dir):
 
     class _FakeInterface:
         def split(self, input_path: str, output_dir: str, **kwargs):
-            out_dir = _Path(output_dir)
+            out_dir = Path(output_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
-            stem = _Path(input_path).stem
-            suffix = _Path(input_path).suffix or ".bin"
+            stem = Path(input_path).stem
+            suffix = Path(input_path).suffix or ".bin"
             files = []
             for i in range(3):
                 p = out_dir / f"{stem}_chunk_{i:04d}{suffix}"
