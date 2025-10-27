@@ -329,12 +329,33 @@ class IngestJobHandler:
                         job_id: str = futures_dict[future]
                         trace_ids[job_id_map[job_id]] = trace_id
 
-                        first_page_metadata = future_response["data"][0]["metadata"]
-                        file_page_counts: Dict[str, int] = {
-                            first_page_metadata["source_metadata"]["source_name"]: first_page_metadata[
-                                "content_metadata"
-                            ]["hierarchy"]["page_count"]
-                        }
+                        # Extract page count: prefer V2 metadata location, fall back to V1
+                        page_count = None
+                        source_name = None
+
+                        # Try V2 metadata location first (top-level metadata.total_pages)
+                        if "metadata" in future_response and future_response["metadata"]:
+                            response_metadata = future_response["metadata"]
+                            page_count = response_metadata.get("total_pages")
+                            source_name = response_metadata.get("original_source_name")
+
+                        # Fall back to V1 location (first data element's hierarchy.page_count)
+                        if page_count is None and future_response.get("data"):
+                            try:
+                                first_page_metadata = future_response["data"][0]["metadata"]
+                                page_count = first_page_metadata["content_metadata"]["hierarchy"]["page_count"]
+                                source_name = first_page_metadata["source_metadata"]["source_name"]
+                            except (KeyError, IndexError, TypeError):
+                                # If we can't extract from V1 location, use defaults
+                                pass
+
+                        # Use extracted values or defaults
+                        if page_count is None:
+                            page_count = 0  # Default if not found
+                        if source_name is None:
+                            source_name = "unknown_source"
+
+                        file_page_counts: Dict[str, int] = {source_name: page_count}
 
                         if self.output_directory:
                             self._save_response_data(
