@@ -8,10 +8,12 @@ from typing import Tuple
 
 from pydantic import field_validator, model_validator, ConfigDict, BaseModel, Field
 
+from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
+
 logger = logging.getLogger(__name__)
 
 
-class ChartExtractorConfigSchema(BaseModel):
+class ChartExtractorConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for chart extraction service endpoints and options.
 
@@ -96,11 +98,11 @@ class ChartExtractorConfigSchema(BaseModel):
 
             values[endpoint_name] = (grpc_service, http_service)
 
+            # Auto-infer protocol from endpoints if not specified
             protocol_name = endpoint_name.replace("_endpoints", "_infer_protocol")
             protocol_value = values.get(protocol_name)
             if not protocol_value:
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
-            protocol_value = protocol_value.lower()
             values[protocol_name] = protocol_value
 
         return values
