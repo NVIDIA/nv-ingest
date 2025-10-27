@@ -96,6 +96,13 @@ class ChartExtractorConfigSchema(BaseModel):
 
             values[endpoint_name] = (grpc_service, http_service)
 
+            protocol_name = endpoint_name.replace("_endpoints", "_infer_protocol")
+            protocol_value = values.get(protocol_name)
+            if not protocol_value:
+                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+            protocol_value = protocol_value.lower()
+            values[protocol_name] = protocol_value
+
         return values
 
     model_config = ConfigDict(extra="forbid")

@@ -46,6 +46,37 @@ def test_extra_fields_forbidden_in_infographic_config():
         InfographicExtractorConfigSchema(ocr_endpoints=("grpc_service", None), extra_field="fail")
 
 
+def test_protocol_case_insensitive():
+    """Test that protocol values are normalized to lowercase for case-insensitive handling."""
+    config = InfographicExtractorConfigSchema(
+        ocr_endpoints=("grpc_ocr", "http_ocr"),
+        ocr_infer_protocol="HTTP",  # uppercase
+    )
+    assert config.ocr_infer_protocol == "http"
+
+
+def test_protocol_mixed_case():
+    """Test that mixed case protocol values are normalized to lowercase."""
+    config = InfographicExtractorConfigSchema(
+        ocr_endpoints=("grpc_ocr", None),
+        ocr_infer_protocol="GrPc",  # mixed case
+    )
+    assert config.ocr_infer_protocol == "grpc"
+
+
+def test_protocol_auto_inference_from_endpoints():
+    """Test that protocol is auto-inferred from endpoints when not specified."""
+    config = InfographicExtractorConfigSchema(
+        ocr_endpoints=(None, "http_service"),
+    )
+    assert config.ocr_infer_protocol == "http"
+
+    config2 = InfographicExtractorConfigSchema(
+        ocr_endpoints=("grpc_service", None),
+    )
+    assert config2.ocr_infer_protocol == "grpc"
+
+
 ### Tests for InfographicExtractorSchema ###
 
 

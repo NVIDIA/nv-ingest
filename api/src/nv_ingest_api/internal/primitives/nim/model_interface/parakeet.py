@@ -355,6 +355,10 @@ def create_audio_inference_client(
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
         infer_protocol = "grpc"
 
+    # Normalize protocol to lowercase for case-insensitive comparison
+    if infer_protocol:
+        infer_protocol = infer_protocol.lower()
+
     if infer_protocol == "http":
         raise ValueError("`http` endpoints are not supported for audio. Use `grpc`.")
 
