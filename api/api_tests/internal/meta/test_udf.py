@@ -366,3 +366,92 @@ def udf_{i}(control_message: IngestControlMessage) -> IngestControlMessage:
     # Verify all UDFs were executed
     for i in range(5):
         assert result.get_metadata(f"udf_{i}_executed") is True
+
+
+def test_udf_inline_with_imports_before_def_executes():
+    """Inline UDF that begins with imports (and annotations) before the def should execute."""
+    control_message = IngestControlMessage()
+    udf_task = ControlMessageTask(
+        type="udf",
+        id="udf",
+        properties={
+            "udf_function": """
+from typing import Any
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+
+def udf_with_imports(control_message: IngestControlMessage) -> IngestControlMessage:
+    # simple effect to verify execution
+    control_message.set_metadata("udf_with_imports_executed", True)
+    return control_message
+""",
+            "udf_function_name": "udf_with_imports",
+        },
+    )
+    control_message.add_task(udf_task)
+
+    stage_config = UDFStageSchema(ignore_empty_udf=False)
+    result = udf_stage_callable_fn(control_message, stage_config)
+
+    assert isinstance(result, IngestControlMessage)
+    assert not result.has_task("udf")
+    assert result.get_metadata("udf_with_imports_executed") is True
+
+
+def test_udf_inline_with_colons_and_annotations_executes():
+    """Inline UDF that includes type annotations (with colons) should execute."""
+    control_message = IngestControlMessage()
+    udf_task = ControlMessageTask(
+        type="udf",
+        id="udf",
+        properties={
+            "udf_function": """
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+
+def udf_with_annotations(control_message: IngestControlMessage) -> IngestControlMessage:
+    # annotations use colons; ensure they don't break evaluation
+    payload = control_message.payload()
+    control_message.set_metadata("udf_with_annotations_executed", True)
+    return control_message
+""",
+            "udf_function_name": "udf_with_annotations",
+        },
+    )
+    control_message.add_task(udf_task)
+
+    stage_config = UDFStageSchema(ignore_empty_udf=False)
+    result = udf_stage_callable_fn(control_message, stage_config)
+
+    assert isinstance(result, IngestControlMessage)
+    assert not result.has_task("udf")
+    assert result.get_metadata("udf_with_annotations_executed") is True
+
+
+def test_udf_inline_with_colon_in_docstring_or_string_literal_executes():
+    """Inline UDF with colons in string literals/docstrings should execute."""
+    control_message = IngestControlMessage()
+    udf_task = ControlMessageTask(
+        type="udf",
+        id="udf",
+        properties={
+            "udf_function": '''
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+
+def udf_with_colon_strings(control_message: IngestControlMessage) -> IngestControlMessage:
+    """
+    This docstring contains a colon: ensure parsing doesn't treat this as a module delimiter.
+    """
+    msg = "Key: Value"
+    control_message.set_metadata("udf_with_colon_strings_executed", True)
+    return control_message
+''',
+            "udf_function_name": "udf_with_colon_strings",
+        },
+    )
+    control_message.add_task(udf_task)
+
+    stage_config = UDFStageSchema(ignore_empty_udf=False)
+    result = udf_stage_callable_fn(control_message, stage_config)
+
+    assert isinstance(result, IngestControlMessage)
+    assert not result.has_task("udf")
+    assert result.get_metadata("udf_with_colon_strings_executed") is True
