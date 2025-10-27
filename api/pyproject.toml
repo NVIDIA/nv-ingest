@@ -29,6 +29,7 @@ dependencies = [
     "universal_pathlib>=0.2.6",
     "ffmpeg-python==0.2.0",
     "tritonclient",
+    "glom",
 ]
 
 [project.urls]
