@@ -583,6 +583,18 @@ class TestCreateAudioInferenceClient(unittest.TestCase):
             "grpc.endpoint:50051", auth_token=None, function_id=None, use_ssl=False, ssl_cert=None
         )
 
+    def test_create_audio_inference_client_uppercase_http_rejected(self):
+        """Test that uppercase 'HTTP' is properly normalized and rejected for audio."""
+        # Set up endpoints
+        endpoints = ("grpc.endpoint:50051", "http.endpoint:8000")
+
+        # Call the function with uppercase HTTP protocol
+        with self.assertRaises(ValueError) as context:
+            create_audio_inference_client(endpoints=endpoints, infer_protocol="HTTP")
+
+        # Verify error message (should reject because http is not supported, not because of case)
+        self.assertIn("not supported for audio", str(context.exception))
+
     def test_create_audio_inference_client_empty_grpc_endpoint(self):
         """Test creating a client with empty gRPC endpoint."""
         # Set up endpoints with empty gRPC endpoint
