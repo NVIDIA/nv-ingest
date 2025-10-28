@@ -71,8 +71,8 @@ class TestConfig:
                     f"pdf_split_page_count={self.pdf_split_page_count} requires api_version='v2', "
                     f"but got api_version='{self.api_version}'"
                 )
-            if not (1 <= self.pdf_split_page_count <= 512):
-                errors.append(f"pdf_split_page_count must be between 1 and 512, got {self.pdf_split_page_count}")
+            if not (1 <= self.pdf_split_page_count <= 128):
+                errors.append(f"pdf_split_page_count must be between 1 and 128, got {self.pdf_split_page_count}")
 
         # Check text_depth is valid (from TextTypeEnum)
         valid_text_depths = ["block", "body", "document", "header", "line", "nearby_block", "other", "page", "span"]

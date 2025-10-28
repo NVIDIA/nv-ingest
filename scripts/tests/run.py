@@ -147,7 +147,7 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 @click.option("--dataset", help="Dataset name (shortcut) or path")
 @click.option("--test-name", help="Override test name for artifacts and collection naming")
 @click.option("--api-version", help="Override API version (v1 or v2)")
-@click.option("--pdf-split-page-count", type=int, help="V2 API: Override PDF pages per chunk (1-512)")
+@click.option("--pdf-split-page-count", type=int, help="V2 API: Override PDF pages per chunk (1-128)")
 @click.option("--no-build", is_flag=True, help="Skip building Docker images")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")

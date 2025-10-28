@@ -100,7 +100,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Pipeline options
     pipeline_opts = []
     if api_version == "v2" and pdf_split_page_count:
-        clamped_value = max(1, min(pdf_split_page_count, 512))
+        clamped_value = max(1, min(pdf_split_page_count, 128))
         if clamped_value != pdf_split_page_count:
             pipeline_opts.append(f"PDF split: {pdf_split_page_count} pages (clamped to {clamped_value})")
         else:
