@@ -44,6 +44,50 @@ from nv_ingest_client.util.util import (
 logger = logging.getLogger(__name__)
 
 
+def _compute_resident_times(trace_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compute resident_time entries from entry/exit pairs if not already present.
+
+    This ensures consistency between split jobs (where server computes resident_time)
+    and non-split jobs (where we compute it client-side).
+
+    Parameters
+    ----------
+    trace_dict : Dict[str, Any]
+        Trace dictionary with entry/exit pairs
+
+    Returns
+    -------
+    Dict[str, Any]
+        Trace dictionary with resident_time entries added
+    """
+    if not trace_dict or not isinstance(trace_dict, dict):
+        return trace_dict
+
+    # Check if resident_time already exists (server-computed for split jobs)
+    has_resident = any(k.startswith("trace::resident_time::") for k in trace_dict.keys())
+    if has_resident:
+        return trace_dict  # Already computed by server
+
+    # Compute resident_time from entry/exit pairs
+    result = dict(trace_dict)
+    stages = set()
+
+    # Find all unique stages
+    for key in trace_dict:
+        if key.startswith("trace::entry::"):
+            stages.add(key.replace("trace::entry::", ""))
+
+    # Compute resident_time for each stage
+    for stage in stages:
+        entry_key = f"trace::entry::{stage}"
+        exit_key = f"trace::exit::{stage}"
+        if entry_key in trace_dict and exit_key in trace_dict:
+            result[f"trace::resident_time::{stage}"] = trace_dict[exit_key] - trace_dict[entry_key]
+
+    return result
+
+
 class DataDecodeException(Exception):
     """
     Exception raised for errors in decoding data.
@@ -87,6 +131,7 @@ class _ConcurrentProcessor:
         stream_to_callback_only: bool,
         return_full_response: bool,
         verbose: bool = False,
+        return_traces: bool = False,
     ):
         """
         Initializes the concurrent processor.
@@ -120,6 +165,8 @@ class _ConcurrentProcessor:
             initiating job submission or fetching fails for a batch.
         verbose : bool, optional
             If True, enables detailed debug logging. Default is False.
+        return_traces : bool, optional
+            If True, parent-level trace data for each completed job is stored.
 
         Raises
         ------
@@ -142,12 +189,14 @@ class _ConcurrentProcessor:
         self.stream_to_callback_only = stream_to_callback_only
         self.return_full_response = return_full_response
         self.verbose = verbose
+        self.return_traces = return_traces
 
         # State variables managed across batch cycles
         self.retry_job_ids: List[str] = []
         self.retry_counts: Dict[str, int] = defaultdict(int)
         self.results: List[Dict[str, Any]] = []  # Stores successful results (full dicts)
         self.failures: List[Tuple[str, str]] = []  # (job_index, error_message)
+        self.traces: List[Optional[Dict[str, Any]]] = []
 
         # --- Initial Checks ---
         if not self.job_queue_id:
@@ -246,6 +295,14 @@ class _ConcurrentProcessor:
         else:
             # When requested, return the full response envelope (includes 'trace' and 'annotations')
             self.results.append(result_data if self.return_full_response else result_data.get("data"))
+
+        # Extract trace data for all successful (non-failed) jobs
+        if self.return_traces and not is_failed:
+            trace_payload = result_data.get("trace") if result_data else None
+            # Compute resident_time if not already present (for consistency)
+            if trace_payload:
+                trace_payload = _compute_resident_times(trace_payload)
+            self.traces.append(trace_payload if trace_payload else None)
 
         # Cleanup retry count if it exists
         if job_index in self.retry_counts:
@@ -438,7 +495,7 @@ class _ConcurrentProcessor:
 
         return batch_futures_dict, normalized_job_indices
 
-    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
+    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
         """
         Executes the main processing loop in batches.
 
@@ -581,7 +638,7 @@ class _ConcurrentProcessor:
         # --- Final Logging ---
         self._log_final_status(total_jobs)
 
-        return self.results, self.failures
+        return self.results, self.failures, self.traces if self.return_traces else []
 
 
 class NvIngestClient:
@@ -1212,7 +1269,12 @@ class NvIngestClient:
         stream_to_callback_only: bool = False,
         return_full_response: bool = False,
         verbose: bool = False,
-    ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
+        return_traces: bool = False,
+    ) -> Union[
+        List[Any],
+        Tuple[List[Any], List[Tuple[str, str]]],
+        Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]],
+    ]:
         """
         Submit and fetch multiple jobs concurrently.
 
@@ -1247,6 +1309,8 @@ class NvIngestClient:
             Ignored when stream_to_callback_only=True. Default is False.
         verbose : bool, optional
             If True, enable debug logging. Default is False.
+        return_traces : bool, optional
+            If True, parent-level aggregated trace metrics are extracted and returned. Default is False.
 
         Returns
         -------
@@ -1254,6 +1318,9 @@ class NvIngestClient:
             List of successful job results when `return_failures` is False.
         results, failures : tuple
             Tuple of (successful results, failure tuples) when `return_failures` is True.
+        results, failures, traces : tuple
+            Tuple of (successful results, failure tuples, trace dicts) when both
+            `return_failures` and `return_traces` are True.
 
         Raises
         ------
@@ -1266,7 +1333,12 @@ class NvIngestClient:
 
         # Handle empty input
         if not job_indices:
-            return ([], []) if return_failures else []
+            if return_failures and return_traces:
+                return [], [], []
+            elif return_failures:
+                return [], []
+            else:
+                return []
 
         # Validate and set batch_size
         validated_batch_size = self._validate_batch_size(batch_size)
@@ -1289,12 +1361,17 @@ class NvIngestClient:
             stream_to_callback_only=stream_to_callback_only,
             return_full_response=return_full_response,
             verbose=verbose,
+            return_traces=return_traces,
         )
 
-        results, failures = processor.run()
+        results, failures, traces = processor.run()
 
-        if return_failures:
+        if return_failures and return_traces:
+            return results, failures, traces
+        elif return_failures:
             return results, failures
+        elif return_traces:
+            return results, traces
 
         if failures:
             logger.warning(f"{len(failures)} job(s) failed during concurrent processing." " Check logs for details.")
