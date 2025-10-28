@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Regex pattern to detect CUDA-related errors in Triton gRPC responses
 CUDA_ERROR_REGEX = re.compile(
-    r"(illegal memory access|invalid argument|failed to (copy|load|perform) .*: .*|TritonModelException: failed to copy data: .*)",
+    r"(illegal memory access|invalid argument|failed to (copy|load|perform) .*: .*|TritonModelException: failed to copy data: .*)",  # noqa: E501
     re.IGNORECASE,
 )
 
@@ -358,7 +358,6 @@ class NimClient:
                         f"Received gRPC INTERNAL error with CUDA-related message for model '{model_name}'. "
                         f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
                     )
-                    
                     if attempt == self.max_retries - 1:
                         # No more retries left
                         logger.error(f"Max retries exceeded for CUDA errors on model '{model_name}'.")
@@ -368,7 +367,7 @@ class NimClient:
                         model_reload_succeeded = reload_models(client=self.client, client_timeout=self.timeout)
                         if not model_reload_succeeded:
                             logger.error(f"Failed to reload models for model '{model_name}'.")
-                        
+
                         # Exponential backoff
                         backoff_time = base_delay * (2**attempt)
                         time.sleep(backoff_time)
@@ -392,9 +391,7 @@ class NimClient:
                 else:
                     # For other server-side errors (e.g., INVALID_ARGUMENT, NOT_FOUND),
                     # retrying will not help. We should fail fast.
-                    logger.error(
-                        f"Received non-retryable gRPC error from Triton for model '{model_name}': {message}"
-                    )
+                    logger.error(f"Received non-retryable gRPC error from Triton for model '{model_name}': {message}")
                     raise
 
             except Exception as e:
@@ -718,14 +715,14 @@ def get_nim_client_manager(*args, **kwargs) -> NimClientManager:
 def reload_models(client: grpcclient.InferenceServerClient, client_timeout: int = 120) -> bool:
     """
     Reloads all models in the Triton server.
-    
+
     Parameters
     ----------
     client : grpcclient.InferenceServerClient
         The gRPC client connected to the Triton server.
     client_timeout : int, optional
         Timeout for client operations in seconds (default: 120).
-    
+
     Returns
     -------
     bool
