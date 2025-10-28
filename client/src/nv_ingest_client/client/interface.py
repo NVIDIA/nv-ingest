@@ -656,24 +656,18 @@ class Ingestor:
 
         parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
 
-        # Build return tuple based on requested outputs (most specific combinations first)
+        # Build return tuple based on requested outputs
         # Order: results, failures (if requested), traces (if requested), parent_trace_ids (if requested)
-        if return_failures and return_traces and include_parent_trace_ids:
-            return results, failures, traces_list, parent_trace_ids
-        elif return_failures and return_traces:
-            return results, failures, traces_list
-        elif return_failures and include_parent_trace_ids:
-            return results, failures, parent_trace_ids
-        elif return_traces and include_parent_trace_ids:
-            return results, traces_list, parent_trace_ids
-        elif return_failures:
-            return results, failures
-        elif return_traces:
-            return results, traces_list
-        elif include_parent_trace_ids:
-            return results, parent_trace_ids
-        else:
-            return results
+        returns = [results]
+
+        if return_failures:
+            returns.append(failures)
+        if return_traces:
+            returns.append(traces_list)
+        if include_parent_trace_ids:
+            returns.append(parent_trace_ids)
+
+        return tuple(returns) if len(returns) > 1 else results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
