@@ -776,13 +776,13 @@ def bulk_insert_milvus(
     t_bulk_start = time.time()
     task_ids = []
 
-    task_ids.append(
-        utility.do_bulk_insert(
+    for files in writer.batch_files:
+        task_id = utility.do_bulk_insert(
             collection_name=collection_name,
-            files=[file for files in writer.batch_files for file in files],
+            files=files,
             consistency_level=CONSISTENCY,
         )
-    )
+        task_ids.append(task_id)
 
     while len(task_ids) > 0:
         time.sleep(1)

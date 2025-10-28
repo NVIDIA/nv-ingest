@@ -144,6 +144,8 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
     image_elements_modality: Optional[str] = None
     structured_elements_modality: Optional[str] = None
     audio_elements_modality: Optional[str] = None
+    custom_content_field: Optional[str] = None
+    result_target_field: Optional[str] = None
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):

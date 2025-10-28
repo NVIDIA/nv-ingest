@@ -402,16 +402,9 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
+        return_traces: bool = False,
         **kwargs: Any,
-    ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of response['data'] for each doc
-        List[Dict[str, Any]],  # In-memory: Full response envelopes when return_full_response=True
-        List[LazyLoadedList],  # Disk: List of proxies, one per original doc
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[Dict[str, Any]], List[LazyLoadedList]],
-            List[Tuple[str, str]],
-        ],
-    ]:  # noqa: E501
+    ) -> Union[List[Any], Tuple[Any, ...]]:
         """
         Ingest documents by submitting jobs and fetching results concurrently.
 
@@ -421,24 +414,30 @@ class Ingestor:
             Whether to display a progress bar. Default is False.
         return_failures : bool, optional
             If True, return a tuple (results, failures); otherwise, return only results. Default is False.
+        save_to_disk : bool, optional
+            If True, save results to disk and return LazyLoadedList proxies. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
+            Traces contain timing metrics (entry, exit, resident_time) for each stage.
         **kwargs : Any
-            Additional keyword arguments for the underlying client methods. Supported keys:
-            'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'return_full_response', 'verbose'. Unrecognized keys are passed
-            through to process_jobs_concurrently.
+            Additional keyword arguments for the underlying client methods.
             Optional flags include `include_parent_trace_ids=True` to also return
-            parent job trace identifiers gathered during ingestion.
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        results : list of dict
-            List of successful job results when `return_failures` is False.
+        list or tuple
+            Returns vary based on flags:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+            - Additional combinations with include_parent_trace_ids kwarg
 
-        results, failures : tuple (list of dict, list of tuple of str)
-            Tuple containing successful results and failure information when `return_failures` is True.
-
-        If `include_parent_trace_ids=True` is provided via kwargs, an additional
-        list of parent trace IDs is appended to the return value.
+        Notes
+        -----
+        Trace metrics include timing data for each processing stage. For detailed
+        usage and examples, see src/nv_ingest/api/v2/README.md
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
@@ -574,7 +573,8 @@ class Ingestor:
         if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
             self._client.enable_telemetry(bool(enable_telemetry))
 
-        results, failures = self._client.process_jobs_concurrently(
+        # Call process_jobs_concurrently
+        proc_result = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
@@ -583,8 +583,16 @@ class Ingestor:
             return_failures=True,
             stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
+            return_traces=return_traces,
             **proc_kwargs,
         )
+
+        # Unpack result based on return_traces flag
+        if return_traces:
+            results, failures, traces_list = proc_result
+        else:
+            results, failures = proc_result
+            traces_list = []  # Empty list when traces not requested
 
         if show_progress and pbar:
             pbar.close()
@@ -648,13 +656,18 @@ class Ingestor:
 
         parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
 
-        if return_failures and include_parent_trace_ids:
-            return results, failures, parent_trace_ids
+        # Build return tuple based on requested outputs
+        # Order: results, failures (if requested), traces (if requested), parent_trace_ids (if requested)
+        returns = [results]
+
         if return_failures:
-            return results, failures
+            returns.append(failures)
+        if return_traces:
+            returns.append(traces_list)
         if include_parent_trace_ids:
-            return results, parent_trace_ids
-        return results
+            returns.append(parent_trace_ids)
+
+        return tuple(returns) if len(returns) > 1 else results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """

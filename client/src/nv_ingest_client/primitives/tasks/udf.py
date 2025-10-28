@@ -11,6 +11,7 @@ import logging
 import importlib
 import inspect
 import ast
+import re
 from typing import Dict, Optional, Union
 
 from nv_ingest_api.internal.enums.common import PipelinePhase
@@ -122,54 +123,50 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
     3. File path: '/path/to/file.py:my_function'
     4. Legacy import path: 'my_module.my_function' (function name only, no imports)
     """
-    if udf_function_spec.strip().startswith("def "):
-        # Already an inline function string
-        return udf_function_spec
+    # Default to treating as inline unless it clearly matches a
+    # module/file specification. This avoids misclassifying inline code that
+    # contains colons, imports, or annotations before the def line.
 
-    elif ".py:" in udf_function_spec:
-        # File path format: /path/to/file.py:function_name
-        file_path, function_name = udf_function_spec.split(":", 1)
+    spec = udf_function_spec.strip()
+
+    # 1) File path with function: /path/to/file.py:function_name
+    if ".py:" in spec:
+        file_path, function_name = spec.split(":", 1)
         return _extract_function_with_context(file_path, function_name)
 
-    elif udf_function_spec.endswith(".py"):
-        # File path format without function name - this is an error
+    # 2) File path without function name is an explicit error
+    if spec.endswith(".py"):
         raise ValueError(
-            f"File path '{udf_function_spec}' is missing function name. "
-            f"Use format 'file.py:function_name' to specify which function to use."
+            f"File path '{udf_function_spec}' is missing function name. Use format 'file.py:function_name'."
         )
 
-    elif ":" in udf_function_spec and ".py:" not in udf_function_spec:
-        # Module path format with colon: my_module.submodule:function_name
-        # This preserves imports and module context
-        module_path, function_name = udf_function_spec.split(":", 1)
-
+    # 3) Module path with colon: my.module:function
+    # Be strict: only letters, numbers, underscore, and dots on the left; valid identifier on the right;
+    # no whitespace/newlines.
+    module_colon_pattern = re.compile(r"^[A-Za-z_][\w\.]*:[A-Za-z_][\w]*$")
+    if module_colon_pattern.match(spec):
+        module_path, function_name = spec.split(":", 1)
         try:
-            # Import the module to get its file path
             module = importlib.import_module(module_path)
             module_file = inspect.getfile(module)
-
-            # Extract the function with full module context
             return _extract_function_with_context(module_file, function_name)
-
         except ImportError as e:
             raise ValueError(f"Failed to import module '{module_path}': {e}")
         except Exception as e:
             raise ValueError(f"Failed to resolve module path '{module_path}': {e}")
 
-    elif "." in udf_function_spec:
-        # Legacy import path format: module.submodule.function
-        # This only extracts the function source without imports (legacy behavior)
-        func = _load_function_from_import_path(udf_function_spec)
-
-        # Get the source code of the function only
+    # 4) Legacy import path: my.module.function (no colon)
+    legacy_import_pattern = re.compile(r"^[A-Za-z_][\w\.]*\.[A-Za-z_][\w]*$")
+    if legacy_import_pattern.match(spec):
+        func = _load_function_from_import_path(spec)
         try:
             source = inspect.getsource(func)
             return source
         except (OSError, TypeError) as e:
             raise ValueError(f"Could not get source code for function from '{udf_function_spec}': {e}")
 
-    else:
-        raise ValueError(f"Invalid UDF function specification: {udf_function_spec}")
+    # 5) Default: treat as inline UDF source (entire string)
+    return udf_function_spec
 
 
 class UDFTask(Task):

@@ -7,6 +7,8 @@ import logging
 
 from pydantic import ConfigDict, BaseModel, Field, model_validator, field_validator
 
+from typing import Optional
+
 from nv_ingest_api.util.logging.configuration import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ class TextEmbeddingSchema(BaseModel):
     image_elements_modality: str = Field(default="text")
     structured_elements_modality: str = Field(default="text")
     audio_elements_modality: str = Field(default="text")
+    custom_content_field: Optional[str] = None
+    result_target_field: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
 

@@ -10,10 +10,12 @@ from typing import Tuple
 from pydantic import BaseModel, Field
 from pydantic import root_validator
 
+from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
+
 logger = logging.getLogger(__name__)
 
 
-class AudioConfigSchema(BaseModel):
+class AudioConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for audio extraction endpoints and options.
 
@@ -87,13 +89,13 @@ class AudioConfigSchema(BaseModel):
 
         values[endpoint_name] = (grpc_service, http_service)
 
+        # Auto-infer protocol from endpoints if not specified
         protocol_name = "audio_infer_protocol"
         protocol_value = values.get(protocol_name)
 
         if not protocol_value:
             protocol_value = "http" if http_service else "grpc" if grpc_service else ""
 
-        protocol_value = protocol_value.lower()
         values[protocol_name] = protocol_value
 
         return values
