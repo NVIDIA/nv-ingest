@@ -34,6 +34,25 @@ YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
 YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
+# yolox-page-elements-v3 contants
+YOLOX_PAGE_V3_NUM_CLASSES = 6
+YOLOX_PAGE_V3_FINAL_SCORE = {
+    "table": 0.1,
+    "chart": 0.01,
+    "infographic": 0.01,
+    "title": 0.1,
+    "paragraph": 0.1,
+    "header_footer": 0.1,
+}
+YOLOX_PAGE_V3_CLASS_LABELS = [
+    "table",
+    "chart",
+    "title",
+    "infographic",
+    "paragraph",
+    "header_footer",
+]
+
 # yolox-page-elements-v2 contants
 YOLOX_PAGE_V2_NUM_CLASSES = 4
 YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
@@ -97,7 +116,6 @@ class YoloxModelInterfaceBase(ModelInterface):
     def __init__(
         self,
         nim_max_image_size: Optional[int] = None,
-        num_classes: Optional[int] = None,
         conf_threshold: Optional[float] = None,
         iou_threshold: Optional[float] = None,
         min_score: Optional[float] = None,
@@ -110,7 +128,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         ----------
         """
         self.nim_max_image_size = nim_max_image_size
-        self.num_classes = num_classes
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.min_score = min_score
@@ -369,13 +386,11 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         """
         Initialize the yolox-page-elements model interface.
         """
-        num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-        final_score = YOLOX_PAGE_V2_FINAL_SCORE
-        class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+        final_score = YOLOX_PAGE_V3_FINAL_SCORE
+        class_labels = YOLOX_PAGE_V3_CLASS_LABELS
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
-            num_classes=num_classes,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
@@ -400,15 +415,6 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        expected_final_score_keys = [x for x in self.class_labels if x != "title"]
-        if (not isinstance(self.final_score, dict)) or (
-            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
-        ):
-            raise ValueError(
-                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
-                f"{expected_final_score_keys}"
-            )
-
         # Table/chart expansion is "business logic" specific to nv-ingest
         annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
@@ -427,7 +433,16 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
                     bb for bb in annotation_dict["infographic"] if bb[4] >= self.final_score["infographic"]
                 ]
             if "title" in annotation_dict:
-                new_dict["title"] = annotation_dict["title"]
+                new_dict["title"] = [bb for bb in annotation_dict["title"] if bb[4] >= self.final_score["title"]]
+            if "paragraph" in annotation_dict:
+                new_dict["paragraph"] = [
+                    bb for bb in annotation_dict["paragraph"] if bb[4] >= self.final_score["paragraph"]
+                ]
+            if "header_footer" in annotation_dict:
+                new_dict["header_footer"] = [
+                    bb for bb in annotation_dict["header_footer"] if bb[4] >= self.final_score["header_footer"]
+                ]
+
             inference_results.append(new_dict)
 
         inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
@@ -446,7 +461,6 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
         """
         super().__init__(
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
             iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
             min_score=YOLOX_GRAPHIC_MIN_SCORE,
@@ -503,7 +517,6 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
         """
         super().__init__(
             nim_max_image_size=YOLOX_TABLE_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_TABLE_NUM_CLASSES,
             conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
             iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
             min_score=YOLOX_TABLE_MIN_SCORE,

@@ -362,6 +362,47 @@ def construct_image_metadata_from_pdf_image(
     return [ContentTypeEnum.IMAGE, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
+def _construct_text_image_primitive(
+    cropped_image: CroppedImageWithContent,
+    page_idx: int,
+    page_count: int,
+    source_metadata: Dict,
+    base_unified_metadata: Dict,
+) -> List[Any]:
+    """Constructs an 'image' primitive for a detected text block, intended for downstream OCR."""
+    content_metadata = {
+        "type": ContentTypeEnum.TEXT,
+        "description": ContentDescriptionEnum.PDF_TEXT,
+        "page_number": page_idx,
+        "hierarchy": {
+            "page_count": page_count,
+            "page": page_idx,
+        },
+        "subtype": cropped_image.type_string,
+    }
+
+    image_metadata = {
+        "image_type": DocumentTypeEnum.PNG,  # Assuming PNG from our processing
+        "image_location": cropped_image.bbox,
+        "image_location_max_dimensions": (cropped_image.max_width, cropped_image.max_height),
+        "width": cropped_image.bbox[2] - cropped_image.bbox[0],
+        "height": cropped_image.bbox[3] - cropped_image.bbox[1],
+    }
+
+    unified_metadata = base_unified_metadata.copy()
+    unified_metadata.update(
+        {
+            "content": cropped_image.image,  # The base64 image of the text block
+            "source_metadata": source_metadata,
+            "content_metadata": content_metadata,
+            "image_metadata": image_metadata,
+        }
+    )
+
+    validated_metadata = validate_metadata(unified_metadata)
+    return [ContentTypeEnum.TEXT, validated_metadata.model_dump(), str(uuid.uuid4())]
+
+
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_page_element_metadata(
@@ -398,6 +439,11 @@ def construct_page_element_metadata(
     |                                | source_location          |            |   |
     +--------------------------------+--------------------------+------------+---+
     """
+    text_types = {"paragraph", "title", "header_footer"}
+    if structured_image.type_string in text_types:
+        return _construct_text_image_primitive(
+            structured_image, page_idx, page_count, source_metadata, base_unified_metadata
+        )
 
     if structured_image.type_string in ("table",):
         content = structured_image.image

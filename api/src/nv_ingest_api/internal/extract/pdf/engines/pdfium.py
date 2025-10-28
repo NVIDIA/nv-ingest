@@ -172,7 +172,7 @@ def _extract_page_element_images(
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
 
-    for label in ["table", "chart", "infographic"]:
+    for label in ["table", "chart", "infographic", "paragraph", "title", "header_footer"]:
         if not annotation_dict:
             continue
 
@@ -402,7 +402,7 @@ def pdfium_extractor(
             f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
-
+    text_extraction_method = extractor_config.get("text_extraction_method", "ocr")  # FIXME
     extract_images_method = extractor_config.get("extract_images_method", "group")
     extract_images_params = extractor_config.get("extract_images_params", {})
 
@@ -462,11 +462,15 @@ def pdfium_extractor(
     if text_depth != TextTypeEnum.PAGE:
         text_depth = TextTypeEnum.DOCUMENT
 
+    run_page_elements = (extract_tables or extract_charts or extract_infographics) or (
+        extract_text and text_extraction_method == "ocr"
+    )
+
     extracted_data = []
     accumulated_text = []
 
     # Prepare for table/chart extraction
-    pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
+    pages_for_extractions = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
@@ -477,7 +481,9 @@ def pdfium_extractor(
             page_reading_index = page_idx + 1
 
             # Text extraction
-            if extract_text:
+            if extract_text and text_extraction_method == "ocr":
+                pass
+            elif extract_text:
                 page_text = _extract_page_text(page)
                 if text_depth == TextTypeEnum.PAGE:
                     text_meta = construct_text_metadata(
@@ -495,6 +501,7 @@ def pdfium_extractor(
                     extracted_data.append(text_meta)
                 else:
                     accumulated_text.append(page_text)
+                raise  # FIXME
 
             # Image extraction
             if extract_images:
@@ -530,20 +537,20 @@ def pdfium_extractor(
                 extracted_data.append(image_meta)
 
             # If we want tables or charts, rasterize the page and store it
-            if extract_tables or extract_charts or extract_infographics:
+            if run_page_elements:
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     trace_info=execution_trace_log,
                 )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                pages_for_extractions.append((page_idx, image[0], padding_offsets[0]))
 
-                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
-                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                # Whenever pages_for_extractions hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_for_extractions) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
                         _extract_page_elements,
-                        pages_for_tables[:],  # pass a copy
+                        pages_for_extractions[:],  # pass a copy
                         page_count,
                         source_metadata,
                         base_unified_metadata,
@@ -557,15 +564,15 @@ def pdfium_extractor(
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
-                    pages_for_tables.clear()
+                    pages_for_extractions.clear()
 
             page.close()
 
-        # After page loop, if we still have leftover pages_for_tables, submit one last job
-        if (extract_tables or extract_charts or extract_infographics) and pages_for_tables:
+        # After page loop, if we still have leftover pages_for_extractions, submit one last job
+        if run_page_elements and pages_for_extractions:
             future = executor.submit(
                 _extract_page_elements,
-                pages_for_tables[:],
+                pages_for_extractions[:],
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -580,7 +587,7 @@ def pdfium_extractor(
             )
             futures.append(future)
 
-            pages_for_tables.clear()
+            pages_for_extractions.clear()
 
         # Wait for all asynchronous jobs to complete.
         for fut in concurrent.futures.as_completed(futures):
