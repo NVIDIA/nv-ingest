@@ -436,12 +436,13 @@ class RedisIngestService(IngestServiceMeta):
         metadata_key = f"parent:{parent_job_id}:metadata"
 
         try:
-            # Store subjob IDs as a set
-            await self._run_bounded_to_thread(
-                self._ingest_client.get_client().sadd,
-                parent_key,
-                *subjob_ids,
-            )
+            # Store subjob IDs as a set (only if there are subjobs)
+            if subjob_ids:
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().sadd,
+                    parent_key,
+                    *subjob_ids,
+                )
 
             # Store metadata as hash (including original subjob ordering for deterministic fetches)
             metadata_to_store = dict(metadata)

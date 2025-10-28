@@ -352,6 +352,15 @@ class MetadataSchema(BaseModelNoExt):
     raise_on_failure: bool = False
     """If True, indicates that processing should halt on failure."""
 
+    total_pages: Optional[int] = None
+    """Total number of pages in the source document (V2 API)."""
+
+    original_source_id: Optional[str] = None
+    """The original source identifier before any splitting or chunking (V2 API)."""
+
+    original_source_name: Optional[str] = None
+    """The original source name before any splitting or chunking (V2 API)."""
+
     custom_content: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="before")

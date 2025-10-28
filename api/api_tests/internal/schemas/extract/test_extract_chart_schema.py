@@ -46,6 +46,40 @@ def test_invalid_ocr_empty():
     assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
 
 
+def test_protocol_case_insensitive():
+    """Test that protocol values are normalized to lowercase for case-insensitive handling."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", "http_service"),
+        yolox_infer_protocol="GRPC",  # uppercase
+        ocr_endpoints=("grpc_ocr", "http_ocr"),
+        ocr_infer_protocol="HTTP",  # uppercase
+    )
+    assert config.yolox_infer_protocol == "grpc"
+    assert config.ocr_infer_protocol == "http"
+
+
+def test_protocol_mixed_case():
+    """Test that mixed case protocol values are normalized to lowercase."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=(None, "http_service"),
+        yolox_infer_protocol="HtTp",  # mixed case
+        ocr_endpoints=("grpc_ocr", None),
+        ocr_infer_protocol="GrPc",  # mixed case
+    )
+    assert config.yolox_infer_protocol == "http"
+    assert config.ocr_infer_protocol == "grpc"
+
+
+def test_protocol_auto_inference_from_endpoints():
+    """Test that protocol is auto-inferred from endpoints when not specified."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=(None, "http_service"),
+        ocr_endpoints=("grpc_ocr", None),
+    )
+    assert config.yolox_infer_protocol == "http"
+    assert config.ocr_infer_protocol == "grpc"
+
+
 def test_extra_fields_forbidden_in_chart_extractor_config():
     with pytest.raises(ValidationError):
         ChartExtractorConfigSchema(
