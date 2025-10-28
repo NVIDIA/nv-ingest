@@ -8,7 +8,7 @@ active:
   test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v2  # v1 or v2
+  api_version: v1  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -22,7 +22,6 @@ active:
   sparse: true  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
-  llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization
 
   # Extraction configuration
   extract_text: true
@@ -43,6 +42,9 @@ active:
   spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (scripts/tests/artifacts)
   collection_name: null  # null = auto-generated
+
+  # Custom UDF Configs - add specific udf configs here if needed.
+  llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
 # Dataset shortcuts for convenience
 # Add your commonly used dataset paths here
