@@ -1,0 +1,18 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-3.1-nemotron-nano-vl-8b-v1
+spec:
+  source:
+    ngc:
+      modelPuller: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1:latest
+      pullSecret: ngc-secret
+      authSecret: ngc-api-secret
+  storage:
+    pvc:
+      create: true
+      # You should use the appropriate storage class for your cluster
+      storageClass: standard
+      size: "300Gi"
+      volumeAccessMode: ReadWriteMany
+  resources: {}
