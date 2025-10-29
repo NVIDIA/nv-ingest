@@ -10,6 +10,7 @@ from nv_ingest_api.util.dataloader import DataLoader, MediaInterface
 import subprocess
 import json
 import math
+import time
 from .dataloader_test_tools import create_test_wav, create_test_mp3
 
 test_file_size_mb = 100
@@ -230,3 +231,114 @@ def test_dataloader_getitem(temp_dir):
     # Test that accessing negative index raises an exception
     with pytest.raises(Exception):
         loader[-4]  # Should raise an exception for negative index
+
+
+def test_dataloader_stop_drains_queue_and_joins_thread(temp_dir):
+    """Validate that DataLoader.stop() signals the thread via Event, joins it, and drains the queue."""
+
+    # Use a lightweight fake interface to avoid invoking ffmpeg and keep the test fast/stable.
+    class _FakeInterface:
+        def split(self, input_path: str, output_dir: str, **kwargs):
+            out_dir = Path(output_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stem = Path(input_path).stem
+            suffix = Path(input_path).suffix or ".bin"
+            files = []
+            for i in range(3):
+                p = out_dir / f"{stem}_chunk_{i:04d}{suffix}"
+                with open(p, "wb") as f:
+                    f.write(b"x" * 1024)  # 1KB
+                files.append(str(p))
+            return files
+
+    # Create a small WAV file (content size is irrelevant due to _FakeInterface)
+    input_wav = temp_dir / "large_input.wav"
+    original_audio, sample_rate = create_test_wav(input_wav, file_size_mb=1)
+
+    chunks_dir = temp_dir / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+
+    actual_size_bytes = input_wav.stat().st_size
+    split_size_bytes = math.ceil(actual_size_bytes / 3)  # target ~3 chunks
+    loader = DataLoader(
+        path=str(input_wav),
+        output_dir=str(chunks_dir),
+        split_interval=split_size_bytes,
+        interface=_FakeInterface(),
+        size=4,
+    )
+
+    # Start background loader thread by iterating
+    _ = iter(loader)
+
+    # Wait briefly until the background thread reports alive
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    # Now stop and validate
+    loader.stop()
+
+    # Thread should be joined and cleared
+    assert (loader.thread is None) or (
+        not loader.thread.is_alive()
+    ), "Loader thread should be None or not alive after stop()"
+    # Event should be cleared for reuse
+    assert not loader.thread_stop.is_set(), "thread_stop Event should be cleared after stop()"
+    # Queue should be fully drained
+    assert loader.queue.qsize() == 0, "Queue should be empty after stop() drains it"
+
+
+def test_dataloader_stop_is_idempotent_and_cleans_multiple_times(temp_dir):
+    """Validate repeated stop calls leave the queue empty and no thread running."""
+
+    class _FakeInterface:
+        def split(self, input_path: str, output_dir: str, **kwargs):
+            out_dir = Path(output_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stem = Path(input_path).stem
+            suffix = Path(input_path).suffix or ".bin"
+            files = []
+            for i in range(3):
+                p = out_dir / f"{stem}_chunk_{i:04d}{suffix}"
+                with open(p, "wb") as f:
+                    f.write(b"x" * 1024)  # 1KB
+                files.append(str(p))
+            return files
+
+    # Create a small WAV file (content size is irrelevant due to _FakeInterface)
+    input_wav = temp_dir / "large_input.wav"
+    original_audio, sample_rate = create_test_wav(input_wav, file_size_mb=1)
+
+    chunks_dir = temp_dir / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+
+    actual_size_bytes = input_wav.stat().st_size
+    split_size_bytes = math.ceil(actual_size_bytes / 3)
+    loader = DataLoader(
+        path=str(input_wav),
+        output_dir=str(chunks_dir),
+        split_interval=split_size_bytes,
+        interface=_FakeInterface(),
+        size=4,
+    )
+
+    # Start and stop first time
+    _ = iter(loader)
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    loader.stop()
+    assert (loader.thread is None) or (not loader.thread.is_alive())
+    assert not loader.thread_stop.is_set()
+    assert loader.queue.qsize() == 0
+
+    # Start and stop second time to ensure idempotence
+    _ = iter(loader)
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    loader.stop()
+    assert (loader.thread is None) or (not loader.thread.is_alive())
+    assert not loader.thread_stop.is_set()
+    assert loader.queue.qsize() == 0

@@ -432,6 +432,76 @@ def _extract_ray_telemetry(result: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
     return trace_dict, annotations_dict
 
 
+def _normalize_chunk_records(
+    records: Optional[List[Any]],
+    descriptor: Dict[str, Any],
+    parent_metadata: Dict[str, Any],
+) -> List[Any]:
+    """Re-map chunk-local metadata to document-level context for aggregation."""
+
+    if not isinstance(records, list):
+        return []
+
+    total_pages = parent_metadata.get("total_pages")
+    original_source_id = parent_metadata.get("original_source_id")
+    original_source_name = parent_metadata.get("original_source_name")
+
+    start_page = descriptor.get("start_page")
+    page_offset = start_page - 1 if isinstance(start_page, int) and start_page > 0 else 0
+
+    normalized_entries: List[Any] = []
+
+    for entry in records:
+        if not isinstance(entry, dict):
+            normalized_entries.append(entry)
+            continue
+
+        normalized_entry = entry.copy()
+        original_metadata = entry.get("metadata")
+
+        if isinstance(original_metadata, dict):
+            normalized_metadata = original_metadata.copy()
+            normalized_entry["metadata"] = normalized_metadata
+
+            original_source_meta = original_metadata.get("source_metadata")
+            if isinstance(original_source_meta, dict):
+                normalized_source_meta = original_source_meta.copy()
+                normalized_metadata["source_metadata"] = normalized_source_meta
+
+                if original_source_id:
+                    normalized_source_meta["source_id"] = original_source_id
+                if original_source_name:
+                    normalized_source_meta["source_name"] = original_source_name
+
+            original_content_meta = original_metadata.get("content_metadata")
+            if isinstance(original_content_meta, dict):
+                normalized_content_meta = original_content_meta.copy()
+                normalized_metadata["content_metadata"] = normalized_content_meta
+
+                page_number = normalized_content_meta.get("page_number")
+                if isinstance(page_number, int) and page_number >= 0:
+                    normalized_content_meta["page_number"] = page_number + page_offset
+
+                if isinstance(total_pages, int) and isinstance(normalized_content_meta.get("page_count"), int):
+                    # Ensure optional per-record page count reflects the full document
+                    normalized_content_meta["page_count"] = total_pages
+
+                original_hierarchy = original_content_meta.get("hierarchy")
+                if isinstance(original_hierarchy, dict):
+                    normalized_hierarchy = original_hierarchy.copy()
+                    normalized_content_meta["hierarchy"] = normalized_hierarchy
+
+                    hierarchy_page = normalized_hierarchy.get("page")
+                    if isinstance(hierarchy_page, int) and hierarchy_page >= 0:
+                        normalized_hierarchy["page"] = hierarchy_page + page_offset
+                    if isinstance(total_pages, int):
+                        normalized_hierarchy["page_count"] = total_pages
+
+        normalized_entries.append(normalized_entry)
+
+    return normalized_entries
+
+
 def _aggregate_parent_traces(chunk_traces: Dict[str, Any]) -> Dict[str, Any]:
     """
     Aggregate chunk-level traces into parent-level metrics.
@@ -574,7 +644,8 @@ def _build_aggregated_response(
         if result is not None:
             # Add page data to aggregated result
             if "data" in result:
-                aggregated_result["data"].extend(result["data"])
+                normalized_records = _normalize_chunk_records(result.get("data"), descriptor, metadata)
+                aggregated_result["data"].extend(normalized_records)
             chunk_entry = dict(descriptor)
             aggregated_result["metadata"]["chunks"].append(chunk_entry)
 
