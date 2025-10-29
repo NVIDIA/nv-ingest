@@ -739,14 +739,16 @@ def get_nim_client_manager(*args, **kwargs) -> NimClientManager:
     return NimClientManager(*args, **kwargs)
 
 
-def reload_models(client: grpcclient.InferenceServerClient, client_timeout: int = 120) -> bool:
+def reload_models(client: grpcclient.InferenceServerClient, exclude: list[str] = [], client_timeout: int = 120) -> bool:
     """
-    Reloads all models in the Triton server.
+    Reloads all models in the Triton server except for the models in the exclude list.
 
     Parameters
     ----------
     client : grpcclient.InferenceServerClient
         The gRPC client connected to the Triton server.
+    exclude : list[str], optional
+        A list of model names to exclude from reloading.
     client_timeout : int, optional
         Timeout for client operations in seconds (default: 120).
 
@@ -755,8 +757,8 @@ def reload_models(client: grpcclient.InferenceServerClient, client_timeout: int 
     bool
         True if all models were successfully reloaded, False otherwise.
     """
-    exclude = set()
     model_index = client.get_model_repository_index()
+    exclude = set(exclude)
     names = [m.name for m in model_index.models if m.name not in exclude]
 
     logger.info(f"Reloading {len(names)} model(s): {', '.join(names) if names else '(none)'}")
