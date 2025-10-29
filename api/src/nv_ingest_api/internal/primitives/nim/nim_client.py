@@ -71,7 +71,7 @@ class NimClient:
         max_retries : int, optional
             The maximum number of retries for non-429 server-side errors (default: 5).
         max_429_retries : int, optional
-            The maximum number of retries specifically for 429 errors (default: 10).
+            The maximum number of retries specifically for 429 errors (default: 5).
 
         Raises
         ------
@@ -374,6 +374,49 @@ class NimClient:
                         attempt += 1
                         continue
 
+                # Handle errors that can occur after model reload (NOT_FOUND, model not loaded)
+                if (
+                    status == "StatusCode.NOT_FOUND"
+                    or "not loaded" in message.lower()
+                    or "no versions available" in message.lower()
+                ):
+                    logger.warning(
+                        f"Received gRPC {status} error for model '{model_name}'. "
+                        f"Attempt {attempt + 1} of {self.max_retries}. Message: {message[:500]}"
+                    )
+                    if attempt == self.max_retries - 1:
+                        logger.error(f"Max retries exceeded for model not found errors on model '{model_name}'.")
+                        raise e
+                    else:
+                        # Retry with exponential backoff WITHOUT reloading
+                        backoff_time = base_delay * (2**attempt)
+                        logger.info(
+                            f"Retrying after {backoff_time}s backoff for model not found error on model '{model_name}'."
+                        )
+                        time.sleep(backoff_time)
+                        attempt += 1
+                        continue
+
+                # Handle StatusCode.INTERNAL (without CUDA message) - retry without reload
+                # because errors can happen if the model is not loaded yet and the request is middle off running
+                if status == "StatusCode.INTERNAL":
+                    logger.warning(
+                        f"Received gRPC INTERNAL error for model '{model_name}'. "
+                        f"Attempt {attempt + 1} of {self.max_retries}. Message: {message[:500]}"
+                    )
+                    if attempt == self.max_retries - 1:
+                        logger.error(f"Max retries exceeded for INTERNAL error on model '{model_name}'.")
+                        raise e
+                    else:
+                        # Retry with exponential backoff WITHOUT reloading
+                        backoff_time = base_delay * (2**attempt)
+                        logger.info(
+                            f"Retrying after {backoff_time}s backoff for INTERNAL error on model '{model_name}'."
+                        )
+                        time.sleep(backoff_time)
+                        attempt += 1
+                        continue
+
                 if status == "StatusCode.UNAVAILABLE" and "Exceeds maximum queue size".lower() in message.lower():
                     retries_429 += 1
                     logger.warning(
@@ -388,11 +431,12 @@ class NimClient:
                     time.sleep(backoff_time)
                     continue
 
-                else:
-                    # For other server-side errors (e.g., INVALID_ARGUMENT, NOT_FOUND),
-                    # retrying will not help. We should fail fast.
-                    logger.error(f"Received non-retryable gRPC error from Triton for model '{model_name}': {message}")
-                    raise
+                # For other server-side errors (e.g., INVALID_ARGUMENT, etc.),
+                # fail fast as retrying will not help
+                logger.error(
+                    f"Received non-retryable gRPC error {status} from Triton for model '{model_name}': {message}"
+                )
+                raise
 
             except Exception as e:
                 # Catch any other unexpected exceptions (e.g., network issues not caught by Triton client)
