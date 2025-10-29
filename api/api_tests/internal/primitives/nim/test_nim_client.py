@@ -122,7 +122,7 @@ class TestNimClientGrpcRetry(unittest.TestCase):
             test_input = np.array([1.0], dtype=np.float32)
             self.client._grpc_infer(test_input, "test_model")
 
-        self.assertEqual(context.exception.status(), "StatusCode.INVALID_ARG")
+        self.assertEqual(context.exception.status(), "StatusCode.INVALID_ARGUMENT")
 
         self.client.client.infer.assert_called_once()
         mock_sleep.assert_not_called()
