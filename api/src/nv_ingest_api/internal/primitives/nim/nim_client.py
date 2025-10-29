@@ -67,7 +67,7 @@ class NimClient:
         auth_token : str, optional
             Authorization token for HTTP requests (default: None).
         timeout : float, optional
-            Timeout for HTTP requests in seconds (default: 30.0).
+            Timeout for HTTP requests in seconds (default: 120.0).
         max_retries : int, optional
             The maximum number of retries for non-429 server-side errors (default: 5).
         max_429_retries : int, optional
@@ -330,7 +330,7 @@ class NimClient:
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
 
-        base_delay = 0.5
+        base_delay = 2.0
         attempt = 0
         retries_429 = 0
         max_grpc_retries = self.max_429_retries
