@@ -18,7 +18,6 @@ from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_mo
 from nv_ingest_api.internal.schemas.extract.extract_text_schema import TextExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
-from nv_ingest_api.util.image_processing.table_and_chart import reorder_boxes
 
 logger = logging.getLogger(__name__)
 
@@ -129,13 +128,6 @@ def _update_text_metadata(
 
     for idx, ocr_res in enumerate(ocr_results):
         original_index = valid_indices[idx]
-
-        if ocr_model_name == "paddle":
-            logger.debug(f"OCR results for image {base64_images[original_index]}: {ocr_res}")
-        else:
-            # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes, conf_scores).
-            ocr_res = reorder_boxes(*ocr_res)
-
         results[original_index] = (
             base64_images[original_index],
             ocr_res[0],

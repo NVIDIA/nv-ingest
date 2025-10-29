@@ -47,8 +47,8 @@ YOLOX_PAGE_V3_FINAL_SCORE = {
 YOLOX_PAGE_V3_CLASS_LABELS = [
     "table",
     "chart",
-    "title",
     "infographic",
+    "title",
     "paragraph",
     "header_footer",
 ]
@@ -416,8 +416,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
         # Table/chart expansion is "business logic" specific to nv-ingest
-        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
-        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        # annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        # annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        annotation_dicts = [
+            postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
+            for annotation_dict in annotation_dicts
+        ]
+
         inference_results = []
 
         # Filter out bounding boxes below the final threshold
@@ -632,13 +637,14 @@ def expand_chart_bboxes(annotation_dict, labels=None):
         iou_thr=0.01,
         class_agnostic=False,
     )
+
     chart_bboxes = pred_wbf[labels_wbf == 1]
     chart_confidences = confidences_wbf[labels_wbf == 1]
     title_bboxes = pred_wbf[labels_wbf == 2]
 
     found_title_idxs, no_found_title_idxs = [], []
     for i in range(len(chart_bboxes)):
-        match = match_with_title(chart_bboxes[i], title_bboxes, iou_th=0.01)
+        match = match_with_title_v1(chart_bboxes[i], title_bboxes, iou_th=0.01)
         if match is not None:
             chart_bboxes[i] = match[0]
             title_bboxes = match[1]
@@ -646,15 +652,72 @@ def expand_chart_bboxes(annotation_dict, labels=None):
         else:
             no_found_title_idxs.append(i)
 
-    chart_bboxes[found_title_idxs] = expand_boxes(chart_bboxes[found_title_idxs], r_x=1.05, r_y=1.1)
-    chart_bboxes[no_found_title_idxs] = expand_boxes(chart_bboxes[no_found_title_idxs], r_x=1.1, r_y=1.25)
+    chart_bboxes[found_title_idxs] = expand_boxes_v1(chart_bboxes[found_title_idxs], r_x=1.05, r_y=1.1)
+    chart_bboxes[no_found_title_idxs] = expand_boxes_v1(chart_bboxes[no_found_title_idxs], r_x=1.1, r_y=1.25)
 
     annotation_dict = {
         "table": annotation_dict["table"],
         "chart": np.concatenate([chart_bboxes, chart_confidences[:, None]], axis=1).tolist(),
         "title": annotation_dict["title"],
     }
+
     return annotation_dict
+
+
+def postprocess_page_elements_v3(annotation_dict, labels=None):
+    """
+    Expand bounding boxes of tables/charts/infographics and titles based on the bounding boxes of the other class.
+    Args:
+        annotation_dict: output of postprocess_results, a dictionary with keys:
+        "table", "chart", "infographics", "title", "paragraph", "header_footer".
+
+    Returns:
+        annotation_dict: same as input, with expanded bboxes for page elements.
+
+    """
+    if not labels:
+        labels = list(annotation_dict.keys())
+
+    if not annotation_dict:
+        return annotation_dict
+
+    bboxes = []
+    confidences = []
+    label_idxs = []
+
+    for i, label in enumerate(labels):
+        if label not in annotation_dict:
+            continue
+
+        label_annotations = np.array(annotation_dict[label])
+
+        if len(label_annotations) > 0:
+            bboxes.append(label_annotations[:, :4])
+            confidences.append(label_annotations[:, 4])
+            label_idxs.append(np.full(len(label_annotations), i))
+
+    if not bboxes:
+        return annotation_dict
+
+    bboxes = np.concatenate(bboxes)
+    confidences = np.concatenate(confidences)
+    label_idxs = np.concatenate(label_idxs)
+
+    bboxes, confidences, label_idxs = remove_overlapping_boxes_using_wbf(bboxes, confidences, label_idxs)
+    bboxes, confidences, label_idxs, found_title = match_structured_boxes_with_title(bboxes, confidences, label_idxs, labels)
+    bboxes, confidences, label_idxs = expand_tables_and_charts(bboxes, confidences, label_idxs, labels, found_title)
+    bboxes, confidences, label_idxs = postprocess_included_texts(bboxes, confidences, label_idxs, labels)
+
+    order = np.argsort(bboxes[:, 1] * 10 + bboxes[:, 0])
+    bboxes, confidences, label_idxs = bboxes[order], confidences[order], label_idxs[order]
+
+    new_annotation_dict = {}
+    for i, label in enumerate(labels):
+        selected_bboxes = bboxes[label_idxs == i]
+        selected_confidences = confidences[label_idxs == i]
+        new_annotation_dict[label] = np.concatenate([selected_bboxes, selected_confidences[:, None]], axis=1).tolist()
+
+    return new_annotation_dict
 
 
 def weighted_boxes_fusion(
@@ -938,7 +1001,7 @@ def merge_labels(labels, confs):
         return labels[np.argmax(confs)]
 
 
-def match_with_title(chart_bbox, title_bboxes, iou_th=0.01):
+def match_with_title_v1(chart_bbox, title_bboxes, iou_th=0.01):
     if not len(title_bboxes):
         return None
 
@@ -997,7 +1060,7 @@ def merge_boxes(b1, b2):
     return b
 
 
-def expand_boxes(boxes, r_x=1, r_y=1):
+def expand_boxes_v1(boxes, r_x=1, r_y=1):
     dw = (boxes[:, 2] - boxes[:, 0]) / 2 * (r_x - 1)
     boxes[:, 0] -= dw
     boxes[:, 2] += dw
@@ -1207,6 +1270,348 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
+def match_with_title_v3(
+    bbox, title_bboxes, match_dist=0.1, delta=1.5, already_matched=[]
+):
+    """
+    Matches a bounding box with a title bounding box based on IoU or proximity.
+
+    Args:
+        bbox (numpy.ndarray): Bounding box to match with title [x_min, y_min, x_max, y_max].
+        title_bboxes (numpy.ndarray): Array of title bounding boxes with shape (N, 4).
+        match_dist (float, optional): Maximum distance for matching. Defaults to 0.1.
+        delta (float, optional): Multiplier for matching several titles. Defaults to 1.5.
+        already_matched (list, optional): List of already matched title indices. Defaults to [].
+
+    Returns:
+        tuple or None: If matched, returns a tuple of (merged_bbox, updated_title_bboxes).
+                       If no match is found, returns None, None.
+    """
+    if not len(title_bboxes):
+        return None, None
+
+    dist_above = np.abs(title_bboxes[:, 3] - bbox[1])
+    dist_below = np.abs(bbox[3] - title_bboxes[:, 1])
+
+    dist_left = np.abs(title_bboxes[:, 0] - bbox[0])
+    dist_center = np.abs(title_bboxes[:, 0] + title_bboxes[:, 2] - bbox[0] - bbox[2]) / 2
+
+    dists = np.min([dist_above, dist_below], 0)
+    dists += np.min([dist_left, dist_center], 0) / 2
+
+    ious = bb_iou_array(title_bboxes, bbox)
+    dists = np.where(ious > 0, min(match_dist, np.min(dists)), dists)
+
+    if len(already_matched):
+        dists[already_matched] = match_dist * 10  # Remove already matched titles
+
+    # print(dists)
+    matches = None  # noqa
+    if np.min(dists) <= match_dist:
+        matches = np.where(
+            dists <= min(match_dist, np.min(dists) * delta)
+        )[0]
+
+    if matches is not None:
+        new_bbox = bbox
+        for match in matches:
+            new_bbox = merge_boxes(new_bbox, title_bboxes[match])
+        return new_bbox, list(matches)
+    else:
+        return None, None
+
+
+def match_boxes_with_title(boxes, confs, labels, classes, to_match_labels=["chart"], remove_matched_titles=False):
+    """
+    Matches charts with title.
+
+    Args:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (N, 4).
+        confs (numpy.ndarray): Array of confidence scores with shape (N,).
+        labels (numpy.ndarray): Array of labels with shape (N,).
+        classes (list): List of class names.
+        to_match_labels (list): List of class names to match with titles.
+        remove_matched_titles (bool): Whether to remove matched titles from the boxes.
+
+    Returns:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (M, 4).
+        confs (numpy.ndarray): Array of confidence scores with shape (M,).
+        labels (numpy.ndarray): Array of labels with shape (M,).
+        found_title (list): List of indices of matched titles.
+        no_found_title (list): List of indices of unmatched titles.
+    """
+    # Put titles at the end
+    title_ids = np.where(labels == classes.index("title"))[0]
+    order = np.concatenate([np.delete(np.arange(len(boxes)), title_ids), title_ids])
+    boxes = boxes[order]
+    confs = confs[order]
+    labels = labels[order]
+
+    # Ids
+    title_ids = np.where(labels == classes.index("title"))[0]
+    to_match = np.where(np.isin(labels, [classes.index(c) for c in to_match_labels]))[0]
+
+    # Matching
+    found_title, already_matched = [], []
+    for i in range(len(boxes)):
+        if i not in to_match:
+            continue
+        merged_box, matched_title_ids = match_with_title_v3(
+            boxes[i],
+            boxes[title_ids],
+            already_matched=already_matched,
+        )
+        if matched_title_ids is not None:
+            # print(f'Merged {classes[int(labels[i])]} at idx #{i} with title {matched_title_ids[-1]}')  # noqa
+            boxes[i] = merged_box
+            already_matched += matched_title_ids
+            found_title.append(i)
+
+    if remove_matched_titles and len(already_matched):
+        boxes = np.delete(boxes, title_ids[already_matched], axis=0)
+        confs = np.delete(confs, title_ids[already_matched], axis=0)
+        labels = np.delete(labels, title_ids[already_matched], axis=0)
+
+    return boxes, confs, labels, found_title
+
+
+def expand_boxes_v3(boxes, r_x=(1, 1), r_y=(1, 1), size_agnostic=True):
+    """
+    Expands bounding boxes by a specified ratio.
+    Expected box format is normalized [x_min, y_min, x_max, y_max].
+
+    Args:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (N, 4).
+        r_x (tuple, optional): Left, right expansion ratios. Defaults to (1, 1) (no expansion).
+        r_y (tuple, optional): Up, down expansion ratios. Defaults to (1, 1) (no expansion).
+        size_agnostic (bool, optional): Expand independently of the bbox shape. Defaults to True.
+
+    Returns:
+        numpy.ndarray: Adjusted bounding boxes clipped to the [0, 1] range.
+    """
+    old_boxes = boxes.copy()
+
+    if not size_agnostic:
+        h = boxes[:, 3] - boxes[:, 1]
+        w = boxes[:, 2] - boxes[:, 0]
+    else:
+        h, w = 1, 1
+
+    boxes[:, 0] -= w * (r_x[0] - 1)  # left
+    boxes[:, 2] += w * (r_x[1] - 1)  # right
+    boxes[:, 1] -= h * (r_y[0] - 1)  # up
+    boxes[:, 3] += h * (r_y[1] - 1)  # down
+
+    boxes = np.clip(boxes, 0, 1)
+
+    # Enforce non-overlapping boxes
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            iou = bb_iou_array(boxes[i][None], boxes[j])[0]
+            old_iou = bb_iou_array(old_boxes[i][None], old_boxes[j])[0]
+            # print(iou, old_iou)
+            if iou > 0.05 and old_iou < 0.1:
+                if boxes[i, 1] < boxes[j, 1]:  # i above j
+                    boxes[j, 1] = min(old_boxes[j, 1], boxes[i, 3])
+                    if old_iou > 0:
+                        boxes[i, 3] = max(old_boxes[i, 3], boxes[j, 1])
+                else:
+                    boxes[i, 1] = min(old_boxes[i, 1], boxes[j, 3])
+                    if old_iou > 0:
+                        boxes[j, 3] = max(old_boxes[j, 3], boxes[i, 1])
+
+    return boxes
+
+
+def get_overlaps(boxes, other_boxes, normalize="box_only"):
+    """
+    Checks if a box overlaps with any other box.
+    Boxes are expeceted in format (x0, y0, x1, y1)
+
+    Args:
+        boxes (np array [4] or [n x 4]): Boxes.
+        other_boxes (np array [m x 4]): Other boxes.
+
+    Returns:
+        np array [n x m]: Overlaps.
+    """
+    if boxes.ndim == 1:
+        boxes = boxes[None, :]
+
+    x0, y0, x1, y1 = (boxes[:, 0][:, None], boxes[:, 1][:, None], boxes[:, 2][:, None], boxes[:, 3][:, None])
+    areas = (y1 - y0) * (x1 - x0)
+
+    x0_other, y0_other, x1_other, y1_other = (
+        other_boxes[:, 0][None, :],
+        other_boxes[:, 1][None, :],
+        other_boxes[:, 2][None, :],
+        other_boxes[:, 3][None, :],
+    )
+    areas_other = (y1_other - y0_other) * (x1_other - x0_other)
+
+    # Intersection
+    inter_y0 = np.maximum(y0, y0_other)
+    inter_y1 = np.minimum(y1, y1_other)
+    inter_x0 = np.maximum(x0, x0_other)
+    inter_x1 = np.minimum(x1, x1_other)
+    inter_area = np.maximum(0, inter_y1 - inter_y0) * np.maximum(0, inter_x1 - inter_x0)
+
+    # Overlap
+    if normalize == "box_only":  # Only consider box included in other box
+        overlaps = inter_area / areas
+    elif normalize == "all":  # Consider box included in other box and other box included in box
+        overlaps = inter_area / np.minimum(areas, areas_other[:, None])
+    else:
+        raise ValueError(f"Invalid normalization: {normalize}")
+    return overlaps
+
+
+def postprocess_included(boxes, labels, confs, class_="title", classes=["table", "chart", "title", "infographic"]):
+    """
+    Post process title predictions.
+    - Remove titles that are included in other boxes
+
+    Args:
+        boxes (numpy.ndarray [N, 4]): Array of bounding boxes.
+        labels (numpy.ndarray [N]): Array of labels.
+        confs (numpy.ndarray [N]): Array of confidences.
+        class_ (str, optional): Class to postprocess. Defaults to "title".
+        classes (list, optional): Classes. Defaults to ["table", "chart", "title", "infographic"].
+
+    Returns:
+        boxes (numpy.ndarray): Array of bounding boxes.
+        labels (numpy.ndarray): Array of labels.
+        confs (numpy.ndarray): Array of confidences.
+    """
+    boxes_to_pp = boxes[labels == classes.index(class_)]
+    confs_to_pp = confs[labels == classes.index(class_)]
+
+    order = np.argsort(confs_to_pp)  # least to most confident for NMS
+    boxes_to_pp, confs_to_pp = boxes_to_pp[order], confs_to_pp[order]
+
+    if len(boxes_to_pp) == 0:
+        return boxes, labels, confs
+
+    # other_boxes = boxes[labels != classes.index("title")]
+
+    inclusion_classes = ["table", "infographic", "chart"]
+    if class_ in ["header_footer", "title"]:
+        inclusion_classes.append("paragraph")
+
+    other_boxes = boxes[np.isin(labels, [classes.index(c) for c in inclusion_classes])]
+
+    # Remove boxes included in other_boxes
+    kept_boxes, kept_confs = [], []
+    for i, b in enumerate(boxes_to_pp):
+        if len(other_boxes) > 0:
+            overlaps = get_overlaps(b, other_boxes, normalize="box_only")
+            if overlaps.max() > 0.9:
+                continue
+
+        kept_boxes.append(b)
+        kept_confs.append(confs_to_pp[i])
+
+    # Aggregate
+    kept_boxes = np.stack(kept_boxes) if len(kept_boxes) else np.empty((0, 4))
+    kept_confs = np.stack(kept_confs) if len(kept_confs) else np.empty(0)
+
+    boxes_pp = np.concatenate([boxes[labels != classes.index(class_)], kept_boxes])
+    confs_pp = np.concatenate([confs[labels != classes.index(class_)], kept_confs])
+    labels_pp = np.concatenate(
+        [labels[labels != classes.index(class_)], np.ones(len(kept_boxes)) * classes.index(class_)]
+    )
+
+    return boxes_pp, labels_pp, confs_pp
+
+
+def remove_overlapping_boxes_using_wbf(boxes, confs, labels):
+    """
+    Remove overlapping boxes using WBF
+    """
+    # Applied twice because once is not enough in some rare cases
+    for _ in range(2):
+        boxes, confs, labels = weighted_boxes_fusion(
+            boxes[:, None],
+            confs[:, None],
+            labels[:, None],
+            merge_type="biggest",
+            conf_type="max",
+            iou_thr=0.01,
+            class_agnostic=False,
+        )
+
+    return boxes, confs, labels
+
+
+def match_structured_boxes_with_title(boxes, confs, labels, classes):
+    # Reorder by y, x
+    order = np.argsort(boxes[:, 1] * 10 + boxes[:, 0])
+    boxes, confs, labels = boxes[order], confs[order], labels[order]
+
+    # Match with title
+    # Although the model should detect titles, additional post-processing helps retrieve FNs
+    found_title = []
+    boxes, confs, labels, found_title = match_boxes_with_title(
+        boxes,
+        confs,
+        labels,
+        classes,
+        to_match_labels=["chart", "table", "infographic"],
+        remove_matched_titles=True,
+    )
+
+    return boxes, confs, labels, found_title
+
+
+def expand_tables_and_charts(boxes, confs, labels, classes, found_title):
+    # This is mostly to retrieve titles, but this also helps when YOLOX boxes are too tight.
+    # Boxes with titles matched are expanded less.
+    # Expansion is different for tables and charts
+    no_found_title = [i for i in range(len(boxes)) if i not in found_title]
+    ids = np.arange(len(boxes))
+
+    if len(found_title):  # Boxes with title matched are expanded less
+        ids_ = ids[found_title][labels[found_title] == classes.index("chart")]
+        boxes[ids_] = expand_boxes_v3(
+            boxes[ids_],
+            r_x=(1.025, 1.025),
+            r_y=(1.05, 1.05),
+            size_agnostic=False,
+        )
+        ids_ = ids[found_title][labels[found_title] == classes.index("table")]
+        boxes[ids_] = expand_boxes_v3(
+            boxes[ids_],
+            r_x=(1.01, 1.01),
+            r_y=(1.05, 1.01),
+        )
+
+    ids_ = ids[no_found_title][labels[no_found_title] == classes.index("chart")]
+    boxes[ids_] = expand_boxes_v3(
+        boxes[ids_],
+        r_x=(1.05, 1.05),
+        r_y=(1.125, 1.125),
+        size_agnostic=False,
+    )
+
+    ids_ = ids[no_found_title][labels[no_found_title] == classes.index("table")]
+    boxes[ids_] = expand_boxes_v3(
+        boxes[ids_],
+        r_x=(1.02, 1.02),
+        r_y=(1.05, 1.05),
+    )
+
+    order = np.argsort(boxes[:, 1] * 10 + boxes[:, 0])
+    boxes, labels, confs = boxes[order], labels[order], confs[order]
+
+    return boxes, labels, confs
+
+
+def postprocess_included_texts(boxes, confs, labels, classes):
+    for c in ["title", "paragraph", "header_footer"]:
+        boxes, labels, confs = postprocess_included(boxes, labels, confs, c, classes)
+    return boxes, labels, confs
+
+
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
@@ -1220,7 +1625,7 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
             yolox_model_name = default_model_name
     except Exception:
         logger.warning(
-            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
+            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_model_name}'."
         )
         yolox_model_name = default_model_name
 
