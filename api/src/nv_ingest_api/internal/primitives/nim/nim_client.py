@@ -353,69 +353,52 @@ class NimClient:
                 message = e.message()
 
                 # Handle CUDA memory errors
-                if status == "StatusCode.INTERNAL" and CUDA_ERROR_REGEX.search(message):
-                    logger.warning(
-                        f"Received gRPC INTERNAL error with CUDA-related message for model '{model_name}'. "
-                        f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
-                    )
-                    if attempt == self.max_retries - 1:
-                        # No more retries left
-                        logger.error(f"Max retries exceeded for CUDA errors on model '{model_name}'.")
-                        raise e
-                    else:
+                if status == "StatusCode.INTERNAL":
+                    if CUDA_ERROR_REGEX.search(message):
+                        logger.warning(
+                            f"Received gRPC INTERNAL error with CUDA-related message for model '{model_name}'. "
+                            f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
+                        )
+                        if attempt >= self.max_retries - 1:
+                            logger.error(f"Max retries exceeded for CUDA errors on model '{model_name}'.")
+                            raise e
                         # Try to reload models before retrying
                         model_reload_succeeded = reload_models(client=self.client, client_timeout=self.timeout)
                         if not model_reload_succeeded:
                             logger.error(f"Failed to reload models for model '{model_name}'.")
+                    else:
+                        logger.warning(
+                            f"Received gRPC INTERNAL error for model '{model_name}'. "
+                            f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
+                        )
+                        if attempt >= self.max_retries - 1:
+                            logger.error(f"Max retries exceeded for INTERNAL error on model '{model_name}'.")
+                            raise e
 
-                        # Exponential backoff
-                        backoff_time = base_delay * (2**attempt)
-                        time.sleep(backoff_time)
-                        attempt += 1
-                        continue
+                    # Common retry logic for both CUDA and non-CUDA INTERNAL errors
+                    backoff_time = base_delay * (2**attempt)
+                    time.sleep(backoff_time)
+                    attempt += 1
+                    continue
 
                 # Handle errors that can occur after model reload (NOT_FOUND, model not loaded)
-                if (
-                    status == "StatusCode.NOT_FOUND"
-                    or "not loaded" in message.lower()
-                    or "no versions available" in message.lower()
-                ):
+                if status == "StatusCode.NOT_FOUND":
                     logger.warning(
                         f"Received gRPC {status} error for model '{model_name}'. "
                         f"Attempt {attempt + 1} of {self.max_retries}. Message: {message[:500]}"
                     )
-                    if attempt == self.max_retries - 1:
+                    if attempt >= self.max_retries - 1:
                         logger.error(f"Max retries exceeded for model not found errors on model '{model_name}'.")
                         raise e
-                    else:
-                        # Retry with exponential backoff WITHOUT reloading
-                        backoff_time = base_delay * (2**attempt)
-                        logger.info(
-                            f"Retrying after {backoff_time}s backoff for model not found error on model '{model_name}'."
-                        )
-                        time.sleep(backoff_time)
-                        attempt += 1
-                        continue
 
-                # Handle StatusCode.INTERNAL (without CUDA message) - retry without reload
-                # because errors can happen if the model is not loaded yet and the request is middle off running
-                if status == "StatusCode.INTERNAL":
-                    logger.warning(
-                        f"Received gRPC INTERNAL error for model '{model_name}'. "
-                        f"Attempt {attempt + 1} of {self.max_retries}. Message: {message[:500]}"
+                    # Retry with exponential backoff WITHOUT reloading
+                    backoff_time = base_delay * (2**attempt)
+                    logger.info(
+                        f"Retrying after {backoff_time}s backoff for model not found error on model '{model_name}'."
                     )
-                    if attempt == self.max_retries - 1:
-                        logger.error(f"Max retries exceeded for INTERNAL error on model '{model_name}'.")
-                        raise e
-                    else:
-                        # Retry with exponential backoff WITHOUT reloading
-                        backoff_time = base_delay * (2**attempt)
-                        logger.info(
-                            f"Retrying after {backoff_time}s backoff for INTERNAL error on model '{model_name}'."
-                        )
-                        time.sleep(backoff_time)
-                        attempt += 1
-                        continue
+                    time.sleep(backoff_time)
+                    attempt += 1
+                    continue
 
                 if status == "StatusCode.UNAVAILABLE" and "Exceeds maximum queue size".lower() in message.lower():
                     retries_429 += 1
