@@ -349,7 +349,7 @@ class NimClient:
                     return [response.as_numpy(output.name()) for output in outputs]
 
             except grpcclient.InferenceServerException as e:
-                status = e.status()
+                status = str(e.status())
                 message = e.message()
 
                 # Handle CUDA memory errors
