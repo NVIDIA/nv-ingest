@@ -114,7 +114,7 @@ class TestNimClientGrpcRetry(unittest.TestCase):
         """
         Tests that _grpc_infer fails immediately for a gRPC error that is not 'queue full'.
         """
-        non_retryable_error = InferenceServerException(msg="Model not found", status="StatusCode.NOT_FOUND")
+        non_retryable_error = InferenceServerException(msg="Invalid argument", status="StatusCode.INVALID_ARGUMENT")
 
         self.client.client.infer = MagicMock(side_effect=non_retryable_error)
 
@@ -122,13 +122,13 @@ class TestNimClientGrpcRetry(unittest.TestCase):
             test_input = np.array([1.0], dtype=np.float32)
             self.client._grpc_infer(test_input, "test_model")
 
-        self.assertEqual(context.exception.status(), "StatusCode.NOT_FOUND")
+        self.assertEqual(context.exception.status(), "StatusCode.INVALID_ARG")
 
         self.client.client.infer.assert_called_once()
         mock_sleep.assert_not_called()
 
     @patch("nv_ingest_api.internal.primitives.nim.nim_client.reload_models", return_value=True)
-    @patch("time.sleep", return_value=None)  # avoid real waiting
+    @patch("time.sleep", return_value=None)
     def test_grpc_infer_cuda_internal_retries_and_succeeds(self, mock_sleep, mock_reload_models):
         """
         _grpc_infer should retry on INTERNAL + CUDA-like message, call reload_models,
