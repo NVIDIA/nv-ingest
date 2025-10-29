@@ -47,7 +47,7 @@ class NimClient:
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
         timeout: float = 120.0,
-        max_retries: int = 5,
+        max_retries: int = 10,
         max_429_retries: int = 5,
         enable_dynamic_batching: bool = False,
         dynamic_batch_timeout: float = 0.1,  # 100 milliseconds
@@ -69,7 +69,7 @@ class NimClient:
         timeout : float, optional
             Timeout for HTTP requests in seconds (default: 120.0).
         max_retries : int, optional
-            The maximum number of retries for non-429 server-side errors (default: 5).
+            The maximum number of retries for non-429 server-side errors (default: 10).
         max_429_retries : int, optional
             The maximum number of retries specifically for 429 errors (default: 5).
 
