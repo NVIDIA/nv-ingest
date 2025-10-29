@@ -11,9 +11,10 @@ Strategy pattern for clean separation of execution concerns.
 """
 
 import atexit
-import os
 import logging
 import multiprocessing
+import os
+import sys
 import time
 from abc import ABC, abstractmethod
 
@@ -132,7 +133,10 @@ class SubprocessStrategy(ProcessExecutionStrategy):
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
 
         # Create subprocess using fork context
-        ctx = multiprocessing.get_context("fork")
+        start_method = "fork"
+        if sys.platform.lower() == "darwin":
+            start_method = "spawn"
+        ctx = multiprocessing.get_context(start_method)
         process = ctx.Process(
             target=run_pipeline_process,
             args=(
