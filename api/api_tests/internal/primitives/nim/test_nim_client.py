@@ -86,7 +86,7 @@ class TestNimClientGrpcRetry(unittest.TestCase):
         np.testing.assert_array_equal(result, test_output)
         self.assertEqual(self.client.client.infer.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)
-        mock_sleep.assert_has_calls([call(1.0), call(2.0)])
+        mock_sleep.assert_has_calls([call(4.0), call(8.0)])
 
     @patch("tritonclient.grpc.InferenceServerClient")
     @patch("time.sleep", return_value=None)
