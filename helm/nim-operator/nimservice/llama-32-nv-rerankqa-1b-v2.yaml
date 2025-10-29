@@ -1,0 +1,34 @@
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: llama-32-nv-rerankqa-1b-v2
+spec:
+  image:
+    repository:  nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
+    tag: 1.8.0
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: llama-3.2-nv-rerankqa-1b-v2
+      profile: ''
+  replicas: 1
+  nodeSelector:
+    nvidia.com/mig.config: all-1g.23gb
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  tolerations:
+    - key: "nvidia.com/mig"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
