@@ -545,6 +545,55 @@ class TestBuildAggregatedResponse:
         assert aggregated["metadata"]["trace_segments"] == []
         assert aggregated["metadata"]["annotation_segments"] == []
 
+    def test_normalizes_chunk_metadata_to_parent_context(self, sample_subjob_descriptors, sample_parent_metadata):
+        """Chunk-local metadata should be remapped to original source identifiers and absolute pages."""
+
+        chunk_record = {
+            "metadata": {
+                "source_metadata": {
+                    "source_id": "test.pdf#pages_9-16",
+                    "source_name": "test.pdf#pages_9-16",
+                },
+                "content_metadata": {
+                    "page_number": 2,
+                    "hierarchy": {
+                        "page": 2,
+                        "page_count": 8,
+                    },
+                },
+            }
+        }
+
+        subjob_results = [
+            None,
+            {"data": [chunk_record]},
+            None,
+        ]
+
+        aggregated = _build_aggregated_response(
+            "parent-id",
+            subjob_results,
+            [],
+            sample_subjob_descriptors,
+            sample_parent_metadata,
+        )
+
+        assert len(aggregated["data"]) == 1
+        normalized_record = aggregated["data"][0]
+
+        source_meta = normalized_record["metadata"]["source_metadata"]
+        assert source_meta["source_id"] == sample_parent_metadata["original_source_id"]
+        assert source_meta["source_name"] == sample_parent_metadata["original_source_name"]
+
+        content_meta = normalized_record["metadata"]["content_metadata"]
+        expected_page = sample_subjob_descriptors[1]["start_page"] - 1 + 2
+        assert content_meta["page_number"] == expected_page
+        assert content_meta["hierarchy"]["page"] == expected_page
+        assert content_meta["hierarchy"]["page_count"] == sample_parent_metadata["total_pages"]
+
+        # Ensure the original chunk payload remains untouched for debugging workflows
+        assert subjob_results[1]["data"][0]["metadata"]["source_metadata"]["source_id"].endswith("#pages_9-16")
+
 
 class TestUpdateJobStateAfterFetch:
     """Tests for updating the parent job state based on fetch mode."""
