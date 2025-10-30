@@ -60,6 +60,14 @@ class TestConfig:
     artifacts_dir: Optional[str] = None
     collection_name: Optional[str] = None
 
+    # Recall configuration
+    use_reranker: bool = False
+    reranker_only: bool = False
+    recall_top_k: int = 10
+    ground_truth_dir: Optional[str] = None
+    eval_modalities: List[str] = field(default_factory=lambda: ["multimodal"])
+    recall_dataset: Optional[str] = None
+
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
         errors = []
@@ -97,14 +105,15 @@ class TestConfig:
         return errors
 
 
-def load_config(config_file: str = "test_configs.yaml", **cli_overrides) -> TestConfig:
+def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = None, **cli_overrides) -> TestConfig:
     """
     Load test configuration from YAML with overrides.
 
-    Precedence: CLI args > Env vars > YAML active config
+    Precedence: CLI args > Env vars > YAML active config (+ recall section if recall case)
 
     Args:
         config_file: Path to YAML config file (relative to this script)
+        case: Test case name (used to determine if recall section should be merged)
         **cli_overrides: CLI argument overrides (e.g., dataset="bo767", api_version="v2")
 
     Returns:
@@ -125,10 +134,18 @@ def load_config(config_file: str = "test_configs.yaml", **cli_overrides) -> Test
         yaml_data = yaml.safe_load(f)
 
     # Start with active config from YAML
-    config_dict = yaml_data.get("active", {})
+    config_dict = yaml_data.get("active", {}).copy()
 
     if not config_dict:
         raise ValueError("Config file must have 'active' section")
+
+    # Merge recall section when running recall test cases
+    # The recall section provides additional configuration for recall evaluation
+    if case in ("recall", "e2e_recall"):
+        recall_section = yaml_data.get("recall", {})
+        if recall_section:
+            # Merge recall section (recall section overrides active section for conflicts)
+            config_dict.update(recall_section)
 
     # Handle dataset shortcuts
     if "dataset" in cli_overrides:
@@ -205,6 +222,12 @@ def _load_env_overrides() -> dict:
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
+        "USE_RERANKER": ("use_reranker", parse_bool),
+        "RERANKER_ONLY": ("reranker_only", parse_bool),
+        "RECALL_TOP_K": ("recall_top_k", parse_int),
+        "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
+        "EVAL_MODALITIES": ("eval_modalities", parse_list),
+        "RECALL_DATASET": ("recall_dataset", str),
     }
 
     overrides = {}

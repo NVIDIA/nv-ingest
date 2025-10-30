@@ -200,12 +200,33 @@ DATASET_DIR=/custom/path python run.py --case=e2e
 
 ### Available Tests
 
-| Name | Description | Status |
-|------|-------------|--------|
-| `e2e` | Dataset-agnostic E2E test | ✅ Primary (YAML config) |
-| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | ✅ Available (YAML config) |
+| Name | Description | Configuration Needed | Status |
+|------|-------------|----------------------|--------|
+| `e2e` | Dataset-agnostic E2E ingestion | `active` section only | ✅ Primary (YAML config) |
+| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | `active` section only | ✅ Available (YAML config) |
+| `recall` | Recall evaluation against existing collections | `active` + `recall` sections | ✅ Available (YAML config) |
+| `e2e_recall` | Fresh ingestion + recall evaluation | `active` + `recall` sections | ✅ Available (YAML config) |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
+
+### Configuration Synergy
+
+**For E2E-only users:**
+- Only configure `active` section
+- `collection_name` in active: auto-generates with timestamp if `null`, or use custom name
+- `recall` section is optional (not used unless running recall tests)
+
+**For Recall-only users:**
+- Configure `active` section: `hostname`, `sparse`, `gpu_search`, etc. (for evaluation)
+- Configure `recall` section: `recall_dataset` (required), `eval_modalities`, etc.
+- Set `test_name` in active to match your existing collection (collection must be `{test_name}_multimodal`)
+- `collection_name` in active is ignored (recall generates `{test_name}_multimodal`)
+
+**For E2E+Recall users:**
+- Configure `active` section: `dataset_dir`, `test_name`, extraction settings, etc.
+- Configure `recall` section: `recall_dataset` (required), `eval_modalities`, etc.
+- Collection naming: e2e_recall automatically creates `{test_name}_multimodal` collection
+- `collection_name` in active is ignored (e2e_recall forces `{test_name}_multimodal` pattern)
 
 ### Example Configurations
 
@@ -248,6 +269,150 @@ active:
   extract_infographics: true
   enable_caption: true
 ```
+
+## Recall Testing
+
+Recall testing evaluates retrieval accuracy against ground truth query sets. Two test cases are available:
+
+### Test Cases
+
+**`recall`** - Recall-only evaluation against existing collections:
+- Skips ingestion (assumes collections already exist)
+- Loads existing collections from Milvus
+- Evaluates recall for specified modalities
+- Supports reranker comparison (no reranker, with reranker, or reranker-only)
+
+**`e2e_recall`** - Fresh ingestion + recall evaluation:
+- Performs full ingestion pipeline
+- Creates modality-specific collections during ingestion
+- Evaluates recall immediately after ingestion
+- Combines ingestion metrics with recall metrics
+
+### Reranker Configuration
+
+Three modes via two boolean flags:
+
+1. **No reranker** (default): `use_reranker=false, reranker_only=false`
+   - Runs evaluation without reranker only
+
+2. **Both modes**: `use_reranker=true, reranker_only=false`
+   - Runs evaluation twice: once without reranker, once with reranker
+   - Useful for comparing reranker impact
+
+3. **Reranker only**: `use_reranker=true, reranker_only=true`
+   - Runs evaluation with reranker only
+   - Faster when you only need reranked results
+
+### Collection Naming
+
+A single multimodal collection is created for recall evaluation:
+- Pattern: `{test_name}_multimodal`
+- Example: `bo767_multimodal`
+- **All modality queries** (text, tables, charts, multimodal) query against this same collection
+- This matches the research team's approach for even comparison
+
+### Modalities
+
+Default focus is **multimodal** evaluation. Optional modalities:
+- `multimodal`: Combined text/tables/charts (recommended for most use cases)
+- `text`: Text-only evaluation
+- `tables`: Table-only evaluation
+- `charts`: Chart-only evaluation
+
+### Ground Truth Files
+
+**bo767 dataset:**
+- Ground truth files are in the repo `data/` directory:
+  - `text_query_answer_gt_page.csv`
+  - `table_queries_cleaned_235.csv`
+  - `charts_with_page_num_fixed.csv`
+- Default `ground_truth_dir: null` automatically uses `data/` directory
+- Custom path can be specified via `ground_truth_dir` config
+
+**Other datasets** (finance_bench, earnings, audio):
+- Ground truth files must be obtained separately (not in public repo)
+- Set `ground_truth_dir` to point to your ground truth directory
+- Dataset-specific evaluators are extensible (see `recall_utils.py`)
+
+### Configuration
+
+Edit the `recall` section in `test_configs.yaml`:
+
+```yaml
+recall:
+  # Reranker configuration
+  use_reranker: false
+  reranker_only: false
+
+  # Recall evaluation settings
+  recall_top_k: 10
+  ground_truth_dir: null  # null = use repo data/ directory
+  eval_modalities: ["multimodal"]  # Primary focus: multimodal
+  recall_dataset: bo767  # Required: must be explicitly set (bo767, finance_bench, earnings, audio)
+```
+
+### Usage Examples
+
+**Recall-only (existing collections):**
+```bash
+# Evaluate existing bo767 collections
+python run.py --case=recall --test-name=bo767
+
+# With reranker comparison
+python run.py --case=recall --test-name=bo767 --use-reranker
+```
+
+**E2E + Recall (fresh ingestion):**
+```bash
+# Fresh ingestion with recall evaluation
+python run.py --case=e2e_recall --dataset=/raid/jioffe/bo767
+
+# Multiple modalities (all query the same multimodal collection)
+# Edit test_configs.yaml recall section: eval_modalities: ["multimodal", "text", "tables", "charts"]
+# Note: Text/table/chart queries all run against the multimodal collection
+```
+
+**Dataset configuration:**
+- `dataset_dir` (active section): Where PDFs are located (for ingestion)
+- `test_name` (active section): Used to generate collection name `{test_name}_multimodal`
+- `recall_dataset` (recall section): **Required** - Which evaluator to use (bo767, finance_bench, earnings, audio)
+  - Set in `test_configs.yaml` recall section: `recall_dataset: bo767`
+  - Or via environment variable: `RECALL_DATASET=bo767`
+- `eval_modalities`: List of modalities to evaluate (e.g., `["multimodal"]` or `["multimodal", "text", "tables", "charts"]`)
+  - Each modality uses its respective ground truth queries
+  - All queries run against the same `{test_name}_multimodal` collection
+
+### Output
+
+Recall results are included in `results.json`:
+```json
+{
+  "recall_results": {
+    "no_reranker": {
+      "multimodal": {
+        "1": 0.554,
+        "3": 0.746,
+        "5": 0.807,
+        "10": 0.857
+      }
+    },
+    "with_reranker": {
+      "multimodal": {
+        "1": 0.601,
+        "3": 0.781,
+        "5": 0.832,
+        "10": 0.874
+      }
+    }
+  }
+}
+```
+
+Metrics are also logged via `kv_event_log()`:
+- `recall_{modality}_@{k}_no_reranker`
+- `recall_{modality}_@{k}_with_reranker`
+- `recall_eval_time_s_no_reranker`
+- `recall_eval_time_s_with_reranker`
 
 ## Sweeping Parameters
 

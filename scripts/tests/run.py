@@ -12,7 +12,7 @@ from cases.utils import last_commit, now_timestr
 from config import load_config
 
 
-CASES = ["e2e", "e2e_with_llm_summary"]
+CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 
 
 def run_cmd(cmd: list[str]) -> int:
@@ -170,6 +170,7 @@ def main(
     # Load configuration from YAML with CLI overrides
     try:
         config = load_config(
+            case=case,
             dataset=dataset,
             test_name=test_name,
             api_version=api_version,
