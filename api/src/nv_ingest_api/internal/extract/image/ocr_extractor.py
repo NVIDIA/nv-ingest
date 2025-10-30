@@ -294,7 +294,8 @@ def extract_text_data_from_image_internal(
             if group_df.empty:
                 continue
             # Sort text blocks by their original position for correct reading order
-            sorted_group = group_df.dropna(subset=["_x0"]).dropna(subset=["_y0"]).sort_values(by=["_y0", "_x0"])
+            loc_mask = group_df[["_y0", "_x0"]].notna().all(axis=1)
+            sorted_group = group_df.loc[loc_mask].sort_values(by=["_y0", "_x0"], ascending=[True, True])
             page_text = " ".join(sorted_group["metadata"].apply(lambda meta: meta["content"]).tolist())
 
             if page_text.strip():
@@ -304,8 +305,12 @@ def extract_text_data_from_image_internal(
         df_text = df_to_process[df_to_process["document_type"] == "text"].drop_duplicates(
             subset=["_page_number"], keep="first"
         )
+
         for page_num, page_text in new_text.items():
-            df_text.at[df_text["_page_number"] == page_num, "metadata"]["content"] = page_text
+            page_num_mask = df_text["_page_number"] == page_num
+            df_text.loc[page_num_mask, "metadata"] = df_text.loc[page_num_mask, "metadata"].apply(
+                lambda meta: {**meta, "content": page_text}
+            )
 
         df_non_text = df_to_process[df_to_process["document_type"] != "text"]
         df_to_process = pd.concat([df_text, df_non_text])
