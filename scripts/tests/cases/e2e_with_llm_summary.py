@@ -28,47 +28,50 @@ except Exception:
 from utils import default_collection_name, get_repo_root
 
 
-def main() -> int:
-    # Dataset-agnostic: no hardcoded paths, configurable via environment
-    data_dir = os.getenv("DATASET_DIR")
-    if not data_dir:
-        print("ERROR: DATASET_DIR environment variable is required")
-        print("Example: DATASET_DIR=/datasets/bo20 python e2e.py")
+def main(config=None, log_path: str = "test_results") -> int:
+    """
+    E2E test with LLM summarization via UDF.
+
+    Args:
+        config: TestConfig object with all settings
+        log_path: Path for logging output
+
+    Returns:
+        Exit code (0 = success)
+    """
+    # Backward compatibility: if no config provided, error
+    if config is None:
+        print("ERROR: No configuration provided")
+        print("This test case requires a config object from the test runner")
         return 2
 
-    if not os.path.isdir(data_dir):
-        print(f"ERROR: Dataset directory does not exist: {data_dir}")
-        print("Please check the DATASET_DIR path and ensure it's accessible")
-        return 2
-
-    spill_dir = os.getenv("SPILL_DIR", "/tmp/spill")
+    # Extract configuration from config object
+    data_dir = config.dataset_dir
+    spill_dir = config.spill_dir
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = os.getenv("COLLECTION_NAME", default_collection_name())
-    hostname = os.getenv("HOSTNAME", "localhost")
-    sparse = os.getenv("SPARSE", "true").lower() == "true"
-    gpu_search = os.getenv("GPU_SEARCH", "false").lower() == "true"
+    collection_name = config.collection_name or default_collection_name()
+    hostname = config.hostname
+    sparse = config.sparse
+    gpu_search = config.gpu_search
 
-    # Extraction configuration (core testing variables)
-    extract_text = os.getenv("EXTRACT_TEXT", "true").lower() == "true"
-    extract_tables = os.getenv("EXTRACT_TABLES", "true").lower() == "true"
-    extract_charts = os.getenv("EXTRACT_CHARTS", "true").lower() == "true"
-    extract_images = os.getenv("EXTRACT_IMAGES", "false").lower() == "true"
-    extract_infographics = os.getenv("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
-    text_depth = os.getenv("TEXT_DEPTH", "page")
-    table_output_format = os.getenv("TABLE_OUTPUT_FORMAT", "markdown")
+    # Extraction configuration
+    extract_text = config.extract_text
+    extract_tables = config.extract_tables
+    extract_charts = config.extract_charts
+    extract_images = config.extract_images
+    extract_infographics = config.extract_infographics
+    text_depth = config.text_depth
+    table_output_format = config.table_output_format
 
-    # Optional pipeline steps (for special testing scenarios)
-    enable_caption = os.getenv("ENABLE_CAPTION", "false").lower() == "true"
-    enable_split = os.getenv("ENABLE_SPLIT", "false").lower() == "true"
-
-    # Logging configuration
-    log_path = os.getenv("LOG_PATH", "test_results")
+    # Optional pipeline steps
+    enable_caption = config.enable_caption
+    enable_split = config.enable_split
 
     # UDF and LLM Summaries
     udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
     print(f"Path to User-Defined Function: {str(udf_path)}")
-    llm_model = os.getenv("LLM_SUMMARIZATION_MODEL", "nvdev/nvidia/llama-3.1-nemotron-70b-instruct")
+    llm_model = config.llm_summarization_model
 
     model_name, dense_dim = embed_info()
 
@@ -149,7 +152,7 @@ def main() -> int:
     kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
 
     # Document-level analysis
-    if os.getenv("DOC_ANALYSIS", "false").lower() == "true":
+    if os.getenv("DOC_ANALYSIS", "false").lower() == "true":  # DOC_ANALYSIS set by run.py
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
@@ -187,7 +190,7 @@ def main() -> int:
 
     # Summarize
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
-    test_name = os.getenv("TEST_NAME", dataset_name)
+    test_name = config.test_name or dataset_name
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
