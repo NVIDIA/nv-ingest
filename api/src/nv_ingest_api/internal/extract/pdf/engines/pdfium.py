@@ -172,7 +172,7 @@ def _extract_page_element_images(
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
 
-    for label in ["table", "chart", "infographic", "paragraph", "title", "header_footer"]:
+    for label in ["table", "chart", "infographic", "title", "paragraph", "header_footer"]:
         if not annotation_dict:
             continue
 
@@ -402,7 +402,7 @@ def pdfium_extractor(
             f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
-    text_extraction_method = extractor_config.get("text_extraction_method", "ocr")  # FIXME
+    text_extraction_method = extractor_config.get("extract_method", "pdfium")
     extract_images_method = extractor_config.get("extract_images_method", "group")
     extract_images_params = extractor_config.get("extract_images_params", {})
 
@@ -462,8 +462,8 @@ def pdfium_extractor(
     if text_depth != TextTypeEnum.PAGE:
         text_depth = TextTypeEnum.DOCUMENT
 
-    run_page_elements = (extract_tables or extract_charts or extract_infographics) or (
-        extract_text and text_extraction_method == "ocr"
+    run_page_elements = (
+        extract_tables or extract_charts or extract_infographics or (extract_text and text_extraction_method == "ocr")
     )
 
     extracted_data = []
@@ -501,7 +501,6 @@ def pdfium_extractor(
                     extracted_data.append(text_meta)
                 else:
                     accumulated_text.append(page_text)
-                raise  # FIXME
 
             # Image extraction
             if extract_images:

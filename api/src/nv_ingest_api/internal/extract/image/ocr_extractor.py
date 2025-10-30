@@ -15,7 +15,7 @@ from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
-from nv_ingest_api.internal.schemas.extract.extract_text_schema import TextExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_ocr_schema import OCRExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
 
@@ -27,6 +27,8 @@ PADDLE_MIN_HEIGHT = 32
 
 def _filter_text_images(
     base64_images: List[str],
+    min_width: int = PADDLE_MIN_WIDTH,
+    min_height: int = PADDLE_MIN_HEIGHT,
 ) -> Tuple[List[str], List[int], List[Tuple[str, Optional[Any], Optional[Any]]]]:
     """
     Filters base64-encoded images based on minimum size requirements.
@@ -41,22 +43,17 @@ def _filter_text_images(
     Tuple[List[str], List[int], List[Tuple[str, Optional[Any], Optional[Any]]]]
         - valid_images: List of images that meet the size requirements.
         - valid_indices: Original indices of valid images.
-        - results: Initialized results list, with invalid images marked as (img, None, None).
     """
-    results: List[Tuple[str, Optional[Any], Optional[Any]]] = [("", None, None)] * len(base64_images)
     valid_images: List[str] = []
     valid_indices: List[int] = []
 
     for i, img in enumerate(base64_images):
         array = base64_to_numpy(img)
         height, width = array.shape[0], array.shape[1]
-        if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
+        if width >= min_width and height >= min_height:
             valid_images.append(img)
             valid_indices.append(i)
-        else:
-            # Mark image as skipped if it does not meet size requirements.
-            results[i] = (img, None, None)
-    return valid_images, valid_indices, results
+    return valid_images, valid_indices
 
 
 def _update_text_metadata(
@@ -91,14 +88,17 @@ def _update_text_metadata(
     """
     logger.debug(f"Running text extraction using protocol {ocr_client.protocol}")
 
-    valid_images, valid_indices, results = _filter_text_images(base64_images)
+    if ocr_model_name == "paddle":
+        valid_images, valid_indices = _filter_text_images(base64_images)
+    else:
+        valid_images, valid_indices = _filter_text_images(base64_images, min_width=1, min_height=1)
     data_ocr = {"base64_images": valid_images}
 
     # worker_pool_size is not used in current implementation.
     _ = worker_pool_size
 
     infer_kwargs = dict(
-        stage_name="text_extraction",
+        stage_name="ocr_extraction",
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
@@ -126,13 +126,10 @@ def _update_text_metadata(
     if len(ocr_results) != len(valid_images):
         raise ValueError(f"Expected {len(valid_images)} ocr results, got {len(ocr_results)}")
 
+    results = [(None, None, None)] * len(base64_images)
     for idx, ocr_res in enumerate(ocr_results):
         original_index = valid_indices[idx]
-        results[original_index] = (
-            base64_images[original_index],
-            ocr_res[0],
-            ocr_res[1],
-        )
+        results[original_index] = ocr_res
 
     return results
 
@@ -203,7 +200,7 @@ def _meets_text_criteria(row: pd.Series) -> bool:
 def extract_text_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
-    extraction_config: TextExtractorSchema,
+    extraction_config: OCRExtractorSchema,
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
@@ -243,14 +240,16 @@ def extract_text_data_from_image_internal(
     try:
         # Identify rows that meet the text criteria.
         mask = df_extraction_ledger.apply(_meets_text_criteria, axis=1)
-        valid_indices = df_extraction_ledger[mask].index.tolist()
+        df_to_process = df_extraction_ledger[mask].copy()
+        df_unprocessed = df_extraction_ledger[~mask].copy()
 
+        valid_indices = df_to_process.index.tolist()
         # If no rows meet the criteria, return early.
         if not valid_indices:
             return df_extraction_ledger, {"trace_info": execution_trace_log}
 
         # Extract base64 images from valid rows.
-        base64_images = [df_extraction_ledger.at[idx, "metadata"]["content"] for idx in valid_indices]
+        base64_images = [row["metadata"]["content"] for _, row in df_to_process.iterrows()]
 
         # Call bulk update to extract text data.
         ocr_client = _create_ocr_client(
@@ -268,14 +267,53 @@ def extract_text_data_from_image_internal(
             trace_info=execution_trace_log,
         )
 
-        # Write the extracted results back into the DataFrame.
         for result_idx, df_idx in enumerate(valid_indices):
-            # Unpack result: (base64_image, ocr_bounding_boxes, ocr_text_predictions)
-            _, _, text_predictions = bulk_results[result_idx]
-            text_content = " ".join(text_predictions) if text_predictions else None
-            df_extraction_ledger.at[df_idx, "metadata"]["content"] = text_content
+            # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
+            bboxes, texts, _ = bulk_results[result_idx]
+            if not texts:
+                continue
+            combined_data = list(zip(bboxes, texts))
+            try:
+                # Sort by reading order (y_min, then x_min)
+                combined_data.sort(key=lambda item: (min(p[1] for p in item[0]), min(p[0] for p in item[0])))
+            except (ValueError, IndexError):
+                logger.warning("Could not sort OCR results due to malformed bounding box.")
+            df_to_process.loc[df_idx, "_x0"] = min(point[0] for item in combined_data for point in item[0])
+            df_to_process.loc[df_idx, "_y0"] = min(point[1] for item in combined_data for point in item[0])
+            df_to_process.loc[df_idx, "metadata"]["content"] = " ".join([item[1] for item in combined_data])
 
-        return df_extraction_ledger, {"trace_info": execution_trace_log}
+        df_to_process.loc[:, "_page_number"] = df_to_process["metadata"].apply(
+            lambda meta: meta["content_metadata"]["page_number"]
+        )
+
+        # Group by page number to aggregate all text blocks on each page
+        grouped = df_to_process.groupby("_page_number")
+
+        new_text = {}
+        for page_num, group_df in grouped:
+            if group_df.empty:
+                continue
+            # Sort text blocks by their original position for correct reading order
+            sorted_group = group_df.dropna(subset=["_x0"]).dropna(subset=["_y0"]).sort_values(by=["_y0", "_x0"])
+            page_text = " ".join(sorted_group["metadata"].apply(lambda meta: meta["content"]).tolist())
+
+            if page_text.strip():
+                # Use the metadata from the first block on the page
+                new_text[page_num] = page_text
+
+        df_text = df_to_process[df_to_process["document_type"] == "text"].drop_duplicates(
+            subset=["_page_number"], keep="first"
+        )
+        for page_num, page_text in new_text.items():
+            df_text.at[df_text["_page_number"] == page_num, "metadata"]["content"] = page_text
+
+        df_non_text = df_to_process[df_to_process["document_type"] != "text"]
+        df_to_process = pd.concat([df_text, df_non_text])
+
+        df_to_process = df_to_process.drop(["_page_number", "_x0", "_y0"], axis=1)
+        df_final = pd.concat([df_unprocessed, df_to_process], ignore_index=True)
+
+        return df_final, {"trace_info": execution_trace_log}
 
     except Exception:
         err_msg = "Error occurred while extracting text data."

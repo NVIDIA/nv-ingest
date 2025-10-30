@@ -18,6 +18,7 @@ from nv_ingest_client.primitives.tasks.audio_extraction import AudioExtractionTa
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
+from nv_ingest_client.primitives.tasks.ocr_extraction import OCRExtractionTask
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 
@@ -199,6 +200,8 @@ class JobSpec:
             self._tasks.append(ChartExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
+        if isinstance(task, ExtractTask) and (task._extract_method == "ocr"):
+            self._tasks.append(OCRExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_method == "audio"):
             extract_audio_params = task._extract_audio_params or {}
             self._tasks.append(AudioExtractionTask(**extract_audio_params))

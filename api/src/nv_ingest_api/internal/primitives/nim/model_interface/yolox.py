@@ -39,16 +39,16 @@ YOLOX_PAGE_V3_NUM_CLASSES = 6
 YOLOX_PAGE_V3_FINAL_SCORE = {
     "table": 0.1,
     "chart": 0.01,
-    "infographic": 0.01,
     "title": 0.1,
+    "infographic": 0.01,
     "paragraph": 0.1,
     "header_footer": 0.1,
 }
 YOLOX_PAGE_V3_CLASS_LABELS = [
     "table",
     "chart",
-    "infographic",
     "title",
+    "infographic",
     "paragraph",
     "header_footer",
 ]
@@ -415,13 +415,15 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        # Table/chart expansion is "business logic" specific to nv-ingest
-        # annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
-        # annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
-        annotation_dicts = [
-            postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
-            for annotation_dict in annotation_dicts
-        ]
+        if annotation_dicts and (set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()):
+            annotation_dicts = [
+                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
+                for annotation_dict in annotation_dicts
+            ]
+        else:
+            # Table/chart expansion is "business logic" specific to nv-ingest
+            annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+            annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
 
         inference_results = []
 
@@ -704,7 +706,9 @@ def postprocess_page_elements_v3(annotation_dict, labels=None):
     label_idxs = np.concatenate(label_idxs)
 
     bboxes, confidences, label_idxs = remove_overlapping_boxes_using_wbf(bboxes, confidences, label_idxs)
-    bboxes, confidences, label_idxs, found_title = match_structured_boxes_with_title(bboxes, confidences, label_idxs, labels)
+    bboxes, confidences, label_idxs, found_title = match_structured_boxes_with_title(
+        bboxes, confidences, label_idxs, labels
+    )
     bboxes, confidences, label_idxs = expand_tables_and_charts(bboxes, confidences, label_idxs, labels, found_title)
     bboxes, confidences, label_idxs = postprocess_included_texts(bboxes, confidences, label_idxs, labels)
 
@@ -1270,9 +1274,7 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def match_with_title_v3(
-    bbox, title_bboxes, match_dist=0.1, delta=1.5, already_matched=[]
-):
+def match_with_title_v3(bbox, title_bboxes, match_dist=0.1, delta=1.5, already_matched=[]):
     """
     Matches a bounding box with a title bounding box based on IoU or proximity.
 
@@ -1308,9 +1310,7 @@ def match_with_title_v3(
     # print(dists)
     matches = None  # noqa
     if np.min(dists) <= match_dist:
-        matches = np.where(
-            dists <= min(match_dist, np.min(dists) * delta)
-        )[0]
+        matches = np.where(dists <= min(match_dist, np.min(dists) * delta))[0]
 
     if matches is not None:
         new_bbox = bbox

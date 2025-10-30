@@ -7,10 +7,10 @@ import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
-from nv_ingest_api.internal.extract.image.text_extractor import extract_text_data_from_image_internal
+from nv_ingest_api.internal.extract.image.ocr_extractor import extract_text_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable, set_trace_timestamps_with_parent_context
-from nv_ingest_api.internal.schemas.extract.extract_text_schema import TextExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_ocr_schema import OCRExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 from typing import Optional
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @ray.remote
-class TextExtractorStage(RayActorStage):
+class OCRExtractorStage(RayActorStage):
     """
     A Ray actor stage that extracts text data from image content.
 
@@ -30,11 +30,11 @@ class TextExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted text DataFrame.
     """
 
-    def __init__(self, config: TextExtractorSchema, stage_name: Optional[str] = None) -> None:
+    def __init__(self, config: OCRExtractorSchema, stage_name: Optional[str] = None) -> None:
         super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         try:
             self.validated_config = config
-            self._logger.info("TextExtractorStage configuration validated successfully.")
+            self._logger.info("OCRExtractorStage configuration validated successfully.")
         except Exception as e:
             self._logger.exception(f"Error validating Text extractor config: {e}")
             raise
@@ -42,13 +42,15 @@ class TextExtractorStage(RayActorStage):
     @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
-    @filter_by_task(required_tasks=["text_data_extract"])
+    @filter_by_task(required_tasks=["ocr_data_extract"])
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         # Extract DataFrame payload
         df_ledger = control_message.payload()
+        if df_ledger.empty:
+            return control_message
 
         # Remove the "text_data_extract" task from the message
-        task_config = remove_task_by_type(control_message, "text_data_extract")
+        task_config = remove_task_by_type(control_message, "ocr_data_extract")
 
         execution_trace_log = {}
         new_df, extraction_info = extract_text_data_from_image_internal(
@@ -59,11 +61,11 @@ class TextExtractorStage(RayActorStage):
         )
 
         control_message.payload(new_df)
-        control_message.set_metadata("text_extraction_info", extraction_info)
+        control_message.set_metadata("ocr_extraction_info", extraction_info)
 
         do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
         if do_trace_tagging and execution_trace_log:
-            parent_name = self.stage_name if self.stage_name else "text_extractor"
+            parent_name = self.stage_name if self.stage_name else "ocr_extractor"
             set_trace_timestamps_with_parent_context(control_message, execution_trace_log, parent_name, logger)
 
         return control_message

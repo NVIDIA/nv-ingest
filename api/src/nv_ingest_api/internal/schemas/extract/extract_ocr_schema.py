@@ -13,7 +13,7 @@ from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
 logger = logging.getLogger(__name__)
 
 
-class TextExtractorConfigSchema(LowercaseProtocolMixin):
+class OCRExtractorConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for text extraction service endpoints and options.
 
@@ -103,7 +103,7 @@ class TextExtractorConfigSchema(LowercaseProtocolMixin):
     model_config = ConfigDict(extra="forbid")
 
 
-class TextExtractorSchema(BaseModel):
+class OCRExtractorSchema(BaseModel):
     """
     Configuration schema for text extraction processing settings.
 
@@ -118,7 +118,7 @@ class TextExtractorSchema(BaseModel):
     raise_on_failure : bool, default=False
         A flag indicating whether to raise an exception if a failure occurs during text extraction.
 
-    stage_config : Optional[TextExtractorConfigSchema], default=None
+    stage_config : Optional[OCRExtractorConfigSchema], default=None
         Configuration for the text extraction stage, including yolox and ocr service endpoints.
     """
 
@@ -126,7 +126,7 @@ class TextExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    endpoint_config: Optional[TextExtractorConfigSchema] = None
+    endpoint_config: Optional[OCRExtractorConfigSchema] = None
 
     @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):

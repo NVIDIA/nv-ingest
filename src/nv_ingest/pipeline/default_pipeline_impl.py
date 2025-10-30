@@ -192,10 +192,10 @@ stages:
         strategy: "static"
         value: 1
 
-  - name: "text_extractor"
+  - name: "ocr_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.text_extractor:TextExtractorStage"
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor:OCRExtractorStage"
     config:
       endpoint_config:
         ocr_endpoints: [
@@ -482,9 +482,9 @@ edges:
     to: "chart_extractor"
     queue_size: 32
   - from: "chart_extractor"
-    to: "text_extractor"
+    to: "ocr_extractor"
     queue_size: 32
-  - from: "text_extractor"
+  - from: "ocr_extractor"
     to: "image_filter"
     queue_size: 32
 
