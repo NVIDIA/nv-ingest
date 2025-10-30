@@ -229,6 +229,8 @@ milvus:
       repository: "milvusdb/etcd"
       tag: "3.5.22-r1"
     replicaCount: 1
+    extraVolumes: []
+    extraVolumeMounts: []
     persistence:
       storageClass: null
   minio:
@@ -439,10 +441,7 @@ zipkin:
       cpu: 100m
       memory: 2.5Gi
 
-## @section Ingress parameters
-## @param ingress.enabled Enables ingress.
-## @param ingress.className Specify class name for Ingress.
-## @param ingress.annotations Specify additional annotations for ingress.
+## @section Ingress parameters      # You can override the storage class from values.yaml using Helm templating:
 ## @param ingress.hosts[].host Specify name of host.
 ## @param ingress.hosts[].paths[].path Specify ingress path.
 ## @param ingress.hosts[].paths[].pathType Specify path type.
@@ -569,3 +568,60 @@ nemo:
 
 ## @param containerArgs [array] Additional arguments to pass to the container
 containerArgs: []
+
+## @section Nim Operator parameters
+## @param nimCache.pvc.storageClass Specifies the storage class for the PVCs
+nimOperator:
+  ## @section Nim Operator NimCache Configuration
+  ## @param nimOperator.nimCache.pvc.storageClass [string] Storage class to use for all NimCache PVCs. Overrides per-model storageClass if set.
+  nimCache:
+    pvc:
+      create: true
+      # If specified, sets the storageClass for all NIMCache PVCS created by the Helm chart.
+      storageClass: "pdx02-cdot03-ainfs01-nfsv3"
+      size: "25Gi"
+      volumeAccessMode: ReadWriteMany
+
+  ## @section Nim Operator NimService Configuration
+  ## @param nimOperator.nimService.enabled [bool] Whether to deploy NimServices as part of operator
+  ## @param nimOperator.nimService.namespaces [list] List of Kubernetes namespaces where NimServices should be created (defaults to Helm namespace if empty)
+  ## @param nimOperator.nimService.resources [object] Override resources for NimServices, if desired
+  nimService:
+    namespaces: []
+    resources: {}
+
+  # Define each NIM that is used by the nv-ingest service and its possible configurations
+  page-elements:
+    enabled: true
+    image:
+      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
+      tag: 1.5.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api-secret
+    storage:
+      # Defaults to inherit from nimOperator.nimCache.pvc.storageClass, size, and volumeAccessMode
+      pvc:
+        create: true
+        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
+        size: "25Gi"
+        volumeAccessMode: "ReadWriteMany"
+    resources: {}
+
+  graphic-elements:
+    enabled: true
+    image:
+      repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
+      tag: 1.5.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api-secret
+    storage:
+      pvc:
+        create: true
+        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
+        size: "25Gi"
+        volumeAccessMode: "ReadWriteMany"
+    resources: {}
