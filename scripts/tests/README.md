@@ -1,204 +1,342 @@
 # nv-ingest Integration Testing Framework
 
-A configurable, dataset-agnostic testing framework for end-to-end validation of nv-ingest pipelines. This framework is designed to be modular, transparent, and easy to extend for different datasets and test scenarios.
-
-## ✨ **Recent Improvements**
-- **Dataset-agnostic testing** - One `e2e` case works with any dataset via `DATASET_DIR`
-- **Simplified infrastructure** - Default attach mode, optional `--managed` flag
-- **Document analysis** - Per-document element breakdowns with `--doc-analysis`
-- **Smart artifacts** - Dataset-named directories (e.g., `dc20_20240908_2139/`)
-- **Essential config only** - Removed infrastructure noise, focus on test scenarios
+A configurable, dataset-agnostic testing framework for end-to-end validation of nv-ingest pipelines. This framework uses structured YAML configuration for type safety, validation, and parameter management.
 
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Access to test datasets (default: `/datasets`) NOTE: Future versions 
+- Docker and Docker Compose running
 - Python environment with nv-ingest-client
+- Access to test datasets
 
 ### Run Your First Test
+
 ```bash
 # 1. Navigate to the tests directory
 cd scripts/tests
 
-# 2. Create your configuration file
-cp env.example .env
+# 2. Edit the configuration
+vim test_configs.yaml  # Update dataset_dir to point to your data
 
-# 3. Update dataset path in .env (required)
-# Edit DATASET_DIR=/path/to/your/dataset
+# 3. Run the test (assumes services are already running)
+python run.py --case=e2e
 
-# 4. Run the test (from scripts/tests directory)
-python run.py                    # Uses default e2e case with attach mode
+# Or override settings via CLI
+python run.py --case=e2e --dataset=/path/to/data --api-version=v2
 ```
 
-**Important**: All test commands should be run from the `scripts/tests/` directory. The framework expects to find configuration files and test cases relative to this location.
+**Important**: All test commands should be run from the `scripts/tests/` directory.
 
 ## Configuration System
 
-### Environment Variables (`.env` file)
+### YAML Configuration (`test_configs.yaml`)
 
-The framework is fully configurable via environment variables. All parameters can be set in your `.env` file:
+The framework uses a structured YAML file for all test configuration. Configuration is organized into logical sections:
 
-#### Required Configuration
-```bash
-# Dataset path - MUST be set for each test
-DATASET_DIR=/datasets/dc20
+#### Active Configuration
+
+The `active` section contains your current test settings. Edit these values directly for your test runs:
+
+```yaml
+active:
+  # Dataset
+  dataset_dir: /path/to/your/dataset
+  test_name: null  # Auto-generated if null
+  
+  # API Configuration
+  api_version: v1  # v1 or v2
+  pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
+  
+  # Infrastructure
+  hostname: localhost
+  readiness_timeout: 600
+  profiles: [retrieval, table-structure]
+  
+  # Runtime
+  sparse: true
+  gpu_search: false
+  embedding_model: auto
+  
+  # Extraction
+  extract_text: true
+  extract_tables: true
+  extract_charts: true
+  extract_images: false
+  extract_infographics: true
+  text_depth: page
+  table_output_format: markdown
+  
+  # Pipeline (optional steps)
+  enable_caption: false
+  enable_split: false
+  split_chunk_size: 1024
+  split_chunk_overlap: 150
+  
+  # Storage
+  spill_dir: /tmp/spill
+  artifacts_dir: null
+  collection_name: null
 ```
 
-#### Test Configuration
-```bash
-# Test identification
-TEST_NAME=dc20                    # Affects collection naming
-COLLECTION_NAME=                  # Override auto-generated name
+#### Dataset Shortcuts
 
-# Infrastructure
-HOSTNAME=localhost                # Service hostname
-PROFILES=retrieval,table-structure # Docker compose profiles
-READINESS_TIMEOUT=600            # Service startup timeout (seconds)
+Define common dataset paths for quick access:
+
+```yaml
+datasets:
+  bo20: /path/to/bo20
+  bo767: /path/to/bo767
+  single: data/multimodal_test.pdf
 ```
 
-#### Extraction Parameters (Fully Configurable)
+Usage:
 ```bash
-# Content extraction toggles
-EXTRACT_TEXT=true                 # Extract text content
-EXTRACT_TABLES=true              # Extract table structures
-EXTRACT_CHARTS=true              # Extract chart/graph content
-EXTRACT_IMAGES=false             # Extract image content
-EXTRACT_INFOGRAPHICS=true        # Extract infographic content
-
-# Extraction behavior
-TEXT_DEPTH=page                  # Text extraction depth (page/document)
-TABLE_OUTPUT_FORMAT=markdown     # Table format (markdown/html)
+python run.py --case=e2e --dataset=bo767  # Uses /path/to/bo767
 ```
 
-#### Runtime Configuration
+### Configuration Precedence
+
+Settings are applied in order of priority:
+
+**CLI arguments > Environment variables > YAML active config**
+
+Example:
 ```bash
-# Vector database settings
-SPARSE=true                      # Enable sparse embeddings
-GPU_SEARCH=false                 # Use GPU for vector search
+# YAML has api_version: v1
+# Override via environment variable
+API_VERSION=v2 python run.py --case=e2e
 
-# Directories
-SPILL_DIR=/tmp/spill            # Temporary processing directory
-ARTIFACTS_DIR=                   # Test artifacts output (auto-generated if empty)
-LOG_PATH=                        # Log output path (managed by run.py)
+# Override via CLI (highest priority)
+python run.py --case=e2e --api-version=v2
+```
 
-# Model configuration
-EMBEDDING_NIM_MODEL_NAME=        # Override embedding model (auto-detected)
+### Configuration Options Reference
+
+#### Core Options
+- `dataset_dir` (string, required): Path to dataset directory
+- `test_name` (string): Test identifier (auto-generated if null)
+- `api_version` (string): API version - `v1` or `v2`
+- `pdf_split_page_count` (integer): PDF splitting page count (V2 only, 1-128)
+
+#### Extraction Options
+- `extract_text`, `extract_tables`, `extract_charts`, `extract_images`, `extract_infographics` (boolean): Content extraction toggles
+- `text_depth` (string): Text extraction granularity - `page`, `document`, `block`, `line`, etc.
+- `table_output_format` (string): Table output format - `markdown`, `html`, `latex`, `pseudo_markdown`, `simple`
+
+#### Pipeline Options
+- `enable_caption` (boolean): Enable image captioning
+- `enable_split` (boolean): Enable text chunking
+- `split_chunk_size` (integer): Chunk size for text splitting
+- `split_chunk_overlap` (integer): Overlap for text splitting
+
+#### Infrastructure Options
+- `hostname` (string): Service hostname
+- `readiness_timeout` (integer): Docker startup timeout in seconds
+- `profiles` (list): Docker compose profiles
+
+#### Runtime Options
+- `sparse` (boolean): Use sparse embeddings
+- `gpu_search` (boolean): Use GPU for search
+- `embedding_model` (string): Embedding model name (`auto` for auto-detection)
+- `llm_summarization_model` (string): LLM model for summarization (used by `e2e_with_llm_summary`)
+
+#### Storage Options
+- `spill_dir` (string): Temporary processing directory
+- `artifacts_dir` (string): Test output directory (auto-generated if null)
+- `collection_name` (string): Milvus collection name (auto-generated if null)
+
+### Valid Configuration Values
+
+**text_depth**: `block`, `body`, `document`, `header`, `line`, `nearby_block`, `other`, `page`, `span`
+
+**table_output_format**: `html`, `image`, `latex`, `markdown`, `pseudo_markdown`, `simple`
+
+**api_version**: `v1`, `v2`
+
+Configuration is validated on load with helpful error messages.
+
+## Running Tests
+
+### Basic Usage
+
+```bash
+# Run with default YAML configuration
+python run.py --case=e2e
+
+# With document-level analysis
+python run.py --case=e2e --doc-analysis
+
+# With managed infrastructure (starts/stops Docker)
+python run.py --case=e2e --managed
+```
+
+### Using CLI Overrides
+
+```bash
+# Override dataset
+python run.py --case=e2e --dataset=/path/to/data
+
+# Override API version
+python run.py --case=e2e --api-version=v2
+
+# Override readiness timeout
+python run.py --case=e2e --readiness-timeout=300
+
+# Combine multiple overrides
+python run.py --case=e2e --dataset=/data/pdfs --api-version=v2 --doc-analysis
+```
+
+### Using Environment Variables
+
+```bash
+# Override via environment (useful for CI/CD)
+API_VERSION=v2 EXTRACT_TABLES=false python run.py --case=e2e
+
+# Temporary changes without editing YAML
+DATASET_DIR=/custom/path python run.py --case=e2e
 ```
 
 ## Test Scenarios
 
-### Current Tests
+### Available Tests
 
-| Name | Description | Validates | Dataset | Status |
-|------|-------------|-----------|---------|--------|
-| e2e | Dataset-Agnostic E2E | Extract → Embed → VDB Upload → Retrieval | Any via DATASET_DIR | ✅ Primary |
-| dc20_e2e | Legacy DC20 E2E | Extract → Embed → VDB Upload → Retrieval | `/datasets/dc20` | ✅ Backwards Compatible |
+| Name | Description | Status |
+|------|-------------|--------|
+| `e2e` | Dataset-agnostic E2E test | ✅ Primary (YAML config) |
+| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | ✅ Available (YAML config) |
 
-### Example Usage
+**Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
-#### Basic Usage (Any Dataset)
-```bash
-# Test dc20 dataset
-DATASET_DIR=/raid/jioffe/dc20 python run.py
+### Example Configurations
 
-# Test dc767 dataset  
-DATASET_DIR=/raid/jioffe/dc767 python run.py
-
-# With document analysis breakdown
-python run.py --doc-analysis
-
-# With managed infrastructure (starts/stops Docker)
-python run.py --managed
+**V2 API with PDF Splitting:**
+```yaml
+# Edit test_configs.yaml active section:
+active:
+  api_version: v2
+  pdf_split_page_count: 32
+  extract_text: true
+  extract_tables: true
+  extract_charts: true
 ```
-
-#### Example Test Configurations
 
 **Text-Only Processing:**
-```bash
-# In .env file:
-DATASET_DIR=/datasets/audio
-EXTRACT_TABLES=false
-EXTRACT_CHARTS=false
-EXTRACT_IMAGES=false
-EXTRACT_INFOGRAPHICS=false
+```yaml
+active:
+  extract_text: true
+  extract_tables: false
+  extract_charts: false
+  extract_images: false
+  extract_infographics: false
 ```
 
-**Full Multimodal:**
-```bash
-# In .env file:
-DATASET_DIR=/datasets/multiformat
-EXTRACT_IMAGES=true
-ENABLE_CAPTION=true
+**RAG with Text Chunking:**
+```yaml
+active:
+  enable_split: true
+  split_chunk_size: 1024
+  split_chunk_overlap: 150
 ```
 
-**Chunking for RAG:**
-```bash
-# In .env file:
-ENABLE_SPLIT=true
+**Multimodal with Image Extraction:**
+```yaml
+active:
+  extract_text: true
+  extract_tables: true
+  extract_charts: true
+  extract_images: true
+  extract_infographics: true
+  enable_caption: true
 ```
 
-## Architecture
+## Sweeping Parameters
 
-### Framework Components
+To sweep through different parameter values:
 
-1. **`run.py`** - Main test runner
-   - Manages Docker services (managed mode)
-   - Handles artifacts collection
-   - Sets up logging paths
-   - Provides infrastructure abstraction
+1. **Edit** `test_configs.yaml` - Update values in the `active` section
+2. **Run** the test: `python run.py --case=e2e`
+3. **Analyze** results in `artifacts/<test_name>_<timestamp>/`
+4. **Repeat** steps 1-3 for next parameter combination
 
-2. **`cases/dc20_e2e.py`** - Test implementation
-   - Fully configurable via environment variables
-   - Transparent configuration logging
-   - Comprehensive metrics collection
-   - Modular design for future expansion
-
-3. **`utils.py`** - Shared utilities
-   - `embed_info()` - Embedding model detection
-   - `milvus_chunks()` - Vector database statistics
-   - `segment_results()` - Result categorization
-   - `kv_event_log()` - Structured logging
-
-### Execution Modes
-
-#### Attach Mode (Default)
+Example sweep workflow:
 ```bash
-# From scripts/tests/ directory:
-python run.py
+# Test 1: Baseline V1
+vim test_configs.yaml  # Set: api_version=v1, extract_tables=true
+python run.py --case=e2e --dataset=/data/pdfs
+
+# Test 2: V2 with 32-page splitting
+vim test_configs.yaml  # Set: api_version=v2, pdf_split_page_count=32
+python run.py --case=e2e --dataset=/data/pdfs
+
+# Test 3: V2 with 8-page splitting
+vim test_configs.yaml  # Set: pdf_split_page_count=8
+python run.py --case=e2e --dataset=/data/pdfs
+
+# Test 4: Tables disabled
+vim test_configs.yaml  # Set: extract_tables=false
+python run.py --case=e2e --dataset=/data/pdfs
 ```
-- Assumes services are already running (typical development)
+
+**Note**: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.
+
+## Execution Modes
+
+### Attach Mode (Default)
+
+```bash
+python run.py --case=e2e
+```
+
+- Assumes services are already running (typical development workflow)
 - Runs test case only
 - Faster for iterative testing
+- Use when Docker services are already up (e.g., via `nv-start`)
 
-#### Managed Mode
+### Managed Mode
+
 ```bash
-# From scripts/tests/ directory:
-python run.py --managed
+python run.py --case=e2e --managed
 ```
+
 - Starts Docker services automatically
-- Waits for service readiness
+- Waits for service readiness (configurable timeout)
 - Runs test case
 - Collects artifacts
-- Optionally tears down services (`--keep-up` to preserve)
+- Optionally tears down services (use `--keep-up` to preserve)
 
-### Artifacts and Logging
+Additional managed mode options:
+```bash
+# Skip Docker image rebuild (faster startup)
+python run.py --case=e2e --managed --no-build
 
-All test outputs are collected in dataset-named timestamped directories:
+# Keep services running after test
+python run.py --case=e2e --managed --keep-up
 ```
-scripts/tests/artifacts/dc20_20240908_2139/
-├── summary.json          # Test metadata and results
-├── stdout.txt           # Complete test output
-└── e2e.json             # Structured metrics and events
+
+## Artifacts and Logging
+
+All test outputs are collected in timestamped directories:
+
 ```
+scripts/tests/artifacts/<test_name>_<timestamp>_UTC/
+├── results.json         # Consolidated test metadata and results
+├── stdout.txt          # Complete test output
+└── e2e.json            # Structured metrics and events
+```
+
+### Results Structure
+
+`results.json` contains:
+- **Runner metadata**: case name, timestamp, git commit, infrastructure mode
+- **Test configuration**: API version, extraction settings, dataset info
+- **Test results**: chunks created, timing, performance metrics
 
 ### Document Analysis
 
-The framework includes powerful per-document analysis capabilities:
+Enable per-document element breakdown:
 
 ```bash
-# Enable document-level breakdown
-python run.py --doc-analysis
+python run.py --case=e2e --doc-analysis
 ```
 
 **Sample Output:**
@@ -208,113 +346,182 @@ Document Analysis:
   document2.pdf: 14 elements (text: 9, tables: 0, charts: 4, images: 0, infographics: 1)
 ```
 
-This feature provides:
-- **Element counts** by type for each document
-- **Page-level granularity** for capacity planning
-- **Performance insights** for optimization
+This provides:
+- Element counts by type for each document
+- Useful for understanding dataset characteristics
+- Helps identify processing bottlenecks
+- Validates extraction completeness
 
-### Programmatic Access
+## Architecture
 
-For automated tools and CI/CD integration:
+### Framework Components
 
-```python
-from scripts.interact import load_test_artifacts
-from nv_ingest_client.util.document_analysis import analyze_document_chunks
+**1. Configuration Layer**
+- `test_configs.yaml` - Structured configuration file
+  - Active test configuration (edit directly)
+  - Dataset shortcuts for quick access
+- `config.py` - Configuration management
+  - YAML loading and parsing
+  - Type-safe config dataclass
+  - Validation logic with helpful errors
+  - Environment variable override support
 
-# Load and validate test results
-artifacts = load_test_artifacts('artifacts/dc20_20240908_2139')
+**2. Test Runner**
+- `run.py` - Main orchestration
+  - Configuration loading with precedence chain
+  - Docker service management (managed mode)
+  - Test case execution with config injection
+  - Artifact collection and consolidation
 
-# Check test success
-success = artifacts.summary.return_code == 0
+**3. Test Cases**
+- `cases/e2e.py` - Primary E2E test (✅ YAML-based)
+  - Accepts config object directly
+  - Type-safe parameter access
+  - Full pipeline validation (extract → embed → VDB → retrieval)
+  - Transparent configuration logging
+- `cases/e2e_with_llm_summary.py` - E2E with LLM (✅ YAML-based)
+  - Adds UDF-based LLM summarization
+  - Same config-based architecture as e2e.py
 
-# Document analysis programmatically
-results, failures = ingestor.ingest(return_failures=True)
-breakdown = analyze_document_chunks(results)
+**4. Shared Utilities**
+- `interact.py` - Common testing utilities
+  - `embed_info()` - Embedding model detection
+  - `milvus_chunks()` - Vector database statistics
+  - `segment_results()` - Result categorization by type
+  - `kv_event_log()` - Structured logging
+  - `pdf_page_count()` - Dataset page counting
 
-# Access page-level data for optimization
-for doc_name, pages in breakdown.items():
-    total_counts = pages["total"]
-    page_count = len(pages) - 1  # Subtract "total" key
-    print(f"{doc_name}: {sum(total_counts.values())} elements, {page_count} pages")
+### Configuration Flow
+
+```
+test_configs.yaml → load_config() → TestConfig object → test case
+                         ↑                    ↑
+                    Env overrides        CLI overrides
 ```
 
-Models: `TestSummary`, `DC20E2EResults`, `TestArtifacts` in `scripts.interact`
+All test cases receive a validated `TestConfig` object with typed fields, eliminating string parsing errors.
 
 ## Development Guide
 
 ### Adding New Test Cases
 
 1. **Create test script** in `cases/` directory
-2 **Add transparent logging**:
+
+2. **Accept config parameter**:
    ```python
-   print(f"=== Configuration ===")
-   print(f"Dataset: {dataset_dir}")
-   # ... log all parameters
+   def main(config, log_path: str = "test_results") -> int:
+       """
+       Test case entry point.
+       
+       Args:
+           config: TestConfig object with all settings
+           log_path: Path for structured logging
+       
+       Returns:
+           Exit code (0 = success)
+       """
+       # Access config directly (type-safe)
+       data_dir = config.dataset_dir
+       api_version = config.api_version
+       extract_text = config.extract_text
+       # ...
    ```
-3. **Use structured logging**:
+
+3. **Add transparent logging**:
    ```python
-   kv_event_log("metric_name", value, log_path)
+   print("=== Test Configuration ===")
+   print(f"Dataset: {config.dataset_dir}")
+   print(f"API: {config.api_version}")
+   print(f"Extract: text={config.extract_text}, tables={config.extract_tables}")
+   print("=" * 60)
+   ```
+
+4. **Use structured logging**:
+   ```python
+   from interact import kv_event_log
+   
+   kv_event_log("ingestion_time_s", elapsed_time, log_path)
+   kv_event_log("text_chunks", num_text_chunks, log_path)
+   ```
+
+5. **Register case** in `run.py`:
+   ```python
+   CASES = ["e2e", "e2e_with_llm_summary", "your_new_case"]
    ```
 
 ### Extending Configuration
 
 To add new configurable parameters:
 
-1. **Add to `env.example`** with documentation
-2. **Add to configuration logging**
-3. **Update this README** with parameter description
+1. **Add to `TestConfig` dataclass** in `config.py`:
+   ```python
+   @dataclass
+   class TestConfig:
+       # ... existing fields
+       new_param: bool = False  # Add with type and default
+   ```
+
+2. **Add to YAML** `active` section:
+   ```yaml
+   active:
+     # ... existing config
+     new_param: false  # Match Python default
+   ```
+
+3. **Add environment variable mapping** in `config.py` (if needed):
+   ```python
+   env_mapping = {
+       # ... existing mappings
+       "NEW_PARAM": ("new_param", parse_bool),
+   }
+   ```
+
+4. **Add validation** (if needed) in `TestConfig.validate()`:
+   ```python
+   def validate(self) -> List[str]:
+       errors = []
+       # ... existing validation
+       if self.new_param and self.some_other_field is None:
+           errors.append("new_param requires some_other_field to be set")
+       return errors
+   ```
+
+5. **Update this README** with parameter description
 
 ### Testing Different Datasets
 
-The framework is dataset-agnostic. To test with new datasets:
+The framework is dataset-agnostic and supports multiple approaches:
 
-1. **Set `DATASET_DIR`** to your dataset path
-2. **Adjust extraction parameters** for dataset type
-3. **Update `TEST_NAME`** for clear identification
-4. **Run test** with your configuration
-
-## Future Roadmap
-
-### Modular Architecture Vision
-
-The framework is designed to support a modular testing architecture:
-
-```bash
-# Future modular scripts (chainable, dataset-agnostic):
-ingest_documents.py    # Ingestion only
-index_documents.py     # Vector database upload only  
-retrieve_documents.py  # Retrieval testing only
-
-# Composed in test scripts:
-your_test.sh          # Chains scripts with parameters
+**Option 1: Edit YAML directly**
+```yaml
+active:
+  dataset_dir: /path/to/your/dataset
 ```
 
-### Planned Expansions
+**Option 2: Use CLI override**
+```bash
+python run.py --case=e2e --dataset=/path/to/your/dataset
+```
 
-#### Additional Test Cases
-- **Multiformat Testing** - Mixed content extraction validation
-- **Audio Pipeline** - Audio-specific ingestion and retrieval
-- **Earnings Analysis** - Domain-specific document processing
-- **Foundation RAG** - Large-scale RAG workflow validation
-- **Scale Testing** - Performance validation with larger datasets (dc767, dc10k)
+**Option 3: Add dataset shortcut**
+```yaml
+datasets:
+  my_dataset: /path/to/your/dataset
+```
+Then use: `python run.py --case=e2e --dataset=my_dataset`
 
-#### Dataset Management
-- **NGC Dataset Integration** - Portable dataset collections through NVIDIA GPU Cloud
-- **Dataset Validation** - Pre-test dataset integrity checks
+**Option 4: Environment variable**
+```bash
+DATASET_DIR=/path/to/your/dataset python run.py --case=e2e
+```
 
-#### Infrastructure Enhancements
-- **Multi-GPU Testing** - Distributed processing validation
-- **Performance Benchmarking** - Automated performance regression detection
-- **CI/CD Integration** - Automated testing in development pipelines
+Choose the approach that fits your workflow. For repeated testing, add a dataset shortcut. For one-off tests, use CLI override.
 
-## Contributing
+## Additional Resources
 
-When adding new features or test cases:
+- **Configuration**: See `config.py` for complete field list and validation logic
+- **Test utilities**: See `interact.py` for shared helper functions  
+- **Docker setup**: See project root README for service management commands
+- **API documentation**: See `docs/` for API version differences
 
-1. **Maintain configurability** - All parameters should be environment-driven
-2. **Add transparent logging** - Log all configuration for debugging
-3. **Update documentation** - Keep this README current
-4. **Follow naming conventions** - Use descriptive, consistent naming
-5. **Test thoroughly** - Validate with different configurations
-
-The framework prioritizes simplicity, configurability, and extensibility to support the evolving needs of nv-ingest testing.
+The framework prioritizes clarity, type safety, and validation to support reliable testing of nv-ingest pipelines.
