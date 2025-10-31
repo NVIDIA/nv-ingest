@@ -18,6 +18,8 @@ from tqdm import tqdm
 import os
 import glob
 
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -189,6 +191,9 @@ else:
                     "segment_time": segment_time,
                     "c": "copy",
                     "map": "0",
+                    # use 10% of the available cores, but at least 2 threads
+                    # each core has 2 threads
+                    "threads": int(max(SystemResourceProbe().get_effective_cores() * 0.2, 2)),
                 }
                 if suffix == ".mp4":
                     output_kwargs.update(
@@ -206,8 +211,8 @@ else:
                 )
                 logging.debug(f"Split {input_path} into {num_splits} chunks")
                 self.path_metadata[input_path] = probe
-                print(capture_output)
-                print(capture_error)
+                logging.info(capture_output)
+                logging.error(f"{original_input_path} -  {capture_error}")
             except ffmpeg.Error as e:
                 logging.error(f"FFmpeg error for file {original_input_path}: {e.stderr.decode()}")
                 return []
@@ -331,6 +336,14 @@ else:
                 video_audio_separate=self.video_audio_separate,
                 audio_only=self.audio_only,
             )
+            # get durations for files in self.files_completed
+            durations = []
+            for file in self.files_completed:
+                _, _, duration = self.interface.probe_media(
+                    Path(file), split_interval=self.split_interval, split_type=self.split_type
+                )
+                durations.append(duration)
+            self.files_completed = list(zip(self.files_completed, durations))
 
         def __next__(self):
             payload = self.queue.get()

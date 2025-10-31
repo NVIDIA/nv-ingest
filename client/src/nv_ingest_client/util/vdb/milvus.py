@@ -906,6 +906,7 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     indexed_rows = 0
     for index_name in index_names:
         indexed_rows = 0
+        already_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
         while indexed_rows < num_elements:
             pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
             for i in range(20):
@@ -914,7 +915,7 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
                 logger.info(
                     f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
                 )
-                if new_indexed_rows == num_elements:
+                if new_indexed_rows == already_indexed_rows + num_elements:
                     indexed_rows = new_indexed_rows
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong

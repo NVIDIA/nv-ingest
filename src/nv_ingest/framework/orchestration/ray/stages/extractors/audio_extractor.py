@@ -69,12 +69,7 @@ class AudioExtractorStage(RayActorStage):
         # Remove the "audio_data_extract" task from the message to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "extract")
         self._logger.error("Extracted task config: %s", sanitize_for_logging(task_config))
-        # content = base64.b64decode(df_ledger.content[0])
-        # content = base64.b64encode(content).decode("utf-8")
-        # content = base64.b64decode(content).decode("utf-8")
-        # content = read_file_as_base64(content)
-        # df_ledger.loc[0, "content"] = content
-        # df_ledger["metadata"]["content"] = content
+
         # Perform audio text extraction.
         new_df, extraction_info = extract_text_from_audio_internal(
             df_extraction_ledger=df_ledger,

@@ -15,6 +15,7 @@ import uuid
 import random
 =======
 from pathlib import Path
+import fsspec
 
 from fastapi import APIRouter, Request, Response
 from fastapi import HTTPException
@@ -1000,10 +1001,10 @@ async def submit_job_v2(
             document_type = document_types[0]
             upload_path = f"./{Path(original_source_id).name}"
             # dump the payload to a file, just came from client
-            with open(upload_path, "wb") as f:
+            with fsspec.open(upload_path, "wb") as f:
                 f.write(base64.b64decode(payloads[0]))
             dataloader = DataLoader(
-                path=upload_path, output_dir="./audio_chunks/", audio_only=True, split_interval=100000000
+                path=upload_path, output_dir="./audio_chunks/", audio_only=True, split_interval=50000000
             )
             document_type = DocumentTypeEnum.MP3
 
@@ -1011,13 +1012,15 @@ async def submit_job_v2(
             for task in job_spec_dict["tasks"]:
                 if "task_properties" in task and "document_type" in task["task_properties"]:
                     task["task_properties"]["document_type"] = document_type
-            # logger.info(f"DATA:  dataloader.files_completed: {dataloader.files_completed}")
-            for idx, file_path in enumerate(dataloader.files_completed):
+            end = 0
+            for idx, (file_path, duration) in enumerate(dataloader.files_completed):
+                start = end
+                end = int(start + duration)
                 chunk = {
                     "bytes": file_path.encode("utf-8"),
                     "chunk_index": idx,
-                    "start": 1,
-                    "end": -1,
+                    "start": start,
+                    "end": end,
                 }
 
                 subjob_id, subjob_wrapper = _prepare_chunk_submission(
