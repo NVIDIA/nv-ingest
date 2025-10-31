@@ -34,6 +34,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_V3_CLASS_LABELS
 from nv_ingest_api.util.metadata.aggregators import (
     construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
@@ -46,8 +47,9 @@ from nv_ingest_api.util.nim import create_inference_client
 from nv_ingest_api.util.pdf.pdfium import (
     extract_nested_simple_images_from_pdfium_page,
     extract_image_like_objects_from_pdfium_page,
+    # is_scanned_page,
+    pdfium_pages_to_numpy,
 )
-from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
@@ -172,7 +174,12 @@ def _extract_page_element_images(
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
 
-    for label in ["table", "chart", "infographic", "title", "paragraph", "header_footer"]:
+    if annotation_dict and (set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dict.keys()):
+        labels = YOLOX_PAGE_V3_CLASS_LABELS
+    else:
+        labels = ["table", "chart", "infographics"]
+
+    for label in labels:
         if not annotation_dict:
             continue
 
@@ -263,6 +270,7 @@ def _extract_page_elements(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
+    extract_text: bool,
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
@@ -339,6 +347,8 @@ def _extract_page_elements(
             if (not extract_charts) and (page_element.type_string == "chart"):
                 continue
             if (not extract_infographics) and (page_element.type_string == "infographic"):
+                continue
+            if (not extract_text) and (page_element.type_string in {"title", "paragraph", "header_footer"}):
                 continue
 
             # Set content format for tables
@@ -536,7 +546,7 @@ def pdfium_extractor(
                 extracted_data.append(image_meta)
 
             # If we want tables or charts, rasterize the page and store it
-            if run_page_elements:
+            if run_page_elements:  # or is_scanned_page(page):
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
@@ -553,6 +563,7 @@ def pdfium_extractor(
                         page_count,
                         source_metadata,
                         base_unified_metadata,
+                        extract_text,
                         extract_tables,
                         extract_charts,
                         extract_infographics,
@@ -568,6 +579,7 @@ def pdfium_extractor(
             page.close()
 
         # After page loop, if we still have leftover pages_for_extractions, submit one last job
+        # if (run_page_elements or is_scanned_page(page)) and pages_for_extractions:
         if run_page_elements and pages_for_extractions:
             future = executor.submit(
                 _extract_page_elements,
@@ -575,6 +587,7 @@ def pdfium_extractor(
                 page_count,
                 source_metadata,
                 base_unified_metadata,
+                extract_text,
                 extract_tables,
                 extract_charts,
                 extract_infographics,

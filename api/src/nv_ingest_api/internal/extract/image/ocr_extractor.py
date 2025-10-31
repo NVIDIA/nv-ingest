@@ -282,6 +282,8 @@ def extract_text_data_from_image_internal(
             df_to_process.loc[df_idx, "_y0"] = min(point[1] for item in combined_data for point in item[0])
             df_to_process.loc[df_idx, "metadata"]["content"] = " ".join([item[1] for item in combined_data])
 
+        df_to_process = df_to_process.drop(["_x0", "_y0"], axis=1)
+
         df_to_process.loc[:, "_page_number"] = df_to_process["metadata"].apply(
             lambda meta: meta["content_metadata"]["page_number"]
         )
@@ -294,12 +296,14 @@ def extract_text_data_from_image_internal(
             if group_df.empty:
                 continue
             # Sort text blocks by their original position for correct reading order
+            group_df.loc[:, "_x0"] = group_df["metadata"].apply(lambda meta: meta["text_metadata"]["text_location"][0])
+            group_df.loc[:, "_y0"] = group_df["metadata"].apply(lambda meta: meta["text_metadata"]["text_location"][1])
+
             loc_mask = group_df[["_y0", "_x0"]].notna().all(axis=1)
             sorted_group = group_df.loc[loc_mask].sort_values(by=["_y0", "_x0"], ascending=[True, True])
             page_text = " ".join(sorted_group["metadata"].apply(lambda meta: meta["content"]).tolist())
 
             if page_text.strip():
-                # Use the metadata from the first block on the page
                 new_text[page_num] = page_text
 
         df_text = df_to_process[df_to_process["document_type"] == "text"].drop_duplicates(
@@ -315,7 +319,9 @@ def extract_text_data_from_image_internal(
         df_non_text = df_to_process[df_to_process["document_type"] != "text"]
         df_to_process = pd.concat([df_text, df_non_text])
 
-        df_to_process = df_to_process.drop(["_page_number", "_x0", "_y0"], axis=1)
+        for col in {"_y0", "_x0", "_page_number"}:
+            if col in df_to_process:
+                df_to_process = df_to_process.drop(col, axis=1)
         df_final = pd.concat([df_unprocessed, df_to_process], ignore_index=True)
 
         return df_final, {"trace_info": execution_trace_log}

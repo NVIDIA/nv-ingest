@@ -381,12 +381,10 @@ def _construct_text_image_primitive(
         "subtype": cropped_image.type_string,
     }
 
-    image_metadata = {
-        "image_type": DocumentTypeEnum.PNG,  # Assuming PNG from our processing
-        "image_location": cropped_image.bbox,
-        "image_location_max_dimensions": (cropped_image.max_width, cropped_image.max_height),
-        "width": cropped_image.bbox[2] - cropped_image.bbox[0],
-        "height": cropped_image.bbox[3] - cropped_image.bbox[1],
+    text_metadata = {
+        "text_type": "page",
+        "text_location": cropped_image.bbox,
+        "text_location_max_dimensions": (cropped_image.max_width, cropped_image.max_height),
     }
 
     unified_metadata = base_unified_metadata.copy()
@@ -395,7 +393,7 @@ def _construct_text_image_primitive(
             "content": cropped_image.image,  # The base64 image of the text block
             "source_metadata": source_metadata,
             "content_metadata": content_metadata,
-            "image_metadata": image_metadata,
+            "text_metadata": text_metadata,
         }
     )
 
