@@ -5,6 +5,7 @@
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 import queue
@@ -24,6 +25,12 @@ from nv_ingest_api.util.string_processing import generate_url
 
 logger = logging.getLogger(__name__)
 
+# Regex pattern to detect CUDA-related errors in Triton gRPC responses
+CUDA_ERROR_REGEX = re.compile(
+    r"(illegal memory access|invalid argument|failed to (copy|load|perform) .*: .*|TritonModelException: failed to copy data: .*)",  # noqa: E501
+    re.IGNORECASE,
+)
+
 # A simple structure to hold a request's data and its Future for the result
 InferenceRequest = namedtuple("InferenceRequest", ["data", "future", "model_name", "dims", "kwargs"])
 
@@ -40,7 +47,7 @@ class NimClient:
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
         timeout: float = 120.0,
-        max_retries: int = 5,
+        max_retries: int = 10,
         max_429_retries: int = 5,
         enable_dynamic_batching: bool = False,
         dynamic_batch_timeout: float = 0.1,  # 100 milliseconds
@@ -60,11 +67,11 @@ class NimClient:
         auth_token : str, optional
             Authorization token for HTTP requests (default: None).
         timeout : float, optional
-            Timeout for HTTP requests in seconds (default: 30.0).
+            Timeout for HTTP requests in seconds (default: 120.0).
         max_retries : int, optional
-            The maximum number of retries for non-429 server-side errors (default: 5).
+            The maximum number of retries for non-429 server-side errors (default: 10).
         max_429_retries : int, optional
-            The maximum number of retries specifically for 429 errors (default: 10).
+            The maximum number of retries specifically for 429 errors (default: 5).
 
         Raises
         ------
@@ -323,7 +330,7 @@ class NimClient:
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
 
-        base_delay = 0.5
+        base_delay = 2.0
         attempt = 0
         retries_429 = 0
         max_grpc_retries = self.max_429_retries
@@ -342,8 +349,58 @@ class NimClient:
                     return [response.as_numpy(output.name()) for output in outputs]
 
             except grpcclient.InferenceServerException as e:
-                status = e.status()
-                if status == "StatusCode.UNAVAILABLE" and "Exceeds maximum queue size".lower() in e.message().lower():
+                status = str(e.status())
+                message = e.message()
+
+                # Handle CUDA memory errors
+                if status == "StatusCode.INTERNAL":
+                    if CUDA_ERROR_REGEX.search(message):
+                        logger.warning(
+                            f"Received gRPC INTERNAL error with CUDA-related message for model '{model_name}'. "
+                            f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
+                        )
+                        if attempt >= self.max_retries - 1:
+                            logger.error(f"Max retries exceeded for CUDA errors on model '{model_name}'.")
+                            raise e
+                        # Try to reload models before retrying
+                        model_reload_succeeded = reload_models(client=self.client, client_timeout=self.timeout)
+                        if not model_reload_succeeded:
+                            logger.error(f"Failed to reload models for model '{model_name}'.")
+                    else:
+                        logger.warning(
+                            f"Received gRPC INTERNAL error for model '{model_name}'. "
+                            f"Attempt {attempt + 1} of {self.max_retries}. Message (truncated): {message[:500]}"
+                        )
+                        if attempt >= self.max_retries - 1:
+                            logger.error(f"Max retries exceeded for INTERNAL error on model '{model_name}'.")
+                            raise e
+
+                    # Common retry logic for both CUDA and non-CUDA INTERNAL errors
+                    backoff_time = base_delay * (2**attempt)
+                    time.sleep(backoff_time)
+                    attempt += 1
+                    continue
+
+                # Handle errors that can occur after model reload (NOT_FOUND, model not loaded)
+                if status == "StatusCode.NOT_FOUND":
+                    logger.warning(
+                        f"Received gRPC {status} error for model '{model_name}'. "
+                        f"Attempt {attempt + 1} of {self.max_retries}. Message: {message[:500]}"
+                    )
+                    if attempt >= self.max_retries - 1:
+                        logger.error(f"Max retries exceeded for model not found errors on model '{model_name}'.")
+                        raise e
+
+                    # Retry with exponential backoff WITHOUT reloading
+                    backoff_time = base_delay * (2**attempt)
+                    logger.info(
+                        f"Retrying after {backoff_time}s backoff for model not found error on model '{model_name}'."
+                    )
+                    time.sleep(backoff_time)
+                    attempt += 1
+                    continue
+
+                if status == "StatusCode.UNAVAILABLE" and "Exceeds maximum queue size".lower() in message.lower():
                     retries_429 += 1
                     logger.warning(
                         f"Received gRPC {status} for model '{model_name}'. "
@@ -357,13 +414,12 @@ class NimClient:
                     time.sleep(backoff_time)
                     continue
 
-                else:
-                    # For other server-side errors (e.g., INVALID_ARGUMENT, NOT_FOUND),
-                    # retrying will not help. We should fail fast.
-                    logger.error(
-                        f"Received non-retryable gRPC error from Triton for model '{model_name}': {e.message()}"
-                    )
-                    raise
+                # For other server-side errors (e.g., INVALID_ARGUMENT, etc.),
+                # fail fast as retrying will not help
+                logger.error(
+                    f"Received non-retryable gRPC error {status} from Triton for model '{model_name}': {message}"
+                )
+                raise
 
             except Exception as e:
                 # Catch any other unexpected exceptions (e.g., network issues not caught by Triton client)
@@ -681,3 +737,57 @@ class NimClientManager:
 def get_nim_client_manager(*args, **kwargs) -> NimClientManager:
     """Returns the singleton instance of the NimClientManager."""
     return NimClientManager(*args, **kwargs)
+
+
+def reload_models(client: grpcclient.InferenceServerClient, exclude: list[str] = [], client_timeout: int = 120) -> bool:
+    """
+    Reloads all models in the Triton server except for the models in the exclude list.
+
+    Parameters
+    ----------
+    client : grpcclient.InferenceServerClient
+        The gRPC client connected to the Triton server.
+    exclude : list[str], optional
+        A list of model names to exclude from reloading.
+    client_timeout : int, optional
+        Timeout for client operations in seconds (default: 120).
+
+    Returns
+    -------
+    bool
+        True if all models were successfully reloaded, False otherwise.
+    """
+    model_index = client.get_model_repository_index()
+    exclude = set(exclude)
+    names = [m.name for m in model_index.models if m.name not in exclude]
+
+    logger.info(f"Reloading {len(names)} model(s): {', '.join(names) if names else '(none)'}")
+
+    # 1) Unload
+    for name in names:
+        try:
+            client.unload_model(name)
+        except grpcclient.InferenceServerException as e:
+            msg = e.message()
+            if "explicit model load / unload" in msg.lower():
+                status = e.status()
+                logger.warning(
+                    f"[SKIP Model Reload] Explicit model control disabled; cannot unload '{name}'. Status: {status}."
+                )
+                return False
+            logger.error(f"[ERROR] Failed to unload '{name}': {msg}")
+            return False
+
+    # 2) Load
+    for name in names:
+        client.load_model(name)
+
+    # 3) Readiness check
+    for name in names:
+        ready = client.is_model_ready(model_name=name, client_timeout=client_timeout)
+        if not ready:
+            logger.warning(f"[Warning] Triton Not ready: {name}")
+            return False
+
+    logger.info("✅ Reload of models complete.")
+    return True

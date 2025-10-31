@@ -116,6 +116,7 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_CUDA_MEMORY_POOL_MB=${OCR_CUDA_MEMORY_POOL_MB:-8192}
       - NIM_TRITON_MAX_BATCH_SIZE=${OCR_BATCH_SIZE:-32}
+      - NIM_TRITON_ENABLE_MODEL_CONTROL=1
     deploy:
       resources:
         reservations:
