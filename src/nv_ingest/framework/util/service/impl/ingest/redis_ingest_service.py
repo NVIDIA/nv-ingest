@@ -501,21 +501,21 @@ class RedisIngestService(IngestServiceMeta):
         metadata_key = f"parent:{parent_job_id}:metadata"
 
         try:
-            # Check if this is a parent job
+            # Check if this is a parent job (check metadata_key since non-split PDFs may not have parent_key)
             exists = await self._run_bounded_to_thread(
                 self._ingest_client.get_client().exists,
-                parent_key,
+                metadata_key,  # Check metadata instead of parent_key for non-split PDF support
             )
 
             if not exists:
                 return None
 
-            # Get subjob IDs
+            # Get subjob IDs (may be empty for non-split PDFs)
             subjob_ids_bytes = await self._run_bounded_to_thread(
                 self._ingest_client.get_client().smembers,
                 parent_key,
             )
-            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes}
+            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes} if subjob_ids_bytes else set()
 
             # Get metadata
             metadata_dict = await self._run_bounded_to_thread(
