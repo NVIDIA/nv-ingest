@@ -18,7 +18,7 @@
 
 import concurrent.futures
 import logging
-from typing import List, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -47,7 +47,7 @@ from nv_ingest_api.util.nim import create_inference_client
 from nv_ingest_api.util.pdf.pdfium import (
     extract_nested_simple_images_from_pdfium_page,
     extract_image_like_objects_from_pdfium_page,
-    # is_scanned_page,
+    is_scanned_page,
     pdfium_pages_to_numpy,
 )
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
@@ -270,10 +270,10 @@ def _extract_page_elements(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
-    extract_text: bool,
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
+    page_to_text_flag_map: Dict[int, bool],
     table_output_format: str,
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
@@ -340,15 +340,19 @@ def _extract_page_elements(
 
         # Process each extracted element based on extraction flags
         for page_idx, page_element in page_element_results:
+            process_text_for_this_page = page_to_text_flag_map.get(page_idx, False)
+            element_type = page_element.type_string
+
             page_reading_index = page_idx + 1
+
             # Skip elements that shouldn't be extracted based on flags
-            if (not extract_tables) and (page_element.type_string == "table"):
+            if (not extract_tables) and (element_type == "table"):
                 continue
-            if (not extract_charts) and (page_element.type_string == "chart"):
+            if (not extract_charts) and (element_type == "chart"):
                 continue
-            if (not extract_infographics) and (page_element.type_string == "infographic"):
+            if (not extract_infographics) and (element_type == "infographic"):
                 continue
-            if (not extract_text) and (page_element.type_string in {"title", "paragraph", "header_footer"}):
+            if (not process_text_for_this_page) and (element_type in {"title", "paragraph", "header_footer"}):
                 continue
 
             # Set content format for tables
@@ -472,15 +476,12 @@ def pdfium_extractor(
     if text_depth != TextTypeEnum.PAGE:
         text_depth = TextTypeEnum.DOCUMENT
 
-    run_page_elements = (
-        extract_tables or extract_charts or extract_infographics or (extract_text and text_extraction_method == "ocr")
-    )
-
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for table/chart extraction
+    # Prepare for table/chart/infographic/text OCR extraction
     pages_for_extractions = []  # Accumulate tuples of (page_idx, np_image)
+    page_to_text_flag_map = {}  # Maps page_idx -> bool (True if OCR text extraction is needed)
     futures = []  # To track asynchronous table/chart extraction tasks
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
@@ -490,10 +491,13 @@ def pdfium_extractor(
             page_width, page_height = page.get_size()
             page_reading_index = page_idx + 1
 
+            is_scanned = is_scanned_page(page)
+            extraction_needed_for_text = extract_text and (is_scanned or text_extraction_method == "ocr")
+            extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
+            page_to_text_flag_map[page_idx] = extraction_needed_for_text
+
             # Text extraction
-            if extract_text and text_extraction_method == "ocr":
-                pass
-            elif extract_text:
+            if extract_text and not extraction_needed_for_text:
                 page_text = _extract_page_text(page)
                 if text_depth == TextTypeEnum.PAGE:
                     text_meta = construct_text_metadata(
@@ -545,8 +549,8 @@ def pdfium_extractor(
                 )
                 extracted_data.append(image_meta)
 
-            # If we want tables or charts, rasterize the page and store it
-            if run_page_elements:  # or is_scanned_page(page):
+            # If we want OCR extraction, rasterize the page and store it
+            if extraction_needed_for_text or extraction_needed_for_structured:
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
@@ -563,14 +567,14 @@ def pdfium_extractor(
                         page_count,
                         source_metadata,
                         base_unified_metadata,
-                        extract_text,
-                        extract_tables,
-                        extract_charts,
-                        extract_infographics,
-                        table_output_format,
-                        pdfium_config.yolox_endpoints,
-                        pdfium_config.yolox_infer_protocol,
-                        pdfium_config.auth_token,
+                        extract_tables=extract_tables,
+                        extract_charts=extract_charts,
+                        extract_infographics=extract_infographics,
+                        page_to_text_flag_map=page_to_text_flag_map,
+                        table_output_format=table_output_format,
+                        yolox_endpoints=pdfium_config.yolox_endpoints,
+                        yolox_infer_protocol=pdfium_config.yolox_infer_protocol,
+                        auth_token=pdfium_config.auth_token,
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
@@ -579,22 +583,21 @@ def pdfium_extractor(
             page.close()
 
         # After page loop, if we still have leftover pages_for_extractions, submit one last job
-        # if (run_page_elements or is_scanned_page(page)) and pages_for_extractions:
-        if run_page_elements and pages_for_extractions:
+        if (extraction_needed_for_text or extraction_needed_for_structured) and pages_for_extractions:
             future = executor.submit(
                 _extract_page_elements,
                 pages_for_extractions[:],
                 page_count,
                 source_metadata,
                 base_unified_metadata,
-                extract_text,
-                extract_tables,
-                extract_charts,
-                extract_infographics,
-                table_output_format,
-                pdfium_config.yolox_endpoints,
-                pdfium_config.yolox_infer_protocol,
-                pdfium_config.auth_token,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                page_to_text_flag_map=page_to_text_flag_map,
+                table_output_format=table_output_format,
+                yolox_endpoints=pdfium_config.yolox_endpoints,
+                yolox_infer_protocol=pdfium_config.yolox_infer_protocol,
+                auth_token=pdfium_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
