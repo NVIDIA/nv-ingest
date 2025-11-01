@@ -492,7 +492,9 @@ def pdfium_extractor(
             page_reading_index = page_idx + 1
 
             is_scanned = is_scanned_page(page)
-            extraction_needed_for_text = extract_text and (is_scanned or text_extraction_method == "ocr")
+            extraction_needed_for_text = extract_text and (
+                (text_extraction_method == "pdfium_hybrid" and is_scanned) or text_extraction_method == "ocr"
+            )
             extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
             page_to_text_flag_map[page_idx] = extraction_needed_for_text
 

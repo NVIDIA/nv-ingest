@@ -200,7 +200,7 @@ class JobSpec:
             self._tasks.append(ChartExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
-        if isinstance(task, ExtractTask) and (task._extract_method == "ocr"):
+        if isinstance(task, ExtractTask) and (task._extract_method in {"pdfium_hybrid", "ocr"}):
             self._tasks.append(OCRExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_method == "audio"):
             extract_audio_params = task._extract_audio_params or {}

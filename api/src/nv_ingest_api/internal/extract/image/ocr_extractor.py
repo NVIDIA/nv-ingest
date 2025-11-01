@@ -190,7 +190,7 @@ def _meets_text_criteria(row: pd.Series) -> bool:
     if (
         content_md.get("type") == "text"
         and content_md.get("subtype") in text_image_subtypes
-        and metadata.get("content") not in [None, ""]
+        and metadata.get("content") not in {None, ""}
     ):
         return True
 
@@ -270,8 +270,12 @@ def extract_text_data_from_image_internal(
         for result_idx, df_idx in enumerate(valid_indices):
             # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
             bboxes, texts, _ = bulk_results[result_idx]
-            if not texts:
+            if not bboxes or not texts:
+                df_to_process.loc[df_idx, "_x0"] = None
+                df_to_process.loc[df_idx, "_y0"] = None
+                df_to_process.loc[df_idx, "metadata"]["content"] = ""
                 continue
+
             combined_data = list(zip(bboxes, texts))
             try:
                 # Sort by reading order (y_min, then x_min)

@@ -32,12 +32,14 @@ EXTRACTOR_LOOKUP = {
     "llama": llama_parse_extractor,
     "nemoretriever_parse": nemoretriever_parse_extractor,
     "pdfium": pdfium_extractor,
+    "pdfium_hybrid": pdfium_extractor,  # Uses pdfium for native text and switches to OCR pipeline only for scanned pages.  # noqa: E501
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
-    "ocr": pdfium_extractor,
+    "ocr": pdfium_extractor,  # Ignores pdfium's text entirely and processes every single page through the full OCR pipline.  # noqa: E501
 }
 
 METHOD_TO_CONFIG_KEY_MAP = {
+    "pdfium_hybrid": "pdfium_config",
     "ocr": "pdfium_config",
 }
 
