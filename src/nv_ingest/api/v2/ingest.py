@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import uuid
+import random
 
 from fastapi import APIRouter, Request, Response
 from fastapi import HTTPException
@@ -43,6 +44,42 @@ logger = logging.getLogger("uvicorn")
 router = APIRouter()
 
 DEFAULT_PDF_SPLIT_PAGE_COUNT = 32
+
+# Default QoS thresholds (pages). Tunable via environment variables:
+# QOS_MAX_PAGES_MICRO, QOS_MAX_PAGES_SMALL, QOS_MAX_PAGES_MEDIUM
+_QOS_DEFAULTS = {
+    "micro": 8,
+    "small": 64,
+    "medium": 256,
+}
+
+
+def get_qos_tier_for_page_count(page_count: int) -> str:
+    """
+    Select QoS tier for a document based on its total page count.
+    Tiers: 'micro', 'small', 'medium', 'large', 'default'
+    Thresholds can be tuned via environment variables:
+      - QOS_MAX_PAGES_MICRO (default: 4)
+      - QOS_MAX_PAGES_SMALL (default: 16)
+      - QOS_MAX_PAGES_MEDIUM (default: 64)
+    Anything above MEDIUM is 'large'. Non-positive page_count returns 'default'.
+    """
+    try:
+        micro_max = int(os.getenv("QOS_MAX_PAGES_MICRO", str(_QOS_DEFAULTS["micro"])))
+        small_max = int(os.getenv("QOS_MAX_PAGES_SMALL", str(_QOS_DEFAULTS["small"])))
+        medium_max = int(os.getenv("QOS_MAX_PAGES_MEDIUM", str(_QOS_DEFAULTS["medium"])))
+    except ValueError:
+        micro_max, small_max, medium_max = _QOS_DEFAULTS["micro"], _QOS_DEFAULTS["small"], _QOS_DEFAULTS["medium"]
+
+    if page_count <= 0:
+        return "default"
+    if page_count <= micro_max:
+        return "micro"
+    if page_count <= small_max:
+        return "small"
+    if page_count <= medium_max:
+        return "medium"
+    return "large"
 
 
 def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
@@ -432,6 +469,76 @@ def _extract_ray_telemetry(result: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
     return trace_dict, annotations_dict
 
 
+def _normalize_chunk_records(
+    records: Optional[List[Any]],
+    descriptor: Dict[str, Any],
+    parent_metadata: Dict[str, Any],
+) -> List[Any]:
+    """Re-map chunk-local metadata to document-level context for aggregation."""
+
+    if not isinstance(records, list):
+        return []
+
+    total_pages = parent_metadata.get("total_pages")
+    original_source_id = parent_metadata.get("original_source_id")
+    original_source_name = parent_metadata.get("original_source_name")
+
+    start_page = descriptor.get("start_page")
+    page_offset = start_page - 1 if isinstance(start_page, int) and start_page > 0 else 0
+
+    normalized_entries: List[Any] = []
+
+    for entry in records:
+        if not isinstance(entry, dict):
+            normalized_entries.append(entry)
+            continue
+
+        normalized_entry = entry.copy()
+        original_metadata = entry.get("metadata")
+
+        if isinstance(original_metadata, dict):
+            normalized_metadata = original_metadata.copy()
+            normalized_entry["metadata"] = normalized_metadata
+
+            original_source_meta = original_metadata.get("source_metadata")
+            if isinstance(original_source_meta, dict):
+                normalized_source_meta = original_source_meta.copy()
+                normalized_metadata["source_metadata"] = normalized_source_meta
+
+                if original_source_id:
+                    normalized_source_meta["source_id"] = original_source_id
+                if original_source_name:
+                    normalized_source_meta["source_name"] = original_source_name
+
+            original_content_meta = original_metadata.get("content_metadata")
+            if isinstance(original_content_meta, dict):
+                normalized_content_meta = original_content_meta.copy()
+                normalized_metadata["content_metadata"] = normalized_content_meta
+
+                page_number = normalized_content_meta.get("page_number")
+                if isinstance(page_number, int) and page_number >= 0:
+                    normalized_content_meta["page_number"] = page_number + page_offset
+
+                if isinstance(total_pages, int) and isinstance(normalized_content_meta.get("page_count"), int):
+                    # Ensure optional per-record page count reflects the full document
+                    normalized_content_meta["page_count"] = total_pages
+
+                original_hierarchy = original_content_meta.get("hierarchy")
+                if isinstance(original_hierarchy, dict):
+                    normalized_hierarchy = original_hierarchy.copy()
+                    normalized_content_meta["hierarchy"] = normalized_hierarchy
+
+                    hierarchy_page = normalized_hierarchy.get("page")
+                    if isinstance(hierarchy_page, int) and hierarchy_page >= 0:
+                        normalized_hierarchy["page"] = hierarchy_page + page_offset
+                    if isinstance(total_pages, int):
+                        normalized_hierarchy["page_count"] = total_pages
+
+        normalized_entries.append(normalized_entry)
+
+    return normalized_entries
+
+
 def _aggregate_parent_traces(chunk_traces: Dict[str, Any]) -> Dict[str, Any]:
     """
     Aggregate chunk-level traces into parent-level metrics.
@@ -574,7 +681,8 @@ def _build_aggregated_response(
         if result is not None:
             # Add page data to aggregated result
             if "data" in result:
-                aggregated_result["data"].extend(result["data"])
+                normalized_records = _normalize_chunk_records(result.get("data"), descriptor, metadata)
+                aggregated_result["data"].extend(normalized_records)
             chunk_entry = dict(descriptor)
             aggregated_result["metadata"]["chunks"].append(chunk_entry)
 
@@ -631,6 +739,51 @@ def _build_aggregated_response(
     return aggregated_result
 
 
+# ---------------------------------------------------------------------------
+# Bursty submission helpers (fairness without long-lived in-flight tasks)
+# ---------------------------------------------------------------------------
+
+
+def _get_submit_burst_params() -> Tuple[int, int, int]:
+    """
+    Returns (burst_size, pause_ms, jitter_ms) from environment with sane defaults.
+    - V2_SUBMIT_BURST_SIZE (default: 16)
+    - V2_SUBMIT_BURST_PAUSE_MS (default: 25)
+    - V2_SUBMIT_BURST_JITTER_MS (default: 10)
+    """
+    burst_size = int(os.getenv("V2_SUBMIT_BURST_SIZE", "16"))
+    pause_ms = int(os.getenv("V2_SUBMIT_BURST_PAUSE_MS", "50"))
+    jitter_ms = int(os.getenv("V2_SUBMIT_BURST_JITTER_MS", "15"))
+
+    return max(1, burst_size), max(0, pause_ms), max(0, jitter_ms)
+
+
+async def _submit_subjobs_in_bursts(
+    items: List[Tuple[str, MessageWrapper]],
+    ingest_service: "INGEST_SERVICE_T",
+    *,
+    burst_size: int,
+    pause_ms: int,
+    jitter_ms: int,
+) -> None:
+    """
+    Submit subjobs in sequential bursts and await each burst to completion.
+    This avoids keeping a large number of pending tasks in the REST handler
+    and allows other concurrent requests to interleave enqueue work between bursts.
+    """
+    for offset in range(0, len(items), burst_size):
+        burst = items[offset : offset + burst_size]
+        tasks = [ingest_service.submit_job(wrapper, subjob_id) for (subjob_id, wrapper) in burst]
+        # Propagate any errors from this burst
+        await asyncio.gather(*tasks)
+
+        # Pause with jitter to yield to other request handlers before next burst
+        if offset + burst_size < len(items):
+            delay_ms = pause_ms + (random.randint(0, jitter_ms) if jitter_ms > 0 else 0)
+            if delay_ms > 0:
+                await asyncio.sleep(delay_ms / 1000.0)
+
+
 # POST /v2/submit_job
 @router.post(
     "/submit_job",
@@ -681,22 +834,24 @@ async def submit_job_v2(
             pdf_content = base64.b64decode(payloads[0])
             page_count = get_pdf_page_count(pdf_content)
             pdf_page_count_cache = page_count  # Cache for later use
+            qos_tier = get_qos_tier_for_page_count(page_count)
             pages_per_chunk = get_pdf_split_page_count(client_override=client_split_page_count)
 
             # Split if the document has more pages than our chunk size
             if page_count > pages_per_chunk:
                 logger.warning(
-                    "Splitting PDF %s into %s-page chunks (total pages: %s)",
+                    "Splitting PDF %s into %s-page chunks (total pages: %s) -> (qos_tier: %s)",
                     original_source_name,
                     pages_per_chunk,
                     page_count,
+                    qos_tier,
                 )
 
                 chunks = split_pdf_to_chunks(pdf_content, pages_per_chunk)
 
                 subjob_ids: List[str] = []
                 subjob_descriptors: List[Dict[str, Any]] = []
-                submission_tasks = []
+                submission_items: List[Tuple[str, MessageWrapper]] = []
 
                 try:
                     parent_uuid = uuid.UUID(parent_job_id)
@@ -717,7 +872,19 @@ async def submit_job_v2(
                         original_source_id=original_source_id,
                         original_source_name=original_source_name,
                     )
-                    submission_tasks.append(ingest_service.submit_job(subjob_wrapper, subjob_id))
+
+                    # Inject QoS routing hint into subjob routing_options (keeps API and service loosely coupled)
+                    try:
+                        sub_spec = json.loads(subjob_wrapper.payload)
+                        routing_opts = sub_spec.get("routing_options") or {}
+                        routing_opts["queue_hint"] = qos_tier
+                        sub_spec["routing_options"] = routing_opts
+                        subjob_wrapper = MessageWrapper(payload=json.dumps(sub_spec))
+                    except Exception:
+                        # Best-effort; if we cannot inject, fall back to default routing
+                        pass
+
+                    submission_items.append((subjob_id, subjob_wrapper))
                     subjob_ids.append(subjob_id)
                     subjob_descriptors.append(
                         {
@@ -729,8 +896,15 @@ async def submit_job_v2(
                         }
                     )
 
-                if submission_tasks:
-                    await asyncio.gather(*submission_tasks)
+                if submission_items:
+                    burst_size, pause_ms, jitter_ms = _get_submit_burst_params()
+                    await _submit_subjobs_in_bursts(
+                        submission_items,
+                        ingest_service,
+                        burst_size=burst_size,
+                        pause_ms=pause_ms,
+                        jitter_ms=jitter_ms,
+                    )
 
                 parent_metadata: Dict[str, Any] = {
                     "total_pages": page_count,
@@ -758,6 +932,16 @@ async def submit_job_v2(
         if "tracing_options" not in job_spec_dict:
             job_spec_dict["tracing_options"] = {"trace": True}
         job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
+        # If this was a PDF and we computed page_count, route the single job using the same QoS tier
+        try:
+            if (
+                document_types
+                and document_types[0].lower() == "pdf"
+                and "queue_hint" not in (job_spec_dict.get("routing_options") or {})
+            ):
+                job_spec_dict.setdefault("routing_options", {})["queue_hint"] = qos_tier
+        except Exception:
+            pass
         updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
         span.add_event("Submitting as single job (no split needed)")

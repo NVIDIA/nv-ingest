@@ -218,12 +218,33 @@ class RedisIngestService(IngestServiceMeta):
             ttl_for_result: Optional[int] = (
                 self._result_data_ttl_seconds if self._fetch_mode == FetchMode.NON_DESTRUCTIVE else None
             )
+            # Determine target queue based on optional QoS hint
+            queue_hint = None
+            try:
+                routing_opts = job_spec.get("routing_options") or {}
+                tracing_opts = job_spec.get("tracing_options") or {}
+                queue_hint = routing_opts.get("queue_hint") or tracing_opts.get("queue_hint")
+            except Exception:
+                queue_hint = None
+            allowed = {"default", "immediate", "micro", "small", "medium", "large"}
+            if isinstance(queue_hint, str) and queue_hint in allowed:
+                if queue_hint == "default":
+                    channel_name = self._redis_task_queue
+                else:
+                    channel_name = f"{self._redis_task_queue}_{queue_hint}"
+            else:
+                channel_name = self._redis_task_queue
+            logger.debug(
+                f"Submitting job {trace_id} to queue '{channel_name}' (hint={queue_hint}) "
+                f"with result TTL: {ttl_for_result}"
+            )
+
             logger.debug(
                 f"Submitting job {trace_id} to queue '{self._redis_task_queue}' with result TTL: {ttl_for_result}"
             )
             await self._run_bounded_to_thread(
                 self._ingest_client.submit_message,
-                channel_name=self._redis_task_queue,
+                channel_name=channel_name,
                 message=job_spec_json,
                 ttl_seconds=ttl_for_result,
             )
@@ -501,21 +522,21 @@ class RedisIngestService(IngestServiceMeta):
         metadata_key = f"parent:{parent_job_id}:metadata"
 
         try:
-            # Check if this is a parent job
+            # Check if this is a parent job (check metadata_key since non-split PDFs may not have parent_key)
             exists = await self._run_bounded_to_thread(
                 self._ingest_client.get_client().exists,
-                parent_key,
+                metadata_key,  # Check metadata instead of parent_key for non-split PDF support
             )
 
             if not exists:
                 return None
 
-            # Get subjob IDs
+            # Get subjob IDs (may be empty for non-split PDFs)
             subjob_ids_bytes = await self._run_bounded_to_thread(
                 self._ingest_client.get_client().smembers,
                 parent_key,
             )
-            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes}
+            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes} if subjob_ids_bytes else set()
 
             # Get metadata
             metadata_dict = await self._run_bounded_to_thread(

@@ -254,22 +254,29 @@ else:
         file = None
         try:
             for file in paths:
+                if thread_stop.is_set():
+                    return
                 if isinstance(file, tuple):
                     video_file, audio_file = file
+                    if thread_stop.is_set():
+                        return
                     with open(video_file, "rb") as f:
                         video = f.read()
+                    if thread_stop.is_set():
+                        return
                     with open(audio_file, "rb") as f:
                         audio = f.read()
                     queue.put((video, audio))
                 else:
-                    if thread_stop:
+                    if thread_stop.is_set():
                         return
                     with open(file, "rb") as f:
                         queue.put(f.read())
         except Exception as e:
             logging.error(f"Error processing file {file}: {e}")
             queue.put(RuntimeError(f"Error processing file {file}: {e}"))
-        queue.put(StopIteration)
+        finally:
+            queue.put(StopIteration)
 
     class DataLoader:
         """
@@ -290,7 +297,7 @@ else:
         ):
             interface = interface if interface else MediaInterface()
             self.thread = None
-            self.thread_stop = False
+            self.thread_stop = threading.Event()
             self.queue = queue.Queue(size)
             self.path = Path(path)
             self.output_dir = output_dir
@@ -323,16 +330,20 @@ else:
             Reset itertor by stopping the thread and clearing the queue.
             """
             if self.thread:
-                self.thread_stop = True
+                self.thread_stop.set()
                 self.thread.join()
-            self.thread_stop = False
-            while self.queue.qsize() != 0:
-                with self.queue.mutex:
-                    self.queue.queue.clear()
+                self.thread = None
+            try:
+                while True:
+                    self.queue.get_nowait()
+            except Exception:
+                pass
+            finally:
+                self.thread_stop.clear()
 
         def __iter__(self):
             self.stop()
-            self.thread_stop = False
+            self.thread_stop.clear()
             self.thread = threading.Thread(
                 target=load_data,
                 args=(

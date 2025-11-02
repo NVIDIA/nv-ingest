@@ -18,6 +18,18 @@ from nv_ingest_api.util.message_brokers.simple_message_broker.broker import Simp
 logger = logging.getLogger(__name__)
 
 
+def _broker_server_target(host, port, max_queue_size):
+    """
+    Target function to be run in a separate process for the SimpleMessageBroker.
+    """
+    server = SimpleMessageBroker(host, port, max_queue_size)
+    try:
+        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except Exception:
+        pass
+    server.serve_forever()
+
+
 def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     """
     Starts a SimpleMessageBroker server in a separate process.
@@ -58,16 +70,11 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
             f"continuing to spawn a broker process (tests expect a Process to be returned)"
         )
 
-    def broker_server():
-        # Optionally, set socket options here for reuse (note: binding occurs in server __init__).
-        server = SimpleMessageBroker(server_host, server_port, max_queue_size)
-        try:
-            server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        except Exception:
-            pass
-        server.serve_forever()
-
-    p = multiprocessing.Process(target=broker_server)
+    p = multiprocessing.Process(
+        target=_broker_server_target,
+        args=(server_host, server_port, max_queue_size),
+        daemon=True,
+    )
     # If we're launching from inside the pipeline subprocess, mark daemon so the
     # broker dies automatically when the subprocess exits.
     p.daemon = os.environ.get("NV_INGEST_BROKER_IN_SUBPROCESS") == "1"
