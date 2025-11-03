@@ -144,10 +144,10 @@ class TestExpandChartBboxes(unittest.TestCase):
         self.wbf_patcher = patch(f"{MODULE_UNDER_TEST}.weighted_boxes_fusion")
         self.mock_wbf = self.wbf_patcher.start()
 
-        self.match_title_patcher = patch(f"{MODULE_UNDER_TEST}.match_with_title")
+        self.match_title_patcher = patch(f"{MODULE_UNDER_TEST}.match_with_title_v1")
         self.mock_match_title = self.match_title_patcher.start()
 
-        self.expand_boxes_patcher = patch(f"{MODULE_UNDER_TEST}.expand_boxes")
+        self.expand_boxes_patcher = patch(f"{MODULE_UNDER_TEST}.expand_boxes_v1")
         self.mock_expand_boxes = self.expand_boxes_patcher.start()
 
         # Setup return values for mocks

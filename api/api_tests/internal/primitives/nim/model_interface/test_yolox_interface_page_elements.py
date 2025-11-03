@@ -31,9 +31,8 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
             YOLOX_PAGE_CONF_THRESHOLD=0.5,
             YOLOX_PAGE_IOU_THRESHOLD=0.45,
             YOLOX_PAGE_MIN_SCORE=0.3,
-            YOLOX_PAGE_V2_NUM_CLASSES=4,
-            YOLOX_PAGE_V2_FINAL_SCORE={"table": 0.5, "chart": 0.5, "infographic": 0.5},
-            YOLOX_PAGE_V2_CLASS_LABELS=["table", "chart", "infographic", "title"],
+            YOLOX_PAGE_FINAL_SCORE={"table": 0.5, "chart": 0.5, "infographic": 0.5},
+            YOLOX_PAGE_CLASS_LABELS=["table", "chart", "infographic", "title"],
         )
         self.mocked_constants = self.constants_patcher.start()
 
@@ -65,7 +64,6 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         model = YoloxPageElementsModelInterface()
 
         # Check that v2 parameters are used by default
-        self.assertEqual(model.num_classes, 4)
         self.assertEqual(model.final_score, {"table": 0.5, "chart": 0.5, "infographic": 0.5})
         self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
 
@@ -256,7 +254,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_invalid_final_score(self):
         """Test postprocess_annotations with invalid final_score."""
         # Create an instance with an invalid final_score (not a dictionary)
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", 0.5):
+        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_FINAL_SCORE", 0.5):
             model = YoloxPageElementsModelInterface()
 
             # Create mock annotations
@@ -271,7 +269,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_missing_class_in_final_score(self):
         """Test postprocess_annotations with final_score missing a required class."""
         # Create an instance with final_score missing a required class
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", {"table": 0.5, "chart": 0.5}):
+        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_FINAL_SCORE", {"table": 0.5, "chart": 0.5}):
             model = YoloxPageElementsModelInterface()
 
             # Create mock annotations

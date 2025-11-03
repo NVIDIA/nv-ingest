@@ -35,8 +35,7 @@ YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
 YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
 # yolox-page-elements-v3 contants
-YOLOX_PAGE_V3_NUM_CLASSES = 6
-YOLOX_PAGE_V3_FINAL_SCORE = {
+YOLOX_PAGE_FINAL_SCORE = YOLOX_PAGE_V3_FINAL_SCORE = {
     "table": 0.1,
     "chart": 0.01,
     "title": 0.1,
@@ -44,7 +43,7 @@ YOLOX_PAGE_V3_FINAL_SCORE = {
     "paragraph": 0.1,
     "header_footer": 0.1,
 }
-YOLOX_PAGE_V3_CLASS_LABELS = [
+YOLOX_PAGE_CLASS_LABELS = YOLOX_PAGE_V3_CLASS_LABELS = [
     "table",
     "chart",
     "title",
@@ -54,7 +53,6 @@ YOLOX_PAGE_V3_CLASS_LABELS = [
 ]
 
 # yolox-page-elements-v2 contants
-YOLOX_PAGE_V2_NUM_CLASSES = 4
 YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
 YOLOX_PAGE_V2_CLASS_LABELS = [
     "table",
@@ -65,7 +63,6 @@ YOLOX_PAGE_V2_CLASS_LABELS = [
 
 
 # yolox-graphic-elements-v1 contants
-YOLOX_GRAPHIC_NUM_CLASSES = 10
 YOLOX_GRAPHIC_CONF_THRESHOLD = 0.01
 YOLOX_GRAPHIC_IOU_THRESHOLD = 0.25
 YOLOX_GRAPHIC_MIN_SCORE = 0.1
@@ -88,7 +85,6 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 
 
 # yolox-table-structure-v1 contants
-YOLOX_TABLE_NUM_CLASSES = 5
 YOLOX_TABLE_CONF_THRESHOLD = 0.01
 YOLOX_TABLE_IOU_THRESHOLD = 0.25
 YOLOX_TABLE_MIN_SCORE = 0.1
@@ -386,8 +382,8 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         """
         Initialize the yolox-page-elements model interface.
         """
-        final_score = YOLOX_PAGE_V3_FINAL_SCORE
-        class_labels = YOLOX_PAGE_V3_CLASS_LABELS
+        final_score = YOLOX_PAGE_FINAL_SCORE
+        class_labels = YOLOX_PAGE_CLASS_LABELS
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
@@ -415,9 +411,23 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        if annotation_dicts and (set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()):
+        running_v3 = set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
+
+        if running_v3:
+            expected_final_score_keys = [x for x in self.class_labels]
+        else:
+            expected_final_score_keys = [x for x in self.class_labels if x != "title"]
+        if (not isinstance(self.final_score, dict)) or (
+            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
+        ):
+            raise ValueError(
+                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
+                f"{expected_final_score_keys}"
+            )
+
+        if annotation_dicts and running_v3:
             annotation_dicts = [
-                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
+                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_CLASS_LABELS)
                 for annotation_dict in annotation_dicts
             ]
         else:
@@ -429,26 +439,12 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         # Filter out bounding boxes below the final threshold
         # This final thresholding is "business logic" specific to nv-ingest
+        labels_to_check = {"table", "chart", "title", "infographic", "paragraph", "header_footer"}
         for annotation_dict in annotation_dicts:
             new_dict = {}
-            if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score["table"]]
-            if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score["chart"]]
-            if "infographic" in annotation_dict:
-                new_dict["infographic"] = [
-                    bb for bb in annotation_dict["infographic"] if bb[4] >= self.final_score["infographic"]
-                ]
-            if "title" in annotation_dict:
-                new_dict["title"] = [bb for bb in annotation_dict["title"] if bb[4] >= self.final_score["title"]]
-            if "paragraph" in annotation_dict:
-                new_dict["paragraph"] = [
-                    bb for bb in annotation_dict["paragraph"] if bb[4] >= self.final_score["paragraph"]
-                ]
-            if "header_footer" in annotation_dict:
-                new_dict["header_footer"] = [
-                    bb for bb in annotation_dict["header_footer"] if bb[4] >= self.final_score["header_footer"]
-                ]
+            for label in labels_to_check:
+                if label in annotation_dict and label in self.final_score:
+                    new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= self.final_score[label]]
 
             inference_results.append(new_dict)
 

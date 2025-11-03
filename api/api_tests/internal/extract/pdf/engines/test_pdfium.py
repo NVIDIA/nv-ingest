@@ -343,6 +343,7 @@ def test_extract_page_elements_happy_path2(
         extract_tables=True,
         extract_charts=False,
         extract_infographics=False,
+        page_to_text_flag_map={0: False},
         table_output_format="markdown",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
@@ -381,6 +382,7 @@ def test_extract_page_elements_fallback_to_default_model(
         extract_tables=False,
         extract_charts=True,
         extract_infographics=False,
+        page_to_text_flag_map={0: False},
         table_output_format="latex",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
@@ -411,6 +413,7 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
         extract_tables=False,
         extract_charts=False,
         extract_infographics=False,  # all False => should be skipped
+        page_to_text_flag_map={0: False},
         table_output_format="latex",
         yolox_endpoints=("grpc://dummy", None),
         yolox_infer_protocol="http",

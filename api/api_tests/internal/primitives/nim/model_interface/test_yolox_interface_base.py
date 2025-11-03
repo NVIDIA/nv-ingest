@@ -45,7 +45,6 @@ class TestYoloxModelInterface(unittest.TestCase):
         # Test parameters for the model
         self.test_params = {
             "nim_max_image_size": 1000000,
-            "num_classes": 80,
             "conf_threshold": 0.5,
             "iou_threshold": 0.45,
             "min_score": 0.3,
@@ -92,7 +91,6 @@ class TestYoloxModelInterface(unittest.TestCase):
 
         # Check that parameters are correctly stored
         self.assertEqual(model.nim_max_image_size, self.test_params["nim_max_image_size"])
-        self.assertEqual(model.num_classes, self.test_params["num_classes"])
         self.assertEqual(model.conf_threshold, self.test_params["conf_threshold"])
         self.assertEqual(model.iou_threshold, self.test_params["iou_threshold"])
         self.assertEqual(model.min_score, self.test_params["min_score"])
