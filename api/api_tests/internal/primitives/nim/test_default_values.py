@@ -26,10 +26,6 @@ def test_yolox_min_score():
     assert 0.0 <= YOLOX_MIN_SCORE <= 1.0, "YOLOX_MIN_SCORE should be between 0.0 and 1.0"
 
 
-def test_yolox_final_score():
-    assert 0.0 <= YOLOX_FINAL_SCORE <= 1.0, "YOLOX_FINAL_SCORE should be between 0.0 and 1.0"
-
-
 def test_yolox_score_consistency():
     assert (
         YOLOX_CONF_THRESHOLD <= YOLOX_MIN_SCORE <= YOLOX_FINAL_SCORE

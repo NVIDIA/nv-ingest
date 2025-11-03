@@ -31,7 +31,6 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
             YOLOX_PAGE_CONF_THRESHOLD=0.5,
             YOLOX_PAGE_IOU_THRESHOLD=0.45,
             YOLOX_PAGE_MIN_SCORE=0.3,
-            YOLOX_PAGE_FINAL_SCORE={"table": 0.5, "chart": 0.5, "infographic": 0.5},
             YOLOX_PAGE_CLASS_LABELS=["table", "chart", "infographic", "title"],
         )
         self.mocked_constants = self.constants_patcher.start()
@@ -64,7 +63,6 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         model = YoloxPageElementsModelInterface()
 
         # Check that v2 parameters are used by default
-        self.assertEqual(model.final_score, {"table": 0.5, "chart": 0.5, "infographic": 0.5})
         self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
 
     def test_inheritance(self):
@@ -254,32 +252,30 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_invalid_final_score(self):
         """Test postprocess_annotations with invalid final_score."""
         # Create an instance with an invalid final_score (not a dictionary)
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_FINAL_SCORE", 0.5):
-            model = YoloxPageElementsModelInterface()
+        model = YoloxPageElementsModelInterface()
 
-            # Create mock annotations
-            annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
+        # Create mock annotations
+        annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
 
-            # Should raise ValueError due to invalid final_score
-            with self.assertRaises(ValueError) as context:
-                model.postprocess_annotations(annotations)
+        # Should raise ValueError due to invalid final_score
+        with self.assertRaises(ValueError) as context:
+            model.postprocess_annotations(annotations, final_score=0.5)
 
-            self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
+        self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
 
     def test_postprocess_annotations_missing_class_in_final_score(self):
         """Test postprocess_annotations with final_score missing a required class."""
         # Create an instance with final_score missing a required class
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_FINAL_SCORE", {"table": 0.5, "chart": 0.5}):
-            model = YoloxPageElementsModelInterface()
+        model = YoloxPageElementsModelInterface()
 
-            # Create mock annotations
-            annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
+        # Create mock annotations
+        annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
 
-            # Should raise ValueError due to missing class in final_score
-            with self.assertRaises(ValueError) as context:
-                model.postprocess_annotations(annotations)
+        # Should raise ValueError due to missing class in final_score
+        with self.assertRaises(ValueError) as context:
+            model.postprocess_annotations(annotations, final_score={"table": 0.5, "chart": 0.5})
 
-            self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
+        self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
 
 
 if __name__ == "__main__":

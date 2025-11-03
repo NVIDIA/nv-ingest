@@ -48,7 +48,6 @@ class TestYoloxModelInterface(unittest.TestCase):
             "conf_threshold": 0.5,
             "iou_threshold": 0.45,
             "min_score": 0.3,
-            "final_score": 0.3,
             "class_labels": ["person", "car", "dog", "cat"],
         }
 
@@ -94,7 +93,6 @@ class TestYoloxModelInterface(unittest.TestCase):
         self.assertEqual(model.conf_threshold, self.test_params["conf_threshold"])
         self.assertEqual(model.iou_threshold, self.test_params["iou_threshold"])
         self.assertEqual(model.min_score, self.test_params["min_score"])
-        self.assertEqual(model.final_score, self.test_params["final_score"])
         self.assertEqual(model.class_labels, self.test_params["class_labels"])
 
     def test_inheritance(self):

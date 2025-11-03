@@ -66,7 +66,6 @@ YOLOX_PAGE_V2_CLASS_LABELS = [
 YOLOX_GRAPHIC_CONF_THRESHOLD = 0.01
 YOLOX_GRAPHIC_IOU_THRESHOLD = 0.25
 YOLOX_GRAPHIC_MIN_SCORE = 0.1
-YOLOX_GRAPHIC_FINAL_SCORE = 0.0
 YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
 
 
@@ -88,7 +87,6 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 YOLOX_TABLE_CONF_THRESHOLD = 0.01
 YOLOX_TABLE_IOU_THRESHOLD = 0.25
 YOLOX_TABLE_MIN_SCORE = 0.1
-YOLOX_TABLE_FINAL_SCORE = 0.0
 YOLOX_TABLE_NIM_MAX_IMAGE_SIZE = 512_000
 
 YOLOX_TABLE_IMAGE_PREPROC_HEIGHT = 1024
@@ -115,7 +113,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         conf_threshold: Optional[float] = None,
         iou_threshold: Optional[float] = None,
         min_score: Optional[float] = None,
-        final_score: Optional[float] = None,
         class_labels: Optional[List[str]] = None,
     ):
         """
@@ -127,7 +124,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.min_score = min_score
-        self.final_score = final_score
         self.class_labels = class_labels
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -382,7 +378,6 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         """
         Initialize the yolox-page-elements model interface.
         """
-        final_score = YOLOX_PAGE_FINAL_SCORE
         class_labels = YOLOX_PAGE_CLASS_LABELS
 
         super().__init__(
@@ -390,7 +385,6 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
-            final_score=final_score,
             class_labels=class_labels,
         )
 
@@ -408,26 +402,31 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         return "yolox-page-elements"
 
-    def postprocess_annotations(self, annotation_dicts, **kwargs):
+    def postprocess_annotations(self, annotation_dicts, final_score=None, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
         running_v3 = set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
 
+        if not final_score:
+            if running_v3:
+                final_score = YOLOX_PAGE_V3_FINAL_SCORE
+            else:
+                final_score = YOLOX_PAGE_V2_FINAL_SCORE
+
         if running_v3:
-            expected_final_score_keys = [x for x in self.class_labels]
+            expected_final_score_keys = YOLOX_PAGE_V3_CLASS_LABELS
         else:
-            expected_final_score_keys = [x for x in self.class_labels if x != "title"]
-        if (not isinstance(self.final_score, dict)) or (
-            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
-        ):
+            expected_final_score_keys = [x for x in YOLOX_PAGE_V2_CLASS_LABELS if x != "title"]
+
+        if (not isinstance(final_score, dict)) or (sorted(final_score.keys()) != sorted(expected_final_score_keys)):
             raise ValueError(
-                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
+                "yolox-page-elements requires a dictionary of thresholds per each class: "
                 f"{expected_final_score_keys}"
             )
 
         if annotation_dicts and running_v3:
             annotation_dicts = [
-                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_CLASS_LABELS)
+                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
                 for annotation_dict in annotation_dicts
             ]
         else:
@@ -443,8 +442,10 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             for label in labels_to_check:
-                if label in annotation_dict and label in self.final_score:
-                    new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= self.final_score[label]]
+                if label in annotation_dict and label in final_score:
+                    if not running_v3 and label == "title":
+                        continue
+                    new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= final_score[label]]
 
             inference_results.append(new_dict)
 
@@ -467,7 +468,6 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
             iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
             min_score=YOLOX_GRAPHIC_MIN_SCORE,
-            final_score=YOLOX_GRAPHIC_FINAL_SCORE,
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
         )
 
@@ -523,7 +523,6 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
             iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
             min_score=YOLOX_TABLE_MIN_SCORE,
-            final_score=YOLOX_TABLE_FINAL_SCORE,
             class_labels=YOLOX_TABLE_CLASS_LABELS,
         )
 

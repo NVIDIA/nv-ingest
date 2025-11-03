@@ -31,7 +31,6 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
             YOLOX_TABLE_CONF_THRESHOLD=0.5,
             YOLOX_TABLE_IOU_THRESHOLD=0.45,
             YOLOX_TABLE_MIN_SCORE=0.3,
-            YOLOX_TABLE_FINAL_SCORE=0.3,
             YOLOX_TABLE_CLASS_LABELS=["cell", "row", "column"],
         )
         self.mocked_constants = self.constants_patcher.start()
@@ -72,7 +71,6 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
         self.assertEqual(self.model_interface.conf_threshold, 0.5)
         self.assertEqual(self.model_interface.iou_threshold, 0.45)
         self.assertEqual(self.model_interface.min_score, 0.3)
-        self.assertEqual(self.model_interface.final_score, 0.3)
         self.assertEqual(self.model_interface.class_labels, ["cell", "row", "column"])
 
     def test_inheritance(self):

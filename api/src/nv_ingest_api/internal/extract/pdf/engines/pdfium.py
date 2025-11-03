@@ -34,7 +34,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_V3_CLASS_LABELS
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_CLASS_LABELS
 from nv_ingest_api.util.metadata.aggregators import (
     construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
@@ -174,8 +174,8 @@ def _extract_page_element_images(
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
 
-    if annotation_dict and (set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dict.keys()):
-        labels = YOLOX_PAGE_V3_CLASS_LABELS
+    if annotation_dict and (set(YOLOX_PAGE_CLASS_LABELS) <= annotation_dict.keys()):
+        labels = YOLOX_PAGE_CLASS_LABELS
     else:
         labels = ["table", "chart", "infographics"]
 
