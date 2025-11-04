@@ -5,6 +5,7 @@
 import os
 import logging
 import warnings
+from collections import defaultdict
 from math import log
 from typing import Any
 from typing import Dict
@@ -292,7 +293,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
             batch_results = response.get("data", [])
             for detections in batch_results:
-                new_bounding_boxes = {label: [] for label in self.class_labels}
+                new_bounding_boxes = defaultdict(list)
 
                 bounding_boxes = detections.get("bounding_boxes", [])
                 for obj_type, bboxes in bounding_boxes.items():
@@ -302,7 +303,6 @@ class YoloxModelInterfaceBase(ModelInterface):
                         xmax = bbox["x_max"]
                         ymax = bbox["y_max"]
                         confidence = bbox["confidence"]
-
                         new_bounding_boxes[obj_type].append([xmin, ymin, xmax, ymax, confidence])
 
                 processed_outputs.append(new_bounding_boxes)
@@ -1161,6 +1161,9 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
     bbox_dict = {label: np.array([]) for label in class_labels}
 
     for i, label in enumerate(class_labels):
+        if label not in preds:
+            continue
+
         bboxes_class = np.array(preds[label])
 
         if bboxes_class.size == 0:
