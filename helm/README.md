@@ -61,11 +61,11 @@ helm upgrade \
 > The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
 >
 > ```bash
-> --set redis.image.repository=redis \
-> --set redis.image.tag=8.2.1 \
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
 > ```
 >
-> This uses the Bitnami Redis 8.2.1 image. Adjust the tag as needed for your environment.
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
 
 > [!NOTE]
 > For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
@@ -371,7 +371,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.6.2"` |  |
+| image.tag | string | `"latest"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -757,9 +757,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | riva-nim.env[0].value | string | `"9000"` |  |
 | riva-nim.env[1].name | string | `"NIM_TAGS_SELECTOR"` |  |
-| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"` |  |
+| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
 | riva-nim.fullnameOverride | string | `"nv-ingest-riva-nim"` |  |
-| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us"` |  |
 | riva-nim.image.tag | string | `"1.3.0"` |  |
 | riva-nim.nim.grpcPort | int | `50051` |  |
 | riva-nim.nim.logLevel | string | `"INFO"` |  |
