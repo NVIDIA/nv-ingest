@@ -28,7 +28,6 @@ def test_images_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
     multimodal_second_table_markdown,
-    multimodal_first_chart_xaxis,
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
@@ -36,7 +35,7 @@ def test_images_extract_only(
     expected_table_jpeg_full_markdown_variants,
     expected_table_png_full_markdown_variants,
     expected_table_tiff_full_markdown_variants,
-    multimodal_first_chart_xaxis_variants_images,
+    multimodal_first_chart_xaxis_variants,
     image_file,
 ):
     client = NvIngestClient(
@@ -114,5 +113,5 @@ def test_images_extract_only(
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
 
-    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants_images)
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants)
     assert multimodal_first_chart_yaxis in chart_contents
