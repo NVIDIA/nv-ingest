@@ -6,6 +6,11 @@ import pytest
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
+from .utilities_for_test import (
+    levenshtein_ratio,
+    jaccard_similarity,
+    token_f1,
+)
 
 
 @pytest.mark.integration
@@ -26,6 +31,11 @@ def test_images_extract_only(
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
+    expected_table_bmp_full_markdown_variants,
+    expected_table_jpeg_full_markdown_variants,
+    expected_table_png_full_markdown_variants,
+    expected_table_tiff_full_markdown_variants,
+    multimodal_first_chart_xaxis_variants_images,
     image_file,
 ):
     client = NvIngestClient(
@@ -42,7 +52,7 @@ def test_images_extract_only(
             extract_tables=True,
             extract_charts=True,
             extract_images=True,
-            paddle_output_format="markdown",
+            table_output_format="markdown",
             extract_infographics=True,
             text_depth="page",
         )
@@ -65,10 +75,37 @@ def test_images_extract_only(
     assert len(charts) == 1
     assert len(infographics) == 0
 
-    table_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in tables)
-    assert multimodal_first_table_markdown in table_contents
+    # Assert exact table content per format based on observed outputs
+    assert len(tables) == 1
+    extracted_table = tables[0]["metadata"]["table_metadata"]["table_content"]
+    if image_file.endswith(".bmp"):
+        expected_variants = expected_table_bmp_full_markdown_variants
+    elif image_file.endswith(".jpeg"):
+        expected_variants = expected_table_jpeg_full_markdown_variants
+    elif image_file.endswith(".png"):
+        expected_variants = expected_table_png_full_markdown_variants
+    elif image_file.endswith(".tiff"):
+        expected_variants = expected_table_tiff_full_markdown_variants
+    else:
+        raise AssertionError(f"Unhandled image format for test: {image_file}")
+    # Accept either exact match or sufficiently high similarity to any expected variant
+    if extracted_table not in expected_variants:
+        LEV_THR = 0.98
+        TOK_THR = 0.95
+        best = {"lev": 0.0, "jac": 0.0, "f1": 0.0, "variant": None}
+        for expected in expected_variants:
+            lev = levenshtein_ratio(extracted_table, expected)
+            jac = jaccard_similarity(extracted_table, expected)
+            f1 = token_f1(extracted_table, expected)
+            if (lev + jac + f1) > (best["lev"] + best["jac"] + best["f1"]):
+                best = {"lev": lev, "jac": jac, "f1": f1, "variant": expected}
+
+        if not (best["lev"] >= LEV_THR or best["jac"] >= TOK_THR or best["f1"] >= TOK_THR):
+            assert False, (
+                f"Table content differs from expected variants. "
+                f"Best similarity scores: lev={best['lev']:.3f}, jaccard={best['jac']:.3f}, token_f1={best['f1']:.3f}"
+            )
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    multimodal_first_chart_xaxis_alt = multimodal_first_chart_xaxis.replace("Bluetooth speaker", "Bluetoothspeaker")
-    assert (multimodal_first_chart_xaxis in chart_contents) or (multimodal_first_chart_xaxis_alt in chart_contents)
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants_images)
     assert multimodal_first_chart_yaxis in chart_contents

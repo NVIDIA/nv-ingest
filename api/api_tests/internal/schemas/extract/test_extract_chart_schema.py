@@ -9,6 +9,7 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import (
     ChartExtractorConfigSchema,
     ChartExtractorSchema,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 
 ### Tests for ChartExtractorConfigSchema ###
@@ -43,6 +44,40 @@ def test_invalid_ocr_empty():
     with pytest.raises(ValidationError) as excinfo:
         ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=("  ", '   "  '))
     assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
+
+
+def test_protocol_case_insensitive():
+    """Test that protocol values are normalized to lowercase for case-insensitive handling."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", "http_service"),
+        yolox_infer_protocol="GRPC",  # uppercase
+        ocr_endpoints=("grpc_ocr", "http_ocr"),
+        ocr_infer_protocol="HTTP",  # uppercase
+    )
+    assert config.yolox_infer_protocol == "grpc"
+    assert config.ocr_infer_protocol == "http"
+
+
+def test_protocol_mixed_case():
+    """Test that mixed case protocol values are normalized to lowercase."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=(None, "http_service"),
+        yolox_infer_protocol="HtTp",  # mixed case
+        ocr_endpoints=("grpc_ocr", None),
+        ocr_infer_protocol="GrPc",  # mixed case
+    )
+    assert config.yolox_infer_protocol == "http"
+    assert config.ocr_infer_protocol == "grpc"
+
+
+def test_protocol_auto_inference_from_endpoints():
+    """Test that protocol is auto-inferred from endpoints when not specified."""
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=(None, "http_service"),
+        ocr_endpoints=("grpc_ocr", None),
+    )
+    assert config.yolox_infer_protocol == "http"
+    assert config.ocr_infer_protocol == "grpc"
 
 
 def test_extra_fields_forbidden_in_chart_extractor_config():
@@ -95,3 +130,41 @@ def test_extractor_rejects_low_values_correctly():
         ChartExtractorSchema(max_queue_size=0, n_workers=15)
     with pytest.raises(ValidationError):
         ChartExtractorSchema(max_queue_size=-1, n_workers=10)
+
+
+### Sanitization and Redaction Tests ###
+
+
+def test_chart_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    cfg = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        ocr_endpoints=("grpc_ocr", None),
+        auth_token="chart_secret",
+    )
+
+    rep = repr(cfg)
+    s = str(cfg)
+    assert "chart_secret" not in rep
+    assert "chart_secret" not in s
+
+    sanitized = sanitize_for_logging(cfg)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_chart_extractor_schema_sanitize_nested_config():
+    cfg = ChartExtractorConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        ocr_endpoints=("grpc_ocr", None),
+        auth_token="nested_chart_secret",
+    )
+    schema = ChartExtractorSchema(
+        max_queue_size=3,
+        n_workers=2,
+        raise_on_failure=False,
+        endpoint_config=cfg,
+    )
+
+    sanitized = sanitize_for_logging(schema)
+    assert isinstance(sanitized, dict)
+    assert sanitized["endpoint_config"]["auth_token"] == "***REDACTED***"

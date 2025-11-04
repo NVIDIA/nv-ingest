@@ -31,7 +31,7 @@ def test_pptx_extract_only(
             extract_tables=True,
             extract_charts=True,
             extract_images=True,
-            paddle_output_format="markdown",
+            table_output_format="markdown",
             extract_infographics=True,
             text_depth="page",
         )

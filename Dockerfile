@@ -5,9 +5,11 @@
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
 ARG BASE_IMG_TAG=jammy-20250619
+ARG TARGETPLATFORM
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
+ARG TARGETPLATFORM
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
@@ -31,6 +33,12 @@ RUN apt-get update && apt-get install -y \
       wget \
     && apt-get clean
 
+# Install ffmpeg
+COPY ./docker/scripts/install_ffmpeg.sh scripts/install_ffmpeg.sh
+RUN chmod +x scripts/install_ffmpeg.sh \
+    && bash scripts/install_ffmpeg.sh \
+    && rm scripts/install_ffmpeg.sh
+
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
@@ -38,15 +46,31 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
 # Add conda to the PATH
 ENV PATH=/opt/conda/bin:$PATH
 
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      CONDA_SUBDIR=linux-aarch64; \
+    else \
+      CONDA_SUBDIR=linux-64; \
+    fi;
+
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 -n base -c conda-forge
+    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
-COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
+COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
+COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
+COPY conda/environments/nv_ingest_environment.linux_aarch64.yml /workspace/nv_ingest_environment.linux_aarch64.yml
+
 # Create nv_ingest base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
+    if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
+      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml; \
+    else \
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
+      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml; \
+    fi; \
     mamba env create -f /workspace/nv_ingest_environment.yml
 
 # Set default shell to bash
@@ -126,6 +150,7 @@ RUN rm -rf src
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
+COPY config/default_pipeline.yaml ./config/
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh

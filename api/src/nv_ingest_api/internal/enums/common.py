@@ -386,6 +386,40 @@ class StatusEnum(str, Enum):
     SUCCESS: str = "success"
 
 
+class PipelinePhase(int, Enum):
+    """
+    The logical phase of a pipeline stage.
+
+    Attributes
+    ----------
+    PRE_PROCESSING : int
+        Pre-processing phase.
+    EXTRACTION : int
+        Extraction phase.
+    POST_PROCESSING : int
+        Post-processing phase.
+    MUTATION : int
+        Mutation phase.
+    TRANSFORM : int
+        Transform phase.
+    RESPONSE : int
+        Response phase.
+    TELEMETRY : int
+        Telemetry phase.
+    DRAIN : int
+        Drain phase.
+    """
+
+    PRE_PROCESSING = 0
+    EXTRACTION = 1
+    POST_PROCESSING = 2
+    MUTATION = 3
+    TRANSFORM = 4
+    RESPONSE = 5
+    TELEMETRY = 6
+    DRAIN = 7
+
+
 class TableFormatEnum(str, Enum):
     """
     Enum for representing table formats.
@@ -446,6 +480,8 @@ class TaskTypeEnum(str, Enum):
         Represents a task for extracting chart data.
     INFOGRAPHIC_DATA_EXTRACT : str
         Represents a task for extracting infographic data.
+    UDF : str
+        Represents a user-defined function task.
     """
 
     AUDIO_DATA_EXTRACT: str = "audio_data_extract"
@@ -460,6 +496,7 @@ class TaskTypeEnum(str, Enum):
     STORE_EMBEDDING: str = "store_embedding"
     STORE: str = "store"
     TABLE_DATA_EXTRACT: str = "table_data_extract"
+    UDF: str = "udf"
     VDB_UPLOAD: str = "vdb_upload"
 
 

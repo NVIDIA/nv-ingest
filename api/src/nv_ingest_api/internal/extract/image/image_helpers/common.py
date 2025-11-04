@@ -242,10 +242,6 @@ def extract_page_elements_from_images(
         logger.exception(f"Unhandled error during table/chart extraction: {str(e)}")
         raise
 
-    finally:
-        if yolox_client:
-            yolox_client.close()
-
     logger.debug(f"Extracted {len(page_elements)} tables and charts from image.")
     return page_elements
 

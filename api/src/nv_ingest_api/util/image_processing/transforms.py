@@ -49,6 +49,68 @@ def _resize_image_opencv(
     return cv2.resize(array, target_size, interpolation=interpolation)
 
 
+def rgba_to_rgb_white_bg(rgba_image):
+    """
+    Convert RGBA image to RGB by blending with a white background.
+
+    This function properly handles transparency by alpha-blending transparent
+    and semi-transparent pixels with a white background, producing visually
+    accurate results that match how the image would appear when displayed.
+
+    Parameters
+    ----------
+    rgba_image : numpy.ndarray
+        Input image array with shape (height, width, 4) where the channels
+        are Red, Green, Blue, Alpha. Alpha values can be in range [0, 1]
+        (float) or [0, 255] (uint8).
+
+    Returns
+    -------
+    numpy.ndarray
+        RGB image array with shape (height, width, 3) and dtype uint8.
+        Values are in range [0, 255] representing Red, Green, Blue channels.
+
+    Notes
+    -----
+    The alpha blending formula used is:
+        RGB_out = RGB_in * alpha + background * (1 - alpha)
+
+    Where background is white (255, 255, 255).
+
+    For pixels with alpha = 1.0 (fully opaque), the original RGB values
+    are preserved. For pixels with alpha = 0.0 (fully transparent), the
+    result is white. Semi-transparent pixels are blended proportionally.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Create a sample RGBA image with some transparency
+    >>> rgba = np.random.randint(0, 256, (100, 100, 4), dtype=np.uint8)
+    >>> rgb = rgba_to_rgb_white_bg(rgba)
+    >>> print(rgb.shape)  # (100, 100, 3)
+    >>> print(rgb.dtype)  # uint8
+
+    >>> # Example with float alpha values [0, 1]
+    >>> rgba_float = np.random.rand(50, 50, 4).astype(np.float32)
+    >>> rgb_float = rgba_to_rgb_white_bg(rgba_float)
+    >>> print(rgb_float.dtype)  # uint8
+    """
+    # Extract RGB and alpha channels
+    rgb = rgba_image[:, :, :3]  # RGB channels (H, W, 3)
+    alpha = rgba_image[:, :, 3:4]  # Alpha channel (H, W, 1)
+
+    # Normalize alpha to [0, 1] range if it's in [0, 255] range
+    if alpha.max() > 1.0:
+        alpha = alpha / 255.0
+
+    # Alpha blend with white background using the formula:
+    # result = foreground * alpha + background * (1 - alpha)
+    rgb_image = rgb * alpha + 255 * (1 - alpha)
+
+    # Convert to uint8 format for standard image representation
+    return rgb_image.astype(np.uint8)
+
+
 def scale_image_to_encoding_size(
     base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9, format: str = "PNG", **kwargs
 ) -> Tuple[str, Tuple[int, int]]:
@@ -93,7 +155,7 @@ def scale_image_to_encoding_size(
 
         # Check initial size
         if len(base64_image) <= max_base64_size:
-            return base64_image, original_size
+            return numpy_to_base64(img_array, format=format, **kwargs), original_size
 
         # Initial reduction step
         reduction_step = initial_reduction
@@ -162,7 +224,7 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     base64_image : str
         Base64-encoded image string.
     target_format : str, optional
-        The target image format. Supported formats are "PNG" and "JPEG". Defaults to "PNG".
+        The target image format. Supported formats are "PNG", "JPEG"/"JPG". Defaults to "PNG".
     **kwargs
         Additional keyword arguments passed to the format-specific encoding function.
         For JPEG: quality (int, default=100) - JPEG quality (1-100).
@@ -176,9 +238,10 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     Raises
     ------
     ValueError
-        If there is an error during format conversion.
+        If there is an error during format conversion or if an unsupported format is provided.
     """
-    target_format = target_format.upper()
+    # Quick format normalization
+    target_format = target_format.upper().strip()
     if target_format == "JPG":
         target_format = "JPEG"
 
@@ -566,11 +629,14 @@ def numpy_to_base64(array: np.ndarray, format: str = "PNG", **kwargs) -> str:
     # Centralized preprocessing of the numpy array
     processed_array = _preprocess_numpy_array(array)
 
-    format = format.upper()
+    # Quick format normalization
+    format = format.upper().strip()
+    if format == "JPG":
+        format = "JPEG"
 
     if format == "PNG":
         return numpy_to_base64_png(processed_array)
-    elif format == "JPEG" or format == "JPG":
+    elif format == "JPEG":
         quality = kwargs.get("quality", 100)
         return numpy_to_base64_jpeg(processed_array, quality=quality)
     else:
@@ -616,6 +682,10 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
         if img is None:
             raise ValueError("OpenCV failed to decode image")
+
+        # Convert 4 channel to 3 channel if necessary
+        if img.shape[2] == 4:
+            img = rgba_to_rgb_white_bg(img)
 
         # Convert BGR to RGB for consistent processing (OpenCV loads as BGR)
         # Only convert if it's a 3-channel color image
@@ -669,3 +739,112 @@ def scale_numpy_image(
         img_arr = np.array(image)
     # Ensure we return a copy
     return img_arr.copy()
+
+
+def base64_to_disk(base64_string: str, output_path: str) -> bool:
+    """
+    Write base64-encoded image data directly to disk without conversion.
+
+    This function performs efficient base64 decoding and direct file writing,
+    preserving the original image format without unnecessary decode/encode cycles.
+    Used as the foundation for higher-level image saving operations.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image data. May include data URL prefix.
+    output_path : str
+        Path where the image should be saved.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+
+    Examples
+    --------
+    >>> success = base64_to_disk(image_b64, "/path/to/output.jpeg")
+    >>> if success:
+    ...     print("Image saved successfully")
+    """
+    try:
+        # Validate input
+        if not base64_string or not base64_string.strip():
+            return False
+
+        # Strip data URL prefix if present (e.g., "data:image/jpeg;base64,")
+        if "," in base64_string:
+            base64_string = base64_string.split(",")[1]
+
+        # Decode and write directly using bytetools (consistent with rest of codebase)
+        image_bytes = bytetools.bytesfrombase64(base64_string)
+
+        # Validate we actually have image data
+        if not image_bytes:
+            return False
+
+        with open(output_path, "wb") as f:
+            f.write(image_bytes)
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to write base64 image to disk: {e}")
+        return False
+
+
+def save_image_to_disk(base64_content: str, output_path: str, target_format: str = "auto", **kwargs) -> bool:
+    """
+    Save base64 image to disk with optional format conversion.
+
+    This function provides a high-level interface for saving images that combines
+    format conversion capabilities with efficient disk writing. It automatically
+    chooses between direct writing (when no conversion needed) and format conversion
+    to optimize performance while maintaining flexibility.
+
+    Parameters
+    ----------
+    base64_content : str
+        Base64-encoded image data.
+    output_path : str
+        Path where the image should be saved.
+    target_format : str, optional
+        Target format ("PNG", "JPEG", "auto"). Default is "auto" (preserve original).
+        Use "auto" to preserve the original format for maximum speed.
+    **kwargs
+        Additional arguments passed to ensure_base64_format() for conversion.
+        For JPEG: quality (int, default=100) - JPEG quality (1-100).
+        For PNG: compression (int, default=3) - PNG compression level (0-9).
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+
+    Examples
+    --------
+    >>> # Preserve original format (fastest)
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "auto")
+    >>>
+    >>> # Convert to JPEG with specific quality
+    >>> success = save_image_to_disk(image_b64, "/path/to/output.jpeg", "JPEG", quality=85)
+    """
+    try:
+        # Quick format normalization
+        target_format = target_format.lower().strip()
+        if target_format in ["jpg"]:
+            target_format = "jpeg"
+
+        # Handle format conversion if needed
+        if target_format == "auto":
+            # Preserve original format - no conversion needed
+            formatted_b64 = base64_content
+        else:
+            # Use API's smart format conversion
+            formatted_b64 = ensure_base64_format(base64_content, target_format, **kwargs)
+
+        # Direct write - no round trips
+        return base64_to_disk(formatted_b64, output_path)
+
+    except Exception as e:
+        logger.error(f"Failed to save image to disk: {e}")
+        return False

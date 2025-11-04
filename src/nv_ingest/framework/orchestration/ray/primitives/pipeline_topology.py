@@ -183,7 +183,7 @@ class PipelineTopology:
         """Marks an actor as pending removal, to be cleaned up by the background thread."""
         with self._lock:
             self._actors_pending_removal.add((stage_name, actor))
-            logger.info(f"Marked actor {actor} from stage {stage_name} for removal.")
+            logger.debug(f"Marked actor {actor} from stage {stage_name} for removal.")
 
     def start_cleanup_thread(self, interval: int = 5) -> None:
         """Starts the background thread for periodic cleanup tasks."""
@@ -191,14 +191,14 @@ class PipelineTopology:
             self._stop_cleanup.clear()
             self._cleanup_thread = threading.Thread(target=self._cleanup_loop, args=(interval,), daemon=True)
             self._cleanup_thread.start()
-            logger.info("Topology cleanup thread started.")
+            logger.debug("Topology cleanup thread started.")
 
     def stop_cleanup_thread(self) -> None:
         """Stops the background cleanup thread."""
         if self._cleanup_thread and self._cleanup_thread.is_alive():
             self._stop_cleanup.set()
             self._cleanup_thread.join(timeout=5)
-            logger.info("Topology cleanup thread stopped.")
+            logger.debug("Topology cleanup thread stopped.")
 
     def _cleanup_loop(self, interval: int) -> None:
         """Periodically checks for and removes actors that have completed shutdown."""
@@ -235,7 +235,7 @@ class PipelineTopology:
                             self._actors_pending_removal.remove((stage_name, actor))
                         if actor in self._stage_actors.get(stage_name, []):
                             self._stage_actors[stage_name].remove(actor)
-                            logger.info(f"Successfully removed actor {actor} from stage {stage_name} in topology.")
+                            logger.debug(f"Successfully removed actor {actor} from stage {stage_name} in topology.")
 
             time.sleep(interval)
 

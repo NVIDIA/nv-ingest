@@ -108,8 +108,12 @@ def _decode_and_extract_from_image(
             f"decode_and_extract: Extracting image content using image_extraction_config: "
             f"{validated_extraction_config}"
         )
+        # Ensure we pass the correct nested config type (ImageConfigSchema) to helpers.
+        # Some callers provide the full ImageExtractorSchema; extract its inner image_extraction_config.
         if validated_extraction_config is not None:
-            extract_params["image_extraction_config"] = validated_extraction_config
+            inner_cfg = getattr(validated_extraction_config, "image_extraction_config", validated_extraction_config)
+            if inner_cfg is not None:
+                extract_params["image_extraction_config"] = inner_cfg
 
         if execution_trace_log is not None:
             extract_params["trace_info"] = execution_trace_log

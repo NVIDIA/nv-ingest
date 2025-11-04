@@ -45,12 +45,12 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr and then set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
 
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
     OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text
+    OCR_MODEL_NAME=scene_text_ensemble
     ```
         
    Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
@@ -66,6 +66,18 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     !!! tip
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+
+    !!! tip
+
+    	For optimal performance on specific hardware, you can use `docker-compose` override files. Override files adjust settings, such as memory allocation, for different GPU architectures. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+
+    The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
+    ```shell
+    docker compose \
+      -f docker-compose.yaml \
+      -f docker-compose.a100-40gb.yaml \
+      --profile retrieval --profile table-structure up
+    ```
 
 8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
@@ -116,7 +128,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest-client==2025.3.10.dev20250310
+pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 ```
 
 !!! tip
@@ -133,7 +145,7 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
-In the below examples, we are doing text, chart, table, and image extraction:
+In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
@@ -177,13 +189,25 @@ ingestor = (
         dense_dim=2048
     )
 )
+
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Total time: {t1-t0} seconds")
+
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 !!! note
@@ -191,11 +215,13 @@ print(ingest_json_results_to_blob(results[0]))
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
 
+The output looks similar to the following.
+
 ```
 Starting ingestion..
 1 records to insert to milvus
 logged 8 records
-Time taken: 5.479151725769043 seconds
+Total time: 5.479151725769043 seconds
 This chart shows some gadgets, and some very fictitious costs. Gadgets and their cost   Chart 1 - Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost
 Table 1
 | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
@@ -282,7 +308,8 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
+You should see output that indicates the document processing status followed by a breakdown of time spent during job execution.
+
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to

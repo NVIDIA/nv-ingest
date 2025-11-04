@@ -1,10 +1,11 @@
-## Data Upload for NeMo Retriever Extraction
+# Data Upload for NeMo Retriever Extraction
 
 Use this documentation to learn how [NeMo Retriever extraction](overview.md) handles and uploads data.
 
 !!! note
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
 
 ## Overview
 
@@ -19,7 +20,7 @@ It does not store the embeddings for images.
 
 NeMo Retriever extraction supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md). 
 Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
- 
+
 
 
 ## Upload to Milvus
@@ -39,7 +40,11 @@ You can delete all collections by deleting that volume, and then restarting the 
 
     When you use the `vdb_upload` task with Milvus, you must expose the ports for the Milvus and MinIO containers to the nv-ingest client. This ensures that the nv-ingest client can connect to both services and perform the `vdb_upload` action.
 
-To upload to Milvus, use code similar to the following.
+!!! tip
+
+    When you use the `vdb_upload` method, the behavior of the upload depends on the `return_failures` parameter of the `ingest` method. For details, refer to [Capture Job Failures](nv-ingest-python-api.md#capture-job-failures).
+
+To upload to Milvus, use code similar to the following to define your `Ingestor`.
 
 ```python
 Ingestor(client=client)
@@ -66,4 +71,15 @@ You can ingest to other data stores by using the `Ingestor.vdb_upload` method;
 however, you must configure other data stores and connections yourself. 
 NeMo Retriever extraction does not provide connections to other data sources. 
 
+!!! important
+
+    NVIDIA makes no claim about accuracy, performance, or functionality of any vector database except Milvus. If you use a different vector database, it's your responsibility to test and maintain it.
+
 For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
+
+
+
+## Related Topics
+
+- [Use the NeMo Retriever Extraction Python API](nv-ingest-python-api.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)

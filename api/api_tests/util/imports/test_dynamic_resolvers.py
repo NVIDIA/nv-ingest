@@ -6,8 +6,46 @@ import inspect
 import types
 import pytest
 import sys
+import ray
+import os
+from pydantic import BaseModel
 
-from nv_ingest_api.util.imports.dynamic_resolvers import resolve_obj_from_path, resolve_callable_from_path
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest_api.util.imports.dynamic_resolvers import (
+    resolve_obj_from_path,
+    resolve_callable_from_path,
+    resolve_actor_class_from_path,
+)
+
+
+# Define dummy classes in the global scope so Ray workers can find them
+class DummyStageConfig(BaseModel):
+    pass
+
+
+class MyActorBase(RayActorStage):
+    def __init__(self, config: BaseModel, **kwargs):
+        # Add log_to_stdout=False to avoid printing during tests
+        super().__init__(config, log_to_stdout=False, **kwargs)
+
+    def on_data(self, control_message):
+        pass  # Abstract method implemented
+
+
+@ray.remote
+class ValidActor(MyActorBase):
+    def __init__(self, config: BaseModel, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def on_data(self, control_message):
+        return control_message
+
+    def ping(self):
+        return "pong"
+
+
+class NotAnActor:
+    pass
 
 
 @pytest.fixture
@@ -28,11 +66,22 @@ def dummy_module(monkeypatch):
     def sig_checker_bad(sig):
         raise TypeError("Always fails!")
 
+    # Use the globally defined classes
     mod.foo = foo
     mod.bar = bar
     mod.not_callable = 42
     mod.sig_checker_good = sig_checker_good
     mod.sig_checker_bad = sig_checker_bad
+    mod.MyActorBase = MyActorBase
+    mod.ValidActor = ValidActor
+    mod.NotAnActor = NotAnActor
+    mod.DummyStageConfig = DummyStageConfig
+
+    # Since the classes are now global, we need to add them to the module's
+    # __dict__ so they can be resolved by path, but we also need to handle
+    # how they are injected into sys.modules.
+    # The key is that `resolve_obj_from_path` looks in sys.modules['dummy_mod']
+    # which we are creating here.
     sys.modules["dummy_mod"] = mod
     yield mod
     del sys.modules["dummy_mod"]
@@ -91,7 +140,7 @@ def test_resolve_callable_from_path_callable_checker_good(dummy_module):
 def test_resolve_callable_from_path_callable_checker_bad(dummy_module):
     with pytest.raises(TypeError) as exc:
         resolve_callable_from_path("dummy_mod:foo", dummy_module.sig_checker_bad)
-    assert "failed custom signature validation" in str(exc.value)
+    assert "Always fails!" in str(exc.value)
 
 
 # -------- resolve_callable_from_path: checker as string --------
@@ -279,3 +328,69 @@ def test_resolve_callable_with_allowed_schema_path():
         assert callable(func)
     finally:
         del sys.modules["checker_mod_allowed"]
+
+
+# -------- resolve_actor_class_from_path --------
+
+
+def test_resolve_actor_class_from_path_success(dummy_module):
+    """Tests that a valid Ray actor class is resolved successfully."""
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    try:
+        if not ray.is_initialized():
+            ray.init(runtime_env={"working_dir": project_root})
+
+        # We now resolve the global class, not the one inside the fixture's scope
+        ActorClass = resolve_actor_class_from_path("dummy_mod:ValidActor", MyActorBase)
+        assert ActorClass is ValidActor
+        # Verify it's a real actor by instantiating it
+        actor = ActorClass.remote(config=DummyStageConfig())
+        assert ray.get(actor.ping.remote()) == "pong"
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
+
+
+def test_resolve_actor_class_from_path_wrong_base_class(dummy_module):
+    """Tests that a TypeError is raised if the resolved class does not inherit from the expected base."""
+
+    class AnotherBase:
+        pass
+
+    with pytest.raises(TypeError, match="must inherit from 'AnotherBase'"):
+        resolve_actor_class_from_path("dummy_mod:ValidActor", AnotherBase)
+
+
+def test_resolve_actor_class_from_path_not_an_actor(dummy_module):
+    """Tests that a TypeError is raised if the resolved object is not a Ray actor."""
+    with pytest.raises(TypeError, match="must inherit from 'MyActorBase'"):
+        # Note: We pass RayActorStage directly, not via the dummy module
+        resolve_actor_class_from_path("dummy_mod:NotAnActor", MyActorBase)
+
+
+def test_resolve_actor_class_from_path_not_a_class(dummy_module):
+    """Tests that a TypeError is raised if the resolved object is not a class."""
+    with pytest.raises(TypeError, match="not a class and not a recognized actor factory"):
+        resolve_actor_class_from_path("dummy_mod:foo", MyActorBase)
+
+
+def test_resolve_actor_class_from_path_attribute_error(dummy_module):
+    with pytest.raises(AttributeError):
+        resolve_actor_class_from_path("dummy_mod:DoesNotExist", MyActorBase)
+
+
+def test_resolve_actor_class_from_path_import_error(dummy_module):
+    with pytest.raises(ImportError):
+        resolve_actor_class_from_path("not_a_real_module:ValidActor", MyActorBase)
+
+
+def test_resolve_actor_class_from_path_allowed(dummy_module):
+    """Tests that an actor is resolved when its path is in the allowed list."""
+    ActorClass = resolve_actor_class_from_path("dummy_mod:ValidActor", MyActorBase, allowed_base_paths=["dummy_mod"])
+    assert ActorClass is ValidActor
+
+
+def test_resolve_actor_class_from_path_denied(dummy_module):
+    """Tests that an ImportError is raised when the path is not in the allowed list."""
+    with pytest.raises(ImportError, match="is not in the list of allowed base paths"):
+        resolve_actor_class_from_path("dummy_mod:ValidActor", MyActorBase, allowed_base_paths=["another_mod"])

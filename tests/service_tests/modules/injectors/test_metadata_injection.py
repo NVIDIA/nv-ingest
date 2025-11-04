@@ -63,8 +63,8 @@ class TestMetadataInjectionStage:
         # Create a config dictionary for initialization
         config = {}  # Replace with actual config if needed
 
-        # Create a remote actor instance
-        self.actor_ref = MetadataInjectionStage.remote(config)
+        # Create a remote actor instance with proper stage_name for decorator annotations
+        self.actor_ref = MetadataInjectionStage.remote(config, stage_name="metadata_injector")
 
         # Yield to run the test
         yield
@@ -160,7 +160,6 @@ class TestMetadataInjectionStage:
         assert cm["type"] == expected_type
         assert cm["page_number"] == -1
         assert cm["description"] == ""
-        assert isinstance(cm["hierarchy"], dict)
         assert cm["hierarchy"] == ContentHierarchySchema().model_dump()
         assert cm["subtype"] == ""
         assert cm["start_time"] == -1

@@ -43,7 +43,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -53,15 +53,26 @@ helm upgrade \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set paddleocr-nim.deployed=true \
     --set nemoretriever-ocr.deployed=false \
+    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.3.0"
+    --set image.tag="25.9.0"
 ```
 
 > [!NOTE]
-> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim.
+> The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
+>
+> ```bash
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
+> ```
+>
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
+
+> [!NOTE]
+> For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
 > Currently, the NemoRetriever OCR v1 container is in early access preview.
-> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
-> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
+> To use nemoretriever-ocr-v1, in the preceding code, change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`, and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](https://docs.nvidia.com/nemo/retriever/25.9.0/extraction/quickstart-guide/).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
@@ -112,7 +123,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==25.3.0
+pip install nv-ingest-client==25.9.0
 ```
 
 #### Rest Endpoint Ingress

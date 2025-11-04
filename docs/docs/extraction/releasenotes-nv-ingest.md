@@ -8,29 +8,41 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 
 
-## Release 25.7.1
+## Release 25.09 (25.9.0)
 
-The NeMo Retriever extraction 25.7.1 release adds new hardware and software support, and other improvements, including the following:
+The NeMo Retriever extraction 25.09 release adds new hardware and software support, and other improvements, including the following:
 
-- Add functional support for [RTX Pro 6000](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
+- Add functional support for [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/).
 - Add functional support for [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/).
-- Add support for [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr). For details, refer to [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md) and [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
+- Add support for [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1). For details, refer to [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md) and [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
 - Add support for [llama-3.2-nemoretriever-1b-vlm-embed-v1](https://build.nvidia.com/nvidia/llama-3_2-nemoretriever-1b-vlm-embed-v1).
 - Add support for Llama Nemotron VLM 8b NIM for image captioning. For details, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 - Add support for custom vector database implementations. For details, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
 - Add support for custom Lambda stages.  For details, refer to [Add User-defined Stages to Your NeMo Retriever Extraction Pipeline](user-defined-stages.md).
-- Expanded documentation about how to use [Library Mode](quickstart-library-mode.md).
+- Expanded documentation for [Library Mode](quickstart-library-mode.md).
+- New documentation [Configure Ray Logging](ray-logging.md).
+- New documentation [Use Multimodal Embedding](vlm-embed.md).
 - Add support for Integer, float, boolean, and array in custom metadata during Milvus entity creation.
 - Add support for running more than one VLM at a time by using Helm.  For details, refer to [NV-Ingest Helm Charts](https://github.com/nkmcalli/nv-ingest/tree/main/helm).
+
+
+### Known Issues
+
+The following are the known issues for this release:
+
+- A10G and L40S are not supported. To use A10G or L40S hardware, use release 25.6.x.
+- `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
 
 ### Breaking Changes
 
 There are no breaking changes in this version.
 
+
 ### Upgrade
 
-QA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/main/helm/values.yaml).
-GA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/TODO/helm/values.yaml).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/25.9.0/helm/README.md).
 
 
 
@@ -41,6 +53,13 @@ that updates the client's dependency on [pypdfium2](https://github.com/pypdfium2
 
 Only the release branch and the `nv-ingest-client` package have been updated in 25.6.3. 
 The previously released 25.6.2 container on NGC remains unchanged.
+
+
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
 
 
@@ -58,9 +77,17 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/examples/metadata_and_filtered_search.ipynb).
 
 
+### Known Issues
+
+The following are the known issues for this release:
+
+- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
+
+
 ### Breaking Changes
 
 There are no breaking changes in this version.
+
 
 ### Upgrade
 

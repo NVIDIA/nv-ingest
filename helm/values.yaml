@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.6.2"
+  tag: "latest"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -539,7 +539,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.8.0"
+    tag: "1.9.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -791,7 +791,7 @@ riva-nim:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/nvidia/riva-asr
+    repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
     tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
@@ -821,7 +821,7 @@ riva-nim:
     - name: NIM_HTTP_API_PORT
       value: "9000"
     - name: NIM_TAGS_SELECTOR
-      value: "name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"
+      value: "name=parakeet-1-1b-ctc-en-us,mode=ofl"
 
 
 ## @section Milvus Deployment parameters
@@ -852,19 +852,27 @@ milvus:
   image:
     all:
       repository: milvusdb/milvus
-      tag: v2.5.3-gpu
+      tag: v2.5.17-gpu
   cluster:
     enabled: false
   etcd:
+    image:
+      repository: "milvusdb/etcd"
+      tag: "3.5.22-r1"
     replicaCount: 1
     persistence:
       storageClass: null
   minio:
+    enabled: true
     mode: standalone
+    image:
+      tag: "RELEASE.2025-09-07T16-13-09Z"
     bucketName: nv-ingest
     persistence:
       size: 50Gi
       storageClass: null
+  pulsarv3:
+    enabled: false
   pulsar:
     enabled: false
   standalone:
@@ -923,7 +931,7 @@ redisDeployed: true
 
 redis:
   image:
-    tag: 7.4.3-debian-12-r0
+    tag: "8.2.1-debian-12-r0"
   auth:
     enabled: false
   replica:
@@ -1006,7 +1014,6 @@ prometheus:
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
-## @param envVars.INSTALL_AUDIO_EXTRACTION_DEPS [default: "true"] Install required libraries for audio processing
 envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   INGEST_LOG_LEVEL: "DEFAULT"
@@ -1060,7 +1067,6 @@ envVars:
 
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
-  INSTALL_AUDIO_EXTRACTION_DEPS: "true"
 
 ## @section Open Telemetry
 ## @descriptionStart
@@ -1077,39 +1083,41 @@ otelDeployed: true
 ## @skip opentelemetry-collector
 ## @extra opentelemetry-collector [default: sane {}] Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml
 opentelemetry-collector:
+  image:
+    repository: "otel/opentelemetry-collector-contrib"
+    tag: "0.133.0"
   mode: deployment
   config:
     receivers:
       otlp:
         protocols:
           grpc:
-            endpoint: '${env:MY_POD_IP}:4317'
+            endpoint: "${env:MY_POD_IP}:4317"
           http:
+            endpoint: "${env:MY_POD_IP}:4318"
             cors:
-              allowed_origins:
-                - "*"
+              allowed_origins: ["*"]
+
     exporters:
-      # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
       zipkin:
         endpoint: "http://nv-ingest-zipkin:9411/api/v2/spans"
       debug:
         verbosity: detailed
+
     extensions:
       health_check: {}
       zpages:
         endpoint: 0.0.0.0:55679
+
     processors:
       batch: {}
       tail_sampling:
-        # filter out health checks
-        # https://github.com/open-telemetry/opentelemetry-collector/issues/2310#issuecomment-1268157484
         policies:
           - name: drop_noisy_traces_url
             type: string_attribute
             string_attribute:
               key: http.target
-              values:
-                - \/health
+              values: ["/health"]
               enabled_regex_matching: true
               invert_match: true
       transform:
@@ -1118,29 +1126,29 @@ opentelemetry-collector:
             statements:
               - set(status.code, 1) where attributes["http.path"] == "/health"
 
-              # after the http target has been anonymized, replace other aspects of the span
+              # replace aspects of the span after anonymization
               - replace_match(attributes["http.route"], "/v1", attributes["http.target"]) where attributes["http.target"] != nil
-
-              # replace the title of the span with the route to be more descriptive
               - replace_pattern(name, "/v1", attributes["http.route"]) where attributes["http.route"] != nil
-
-              # set the route to equal the URL if it's nondescriptive (for the embedding case)
               - set(name, Concat([name, attributes["http.url"]], " ")) where name == "POST"
+
     service:
       extensions: [zpages, health_check]
+      telemetry:
+        logs:
+          level: "debug"
       pipelines:
         traces:
           receivers: [otlp]
+          processors: [batch, tail_sampling, transform]
           exporters: [debug, zipkin]
-          processors: [tail_sampling, transform]
         metrics:
           receivers: [otlp]
-          exporters: [debug]
           processors: [batch]
+          exporters: [debug]
         logs:
           receivers: [otlp]
-          exporters: [debug]
           processors: [batch]
+          exporters: [debug]
 
 ## @param otelEnvVars [default: sane {}] Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value
 ## @extra otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT Default deployment target for GRPC otel - Default "http://{{ .Release.Name }}-opentelemetry-collector:4317"
@@ -1166,6 +1174,9 @@ otelEnvVars:
 zipkinDeployed: true
 
 zipkin:
+  image:
+    repository: "openzipkin/zipkin"
+    tag: "3.5.0"
   zipkin:
     extraEnv:
       JAVA_OPTS: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"

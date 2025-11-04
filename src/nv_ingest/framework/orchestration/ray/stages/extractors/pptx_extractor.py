@@ -3,8 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import ray
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
@@ -28,7 +30,7 @@ class PPTXExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted content DataFrame.
     """
 
-    def __init__(self, config: PPTXExtractorSchema) -> None:
+    def __init__(self, config: PPTXExtractorSchema, stage_name: Optional[str] = None) -> None:
         """
         Initializes the PptxExtractorStage.
 
@@ -36,8 +38,10 @@ class PPTXExtractorStage(RayActorStage):
         ----------
         config : PPTXExtractorSchema
             The validated configuration object for PPTX extraction.
+        stage_name : Optional[str]
+            Name of the stage from YAML pipeline configuration.
         """
-        super().__init__(config)
+        super().__init__(config, stage_name=stage_name)
         try:
             # The config passed in should already be validated, but storing it.
             self.validated_config = config
@@ -47,9 +51,10 @@ class PPTXExtractorStage(RayActorStage):
             logger.exception(f"Error initializing or validating PPTX Extractor config: {e}")
             raise
 
-    @traceable("pptx_extractor")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "pptx"})])
-    @nv_ingest_node_failure_try_except(annotation_id="pptx_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting content from PPTX documents.
@@ -80,6 +85,6 @@ class PPTXExtractorStage(RayActorStage):
 
         # Update the message payload with the extracted PPTX content DataFrame.
         control_message.payload(new_df)
-        control_message.set_metadata("pptx_extraction_info", extraction_info)  # <-- Changed metadata key
+        control_message.set_metadata("pptx_extraction_info", extraction_info)
 
         return control_message

@@ -12,11 +12,10 @@ from typing import Tuple
 import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import NimClient
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
-from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
-    InfographicExtractorSchema,
-)
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
 from nv_ingest_api.util.image_processing.table_and_chart import reorder_boxes
@@ -101,20 +100,24 @@ def _update_infographic_metadata(
 
     infer_kwargs = dict(
         stage_name="infographic_extraction",
-        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
         infer_kwargs.update(
             model_name="paddle",
+            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
-    else:
+    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
         infer_kwargs.update(
-            model_name="scene_text",
-            input_names=["input", "merge_levels"],
-            dtypes=["FP32", "BYTES"],
+            model_name=ocr_model_name,
+            input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
+            output_names=["OUTPUT"],
+            dtypes=["BYTES", "BYTES"],
             merge_level="paragraph",
         )
+    else:
+        raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
+
     try:
         ocr_results = ocr_client.infer(data_ocr, **infer_kwargs)
     except Exception as e:
@@ -133,25 +136,36 @@ def _update_infographic_metadata(
             # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes, conf_scores).
             ocr_res = reorder_boxes(*ocr_res)
 
-        results[original_index] = (base64_images[original_index], ocr_res[0], ocr_res[1])
+        results[original_index] = (
+            base64_images[original_index],
+            ocr_res[0],
+            ocr_res[1],
+        )
 
     return results
 
 
-def _create_clients(
+def _create_ocr_client(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
+    ocr_model_name: str,
     auth_token: str,
 ) -> NimClient:
-    ocr_model_interface = OCRModelInterface()
-
-    logger.debug(f"Inference protocols: ocr={ocr_protocol}")
+    ocr_model_interface = (
+        NemoRetrieverOCRModelInterface()
+        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        else PaddleOCRModelInterface()
+    )
 
     ocr_client = create_inference_client(
         endpoints=ocr_endpoints,
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
+        enable_dynamic_batching=(
+            True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"} else False
+        ),
+        dynamic_batch_memory_budget_mb=32,
     )
 
     return ocr_client
@@ -228,11 +242,6 @@ def extract_infographic_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    ocr_client = _create_clients(
-        endpoint_config.ocr_endpoints,
-        endpoint_config.ocr_infer_protocol,
-        endpoint_config.auth_token,
-    )
 
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
@@ -251,6 +260,13 @@ def extract_infographic_data_from_image_internal(
         base64_images = [df_extraction_ledger.at[idx, "metadata"]["content"] for idx in valid_indices]
 
         # Call bulk update to extract infographic data.
+        ocr_client = _create_ocr_client(
+            endpoint_config.ocr_endpoints,
+            endpoint_config.ocr_infer_protocol,
+            ocr_model_name,
+            endpoint_config.auth_token,
+        )
+
         bulk_results = _update_infographic_metadata(
             base64_images=base64_images,
             ocr_client=ocr_client,
@@ -272,6 +288,3 @@ def extract_infographic_data_from_image_internal(
         err_msg = "Error occurred while extracting infographic data."
         logger.exception(err_msg)
         raise
-
-    finally:
-        ocr_client.close()

@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema, ImageExtractorSchema
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 
 ### Tests for ImageConfigSchema ###
@@ -81,3 +82,39 @@ def test_image_extractor_forbid_extra_fields():
 def test_image_extractor_invalid_types():
     with pytest.raises(ValidationError):
         ImageExtractorSchema(max_queue_size="not_int", n_workers="also_not_int")
+
+
+### Sanitization and Redaction Tests ###
+
+
+def test_image_config_repr_hides_sensitive_fields_and_sanitize_redacts():
+    config = ImageConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        auth_token="very_secret",
+    )
+
+    rep = repr(config)
+    s = str(config)
+    assert "very_secret" not in rep
+    assert "very_secret" not in s
+
+    sanitized = sanitize_for_logging(config)
+    assert isinstance(sanitized, dict)
+    assert sanitized.get("auth_token") == "***REDACTED***"
+
+
+def test_image_extractor_schema_sanitize_nested_config():
+    image_config = ImageConfigSchema(
+        yolox_endpoints=("grpc_service", None),
+        auth_token="nested_secret",
+    )
+    schema = ImageExtractorSchema(
+        max_queue_size=3,
+        n_workers=2,
+        raise_on_failure=False,
+        image_extraction_config=image_config,
+    )
+
+    sanitized = sanitize_for_logging(schema)
+    assert isinstance(sanitized, dict)
+    assert sanitized["image_extraction_config"]["auth_token"] == "***REDACTED***"

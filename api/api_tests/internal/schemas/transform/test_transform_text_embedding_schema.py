@@ -11,7 +11,7 @@ from nv_ingest_api.util.logging.configuration import LogLevel
 
 def test_text_embedding_schema_defaults():
     schema = TextEmbeddingSchema()
-    assert schema.api_key == "api_key"
+    assert schema.api_key == ""
     assert schema.batch_size == 4
     assert schema.embedding_model.startswith("nvidia/")
     assert schema.embedding_nim_endpoint.startswith("http")
@@ -20,6 +20,8 @@ def test_text_embedding_schema_defaults():
     assert schema.input_type == "passage"
     assert schema.raise_on_failure is False
     assert schema.truncate == "END"
+    assert schema.custom_content_field is None
+    assert schema.result_target_field is None
 
 
 def test_text_embedding_schema_accepts_custom_values():
@@ -33,6 +35,8 @@ def test_text_embedding_schema_accepts_custom_values():
         input_type="query",
         raise_on_failure=True,
         truncate="START",
+        custom_content_field="custom_content",
+        result_target_field="custom_content_embeddings",
     )
     assert schema.api_key == "mykey"
     assert schema.batch_size == 16
@@ -43,6 +47,8 @@ def test_text_embedding_schema_accepts_custom_values():
     assert schema.input_type == "query"
     assert schema.raise_on_failure is True
     assert schema.truncate == "START"
+    assert schema.custom_content_field == "custom_content"
+    assert schema.result_target_field == "custom_content_embeddings"
 
 
 def test_text_embedding_schema_rejects_extra_fields():

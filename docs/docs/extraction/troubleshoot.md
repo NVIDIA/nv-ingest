@@ -2,6 +2,10 @@
 
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
 
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
 
 ## Can't process long, non-language text strings
 
@@ -38,6 +42,33 @@ Before you change the `-u` setting, consider the following:
 ```bash
 ulimit -u 10,000
 ```
+
+
+
+## Out-of-Memory (OOM) Error when Processing Large Datasets
+
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+This happens because, by default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+If the total size of the results exceeds the available memory, the process fails.
+
+To resolve this issue, use the `save_to_disk` method. 
+For details, refer to [Working with Large Datasets: Saving to Disk](nv-ingest-python-api.md#work-with-large-datasets-save-to-disk).
+
+
+
+## Embedding service fails to start with an unsupported batch size error
+
+On certain hardware, for example RTX 6000, 
+the embedding service might fail to start and you might see an error similar to the following.
+
+```bash
+ValueError: Configured max_batch_size (30) is larger than the model''s supported max_batch_size (3).
+```
+
+If you are using hardware where the embedding NIM uses the ONNX model profile, 
+you must set `EMBEDDER_BATCH_SIZE=3` in your environment. 
+You can set the variable in your .env file or directly in your environment.
+
 
 
 ## Extract method nemoretriever-parse doesn't support image files
@@ -94,14 +125,6 @@ ERROR 2025-04-24 22:49:44.434 nimutils.py:68] }
 ...
 ```
 
-## Embedding service fails to start with an unsupported batch size error
-
-If you are using hardware where the embedding NIM uses the ONNX model profile, you must set `EMBEDDER_BATCH_SIZE=3` in your environment
-(e.g., in a `.env` file) to prevent the embedding service from failing to start due to an unsupported batch size error.
-For example, on certain hardware like RTX 6000, you might see an error that looks similar to the following.
-```bash
-ValueError: Configured max_batch_size (30) is larger than the model's supported max_batch_size (3).
-```
 
 
 ## Related Topics

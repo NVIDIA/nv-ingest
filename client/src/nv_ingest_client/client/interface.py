@@ -6,6 +6,7 @@
 
 import collections
 import glob
+import gzip
 import json
 import logging
 import os
@@ -27,6 +28,16 @@ from typing import Union
 from urllib.parse import urlparse
 
 import fsspec
+from nv_ingest_api.internal.enums.common import PipelinePhase
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.util.introspection.function_inspect import infer_udf_function_name
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.client.util.processing import get_valid_filename
 from nv_ingest_client.client.util.processing import save_document_results_to_jsonl
@@ -38,19 +49,12 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
-from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
-from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
 from nv_ingest_client.util.vdb import VDB, get_vdb_op_cls
 from tqdm import tqdm
 
@@ -90,17 +94,20 @@ def ensure_job_specs(func):
 
 
 class LazyLoadedList(collections.abc.Sequence):
-    def __init__(self, filepath: str, expected_len: Optional[int] = None):
+    def __init__(self, filepath: str, expected_len: Optional[int] = None, compression: Optional[str] = None):
         self.filepath = filepath
         self._len: Optional[int] = expected_len  # Store pre-calculated length
         self._offsets: Optional[List[int]] = None
+        self.compression = compression
 
         if self._len == 0:
             self._offsets = []
 
+        self._open = gzip.open if self.compression == "gzip" else open
+
     def __iter__(self) -> Iterator[Any]:
         try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
+            with self._open(self.filepath, "rt", encoding="utf-8") as f:
                 for line in f:
                     yield json.loads(line)
         except FileNotFoundError:
@@ -117,7 +124,7 @@ class LazyLoadedList(collections.abc.Sequence):
         self._offsets = []
         line_count = 0
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 while True:
                     current_pos = f.tell()
                     line = f.readline()
@@ -141,10 +148,12 @@ class LazyLoadedList(collections.abc.Sequence):
     def __len__(self) -> int:
         if self._len is not None:
             return self._len
+
         if self._offsets is not None:
             self._len = len(self._offsets)
             return self._len
         self._build_index()
+
         return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
@@ -167,7 +176,7 @@ class LazyLoadedList(collections.abc.Sequence):
             raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with open(self.filepath, "rb") as f:
+            with self._open(self.filepath, "rb") as f:
                 f.seek(self._offsets[idx])
                 line_bytes = f.readline()
                 return json.loads(line_bytes.decode("utf-8"))
@@ -393,15 +402,9 @@ class Ingestor:
         show_progress: bool = False,
         return_failures: bool = False,
         save_to_disk: bool = False,
+        return_traces: bool = False,
         **kwargs: Any,
-    ) -> Union[
-        List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
-        List[LazyLoadedList],  # Disk: List of proxies, one per original doc
-        Tuple[
-            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
-            List[Tuple[str, str]],
-        ],
-    ]:  # noqa: E501
+    ) -> Union[List[Any], Tuple[Any, ...]]:
         """
         Ingest documents by submitting jobs and fetching results concurrently.
 
@@ -411,21 +414,35 @@ class Ingestor:
             Whether to display a progress bar. Default is False.
         return_failures : bool, optional
             If True, return a tuple (results, failures); otherwise, return only results. Default is False.
+        save_to_disk : bool, optional
+            If True, save results to disk and return LazyLoadedList proxies. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
+            Traces contain timing metrics (entry, exit, resident_time) for each stage.
         **kwargs : Any
-            Additional keyword arguments for the underlying client methods. Supported keys:
-            'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
-            'data_only', 'verbose'. Unrecognized keys are passed through to
-            process_jobs_concurrently.
+            Additional keyword arguments for the underlying client methods.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        results : list of dict
-            List of successful job results when `return_failures` is False.
-        results, failures : tuple (list of dict, list of tuple of str)
-            Tuple containing successful results and failure information when `return_failures` is True.
+        list or tuple
+            Returns vary based on flags:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+            - Additional combinations with include_parent_trace_ids kwarg
+
+        Notes
+        -----
+        Trace metrics include timing data for each processing stage. For detailed
+        usage and examples, see src/nv_ingest/api/v2/README.md
         """
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
+
+        include_parent_trace_ids = bool(kwargs.pop("include_parent_trace_ids", False))
 
         self._prepare_ingest_run()
 
@@ -436,7 +453,7 @@ class Ingestor:
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
-        # Lock for thread-safe appends to final_results_payload_list by I/O tasks
+        # Lock for thread-safe appending to final_results_payload_list by I/O tasks
         results_lock = threading.Lock() if self._output_config else None
 
         io_executor: Optional[ThreadPoolExecutor] = None
@@ -452,6 +469,8 @@ class Ingestor:
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
                 file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+                if self._output_config["compression"] == "gzip":
+                    file_suffix += ".gz"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
@@ -459,10 +478,13 @@ class Ingestor:
                     jsonl_filepath,
                     source_name,
                     ensure_parent_dir_exists=False,
+                    compression=self._output_config["compression"],
                 )
 
                 if num_items_saved > 0:
-                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    results = LazyLoadedList(
+                        jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
+                    )
                     if results_lock:
                         with results_lock:
                             final_results_payload_list.append(results)
@@ -535,7 +557,24 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
-        results, failures = self._client.process_jobs_concurrently(
+        # Telemetry controls (optional)
+        enable_telemetry: Optional[bool] = kwargs.pop("enable_telemetry", None)
+        show_telemetry: Optional[bool] = kwargs.pop("show_telemetry", None)
+        if show_telemetry is None:
+            # Fallback to env NV_INGEST_CLIENT_SHOW_TELEMETRY (0/1), default off
+            try:
+                show_telemetry = bool(int(os.getenv("NV_INGEST_CLIENT_SHOW_TELEMETRY", "0")))
+            except ValueError:
+                show_telemetry = False
+        # If user explicitly wants to show telemetry but did not specify enable_telemetry,
+        # ensure collection is enabled so summary isn't empty.
+        if enable_telemetry is None and show_telemetry:
+            enable_telemetry = True
+        if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
+            self._client.enable_telemetry(bool(enable_telemetry))
+
+        # Call process_jobs_concurrently
+        proc_result = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
@@ -544,8 +583,16 @@ class Ingestor:
             return_failures=True,
             stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
+            return_traces=return_traces,
             **proc_kwargs,
         )
+
+        # Unpack result based on return_traces flag
+        if return_traces:
+            results, failures, traces_list = proc_result
+        else:
+            results, failures = proc_result
+            traces_list = []  # Empty list when traces not requested
 
         if show_progress and pbar:
             pbar.close()
@@ -597,7 +644,30 @@ class Ingestor:
                     logger.info("Purging saved results from disk after successful VDB upload.")
                     self._purge_saved_results(results)
 
-        return (results, failures) if return_failures else results
+        # Print telemetry summary if requested
+        if show_telemetry:
+            try:
+                summary = self._client.summarize_telemetry()
+                # Print to stdout and log for convenience
+                print("NvIngestClient Telemetry Summary:", json.dumps(summary, indent=2))
+                logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
+            except Exception:
+                pass
+
+        parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+
+        # Build return tuple based on requested outputs
+        # Order: results, failures (if requested), traces (if requested), parent_trace_ids (if requested)
+        returns = [results]
+
+        if return_failures:
+            returns.append(failures)
+        if return_traces:
+            returns.append(traces_list)
+        if include_parent_trace_ids:
+            returns.append(parent_trace_ids)
+
+        return tuple(returns) if len(returns) > 1 else results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
@@ -698,8 +768,23 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(DedupTaskSchema, kwargs, "dedup", json.dumps(kwargs))
-        dedup_task = DedupTask(**task_options.model_dump())
+        # Extract content_type and build params dict for API schema
+        content_type = kwargs.pop("content_type", "text")  # Default to "text" if not specified
+        params = kwargs  # Remaining parameters go into params dict
+
+        # Validate with API schema
+        api_options = {
+            "content_type": content_type,
+            "params": params,
+        }
+        task_options = check_schema(IngestTaskDedupSchema, api_options, "dedup", json.dumps(api_options))
+
+        # Extract individual parameters from API schema for DedupTask constructor
+        dedup_params = {
+            "content_type": task_options.content_type,
+            "filter": task_options.params.filter,
+        }
+        dedup_task = DedupTask(**dedup_params)
         self._job_specs.add_task(dedup_task)
 
         return self
@@ -719,8 +804,14 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(EmbedTaskSchema, kwargs, "embed", json.dumps(kwargs))
-        embed_task = EmbedTask(**task_options.model_dump())
+        # Filter out deprecated parameters before API schema validation
+        # The EmbedTask constructor handles these deprecated parameters with warnings
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ["text", "tables"]}
+
+        _ = check_schema(IngestTaskEmbedSchema, filtered_kwargs, "embed", json.dumps(filtered_kwargs))
+
+        # Pass original kwargs to EmbedTask constructor so it can handle deprecated parameters
+        embed_task = EmbedTask(**kwargs)
         self._job_specs.add_task(embed_task)
 
         return self
@@ -767,9 +858,52 @@ class Ingestor:
                 extract_page_as_image=extract_page_as_image,
                 **kwargs,
             )
-            task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))
 
-            extract_task = ExtractTask(**task_options.model_dump())
+            # Extract method from task_options for API schema
+            method = task_options.pop("extract_method", None)
+            if method is None:
+                # Let ExtractTask constructor handle default method selection
+                method = "pdfium"  # Default fallback
+
+            # Build params dict for API schema
+            params = {k: v for k, v in task_options.items() if k != "document_type"}
+
+            # Map document type to API schema expected values
+            # Handle common file extension to DocumentTypeEnum mapping
+            document_type_mapping = {
+                "txt": "text",
+                "md": "text",
+                "sh": "text",
+                "json": "text",
+                "jpg": "jpeg",
+                "jpeg": "jpeg",
+                "png": "png",
+                "pdf": "pdf",
+                "docx": "docx",
+                "pptx": "pptx",
+                "html": "html",
+                "bmp": "bmp",
+                "tiff": "tiff",
+                "svg": "svg",
+                "mp3": "mp3",
+                "wav": "wav",
+            }
+
+            # Use mapped document type for API schema validation
+            api_document_type = document_type_mapping.get(document_type.lower(), document_type)
+
+            # Validate with API schema
+            api_task_options = {
+                "document_type": api_document_type,
+                "method": method,
+                "params": params,
+            }
+
+            check_schema(IngestTaskExtractSchema, api_task_options, "extract", json.dumps(api_task_options))
+
+            # Create ExtractTask with mapped document type for API schema compatibility
+            extract_task_params = {"document_type": api_document_type, "extract_method": method, **params}
+            extract_task = ExtractTask(**extract_task_params)
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
@@ -789,8 +923,27 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(FilterTaskSchema, kwargs, "filter", json.dumps(kwargs))
-        filter_task = FilterTask(**task_options.model_dump())
+        # Restructure parameters to match API schema structure
+        params_fields = {"min_size", "max_aspect_ratio", "min_aspect_ratio", "filter"}
+        params = {k: v for k, v in kwargs.items() if k in params_fields}
+        top_level = {k: v for k, v in kwargs.items() if k not in params_fields}
+
+        # Build API schema structure
+        api_kwargs = top_level.copy()
+        if params:
+            api_kwargs["params"] = params
+
+        task_options = check_schema(IngestTaskFilterSchema, api_kwargs, "filter", json.dumps(api_kwargs))
+
+        # Extract individual parameters from API schema for FilterTask constructor
+        filter_params = {
+            "content_type": task_options.content_type,
+            "min_size": task_options.params.min_size,
+            "max_aspect_ratio": task_options.params.max_aspect_ratio,
+            "min_aspect_ratio": task_options.params.min_aspect_ratio,
+            "filter": task_options.params.filter,
+        }
+        filter_task = FilterTask(**filter_params)
         self._job_specs.add_task(filter_task)
 
         return self
@@ -810,7 +963,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(SplitTaskSchema, kwargs, "split", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskSplitSchema, kwargs, "split", json.dumps(kwargs))
         extract_task = SplitTask(**task_options.model_dump())
         self._job_specs.add_task(extract_task)
 
@@ -831,8 +984,24 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreTaskSchema, kwargs, "store", json.dumps(kwargs))
-        store_task = StoreTask(**task_options.model_dump())
+        # Handle parameter name mapping: store_method -> method for API schema
+        if "store_method" in kwargs:
+            kwargs["method"] = kwargs.pop("store_method")
+
+        # Provide default method if not specified (matching client StoreTask behavior)
+        if "method" not in kwargs:
+            kwargs["method"] = "minio"
+
+        task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
+
+        # Map API schema fields back to StoreTask constructor parameters
+        store_params = {
+            "structured": task_options.structured,
+            "images": task_options.images,
+            "store_method": task_options.method,  # Map method back to store_method
+            "params": task_options.params,
+        }
+        store_task = StoreTask(**store_params)
         self._job_specs.add_task(store_task)
 
         return self
@@ -840,21 +1009,94 @@ class Ingestor:
     @ensure_job_specs
     def store_embed(self, **kwargs: Any) -> "Ingestor":
         """
-        Adds a StoreTask to the batch job specification.
+        Adds a StoreEmbedTask to the batch job specification.
 
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the StoreTask.
+            Parameters specific to the StoreEmbedTask.
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskStoreEmbedSchema, kwargs, "store_embedding", json.dumps(kwargs))
         store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
+
+        return self
+
+    def udf(
+        self,
+        udf_function: str,
+        udf_function_name: Optional[str] = None,
+        phase: Optional[Union[PipelinePhase, int, str]] = None,
+        target_stage: Optional[str] = None,
+        run_before: bool = False,
+        run_after: bool = False,
+    ) -> "Ingestor":
+        """
+        Adds a UDFTask to the batch job specification.
+
+        Parameters
+        ----------
+        udf_function : str
+            UDF specification. Supports three formats:
+            1. Inline function: 'def my_func(control_message): ...'
+            2. Import path: 'my_module.my_function'
+            3. File path: '/path/to/file.py:function_name'
+        udf_function_name : str, optional
+            Name of the function to execute from the UDF specification.
+            If not provided, attempts to infer from udf_function.
+        phase : Union[PipelinePhase, int, str], optional
+            Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
+            or numbers (1-4). Cannot be used with target_stage.
+        target_stage : str, optional
+            Specific stage name to target for UDF execution. Cannot be used with phase.
+        run_before : bool, optional
+            If True and target_stage is specified, run UDF before the target stage. Default: False.
+        run_after : bool, optional
+            If True and target_stage is specified, run UDF after the target stage. Default: False.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+
+        Raises
+        ------
+        ValueError
+            If udf_function_name cannot be inferred and is not provided explicitly,
+            or if both phase and target_stage are specified, or if neither is specified.
+        """
+        # Validate mutual exclusivity of phase and target_stage
+        if phase is not None and target_stage is not None:
+            raise ValueError("Cannot specify both 'phase' and 'target_stage'. Please specify only one.")
+        elif phase is None and target_stage is None:
+            # Default to response phase for backward compatibility
+            phase = PipelinePhase.RESPONSE
+
+        # Try to infer udf_function_name if not provided
+        if udf_function_name is None:
+            udf_function_name = infer_udf_function_name(udf_function)
+            if udf_function_name is None:
+                raise ValueError(
+                    f"Could not infer UDF function name from '{udf_function}'. "
+                    "Please specify 'udf_function_name' explicitly."
+                )
+            logger.info(f"Inferred UDF function name: {udf_function_name}")
+
+        # Use UDFTask constructor with explicit parameters
+        udf_task = UDFTask(
+            udf_function=udf_function,
+            udf_function_name=udf_function_name,
+            phase=phase,
+            target_stage=target_stage,
+            run_before=run_before,
+            run_after=run_after,
+        )
+        self._job_specs.add_task(udf_task)
 
         return self
 
@@ -893,6 +1135,7 @@ class Ingestor:
         self,
         output_directory: Optional[str] = None,
         cleanup: bool = True,
+        compression: Optional[str] = "gzip",
     ) -> "Ingestor":
         """Configures the Ingestor to save results to disk instead of memory.
 
@@ -917,6 +1160,12 @@ class Ingestor:
             when the Ingestor's context is exited (i.e., when used in a `with`
             statement).
             Defaults to True.
+        compression : str, optional
+            The compression algorithm to use for the saved result files.
+            Currently, the only supported value is `'gzip'`. To disable
+            compression, set this parameter to `None`. Defaults to `'gzip'`,
+            which significantly reduces the disk space required for results.
+            When enabled, files are saved with a `.gz` suffix (e.g., `results.jsonl.gz`).
 
         Returns
         -------
@@ -932,6 +1181,7 @@ class Ingestor:
         self._output_config = {
             "output_directory": output_directory,
             "cleanup": cleanup,
+            "compression": compression,
         }
         ensure_directory_with_permissions(output_directory)
 
@@ -986,9 +1236,55 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(CaptionTaskSchema, kwargs, "caption", json.dumps(kwargs))
-        caption_task = CaptionTask(**task_options.model_dump())
+        task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
+
+        # Extract individual parameters from API schema for CaptionTask constructor
+        caption_params = {
+            "api_key": task_options.api_key,
+            "endpoint_url": task_options.endpoint_url,
+            "prompt": task_options.prompt,
+            "model_name": task_options.model_name,
+        }
+        caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
+
+        return self
+
+    @ensure_job_specs
+    def pdf_split_config(self, pages_per_chunk: int = 32) -> "Ingestor":
+        """
+        Configure PDF splitting behavior for V2 API.
+
+        Parameters
+        ----------
+        pages_per_chunk : int, optional
+            Number of pages per PDF chunk (default: 32)
+            Server enforces boundaries: min=1, max=128
+
+        Returns
+        -------
+        Ingestor
+            Self for method chaining
+
+        Notes
+        -----
+        - Only affects V2 API endpoints with PDF splitting support
+        - Server will clamp values outside [1, 128] range
+        - Smaller chunks = more parallelism but more overhead
+        - Larger chunks = less overhead but reduced concurrency
+        """
+        MIN_PAGES = 1
+        MAX_PAGES = 128
+
+        # Warn if value will be clamped by server
+        if pages_per_chunk < MIN_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} is below minimum. Server will clamp to {MIN_PAGES}.")
+        elif pages_per_chunk > MAX_PAGES:
+            logger.warning(f"pages_per_chunk={pages_per_chunk} exceeds maximum. Server will clamp to {MAX_PAGES}.")
+
+        # Flatten all job specs and apply PDF config using shared utility
+        all_job_specs = [spec for job_specs in self._job_specs._file_type_to_job_spec.values() for spec in job_specs]
+        apply_pdf_split_config_to_job_specs(all_job_specs, pages_per_chunk)
 
         return self
 

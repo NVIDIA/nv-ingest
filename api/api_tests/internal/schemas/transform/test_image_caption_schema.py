@@ -10,7 +10,7 @@ from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema imp
 
 def test_image_caption_extraction_schema_defaults():
     schema = ImageCaptionExtractionSchema()
-    assert schema.api_key == "api_key"
+    assert schema.api_key == ""
     assert schema.endpoint_url.startswith("https://")
     assert schema.prompt.startswith("Caption")
     assert schema.model_name.startswith("nvidia/")

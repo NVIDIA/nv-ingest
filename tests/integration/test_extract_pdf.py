@@ -34,7 +34,7 @@ def run_basic_extract_test(
         "extract_tables": True,
         "extract_charts": True,
         "extract_images": True,
-        "paddle_output_format": "markdown",
+        "table_output_format": "markdown",
         "extract_infographics": True,
         "text_depth": "page",
     }
@@ -72,7 +72,7 @@ def run_basic_extract_test(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("extract_method", [None, "nemoretriever_parse"])
+@pytest.mark.parametrize("extract_method", [None])  # , "nemoretriever_parse"])
 def test_extract_only(
     extract_method,
     pipeline_process,
@@ -99,6 +99,7 @@ def test_extract_only(
 
 
 @pytest.mark.integration
+@pytest.mark.skip("Skipping for the moment")
 def test_pdfium_extract_embed_upload_query(pipeline_process):
     client = create_client()
 

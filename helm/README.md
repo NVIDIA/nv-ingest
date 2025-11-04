@@ -42,7 +42,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -52,15 +52,26 @@ helm upgrade \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set paddleocr-nim.deployed=true \
     --set nemoretriever-ocr.deployed=false \
+    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.3.0"
+    --set image.tag="25.9.0"
 ```
 
 > [!NOTE]
-> For faster OCR performance, you can use the [nemoretriever-ocr](https://build.nvidia.com/nvidia/nemoretriever-ocr) container instead of the default paddleocr-nim.
+> The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
+>
+> ```bash
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
+> ```
+>
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
+
+> [!NOTE]
+> For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
 > Currently, the NemoRetriever OCR v1 container is in early access preview.
-> To use nemoretriever-ocr, in the above code change `paddleocr-nim.deployed` to `false` and `nemoretriever-ocr.deployed` to `true`.
-> For more information, see [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md).
+> To use nemoretriever-ocr-v1, in the preceding code, change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`, and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](https://docs.nvidia.com/nemo/retriever/25.9.0/extraction/quickstart-guide/).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
@@ -110,7 +121,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==25.3.0
+pip install nv-ingest-client==25.9.0
 ```
 
 #### Rest Endpoint Ingress
@@ -294,10 +305,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.4.0 |
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
-| https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
+| https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.133.0 |
 | https://prometheus-community.github.io/helm-charts | prometheus | 27.12.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
-| https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
+| https://zipkin.io/zipkin-helm | zipkin | 0.4.0 |
 | oci://registry-1.docker.io/bitnamicharts | redis | 19.1.3 |
 
 ## Values
@@ -321,7 +332,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
 | envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
-| envVars.INSTALL_AUDIO_EXTRACTION_DEPS | string | `"true"` |  |
 | envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
@@ -361,7 +371,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.6.2"` |  |
+| image.tag | string | `"latest"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -408,15 +418,20 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | llama-32-nv-rerankqa-1b-v2.statefuleSet.enabled | bool | `false` |  |
 | logLevel | string | `"DEFAULT"` |  |
 | milvus.cluster.enabled | bool | `false` |  |
+| milvus.etcd.image.repository | string | `"milvusdb/etcd"` |  |
+| milvus.etcd.image.tag | string | `"3.5.22-r1"` |  |
 | milvus.etcd.persistence.storageClass | string | `nil` |  |
 | milvus.etcd.replicaCount | int | `1` |  |
 | milvus.image.all.repository | string | `"milvusdb/milvus"` |  |
-| milvus.image.all.tag | string | `"v2.5.3-gpu"` |  |
+| milvus.image.all.tag | string | `"v2.5.17-gpu"` |  |
 | milvus.minio.bucketName | string | `"nv-ingest"` |  |
+| milvus.minio.enabled | bool | `true` |  |
+| milvus.minio.image.tag | string | `"RELEASE.2025-09-07T16-13-09Z"` |  |
 | milvus.minio.mode | string | `"standalone"` |  |
 | milvus.minio.persistence.size | string | `"50Gi"` |  |
 | milvus.minio.persistence.storageClass | string | `nil` |  |
 | milvus.pulsar.enabled | bool | `false` |  |
+| milvus.pulsarv3.enabled | bool | `false` |  |
 | milvus.standalone.extraEnv[0].name | string | `"LOG_LEVEL"` |  |
 | milvus.standalone.extraEnv[0].value | string | `"error"` |  |
 | milvus.standalone.persistence.persistentVolumeClaim.size | string | `"50Gi"` |  |
@@ -635,7 +650,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.enabled_regex_matching | bool | `true` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.invert_match | bool | `true` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.key | string | `"http.target"` |  |
-| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.values[0] | string | `"\\/health"` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.values[0] | string | `"/health"` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].type | string | `"string_attribute"` |  |
 | opentelemetry-collector.config.processors.transform.trace_statements[0].context | string | `"span"` |  |
 | opentelemetry-collector.config.processors.transform.trace_statements[0].statements[0] | string | `"set(status.code, 1) where attributes[\"http.path\"] == \"/health\""` |  |
@@ -644,6 +659,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.processors.transform.trace_statements[0].statements[3] | string | `"set(name, Concat([name, attributes[\"http.url\"]], \" \")) where name == \"POST\""` |  |
 | opentelemetry-collector.config.receivers.otlp.protocols.grpc.endpoint | string | `"${env:MY_POD_IP}:4317"` |  |
 | opentelemetry-collector.config.receivers.otlp.protocols.http.cors.allowed_origins[0] | string | `"*"` |  |
+| opentelemetry-collector.config.receivers.otlp.protocols.http.endpoint | string | `"${env:MY_POD_IP}:4318"` |  |
 | opentelemetry-collector.config.service.extensions[0] | string | `"zpages"` |  |
 | opentelemetry-collector.config.service.extensions[1] | string | `"health_check"` |  |
 | opentelemetry-collector.config.service.pipelines.logs.exporters[0] | string | `"debug"` |  |
@@ -654,9 +670,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.service.pipelines.metrics.receivers[0] | string | `"otlp"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.exporters[0] | string | `"debug"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.exporters[1] | string | `"zipkin"` |  |
-| opentelemetry-collector.config.service.pipelines.traces.processors[0] | string | `"tail_sampling"` |  |
-| opentelemetry-collector.config.service.pipelines.traces.processors[1] | string | `"transform"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[0] | string | `"batch"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[1] | string | `"tail_sampling"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[2] | string | `"transform"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.receivers[0] | string | `"otlp"` |  |
+| opentelemetry-collector.config.service.telemetry.logs.level | string | `"debug"` |  |
+| opentelemetry-collector.image.repository | string | `"otel/opentelemetry-collector-contrib"` |  |
+| opentelemetry-collector.image.tag | string | `"0.133.0"` |  |
 | opentelemetry-collector.mode | string | `"deployment"` |  |
 | otelDeployed | bool | `true` |  |
 | otelEnabled | bool | `true` |  |
@@ -712,7 +732,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | readinessProbe.successThreshold | int | `1` |  |
 | readinessProbe.timeoutSeconds | int | `10` |  |
 | redis.auth.enabled | bool | `false` |  |
-| redis.image.tag | string | `"7.4.3-debian-12-r0"` |  |
+| redis.image.tag | string | `"8.2.1-debian-12-r0"` |  |
 | redis.master.configmap | string | `"protected-mode no"` |  |
 | redis.master.persistence.size | string | `"50Gi"` |  |
 | redis.master.resources.limits.memory | string | `"12Gi"` |  |
@@ -737,9 +757,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | riva-nim.env[0].value | string | `"9000"` |  |
 | riva-nim.env[1].name | string | `"NIM_TAGS_SELECTOR"` |  |
-| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"` |  |
+| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
 | riva-nim.fullnameOverride | string | `"nv-ingest-riva-nim"` |  |
-| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us"` |  |
 | riva-nim.image.tag | string | `"1.3.0"` |  |
 | riva-nim.nim.grpcPort | int | `50051` |  |
 | riva-nim.nim.logLevel | string | `"INFO"` |  |
@@ -778,7 +798,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.env[1].value | string | `"1"` |  |
 | text-embedding-nim.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | text-embedding-nim.image.repository | string | `"nvcr.io/nim/nvidia/nv-embedqa-e5-v5"` |  |
-| text-embedding-nim.image.tag | string | `"1.8.0"` |  |
+| text-embedding-nim.image.tag | string | `"1.9.0"` |  |
 | text-embedding-nim.nim.grpcPort | int | `8001` |  |
 | text-embedding-nim.nim.logLevel | string | `"INFO"` |  |
 | text-embedding-nim.podSecurityContext.fsGroup | int | `1000` |  |
@@ -823,6 +843,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | vlm-embedding-nim.serviceAccount.create | bool | `false` |  |
 | vlm-embedding-nim.serviceAccount.name | string | `""` |  |
 | vlm-embedding-nim.statefuleSet.enabled | bool | `false` |  |
+| zipkin.image.repository | string | `"openzipkin/zipkin"` |  |
+| zipkin.image.tag | string | `"3.5.0"` |  |
 | zipkin.resources.limits.cpu | string | `"500m"` |  |
 | zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
 | zipkin.resources.requests.cpu | string | `"100m"` |  |

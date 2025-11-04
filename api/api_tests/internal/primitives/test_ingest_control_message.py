@@ -254,8 +254,7 @@ def test_remove_nonexistent_task():
 def test_payload_get_default():
     cm = IngestControlMessage()
     payload = cm.payload()
-    assert isinstance(payload, pd.DataFrame)
-    assert payload.empty
+    assert payload is None
 
 
 def test_payload_set_valid():
@@ -325,11 +324,3 @@ def test_copy_creates_deep_copy():
     assert cm.get_timestamp("start") == dt
     pd.testing.assert_frame_equal(cm.payload(), df)
     assert cm.config()["config_key"] == "config_value"
-
-
-@pytest.mark.xfail
-def test_remove_nonexistent_task_logs_warning(caplog):
-    cm = IngestControlMessage()
-    with caplog.at_level("WARNING"):
-        cm.remove_task("nonexistent")
-        assert "Attempted to remove non-existent task" in caplog.text

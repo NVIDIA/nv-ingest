@@ -2,6 +2,10 @@
 
 [NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
 In addition, you can use library mode, which is intended for the following cases:
 
 - Local development
@@ -15,7 +19,7 @@ while all other services (such as embedding and storage) are hosted remotely in 
 
 To get started using library mode, you need the following:
 
-- Linux operating systems (Ubuntu 22.04 or later recommended)
+- Linux operating systems (Ubuntu 22.04 or later recommended) or MacOS
 - Python 3.12
 - We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
 
@@ -30,7 +34,7 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
+         uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
     ```
 
     !!! tip
@@ -75,75 +79,88 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time, sys
+import time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-# Start the pipeline subprocess for library mode
-config = PipelineCreationSchema()
+def main():
+    # Start the pipeline subprocess for library mode
+    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
-run_pipeline(config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
-
-client = NvIngestClient(
-    message_client_allocator=SimpleClient,
-    message_client_port=7671,
-    message_client_hostname="localhost"
-)
-
-# gpu_cagra accelerated indexing is not available in milvus-lite
-# Provide a filename for milvus_uri to use milvus-lite
-milvus_uri = "milvus.db"
-collection_name = "test"
-sparse = False
-
-# do content extraction from files                                
-ingestor = (
-    Ingestor(client=client)
-    .files("data/multimodal_test.pdf")
-    .extract(
-        extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
-        extract_images=True,
-        paddle_output_format="markdown",
-        extract_infographics=True,
-        # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        # extract_method="nemoretriever_parse",
-        text_depth="page"
-    ).embed()
-    .vdb_upload(
-        collection_name=collection_name,
-        milvus_uri=milvus_uri,
-        sparse=sparse,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost",
     )
-)
 
-print("Starting ingestion..")
-t0 = time.time()
-results = ingestor.ingest(show_progress=True)
-t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+    # gpu_cagra accelerated indexing is not available in milvus-lite
+    # Provide a filename for milvus_uri to use milvus-lite
+    milvus_uri = "milvus.db"
+    collection_name = "test"
+    sparse = False
 
-# results blob is directly inspectable
-print(ingest_json_results_to_blob(results[0]))
+    # do content extraction from files
+    ingestor = (
+        Ingestor(client=client)
+        .files("data/multimodal_test.pdf")
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            table_output_format="markdown",
+            extract_infographics=True,
+            # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            text_depth="page",
+        )
+        .embed()
+        .vdb_upload(
+            collection_name=collection_name,
+            milvus_uri=milvus_uri,
+            sparse=sparse,
+            # for llama-3.2 embedder, use 1024 for e5-v5
+            dense_dim=2048,
+        )
+    )
+
+    print("Starting ingestion..")
+    t0 = time.time()
+
+    # Return both successes and failures
+    # Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+    results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+    # Return only successes
+    # results = ingestor.ingest(show_progress=True)
+
+    t1 = time.time()
+    print(f"Total time: {t1 - t0} seconds")
+
+    # results blob is directly inspectable
+    if results:
+        print(ingest_json_results_to_blob(results[0]))
+
+    # (optional) Review any failures that were returned
+    if failures:
+        print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 !!! note
 
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
+
 You can see the extracted text that represents the content of the ingested test document.
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text
@@ -171,9 +188,9 @@ This chart shows some gadgets, and some very fictitious costs.
 To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
 
 ```python
+import os
 from openai import OpenAI
 from nv_ingest_client.util.milvus import nvingest_retrieval
-import os
 
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -208,35 +225,33 @@ print(f"Answer: {response}")
 ```
 
 ```shell
-Prompt: Using the following content: TestingDocument
-A sample document with headings and placeholder text
-Introduction
-This is a placeholder document that can be used for any purpose. It contains some 
-headings and some placeholder text to fill the space. The text is not important and contains 
-no real value, but it is useful for testing. Below, we will have some simple tables and charts 
-that we can use to confirm Ingest is working as expected.
-Table 1
-This table describes some animals, and some activities they might be doing in specific 
-locations.
-Animal Activity Place
-Gira@e Driving a car At the beach
-Lion Putting on sunscreen At the park
-Cat Jumping onto a laptop In a home o@ice
-Dog Chasing a squirrel In the front yard
-Chart 1
-This chart shows some gadgets, and some very fictitious costs.
+Prompt: Using the following content: Table 1
+| This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
+| Animal | Activity | Place |
+| Giraffe | Driving a car | At the beach |
+| Lion | Putting on sunscreen | At the park |
+| Cat | Jumping onto a laptop | In a home office |
+| Dog | Chasing a squirrel | In the front yard |
 
  Answer the user query: Which animal is responsible for the typos?
 Answer: A clever query!
 
-After carefully examining the provided content, I'd like to point out the potential "typos" (assuming you're referring to the unusual or intentionally incorrect text) and attempt to playfully "assign blame" to an animal based on the context:
+Based on the provided Table 1, I'd make an educated inference to answer your question. Since the activities listed are quite unconventional for the respective animals (e.g., a giraffe driving a car, a lion putting on sunscreen), it's likely that the table is using humor or hypothetical scenarios.
 
-1. **Gira@e** (instead of Giraffe) - **Animal blamed: Giraffe** (Table 1, first row)
-	* The "@" symbol in "Gira@e" suggests a possible typo or placeholder character, which we'll humorously attribute to the Giraffe's alleged carelessness.
-2. **o@ice** (instead of Office) - **Animal blamed: Cat**
-	* The same "@" symbol appears in "o@ice", which is related to the Cat's activity in the same table. Perhaps the Cat was in a hurry while typing and introduced the error?
+Given this context, the question "Which animal is responsible for the typos?" is probably a tongue-in-cheek inquiry, as there's no direct information in the table about typos or typing activities.
 
-So, according to this whimsical analysis, both the **Giraffe** and the **Cat** are "responsible" for the typos, with the Giraffe possibly being the more egregious offender given the more blatant character substitution in its name.
+However, if we were to make a playful connection, we could look for an animal that's:
+
+1. Typically found in a setting where typing might occur (e.g., an office).
+2. Engaging in an activity that could potentially lead to typos (e.g., interacting with a typing device).
+
+Based on these loose criteria, I'd jokingly point to:
+
+**Cat** as the potential culprit, since it's:
+        * Located "In a home office"
+        * Engaged in "Jumping onto a laptop", which could theoretically lead to accidental keystrokes or typos if the cat were to start "walking" on the keyboard!
+
+Please keep in mind that this response is purely humorous and interpretative, as the table doesn't explicitly mention typos or provide a straightforward answer to the question.
 ```
 
 
@@ -258,8 +273,8 @@ It listens for ingestion requests on port `7671` from an external client.
 
 ```python
 def main():
-config_data = {}
 
+    config_data = {}
     config_data = {key: value for key, value in config_data.items() if value is not None}
     ingest_config = PipelineCreationSchema(**config_data)
 
@@ -283,11 +298,12 @@ and immediately runs an ingestion client against it in the same parent process.
 
 ```python
 def run_ingestor():
-client = NvIngestClient(
-message_client_allocator=SimpleClient,
-message_client_port=7671,
-message_client_hostname="localhost"
-)
+
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost"
+    )
 
     ingestor = (
         Ingestor(client=client)
@@ -318,10 +334,12 @@ message_client_hostname="localhost"
     print("\nIngest done.")
     print(f"Got {len(results)} results.")
 
+
 def main():
-config_data = {}
-config_data = {key: value for key, value in config_data.items() if value is not None}
-ingest_config = PipelineCreationSchema(**config_data)
+
+    config_data = {}
+    config_data = {key: value for key, value in config_data.items() if value is not None}
+    ingest_config = PipelineCreationSchema(**config_data)
 
     try:
         pipeline = run_pipeline(
@@ -341,7 +359,7 @@ ingest_config = PipelineCreationSchema(**config_data)
         logger.info("Shutting down pipeline...")
 
 if __name__ == "__main__":
-main()
+    main()
 ```
 
 

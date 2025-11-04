@@ -112,8 +112,8 @@ def test_validate_task_with_valid_extract():
 
 
 def test_validate_task_with_valid_store_task():
-    """Test with valid stor task options."""
-    value = ['store:{"content_type": "image", "store_method": "minio", "endpoint": "localhost:9000"}']
+    """Test with valid store task options."""
+    value = ['store:{"structured": true, "images": false, "method": "minio", "params": {"endpoint": "localhost:9000"}}']
     result = click_validate_task(None, None, value)
 
     assert "store" in result
@@ -121,8 +121,8 @@ def test_validate_task_with_valid_store_task():
 
 
 def test_validate_task_with_valid_store_embed_task():
-    """Test with valid stor task options."""
-    value = ['store_embedding:{"endpoint": "localhost:9000"}']
+    """Test with valid store embed task options."""
+    value = ['store_embedding:{"params": {"endpoint": "localhost:9000"}}']
     result = click_validate_task(None, None, value)
 
     assert "store_embedding" in result
