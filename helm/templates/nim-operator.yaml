@@ -1,56 +1,22 @@
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-page-elements-v2
-spec:
-  source:
-    ngc:
-      modelPuller: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2:1.5.0
-      pullSecret: "ngc-secret"
-      authSecret: "ngc-api-secret"
-  storage:
-    pvc:
-      create: true
-      storageClass: "pdx02-cdot03-ainfs01-nfsv3"
-      size: "25Gi"
-      volumeAccessMode: "ReadWriteMany"
-  resources: {}
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-graphic-elements-v1
-spec:
-  source:
-    ngc:
-      modelPuller: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1:1.5.0
-      pullSecret: "ngc-secret"
-      authSecret: "ngc-api-secret"
-  storage:
-    pvc:
-      create: true
-      storageClass: "pdx02-cdot03-ainfs01-nfsv3"
-      size: "25Gi"
-      volumeAccessMode: "ReadWriteMany"
-  resources: {}
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: llama-3.1-nemotron-nano-vl-8b-v1
-spec:
-  source:
-    ngc:
-      modelPuller: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1:latest
-      pullSecret: ngc-secret
-      authSecret: ngc-api-secret
-  storage:
-    pvc:
-      create: true
-      storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "" }}
-      size: "300Gi"
-      volumeAccessMode: ReadWriteMany
-  resources: {}
+
+# ---
+# apiVersion: apps.nvidia.com/v1alpha1
+# kind: NIMCache
+# metadata:
+#   name: llama-3.1-nemotron-nano-vl-8b-v1
+# spec:
+#   source:
+#     ngc:
+#       modelPuller: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1:latest
+#       pullSecret: ngc-secret
+#       authSecret: ngc-api-secret
+#   storage:
+#     pvc:
+#       create: true
+#       storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "" }}
+#       size: "300Gi"
+#       volumeAccessMode: ReadWriteMany
+#   resources: {}
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
@@ -97,7 +63,9 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: http://nvcr.io/nvstaging/nim/nemoretriever-ocr-v1:1.2.0-rc2-latest-release-37212681
+      # modelPuller: nvcr.io/nvstaging/nim/nemoretriever-ocr-v1:1.2.0-rc2-latest-release-37212681
+      modelPuller: nvcr.io/nvstaging/nim/nemoretriever-ocr-v1:1.2.0-rc2-latest-release-37831672
+      # modelPuller: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1:1.1.0
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
   storage:
@@ -116,7 +84,8 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1:1.5.0
+      # modelPuller: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1:1.5.0
+      modelPuller: nvcr.io/nvstaging/nim/nemoretriever-table-structure-v1:1.6.1-rc0-latest-release-37212678
       pullSecret: ngc-secret
       authSecret: ngc-api-secret
   storage:
@@ -127,51 +96,51 @@ spec:
       size: "25Gi"
       volumeAccessMode: ReadWriteMany
   resources: {}
+# ---
+# apiVersion: apps.nvidia.com/v1alpha1
+# kind: NIMCache
+# metadata:
+#   name: paddleocr
+# spec:
+#   source:
+#     ngc:
+#       modelPuller: nvcr.io/nim/baidu/paddleocr:1.5.0
+#       pullSecret: ngc-secret
+#       authSecret: ngc-api-secret
+#   storage:
+#     pvc:
+#       create: true
+#       # You should use the storage class that is available in your cluster
+#       storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "standard" }}
+#       size: "25Gi"
+#       volumeAccessMode: ReadWriteMany
+#   resources: {}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: paddleocr
-spec:
-  source:
-    ngc:
-      modelPuller: nvcr.io/nim/baidu/paddleocr:1.5.0
-      pullSecret: ngc-secret
-      authSecret: ngc-api-secret
-  storage:
-    pvc:
-      create: true
-      # You should use the storage class that is available in your cluster
-      storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "standard" }}
-      size: "25Gi"
-      volumeAccessMode: ReadWriteMany
-  resources: {}
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
-metadata:
-  name: llama-31-nemotron-nano-vl-8b-v1
-spec:
-  image:
-    repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
-    tag: latest
-    pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
-  storage:
-    nimCache:
-      name: llama-3.1-nemotron-nano-vl-8b-v1
-      profile: ''
-  replicas: 1
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-  expose:
-    service:
-      type: ClusterIP
-      port: 8000
----
+# apiVersion: apps.nvidia.com/v1alpha1
+# kind: NIMService
+# metadata:
+#   name: llama-31-nemotron-nano-vl-8b-v1
+# spec:
+#   image:
+#     repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+#     tag: latest
+#     pullPolicy: IfNotPresent
+#     pullSecrets:
+#       - ngc-secret
+#   authSecret: ngc-api-secret
+#   storage:
+#     nimCache:
+#       name: llama-3.1-nemotron-nano-vl-8b-v1
+#       profile: ''
+#   replicas: 1
+#   resources:
+#     limits:
+#       nvidia.com/gpu: 1
+#   expose:
+#     service:
+#       type: ClusterIP
+#       port: 8000
+# ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
@@ -206,6 +175,18 @@ spec:
     service:
       type: ClusterIP
       port: 8000
+      grpcPort: 8001
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_LOG_VERBOSE
+      value: "1"
+    - name: NIM_TRITON_MAX_BATCH_SIZE
+      value: "3"
+    - name: OMP_NUM_THREADS
+      value: "1"
+    - name: NIM_TRITON_PERFORMANCE_MODE
+      value: "throughput"
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
@@ -245,61 +226,14 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: nemoretriever-graphic-elements-v1
-spec:
-  image:
-    repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-    tag: 1.5.0
-    pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
-  storage:
-    nimCache:
-      name: nemoretriever-graphic-elements-v1
-      profile: ''
-  replicas: 1
-  nodeSelector:
-    nvidia.com/mig.config: all-1g.23gb
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-  tolerations:
-    - key: "nvidia.com/mig"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
-  expose:
-    service:
-      type: ClusterIP
-      port: 8000
-  env:
-    - name: NIM_TRITON_LOG_VERBOSE
-      value: "1"
-    - name: NIM_TRITON_RATE_LIMIT
-      value: "3"
-    - name: NIM_TRITON_MAX_BATCH_SIZE
-      value: "32"
-    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "2048"
-    - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-      value: "2"
-    - name: OMP_NUM_THREADS
-      value: "1"
-    - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
-      value: "1"
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
-metadata:
   name: nemoretriever-ocr-v1
 spec:
   image:
-    repository: http://nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
-    tag: 1.2.0-rc2-latest-release-37212681
+    repository: nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
+    # tag: 1.2.0-rc2-latest-release-37212681
+    tag: 1.2.0-rc2-latest-release-37831672
+    # repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    # tag: 1.1.0
     pullPolicy: IfNotPresent
     pullSecrets:
       - ngc-secret
@@ -326,70 +260,19 @@ spec:
     service:
       type: ClusterIP
       port: 8000
+      grpcPort: 8001
   env:
+    - name: OMP_NUM_THREADS
+      value: "8"
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
     - name: NIM_TRITON_LOG_VERBOSE
       value: "1"
-    - name: NIM_TRITON_RATE_LIMIT
-      value: "1"
+    # - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+    #   value: "8192"
     - name: NIM_TRITON_MAX_BATCH_SIZE
       value: "32"
-    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "12196"
-    - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-      value: "2"
-    - name: OMP_NUM_THREADS
-      value: "1"
-    - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
-      value: "1"
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
-metadata:
-  name: nemoretriever-page-elements-v2
-spec:
-  image:
-    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: 1.5.0
-    pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
-  storage:
-    nimCache:
-      name: nemoretriever-page-elements-v2
-      profile: ''
-  replicas: 1
-  nodeSelector:
-    nvidia.com/mig.config: all-1g.23gb
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-  tolerations:
-    - key: "nvidia.com/mig"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
-  expose:
-    service:
-      type: ClusterIP
-      port: 8000
-  env:
-    - name: NIM_TRITON_LOG_VERBOSE
-      value: "1"
-    - name: NIM_TRITON_RATE_LIMIT
-      value: "3"
-    - name: NIM_TRITON_MAX_BATCH_SIZE
-      value: "32"
-    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "2048"
-    - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-      value: "2"
-    - name: OMP_NUM_THREADS
-      value: "2"
-    - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
+    - name: NIM_TRITON_ENABLE_MODEL_CONTROL
       value: "1"
 ---
 apiVersion: apps.nvidia.com/v1alpha1
@@ -426,7 +309,10 @@ spec:
     service:
       type: ClusterIP
       port: 8000
+      grpcPort: 8001
   env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
     - name: NIM_TRITON_LOG_VERBOSE
       value: "1"
     - name: NIM_TRITON_RATE_LIMIT
@@ -434,48 +320,46 @@ spec:
     - name: NIM_TRITON_MAX_BATCH_SIZE
       value: "32"
     - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "2048"
-    - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-      value: "2"
-    - name: OMP_NUM_THREADS
-      value: "1"
-    - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
-      value: "1"
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
-metadata:
-  name: paddleocr
-spec:
-  image:
-    repository: nvcr.io/nim/baidu/paddleocr
-    tag: 1.5.0
-    pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
-  storage:
-    nimCache:
-      name: paddleocr
-      profile: ''
-  replicas: 1
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-  expose:
-    service:
-      type: ClusterIP
-      port: 8000
-  env:
-    - name: NIM_TRITON_LOG_VERBOSE
-      value: "1"
-    - name: NIM_TRITON_RATE_LIMIT
-      value: "3"
-    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
       value: "3072"
-    - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-      value: "2"
     - name: OMP_NUM_THREADS
       value: "8"
-    - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
-      value: "1"
+---
+# apiVersion: apps.nvidia.com/v1alpha1
+# kind: NIMService
+# metadata:
+#   name: paddleocr
+# spec:
+#   image:
+#     repository: nvcr.io/nim/baidu/paddleocr
+#     tag: 1.5.0
+#     pullPolicy: IfNotPresent
+#     pullSecrets:
+#       - ngc-secret
+#   authSecret: ngc-api-secret
+#   storage:
+#     nimCache:
+#       name: paddleocr
+#       profile: ''
+#   replicas: 1
+#   resources:
+#     limits:
+#       nvidia.com/gpu: 1
+#   expose:
+#     service:
+#       type: ClusterIP
+#       port: 8000
+#     service:
+#       grpcPort: 8001
+#   env:
+#     - name: NIM_TRITON_LOG_VERBOSE
+#       value: "1"
+#     - name: NIM_TRITON_RATE_LIMIT
+#       value: "3"
+#     - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+#       value: "3072"
+#     - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
+#       value: "2"
+#     - name: OMP_NUM_THREADS
+#       value: "8"
+#     - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
+#       value: "1"

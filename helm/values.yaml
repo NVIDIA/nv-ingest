@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "latest"
+  tag: "25.9.0"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -140,44 +140,49 @@ resources:
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
 envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
+  OMP_NUM_THREADS: 1
+  AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
+  AUDIO_INFER_PROTOCOL: "grpc"
+  CUDA_VISIBLE_DEVICES: -1
+  MAX_INGEST_PROCESS_WORKERS: 16
+  EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
+  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   INGEST_LOG_LEVEL: "DEFAULT"
   INGEST_EDGE_BUFFER_SIZE: 64
   INGEST_DYNAMIC_MEMORY_THRESHOLD: 0.80
-  INGEST_DISABLE_DYNAMIC_SCALING: false
-  MAX_INGEST_PROCESS_WORKERS: 16
-  NV_INGEST_MAX_UTIL: 48
+  INGEST_DISABLE_DYNAMIC_SCALING: true
+  # RAY_num_grpc_threads: 1
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
   MESSAGE_CLIENT_TYPE: "redis"
-  REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
-  NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
-
-  MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
-  MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
+  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: "http://nemoretriever-parse:8000/v1/chat/completions"
+  NEMORETRIEVER_PARSE_INFER_PROTOCOL: "http"
+  NEMORETRIEVER_PARSE_MODEL_NAME: "nvidia/nemoretriever-parse"
+  NV_INGEST_MAX_UTIL: 48
+  OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
 
-  PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
-  PADDLE_INFER_PROTOCOL: grpc
-  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
-  NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
-  NEMORETRIEVER_PARSE_MODEL_NAME: nvidia/nemoretriever-parse
+  OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
+  OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
+  OCR_INFER_PROTOCOL: grpc
+  OCR_MODEL_NAME: scene_text_ensemble
+  REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
+
+  YOLOX_PAGE_IMAGE_FORMAT: JPEG
   YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
   YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
+
   YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
   YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
   YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: grpc
+
   YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
   YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
-  OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
-  OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
-  OCR_INFER_PROTOCOL: grpc
-  OCR_MODEL_NAME: paddle
 
-  EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
-  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+  MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
+  MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
   # This environment variable is controled in the helm/deployment.yaml. There is a ternary operator that
@@ -186,9 +191,11 @@ envVars:
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
-  AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
-  AUDIO_INFER_PROTOCOL: "grpc"
-
+  # "ready" check configuration.
+  # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
+  # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
+  # 3. COMPONENTS_TO_READY_CHECK=YOLOX_HTTP_ENDPOINT, OCR_HTTP_ENDPOINT
+  #    comma separated list of HTTP environment variables for specific services to check for ready
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
 
@@ -284,6 +291,7 @@ redisDeployed: true
 
 redis:
   image:
+    repository: bitnamilegacy/redis
     tag: "8.2.1-debian-12-r0"
   auth:
     enabled: false
@@ -591,7 +599,7 @@ nimOperator:
     resources: {}
 
   # Define each NIM that is used by the nv-ingest service and its possible configurations
-  page-elements:
+  page_elements:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
@@ -607,9 +615,63 @@ nimOperator:
         storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
+    replicas: 1
+    nodeSelector:
+      nvidia.com/mig.config: all-1g.23gb
+    # resources:
+    #   limits:
+    #     nvidia.com/gpu: 1
     resources: {}
+    tolerations:
+      - key: "nvidia.com/mig"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    expose:
+      service:
+        type: ClusterIP
+        port: 8000
+      service:
+        grpcPort: 8001
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_RATE_LIMIT
+        value: "3"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "32"
+      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+        value: "2048"
+      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
+        value: "2"
+      - name: OMP_NUM_THREADS
+        value: "2"
+      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
+        value: "2"
+      - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
+        value: "1"
+      - name: NIM_ENABLE_OTEL
+        value: "true"
+      - name: NIM_OTEL_SERVICE_NAME
+        value: "page-elements"
+      - name: NIM_OTEL_TRACES_EXPORTER
+        value: "otlp"
+      - name: NIM_OTEL_METRICS_EXPORTER
+        value: "console"
+      - name: NIM_OTEL_EXPORTER_OTLP_ENDPOINT
+        value: "http://otel-collector:4318"
+      # Triton OpenTelemetry Settings
+      - name: TRITON_OTEL_URL
+        value: "http://otel-collector:4318/v1/traces"
+      - name: TRITON_OTEL_RATE
+        value: "1"
 
-  graphic-elements:
+  graphic_elements:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
@@ -624,4 +686,35 @@ nimOperator:
         storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
-    resources: {}
+    replicas: 1
+  nodeSelector:
+    nvidia.com/mig.config: all-1g.23gb
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  tolerations:
+    - key: "nvidia.com/mig"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
+      grpcPort: 8001
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_LOG_VERBOSE
+      value: "1"
+    - name: NIM_TRITON_RATE_LIMIT
+      value: "3"
+    - name: NIM_TRITON_MAX_BATCH_SIZE
+      value: "32"
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "2048"
+    - name: OMP_NUM_THREADS
+      value: "1"
