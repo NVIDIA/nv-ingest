@@ -62,8 +62,7 @@ class TestConfig:
     collection_name: Optional[str] = None
 
     # Recall configuration
-    use_reranker: bool = False
-    reranker_only: bool = False
+    reranker_mode: str = "none"  # Options: "none", "with", "both"
     recall_top_k: int = 10
     ground_truth_dir: Optional[str] = None
     recall_dataset: Optional[str] = None
@@ -95,6 +94,10 @@ class TestConfig:
         # Check api_version is valid
         if self.api_version not in ["v1", "v2"]:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
+
+        # Check reranker_mode is valid
+        if self.reranker_mode not in ["none", "with", "both"]:
+            errors.append(f"reranker_mode must be 'none', 'with', or 'both', got '{self.reranker_mode}'")
 
         # Check dataset_dir exists (can be file, directory, or glob pattern)
         # Check if it's a glob pattern (contains *, ?, or [)
@@ -232,8 +235,7 @@ def _load_env_overrides() -> dict:
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
-        "USE_RERANKER": ("use_reranker", parse_bool),
-        "RERANKER_ONLY": ("reranker_only", parse_bool),
+        "RERANKER_MODE": ("reranker_mode", str),
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
         "RECALL_DATASET": ("recall_dataset", str),

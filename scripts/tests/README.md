@@ -290,16 +290,16 @@ Recall testing evaluates retrieval accuracy against ground truth query sets. Two
 
 ### Reranker Configuration
 
-Three modes via two boolean flags:
+Three modes via `reranker_mode` setting:
 
-1. **No reranker** (default): `use_reranker=false, reranker_only=false`
+1. **No reranker** (default): `reranker_mode: none`
    - Runs evaluation without reranker only
 
-2. **Both modes**: `use_reranker=true, reranker_only=false`
+2. **Both modes**: `reranker_mode: both`
    - Runs evaluation twice: once without reranker, once with reranker
    - Useful for comparing reranker impact
 
-3. **Reranker only**: `use_reranker=true, reranker_only=true`
+3. **Reranker only**: `reranker_mode: with`
    - Runs evaluation with reranker only
    - Faster when you only need reranked results
 
@@ -337,8 +337,7 @@ Edit the `recall` section in `test_configs.yaml`:
 ```yaml
 recall:
   # Reranker configuration
-  use_reranker: false
-  reranker_only: false
+  reranker_mode: none  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
@@ -350,11 +349,14 @@ recall:
 
 **Recall-only (existing collections):**
 ```bash
-# Evaluate existing bo767 collections
+# Evaluate existing bo767 collections (no reranker)
 python run.py --case=recall --test-name=bo767
 
-# With reranker comparison
-python run.py --case=recall --test-name=bo767 --use-reranker
+# With reranker only
+python run.py --case=recall --test-name=bo767 --reranker-mode=with
+
+# Both modes for comparison
+python run.py --case=recall --test-name=bo767 --reranker-mode=both
 ```
 
 **E2E + Recall (fresh ingestion):**

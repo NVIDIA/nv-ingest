@@ -11,6 +11,53 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from interact import embed_info, kv_event_log, load_collection, unload_collection
 
 from recall_utils import get_dataset_evaluator
+from typing import Callable, Dict, Tuple
+
+
+def evaluate_recall_with_reranker(
+    evaluator: Callable,
+    collection_name: str,
+    evaluation_params: Dict,
+    use_reranker: bool,
+    log_path: str = "test_results",
+) -> Tuple[Dict[int, float], float]:
+    """
+    Run recall evaluation with specified reranker setting.
+
+    Args:
+        evaluator: Dataset evaluator function
+        collection_name: Milvus collection name
+        evaluation_params: Dict of evaluation parameters (hostname, sparse, etc.)
+        use_reranker: Whether to use reranker
+        log_path: Path for logging output
+
+    Returns:
+        Tuple of (scores_dict, elapsed_time)
+    """
+    mode_str = "with reranker" if use_reranker else "without reranker"
+    print("\n" + "=" * 60)
+    print(f"Running Recall Evaluation ({mode_str})")
+    print("=" * 60)
+
+    eval_start = time.time()
+    scores = evaluator(
+        collection_name=collection_name,
+        nv_ranker=use_reranker,
+        **evaluation_params,
+    )
+    eval_time = time.time() - eval_start
+
+    # Log results
+    print(f"\nMultimodal Recall ({mode_str}):")
+    for k in sorted(scores.keys()):
+        score = scores[k]
+        print(f"  - Recall @{k}: {score:.3f}")
+        reranker_suffix = "with" if use_reranker else "no"
+        kv_event_log(f"recall_multimodal_@{k}_{reranker_suffix}_reranker", score, log_path)
+
+    kv_event_log(f"recall_eval_time_s_{'with' if use_reranker else 'no'}_reranker", eval_time, log_path)
+
+    return scores, eval_time
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -24,11 +71,15 @@ def main(config=None, log_path: str = "test_results") -> int:
     model_name, dense_dim = embed_info()
 
     # Recall-specific configuration with defaults
-    use_reranker = getattr(config, "use_reranker", False)
-    reranker_only = getattr(config, "reranker_only", False)
+    reranker_mode = getattr(config, "reranker_mode", "none")
     recall_top_k = getattr(config, "recall_top_k", 10)
     recall_dataset = getattr(config, "recall_dataset", None)
     ground_truth_dir = getattr(config, "ground_truth_dir", None)
+
+    # Validate reranker_mode
+    if reranker_mode not in ["none", "with", "both"]:
+        print(f"ERROR: Invalid reranker_mode '{reranker_mode}'. Must be 'none', 'with', or 'both'")
+        return 1
 
     # Require explicit recall_dataset configuration
     test_name = config.test_name
@@ -51,7 +102,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Dataset: {recall_dataset}")
     print(f"Test Name: {test_name}")
     print(f"Collection: {collection_name}")
-    print(f"Reranker: {use_reranker} (reranker_only={reranker_only})")
+    print(f"Reranker Mode: {reranker_mode}")
     print(f"Top K: {recall_top_k}")
     print(f"Model: {model_name} (sparse={sparse}, gpu_search={gpu_search})")
     print("=" * 60)
@@ -70,63 +121,37 @@ def main(config=None, log_path: str = "test_results") -> int:
     try:
         recall_results = {}
 
-        # Run without reranker (if not reranker_only)
-        if not reranker_only:
-            print("\n" + "=" * 60)
-            print("Running Recall Evaluation (without reranker)")
-            print("=" * 60)
-            eval_start = time.time()
+        # Prepare evaluation parameters
+        evaluation_params = {
+            "hostname": hostname,
+            "sparse": sparse,
+            "model_name": model_name,
+            "top_k": recall_top_k,
+            "gpu_search": gpu_search,
+            "ground_truth_dir": ground_truth_dir,
+        }
 
-            scores_no_reranker = evaluator(
+        # Run without reranker (if mode is "none" or "both")
+        if reranker_mode in ["none", "both"]:
+            scores, _ = evaluate_recall_with_reranker(
+                evaluator=evaluator,
                 collection_name=collection_name,
-                hostname=hostname,
-                sparse=sparse,
-                model_name=model_name,
-                top_k=recall_top_k,
-                gpu_search=gpu_search,
-                nv_ranker=False,
-                ground_truth_dir=ground_truth_dir,
+                evaluation_params=evaluation_params,
+                use_reranker=False,
+                log_path=log_path,
             )
+            recall_results["no_reranker"] = scores
 
-            eval_time = time.time() - eval_start
-            recall_results["no_reranker"] = scores_no_reranker
-
-            print("\nMultimodal Recall (no reranker):")
-            for k in sorted(scores_no_reranker.keys()):
-                score = scores_no_reranker[k]
-                print(f"  - Recall @{k}: {score:.3f}")
-                kv_event_log(f"recall_multimodal_@{k}_no_reranker", score, log_path)
-
-            kv_event_log("recall_eval_time_s_no_reranker", eval_time, log_path)
-
-        # Run with reranker (if use_reranker)
-        if use_reranker:
-            print("\n" + "=" * 60)
-            print("Running Recall Evaluation (with reranker)")
-            print("=" * 60)
-            eval_start = time.time()
-
-            scores_with_reranker = evaluator(
+        # Run with reranker (if mode is "with" or "both")
+        if reranker_mode in ["with", "both"]:
+            scores, _ = evaluate_recall_with_reranker(
+                evaluator=evaluator,
                 collection_name=collection_name,
-                hostname=hostname,
-                sparse=sparse,
-                model_name=model_name,
-                top_k=recall_top_k,
-                gpu_search=gpu_search,
-                nv_ranker=True,
-                ground_truth_dir=ground_truth_dir,
+                evaluation_params=evaluation_params,
+                use_reranker=True,
+                log_path=log_path,
             )
-
-            eval_time = time.time() - eval_start
-            recall_results["with_reranker"] = scores_with_reranker
-
-            print("\nMultimodal Recall (with reranker):")
-            for k in sorted(scores_with_reranker.keys()):
-                score = scores_with_reranker[k]
-                print(f"  - Recall @{k}: {score:.3f}")
-                kv_event_log(f"recall_multimodal_@{k}_with_reranker", score, log_path)
-
-            kv_event_log("recall_eval_time_s_with_reranker", eval_time, log_path)
+            recall_results["with_reranker"] = scores
 
         # Save results
         results_file = os.path.join(log_path, "_test_results.json")
@@ -135,8 +160,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "dataset": recall_dataset,
             "test_name": test_name,
             "collection_name": collection_name,
-            "use_reranker": use_reranker,
-            "reranker_only": reranker_only,
+            "reranker_mode": reranker_mode,
             "recall_results": recall_results,
         }
         with open(results_file, "w") as f:
