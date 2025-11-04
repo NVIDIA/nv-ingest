@@ -21,25 +21,6 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: llama-3.2-nv-embedqa-1b-v2
-spec:
-  source:
-    ngc:
-      modelPuller: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.0
-      pullSecret: ngc-secret
-      authSecret: ngc-api-secret
-  storage:
-    pvc:
-      create: true
-      # You should use the appropriate storage class for your cluster
-      storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "standard" }}
-      size: "50Gi"
-      volumeAccessMode: ReadWriteMany
-  resources: {}
----
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
   name: llama-3.2-nv-rerankqa-1b-v2
 spec:
   source:
@@ -121,53 +102,6 @@ spec:
 #     service:
 #       type: ClusterIP
 #       port: 8000
-# ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
-metadata:
-  name: llama-32-nv-embedqa-1b-v2
-spec:
-  image:
-    repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: 1.10.0
-    pullPolicy: IfNotPresent
-    pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
-  storage:
-    nimCache:
-      name: llama-3.2-nv-embedqa-1b-v2
-      profile: ''
-  replicas: 1
-  nodeSelector:
-    nvidia.com/mig.config: all-1g.23gb
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-  tolerations:
-    - key: "nvidia.com/mig"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
-  expose:
-    service:
-      type: ClusterIP
-      port: 8000
-      grpcPort: 8001
-  env:
-    - name: NIM_HTTP_API_PORT
-      value: "8000"
-    - name: NIM_TRITON_LOG_VERBOSE
-      value: "1"
-    - name: NIM_TRITON_MAX_BATCH_SIZE
-      value: "3"
-    - name: OMP_NUM_THREADS
-      value: "1"
-    - name: NIM_TRITON_PERFORMANCE_MODE
-      value: "throughput"
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService

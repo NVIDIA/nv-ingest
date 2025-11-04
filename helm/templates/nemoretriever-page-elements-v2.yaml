@@ -32,7 +32,6 @@ spec:
   storage:
     nimCache:
       name: nemoretriever-page-elements-v2
-      profile: ''
   replicas: {{ .Values.nimOperator.page_elements.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}

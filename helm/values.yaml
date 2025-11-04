@@ -763,6 +763,52 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "2048"
+        value: "3072"
+      - name: OMP_NUM_THREADS
+        value: "8"
+
+  embedqa:
+    enabled: true
+    image:
+      repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
+      tag: 1.10.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api-secret
+    storage:
+      pvc:
+        create: true
+        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
+        size: "25Gi"
+        volumeAccessMode: "ReadWriteMany"
+    replicas: 1
+    nodeSelector:
+      nvidia.com/mig.config: all-1g.23gb
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    tolerations:
+      - key: "nvidia.com/mig"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    expose:
+      service:
+        type: ClusterIP
+        port: 8000
+        grpcPort: 8001
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "3"
       - name: OMP_NUM_THREADS
         value: "1"
+      - name: NIM_TRITON_PERFORMANCE_MODE
+        value: "throughput"

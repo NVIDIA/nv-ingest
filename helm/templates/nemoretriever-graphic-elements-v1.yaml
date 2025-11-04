@@ -32,8 +32,7 @@ spec:
   storage:
     nimCache:
       name: nemoretriever-graphic-elements-v1
-      profile: ''
-  replicas: 1
+  replicas: {{ .Values.nimOperator.graphic_elements.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.graphic_elements.nodeSelector | nindent 4 }}
   resources:

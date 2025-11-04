@@ -10,58 +10,36 @@ spec:
       authSecret: {{ .Values.nimOperator.table_structure.authSecret }}
   storage:
     pvc:
-      create: true
-      # You should use the appropriate storage class for your cluster
-      storageClass: {{ .Values.nimOperator.nimCache.pvc.storageClass | default "standard" }}
-      size: "25Gi"
-      volumeAccessMode: ReadWriteMany
-  resources: {}
-  ---
+      create: {{ .Values.nimOperator.table_structure.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.table_structure.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.table_structure.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.table_structure.storage.pvc.volumeAccessMode }}
+  resources:
+{{ toYaml .Values.nimOperator.table_structure.resources | nindent 4 }}
+---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
   name: nemoretriever-table-structure-v1
 spec:
   image:
-    repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-    tag: 1.5.0
-    pullPolicy: IfNotPresent
+    repository: {{ .Values.nimOperator.table_structure.image.repository }}
+    tag: {{ .Values.nimOperator.table_structure.image.tag }}
+    pullPolicy: {{ .Values.nimOperator.table_structure.image.pullPolicy }}
     pullSecrets:
-      - ngc-secret
-  authSecret: ngc-api-secret
+{{ toYaml .Values.nimOperator.table_structure.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.table_structure.authSecret }}
   storage:
     nimCache:
       name: nemoretriever-table-structure-v1
-      profile: ''
-  replicas: 1
+  replicas: {{ .Values.nimOperator.table_structure.replicas }}
   nodeSelector:
-    nvidia.com/mig.config: all-1g.23gb
+{{ toYaml .Values.nimOperator.table_structure.nodeSelector | nindent 4 }}
   resources:
-    limits:
-      nvidia.com/gpu: 1
+{{ toYaml .Values.nimOperator.table_structure.resources | nindent 4 }}
   tolerations:
-    - key: "nvidia.com/mig"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
+{{ toYaml .Values.nimOperator.table_structure.tolerations | nindent 4 }}
   expose:
-    service:
-      type: ClusterIP
-      port: 8000
-      grpcPort: 8001
+{{ toYaml .Values.nimOperator.table_structure.expose | nindent 4 }}
   env:
-    - name: NIM_HTTP_API_PORT
-      value: "8000"
-    - name: NIM_TRITON_LOG_VERBOSE
-      value: "1"
-    - name: NIM_TRITON_RATE_LIMIT
-      value: "3"
-    - name: NIM_TRITON_MAX_BATCH_SIZE
-      value: "32"
-    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "3072"
-    - name: OMP_NUM_THREADS
-      value: "8"
+{{ toYaml .Values.nimOperator.table_structure.env | nindent 4 }}
