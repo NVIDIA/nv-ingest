@@ -5,7 +5,6 @@
 import os
 import logging
 import warnings
-from collections import defaultdict
 from math import log
 from typing import Any
 from typing import Dict
@@ -21,12 +20,15 @@ import pandas as pd
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 import tritonclient.grpc as grpcclient
 from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
-# yolox-page-elements-v1 and v2 common contants
+YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v2"
+
+# yolox-page-elements-v2 and v3 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
@@ -293,7 +295,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
             batch_results = response.get("data", [])
             for detections in batch_results:
-                new_bounding_boxes = defaultdict(list)
+                new_bounding_boxes = {label: [] for label in self.class_labels}
 
                 bounding_boxes = detections.get("bounding_boxes", [])
                 for obj_type, bboxes in bounding_boxes.items():
@@ -303,6 +305,7 @@ class YoloxModelInterfaceBase(ModelInterface):
                         xmax = bbox["x_max"]
                         ymax = bbox["y_max"]
                         confidence = bbox["confidence"]
+
                         new_bounding_boxes[obj_type].append([xmin, ymin, xmax, ymax, confidence])
 
                 processed_outputs.append(new_bounding_boxes)
@@ -374,11 +377,14 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, version: str = YOLOX_PAGE_DEFAULT_VERSION):
         """
         Initialize the yolox-page-elements model interface.
         """
-        class_labels = YOLOX_PAGE_CLASS_LABELS
+        if version.endswith("-v3"):
+            class_labels = YOLOX_PAGE_V3_CLASS_LABELS
+        else:
+            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
@@ -414,9 +420,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
                 final_score = YOLOX_PAGE_V2_FINAL_SCORE
 
         if running_v3:
-            expected_final_score_keys = YOLOX_PAGE_V3_CLASS_LABELS
+            expected_final_score_keys = self.class_labels
         else:
-            expected_final_score_keys = [x for x in YOLOX_PAGE_V2_CLASS_LABELS if x != "title"]
+            expected_final_score_keys = [x for x in self.class_labels if x != "title"]
 
         if (not isinstance(final_score, dict)) or (sorted(final_score.keys()) != sorted(expected_final_score_keys)):
             raise ValueError(
@@ -1627,3 +1633,22 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         yolox_model_name = default_model_name
 
     return yolox_model_name
+
+
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_yolox_page_version(yolox_http_endpoint, default_version=YOLOX_PAGE_DEFAULT_VERSION):
+    try:
+        yolox_version = get_model_name(yolox_http_endpoint, default_version)
+        if not yolox_version:
+            logger.warning(
+                "Failed to obtain yolox-page-elements version from the endpoint. "
+                f"Falling back to '{default_version}'."
+            )
+    except Exception:
+        logger.warning(
+            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_version}'."
+        )
+        yolox_version = default_version
+
+    return yolox_version

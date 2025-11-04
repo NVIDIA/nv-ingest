@@ -34,7 +34,11 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_CLASS_LABELS
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+    YOLOX_PAGE_DEFAULT_VERSION,
+    YOLOX_PAGE_CLASS_LABELS,
+    get_yolox_page_version,
+)
 from nv_ingest_api.util.metadata.aggregators import (
     construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
@@ -324,7 +328,18 @@ def _extract_page_elements(
 
     try:
         # Default model name
-        model_interface = YoloxPageElementsModelInterface()
+        yolox_version = YOLOX_PAGE_DEFAULT_VERSION
+
+        # Get the HTTP endpoint to determine the model name if needed
+        yolox_http_endpoint = yolox_endpoints[1]
+        if yolox_http_endpoint:
+            try:
+                yolox_version = get_yolox_page_version(yolox_http_endpoint)
+            except Exception as e:
+                logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
+
+        # Create the model interface
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
         # Create the inference client
         yolox_client = create_inference_client(
             yolox_endpoints,
