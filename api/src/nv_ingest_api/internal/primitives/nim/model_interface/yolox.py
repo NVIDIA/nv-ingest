@@ -411,7 +411,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, final_score=None, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        running_v3 = set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
+        running_v3 = annotation_dicts and set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
 
         if not final_score:
             if running_v3:
@@ -420,9 +420,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
                 final_score = YOLOX_PAGE_V2_FINAL_SCORE
 
         if running_v3:
-            expected_final_score_keys = self.class_labels
+            expected_final_score_keys = YOLOX_PAGE_V3_FINAL_SCORE
         else:
-            expected_final_score_keys = [x for x in self.class_labels if x != "title"]
+            expected_final_score_keys = [x for x in YOLOX_PAGE_V2_FINAL_SCORE if x != "title"]
 
         if (not isinstance(final_score, dict)) or (sorted(final_score.keys()) != sorted(expected_final_score_keys)):
             raise ValueError(
@@ -446,11 +446,19 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         # This final thresholding is "business logic" specific to nv-ingest
         for annotation_dict in annotation_dicts:
             new_dict = {}
-            for label in YOLOX_PAGE_CLASS_LABELS:
-                if label in annotation_dict and label in final_score:
-                    if not running_v3 and label == "title":
-                        continue
-                    new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= final_score[label]]
+            if running_v3:
+                for label in YOLOX_PAGE_V3_CLASS_LABELS:
+                    if label in annotation_dict and label in final_score:
+                        threshold = final_score[label]
+                        new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= threshold]
+            else:
+                for label in YOLOX_PAGE_V2_CLASS_LABELS:
+                    if label in annotation_dict:
+                        if label == "title":
+                            new_dict[label] = annotation_dict[label]
+                        elif label in final_score:
+                            threshold = final_score[label]
+                            new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= threshold]
 
             inference_results.append(new_dict)
 
@@ -1638,6 +1646,10 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_page_version(yolox_http_endpoint, default_version=YOLOX_PAGE_DEFAULT_VERSION):
+    """
+    Determines the YOLOX page elements model version by querying the endpoint.
+    Falls back to a default version on failure.
+    """
     try:
         yolox_version = get_model_name(yolox_http_endpoint, default_version)
         if not yolox_version:
@@ -1645,10 +1657,11 @@ def get_yolox_page_version(yolox_http_endpoint, default_version=YOLOX_PAGE_DEFAU
                 "Failed to obtain yolox-page-elements version from the endpoint. "
                 f"Falling back to '{default_version}'."
             )
+            return default_version
+
+        return yolox_version
     except Exception:
         logger.warning(
             f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_version}'."
         )
-        yolox_version = default_version
-
-    return yolox_version
+        return default_version

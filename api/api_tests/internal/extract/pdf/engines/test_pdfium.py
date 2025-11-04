@@ -660,3 +660,126 @@ def test_pdfium_extractor_shapes_grouped(pdf_stream_test_shapes_pdf, dummy_extra
     assert extracted_data[2][1]["image_metadata"]["image_location"] == (538, 0, 561, 33)
     assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][0]) == 595 for data in extracted_data)
     assert all(int(data[1]["image_metadata"]["image_location_max_dimensions"][1]) == 419 for data in extracted_data)
+
+
+@patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
+@patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
+@patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+def test_extract_page_elements_processes_text_when_flag_is_true(
+    mock_create_client,
+    mock_extract_ensemble,
+    mock_construct_metadata,
+):
+    """
+    Verify that text elements ARE processed when the flag in page_to_text_flag_map is True.
+    """
+    mock_client = MagicMock()
+    mock_create_client.return_value = mock_client
+
+    # Simulate YOLOX detecting a 'paragraph'
+    mock_element = MagicMock()
+    mock_element.type_string = "paragraph"
+    mock_extract_ensemble.return_value = [(0, mock_element)]  # Page index 0
+
+    module_under_test._extract_page_elements(
+        pages=[MagicMock()],
+        page_count=1,
+        source_metadata={},
+        base_unified_metadata={},
+        extract_tables=False,
+        extract_charts=False,
+        extract_infographics=False,
+        page_to_text_flag_map={0: True},  # <<< Key part of the test: Enable text processing for page 0
+        table_output_format="markdown",
+        yolox_endpoints=("grpc://dummy", None),
+    )
+
+    # Assert that since the flag was True, we attempted to construct metadata for the text element.
+    mock_construct_metadata.assert_called_once()
+
+
+@patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
+@patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
+@patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+def test_extract_page_elements_skips_text_when_flag_is_false(
+    mock_create_client,
+    mock_extract_ensemble,
+    mock_construct_metadata,
+):
+    """
+    Verify that text elements ARE SKIPPED when the flag in page_to_text_flag_map is False.
+    """
+    mock_client = MagicMock()
+    mock_create_client.return_value = mock_client
+
+    # Simulate YOLOX detecting a 'paragraph'
+    mock_element = MagicMock()
+    mock_element.type_string = "paragraph"
+    mock_extract_ensemble.return_value = [(0, mock_element)]  # Page index 0
+
+    module_under_test._extract_page_elements(
+        pages=[MagicMock()],
+        page_count=1,
+        source_metadata={},
+        base_unified_metadata={},
+        extract_tables=False,
+        extract_charts=False,
+        extract_infographics=False,
+        page_to_text_flag_map={0: False},  # <<< Key part of the test: Disable text processing for page 0
+        table_output_format="markdown",
+        yolox_endpoints=("grpc://dummy", None),
+    )
+
+    # Assert that since the flag was False, we did NOT attempt to construct metadata.
+    mock_construct_metadata.assert_not_called()
+
+
+@patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
+@patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
+@patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+def test_extract_page_elements_mixed_flags_and_types(
+    mock_create_client,
+    mock_extract_ensemble,
+    mock_construct_metadata,
+):
+    """
+    Verify correct behavior with a mix of element types and flags.
+    """
+    mock_client = MagicMock()
+    mock_create_client.return_value = mock_client
+
+    # Simulate YOLOX detecting a table on page 0 and a paragraph on page 1
+    mock_table_element = MagicMock()
+    mock_table_element.type_string = "table"
+    mock_paragraph_element = MagicMock()
+    mock_paragraph_element.type_string = "paragraph"
+
+    mock_extract_ensemble.return_value = [(0, mock_table_element), (1, mock_paragraph_element)]
+
+    module_under_test._extract_page_elements(
+        pages=[MagicMock(), MagicMock()],
+        page_count=2,
+        source_metadata={},
+        base_unified_metadata={},
+        extract_tables=True,  # Enable table processing
+        extract_charts=False,
+        extract_infographics=False,
+        # Enable text for page 1, but disable for page 0
+        page_to_text_flag_map={0: False, 1: True},
+        table_output_format="markdown",
+        yolox_endpoints=("grpc://dummy", None),
+    )
+
+    # We expect construct_metadata to be called twice:
+    # 1. For the table on page 0 (since extract_tables=True)
+    # 2. For the paragraph on page 1 (since page_to_text_flag_map[1]=True)
+    assert mock_construct_metadata.call_count == 2
+
+    # Check the calls were made with the correct elements
+    call_args_list = mock_construct_metadata.call_args_list
+    # The order is not guaranteed, so we check the contents
+    called_with_table = any(call.args[0] is mock_table_element for call in call_args_list)
+    called_with_paragraph = any(call.args[0] is mock_paragraph_element for call in call_args_list)
+
+    assert called_with_table, "construct_page_element_metadata was not called for the table element"
+    assert called_with_paragraph, "construct_page_element_metadata was not called for the paragraph element"
