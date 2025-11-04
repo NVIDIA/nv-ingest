@@ -191,9 +191,9 @@ else:
                     "segment_time": segment_time,
                     "c": "copy",
                     "map": "0",
-                    # use 10% of the available cores, but at least 2 threads
+                    # use 10% of the available cores, but at least 4 threads
                     # each core has 2 threads
-                    "threads": int(max(SystemResourceProbe().get_effective_cores() * 0.2, 2)),
+                    "threads": int(max(SystemResourceProbe().get_effective_cores() * 0.2, 4)),
                 }
                 if suffix == ".mp4":
                     output_kwargs.update(

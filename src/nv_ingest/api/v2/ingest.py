@@ -261,41 +261,12 @@ def _prepare_chunk_submission(
 
     subjob_uuid = uuid.uuid5(parent_uuid, f"chunk-{chunk_number}")
     subjob_id = str(subjob_uuid)
-    # subjob_spec = {
-    #     key: value
-    #     for key, value in job_spec_template.items()
-    #     if key not in {"job_payload", "job_id", "tracing_options"}
-    # }
 
-    # subjob_payload = {
-    #     key: value
-    #     for key, value in subjob_payload_template.items()
-    #     if key not in {"content", "source_id", "source_name"}
-    # }
-    # if isinstance(chunk["bytes"], bytes):
-    chunk_bytes = base64.b64encode(chunk["bytes"]).decode("utf-8")
-    # else:
-    # chunk_bytes = chunk["bytes"]
-    # subjob_payload["content"] = [base64.b64encode(chunk_bytes).decode("utf-8")]
     subjob_payload_template = job_spec_template.get("job_payload", {})
-    # start_page = chunk["start_page"]
-    # end_page = chunk["end_page"]
-
+    chunk_bytes = base64.b64encode(chunk["bytes"]).decode("utf-8")
     subjob_payload = _create_payload_dict(subjob_payload_template, chunk_bytes, source_id, source_name, document_type)
     start = chunk["start_page"] if "start_page" in chunk else chunk["start"]
 
-    # subjob_spec["job_payload"] = subjob_payload
-    # subjob_spec["job_id"] = subjob_id
-
-    # base_tracing_options = job_spec_template.get("tracing_options") or {}
-    # tracing_options = dict(base_tracing_options)
-    # tracing_options.setdefault("trace", True)
-    # tracing_options["trace_id"] = str(current_trace_id)
-    # tracing_options["ts_send"] = int(time.time() * 1000)
-    # tracing_options["parent_job_id"] = parent_job_id
-    # tracing_options["page_num"] = start_page
-
-    # subjob_spec["tracing_options"] = tracing_options
     subjob_spec = _create_subjob_dict(
         subjob_id, subjob_payload, job_spec_template, current_trace_id, parent_job_id, {"page_num": start}
     )
