@@ -1,0 +1,23 @@
+nv\_ingest\_api.internal.extract package
+========================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.extract.audio
+   nv_ingest_api.internal.extract.docx
+   nv_ingest_api.internal.extract.html
+   nv_ingest_api.internal.extract.image
+   nv_ingest_api.internal.extract.pdf
+   nv_ingest_api.internal.extract.pptx
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract
+   :members:
+   :undoc-members:
+   :show-inheritance:

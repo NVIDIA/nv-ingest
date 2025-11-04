@@ -1,0 +1,32 @@
+nv\_ingest\_client package
+==========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_client.cli
+   nv_ingest_client.client
+   nv_ingest_client.primitives
+   nv_ingest_client.util
+
+Submodules
+----------
+
+nv\_ingest\_client.nv\_ingest\_cli module
+-----------------------------------------
+
+.. automodule:: nv_ingest_client.nv_ingest_cli
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_client
+   :members:
+   :undoc-members:
+   :show-inheritance:
