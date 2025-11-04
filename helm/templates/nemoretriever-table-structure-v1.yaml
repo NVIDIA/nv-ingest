@@ -1,3 +1,4 @@
+{{- if .Values.nimOperator.table_structure.enabled }}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
@@ -43,3 +44,4 @@ spec:
 {{ toYaml .Values.nimOperator.table_structure.expose | nindent 4 }}
   env:
 {{ toYaml .Values.nimOperator.table_structure.env | nindent 4 }}
+{{- end }}
