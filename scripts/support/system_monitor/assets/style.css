@@ -39,7 +39,7 @@ body {
 }
 
 /* Layout */
-.grid { display: grid; grid-template-columns: 300px 1fr; gap: var(--gap-lg); align-items: start; }
+.grid { display: grid; grid-template-columns: 320px 1fr; gap: var(--gap-lg); align-items: start; }
 .sidebar {
   position: sticky; top: var(--gap-lg);
   padding: var(--gap-lg);
@@ -109,3 +109,29 @@ hr { border: none; border-top: 1px solid var(--border); margin: var(--gap-md) 0;
 /* Plotly figure background harmonization */
 .js-plotly-plot .plotly .bg, .js-plotly-plot .plotly .bglayer, .js-plotly-plot .plotly .plot { background: transparent !important; }
 .js-plotly-plot .plotly .infolayer { color: var(--text); }
+
+/* Sidebar spacing & control layout improvements */
+/* Add breathing room between stacked elements inside controls */
+.sidebar .control > *:not(:last-child) { margin-bottom: var(--gap-sm); }
+
+/* Space out button groups (e.g., Start/Stop/Reset/Snapshot) */
+.sidebar .control button,
+.sidebar .control .button { margin-right: var(--gap-sm); margin-bottom: var(--gap-sm); }
+
+/* Make text/number inputs full-width and comfortable in the sidebar */
+.sidebar .control input[type="text"],
+.sidebar .control input[type="number"] { width: 100%; box-sizing: border-box; }
+
+/* RadioItems and Checklist: wrap and space options nicely */
+.sidebar .control .dash-radio-items,
+.sidebar .control .dash-checklist { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.sidebar .control .dash-radio-items label,
+.sidebar .control .dash-checklist label { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Upload widget spacing */
+.sidebar .control .dccUpload { margin-top: var(--gap-sm); }
+
+/* Details sections: subtle separators and clickable summaries */
+.sidebar details { padding: 8px 0; border-top: 1px solid var(--border); }
+.sidebar details:first-of-type { border-top: none; }
+.sidebar details > summary { cursor: pointer; padding: 6px 0; }

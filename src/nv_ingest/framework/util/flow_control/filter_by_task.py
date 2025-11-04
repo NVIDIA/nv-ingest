@@ -7,10 +7,79 @@ import functools
 import logging
 import re
 from typing import Dict, List, Any, Union, Tuple, Optional, Callable
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TaskMatchResult:
+    """Declarative result describing task matching outcome."""
+
+    matched: bool
+    task_type: Optional[str] = None
+    task_properties: Optional[Any] = None
+    reason: str = ""
+
+
+def _index_tasks(message: Any) -> Dict[str, List[Any]]:
+    """
+    Build an index of tasks from the control message keyed by task.type.
+    """
+    tasks: Dict[str, List[Any]] = {}
+    for task in message.get_tasks():
+        tasks.setdefault(task.type, []).append(task.properties)
+    return tasks
+
+
+def _find_first_match(
+    tasks_index: Dict[str, List[Any]], required_tasks: List[Union[str, Tuple[Any, ...]]]
+) -> TaskMatchResult:
+    """
+    Evaluate required_tasks against tasks_index and return a declarative result.
+    """
+    for required_task in required_tasks:
+        # Case 1: required task is a simple string (by type)
+        if isinstance(required_task, str):
+            if required_task in tasks_index:
+                return TaskMatchResult(
+                    matched=True,
+                    task_type=required_task,
+                    task_properties=None,
+                    reason=f"required task type '{required_task}' present",
+                )
+            continue
+
+        # Case 2: required task is a tuple/list (type + property subsets)
+        if isinstance(required_task, (tuple, list)):
+            required_task_name, *required_task_props_list = required_task
+            if required_task_name not in tasks_index:
+                continue
+            for task_props in tasks_index.get(required_task_name, []):
+                orig_task_props = task_props
+                if isinstance(task_props, BaseModel):
+                    task_props = task_props.model_dump()
+                all_match = True
+                for required_props in required_task_props_list:
+                    if not _is_subset(task_props, required_props):
+                        all_match = False
+                        break
+                if all_match:
+                    return TaskMatchResult(
+                        matched=True,
+                        task_type=required_task_name,
+                        task_properties=orig_task_props,
+                        reason=f"properties matched for task '{required_task_name}'",
+                    )
+            continue
+
+        # Invalid required_task specification
+        logger.debug("filter_by_task: invalid required_task spec of type %s", type(required_task))
+
+    return TaskMatchResult(matched=False, reason="no required task or property subset matched")
 
 
 def filter_by_task(
@@ -49,120 +118,41 @@ def filter_by_task(
                     "The first or second argument must be an IngestControlMessage with task handling capabilities."
                 )
 
+        # Explicitly disallow async callables for this decorator (simplifies semantics).
         if asyncio.iscoroutinefunction(func):
+            raise TypeError(
+                "filter_by_task does not support async callables. Convert to a sync function or "
+                "wrap with an async-aware filter."
+            )
 
-            @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                message = extract_message(args)
-                tasks: Dict[str, List[Any]] = {}
-                for task in message.get_tasks():
-                    tasks.setdefault(task.type, []).append(task.properties)
-                for required_task in required_tasks:
-                    # Case 1: required task is a simple string.
-                    if isinstance(required_task, str):
-                        if required_task in tasks:
-                            logger.debug(
-                                "Task '%s' found. Proceeding with async function '%s'.",
-                                required_task,
-                                func.__name__,
-                            )
-                            return await func(*args, **kwargs)
-                        else:
-                            logger.debug("Required task '%s' not found.", required_task)
-                    # Case 2: required task is a tuple/list with properties.
-                    elif isinstance(required_task, (tuple, list)):
-                        required_task_name, *required_task_props_list = required_task
-                        if required_task_name not in tasks:
-                            continue
-                        for task_props in tasks.get(required_task_name, []):
-                            orig_task_props = task_props
-                            if isinstance(task_props, BaseModel):
-                                task_props = task_props.model_dump()
-                            all_match = True
-                            for required_props in required_task_props_list:
-                                if not _is_subset(task_props, required_props):
-                                    logger.debug(
-                                        "For task '%s', task properties %s do not match required subset %s.",
-                                        required_task_name,
-                                        orig_task_props,
-                                        required_props,
-                                    )
-                                    all_match = False
-                                    break
-                            if all_match:
-                                logger.debug(
-                                    "Task '%s' with properties %s matched for function '%s'.",
-                                    required_task_name,
-                                    orig_task_props,
-                                    func.__name__,
-                                )
-                                return await func(*args, **kwargs)
-                    else:
-                        logger.debug("Invalid required task type: %s", type(required_task))
-                logger.debug("No required task matched for function '%s'.", func.__name__)
-                if forward_func:
-                    logger.debug("Calling forward function for IngestControlMessage.")
-                    return await forward_func(message)
-                else:
-                    logger.debug("Returning original IngestControlMessage without processing.")
-                    return message
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            message = extract_message(args)
 
-            return async_wrapper
-        else:
+            # Build task index and evaluate required tasks declaratively
+            tasks_index = _index_tasks(message)
+            match = _find_first_match(tasks_index, required_tasks)
 
-            @functools.wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                message = extract_message(args)
-                tasks: Dict[str, List[Any]] = {}
-                for task in message.get_tasks():
-                    tasks.setdefault(task.type, []).append(task.properties)
-                for required_task in required_tasks:
-                    if isinstance(required_task, str):
-                        if required_task in tasks:
-                            logger.debug(
-                                "Task '%s' found. Proceeding with function '%s'.", required_task, func.__name__
-                            )
-                            return func(*args, **kwargs)
-                        else:
-                            logger.debug("Required task '%s' not found.", required_task)
-                    elif isinstance(required_task, (tuple, list)):
-                        required_task_name, *required_task_props_list = required_task
-                        if required_task_name not in tasks:
-                            continue
-                        for task_props in tasks.get(required_task_name, []):
-                            orig_task_props = task_props
-                            if isinstance(task_props, BaseModel):
-                                task_props = task_props.model_dump()
-                            all_match = True
-                            for required_props in required_task_props_list:
-                                if not _is_subset(task_props, required_props):
-                                    logger.debug(
-                                        "For task '%s', task properties %s do not match required subset %s.",
-                                        required_task_name,
-                                        orig_task_props,
-                                        required_props,
-                                    )
-                                    all_match = False
-                                    break
-                            if all_match:
-                                logger.debug(
-                                    "Task '%s' with properties %s matched for function '%s'.",
-                                    required_task_name,
-                                    orig_task_props,
-                                    func.__name__,
-                                )
-                                return func(*args, **kwargs)
-                    else:
-                        logger.debug("Invalid required task type: %s", type(required_task))
-                logger.debug("No required task matched for function '%s'.", func.__name__)
-                if forward_func:
-                    logger.debug("Calling forward function for IngestControlMessage.")
-                    return forward_func(message)
-                else:
-                    logger.debug("Returning original IngestControlMessage without processing.")
-                    return message
+            if match.matched:
+                logger.debug(
+                    "filter_by_task: ALLOW '%s' due to %s (task='%s')",
+                    func.__name__,
+                    match.reason or "match",
+                    match.task_type,
+                )
+                return func(*args, **kwargs)
 
-            return sync_wrapper
+            logger.debug(
+                "filter_by_task: SKIP '%s' (%s). Returning original message%s.",
+                func.__name__,
+                match.reason or "no match",
+                " via forward_func" if forward_func else "",
+            )
+            if forward_func:
+                return forward_func(message)
+            return message
+
+        return wrapper
 
     return decorator
 

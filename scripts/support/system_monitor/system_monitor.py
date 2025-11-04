@@ -16,7 +16,7 @@ import psutil
 # flake8: noqa
 
 # Use absolute package import only (no relatives or fallbacks)
-from .system_tracer import (
+from system_tracer import (
     get_process_tree_summary,
     SystemTracer,
 )
@@ -235,6 +235,20 @@ def run_dashboard(datafile, port, host, interval, debug):
                                         ],
                                         className="control",
                                     ),
+                                    html.Div(
+                                        [
+                                            dcc.Checklist(
+                                                id="pause-refresh",
+                                                options=[{"label": "Pause auto-refresh", "value": "pause"}],
+                                                value=[],
+                                                inline=True,
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                            )
+                                        ],
+                                        className="control",
+                                    ),
                                 ],
                                 open=True,
                             ),
@@ -245,6 +259,25 @@ def run_dashboard(datafile, port, host, interval, debug):
                                         "Configure and control in-process tracing. For offline files, leave tracing stopped.",
                                         className="muted",
                                         style={"marginTop": "-6px", "marginBottom": "6px"},
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Div("Data source mode", className="label"),
+                                            dcc.RadioItems(
+                                                id="data-source-mode",
+                                                options=[
+                                                    {"label": "Auto (prefer live if running)", "value": "auto"},
+                                                    {"label": "Live tracer", "value": "live"},
+                                                    {"label": "File (Parquet/CSV)", "value": "file"},
+                                                ],
+                                                value="auto",
+                                                persistence=True,
+                                                persisted_props=["value"],
+                                                persistence_type="local",
+                                                labelStyle={"display": "block", "marginRight": "8px"},
+                                            ),
+                                        ],
+                                        className="control",
                                     ),
                                     html.Div(
                                         [
@@ -557,6 +590,16 @@ def run_dashboard(datafile, port, host, interval, debug):
                     # Main content
                     html.Div(
                         [
+                            # Contextual notice banner (filled by callback)
+                            html.Div(
+                                id="notice-banner",
+                                style={
+                                    "marginBottom": "10px",
+                                    "border": "1px solid var(--border)",
+                                    "padding": "8px",
+                                    "display": "block",
+                                },
+                            ),
                             # (Process Tree tab moved into main tabset below)
                             dcc.Tabs(
                                 id="main-tabs",
@@ -1253,24 +1296,26 @@ def run_dashboard(datafile, port, host, interval, debug):
     )
 
     # Helper function to load and filter data
-    def load_data(data_path, time_range_minutes):
+    def load_data(data_path, time_range_minutes, source_mode="auto"):
         try:
-            # If live tracer is running, read directly from in-memory buffer
-            try:
-                if _is_running():
-                    with _tracer_lock:
-                        tracer = _tracer_obj.get("tracer")
-                        if tracer is not None and getattr(tracer, "data_buffer", None) is not None:
-                            df = pd.DataFrame(list(tracer.data_buffer))
-                            if time_range_minutes > 0 and not df.empty and "timestamp" in df.columns:
-                                latest_time = pd.to_datetime(df["timestamp"]).max()
-                                time_threshold = latest_time - pd.Timedelta(minutes=time_range_minutes)
-                                df = df[pd.to_datetime(df["timestamp"]) >= time_threshold]
-                            return df
-            except Exception as le:
-                print(f"Error reading live buffer: {le}")
+            # Live buffer branch (explicit when mode == live, or auto + running)
+            if source_mode in ("live", "auto"):
+                try:
+                    if _is_running():
+                        with _tracer_lock:
+                            tracer = _tracer_obj.get("tracer")
+                            if tracer is not None and getattr(tracer, "data_buffer", None) is not None:
+                                df = pd.DataFrame(list(tracer.data_buffer))
+                                if time_range_minutes > 0 and not df.empty and "timestamp" in df.columns:
+                                    latest_time = pd.to_datetime(df["timestamp"]).max()
+                                    time_threshold = latest_time - pd.Timedelta(minutes=time_range_minutes)
+                                    df = df[pd.to_datetime(df["timestamp"]) >= time_threshold]
+                                return df
+                except Exception as le:
+                    print(f"Error reading live buffer: {le}")
 
-            if os.path.exists(data_path):
+            # File branch (explicit when mode == file, or auto + no live)
+            if data_path and os.path.exists(data_path):
                 # Prefer parquet if extension says so; let pandas pick available engine (pyarrow/fastparquet)
                 if data_path.endswith(".parquet"):
                     try:
@@ -1299,6 +1344,61 @@ def run_dashboard(datafile, port, host, interval, debug):
         except Exception as e:
             print(f"Error loading data: {e}")
             return pd.DataFrame()
+
+    # Interval enable/disable based on pause toggle
+    @app.callback(
+        Output("interval-component", "disabled"),
+        [Input("pause-refresh", "value")],
+    )
+    def _toggle_interval_disabled(pause_values):
+        try:
+            return isinstance(pause_values, list) and ("pause" in pause_values)
+        except Exception:
+            return False
+
+    # Notice banner content (guides first-time usage)
+    @app.callback(
+        Output("notice-banner", "children"),
+        [
+            Input("interval-component", "n_intervals"),
+            Input("datafile-store", "data"),
+            Input("data-source-mode", "value"),
+        ],
+    )
+    def _notice_banner(_n, data_path, source_mode):
+        try:
+            running = _is_running()
+            has_file = bool(data_path) and os.path.exists(data_path)
+            if source_mode == "live":
+                if not running:
+                    return html.Div(
+                        [
+                            html.Strong("No live data. "),
+                            "Click Start in Live Tracing to begin collecting metrics. ",
+                            "Or switch Data source mode to File and set a Parquet/CSV path.",
+                        ]
+                    )
+            elif source_mode == "file":
+                if not has_file:
+                    return html.Div(
+                        [
+                            html.Strong("No file loaded. "),
+                            "Set Output Parquet Path to an existing Parquet/CSV and Start the tracer, ",
+                            "or switch Data source mode to Live to collect data in-memory.",
+                        ]
+                    )
+            else:  # auto
+                if not running and not has_file:
+                    return html.Div(
+                        [
+                            html.Strong("No data available. "),
+                            "Start live tracing (left) or set a Parquet/CSV in Output Parquet Path. ",
+                            "Data source mode is Auto: it will prefer live data when the tracer is running.",
+                        ]
+                    )
+        except Exception:
+            pass
+        return ""
 
     # ----------------------------
     # Helper utilities (theme, events, small figure helpers)
@@ -2009,6 +2109,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             Input("theme-toggle", "value"),
             Input("smoothing-window", "value"),
             Input("datafile-store", "data"),
+            Input("data-source-mode", "value"),
             Input("container-auto-top", "value"),
             Input("container-top-n", "value"),
             Input("container-select", "value"),
@@ -2026,6 +2127,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         theme_value,
         smoothing_window,
         data_path,
+        source_mode,
         auto_top,
         top_n,
         selected_manual,
@@ -2036,8 +2138,8 @@ def run_dashboard(datafile, port, host, interval, debug):
         display_tz_custom,
         data_tz,
     ):
-        # Load data
-        df = load_data(data_path or datafile, time_range)
+        # Load data (respect selected source mode)
+        df = load_data(data_path or datafile, time_range, source_mode or "auto")
         last_timestamp = "Never"
         if not df.empty and "timestamp" in df.columns:
             try:
