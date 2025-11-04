@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import threading
+from io import BytesIO
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -224,6 +225,7 @@ class Ingestor:
         **kwargs,
     ):
         self._documents = documents or []
+        self._buffers = []
         self._client = client
         self._job_queue_id = job_queue_id
         self._vdb_bulk_upload = None
@@ -349,6 +351,21 @@ class Ingestor:
         if self._check_files_local():
             self._job_specs = BatchJobSpec(self._documents)
             self._all_local = True
+
+        return self
+
+    def buffers(self, buffers: List[Tuple[str, BytesIO]]) -> "Ingestor":
+        """
+        Add buffers for processing.
+
+        Parameters
+        ----------
+        buffers : List[Tuple[str, BytesIO]]
+            List of tuples containing the name of the buffer and the BytesIO object.
+        """
+        self._buffers.extend(buffers)
+        self._job_specs = BatchJobSpec(self._buffers)
+        self._all_local = True
 
         return self
 

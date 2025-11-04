@@ -10,6 +10,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
+from typing import Tuple
 from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
@@ -236,6 +237,8 @@ class BatchJobSpec:
                 self.from_job_specs(job_specs_or_files)
             elif isinstance(job_specs_or_files[0], str):
                 self.from_files(job_specs_or_files)
+            elif isinstance(job_specs_or_files[0], Tuple[str, BytesIO]):
+                self.from_buffers(job_specs_or_files)
             else:
                 raise ValueError("Invalid input type for job_specs. Must be a list of JobSpec or file paths.")
 
@@ -276,6 +279,21 @@ class BatchJobSpec:
             logger.warning(f"No files found matching {files}.")
             return
         job_specs = create_job_specs_for_batch(matching_files)
+        for job_spec in job_specs:
+            self.add_job_spec(job_spec)
+
+    def from_buffers(self, buffers: List[Tuple[str, BytesIO]]) -> None:
+        """
+        Initializes the batch from a list of buffers.
+
+        Parameters
+        ----------
+        buffers : List[Tuple[str, BytesIO]]
+            A list of tuples containing the name of the buffer and the BytesIO object.
+        """
+        from nv_ingest_client.util.util import create_job_specs_for_buffers
+
+        job_specs = create_job_specs_for_buffers(buffers)
         for job_spec in job_specs:
             self.add_job_spec(job_spec)
 

@@ -12,10 +12,12 @@ import math
 import heapq
 from typing import Dict
 from typing import List
+from typing import Tuple
+from io import BytesIO
 
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.file_processing.extract import extract_file_content
+from nv_ingest_client.util.file_processing.extract import extract_file_content, extract_content_from_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -344,6 +346,37 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
             source_id=file_name,
             source_name=file_name,
             extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
+        )
+        job_specs.append(job_spec)
+
+    return job_specs
+
+
+def create_job_specs_for_buffers(buffers: List[Tuple[str, BytesIO]]) -> List[JobSpec]:
+    """
+    Create and job specifications (JobSpecs) for a list of buffers.
+    This function takes a list of buffers, processes each buffer to extract its content and type,
+    creates a job specification (JobSpec) for each buffer.
+
+    Parameters
+    ----------
+    buffers : List[Tuple[str, BytesIO]]
+        A list of tuples containing the name of the buffer and the BytesIO object.
+
+    Returns
+    -------
+    List[JobSpec]
+        A list of JobSpecs.
+    """
+
+    job_specs = []
+    for name, buffer in buffers:
+        content, file_type = extract_content_from_buffer(name, buffer)
+        job_spec = JobSpec(
+            document_type=file_type,
+            payload=content,
+            source_id=name,
+            source_name=name,
         )
         job_specs.append(job_spec)
 
