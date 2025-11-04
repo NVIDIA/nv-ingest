@@ -12,6 +12,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 import base64
+from pathlib import Path
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
@@ -22,6 +23,13 @@ from nv_ingest_api.util.schema.schema_validator import validate_schema
 from nv_ingest_api.interface.utility import read_file_as_base64
 
 logger = logging.getLogger(__name__)
+
+
+def remove_files(row: pd.Series):
+    base64_file_path = row.get("metadata").get("content")
+    base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
+    base64_file_path = Path(base64_file_path)
+    base64_file_path.unlink(missing_ok=True)
 
 
 @unified_exception_handler
@@ -176,6 +184,9 @@ def extract_text_from_audio_internal(
             f"rows and {len(df_extraction_ledger.columns)} columns"
         )
         extraction_series = df_extraction_ledger.apply(_extract_from_audio_partial, axis=1)
+
+        # Remove the files after extraction
+        df_extraction_ledger.apply(remove_files, axis=1)
 
         # Explode the results if the extraction returns lists.
         extraction_series = extraction_series.explode().dropna()
