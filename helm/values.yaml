@@ -621,7 +621,6 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
-    resources: {}
     tolerations:
       - key: "nvidia.com/mig"
         operator: "Equal"
@@ -672,7 +671,7 @@ nimOperator:
         value: "1"
 
   graphic_elements:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
       tag: 1.5.0
@@ -720,7 +719,7 @@ nimOperator:
         value: "1"
 
   table_structure:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
       tag: 1.5.0
@@ -768,7 +767,7 @@ nimOperator:
         value: "8"
 
   embedqa:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
       tag: 1.10.0
@@ -814,7 +813,7 @@ nimOperator:
         value: "throughput"
 
   paddleocr:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/baidu/paddleocr
       tag: 1.5.0
@@ -864,7 +863,7 @@ nimOperator:
         value: "1"
 
   nemoretriever_ocr_v1:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
       tag: 1.2.0-rc2-latest-release-37831672
@@ -910,7 +909,7 @@ nimOperator:
         value: "1"
 
   llama_3_2_nv_rerankqa_1b_v2:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
       tag: 1.8.0
@@ -922,7 +921,7 @@ nimOperator:
       pvc:
         create: true
         storageClass: "pdx02-cdot03-ainfs01-nfsv3"
-        size: "25Gi"
+        size: "50Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
     nodeSelector:
@@ -946,7 +945,7 @@ nimOperator:
     env: []
 
   llama_3_1_nemotron_nano_vl_8b_v1:
-    enabled: true
+    enabled: false
     image:
       repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
       tag: latest

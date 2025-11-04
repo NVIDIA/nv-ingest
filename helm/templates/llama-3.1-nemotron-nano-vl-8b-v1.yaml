@@ -15,7 +15,6 @@ spec:
       storageClass: {{ .Values.nimOperator.llama_3_1_nemotron_nano_vl_8b_v1.storage.pvc.storageClass }}
       size: {{ .Values.nimOperator.llama_3_1_nemotron_nano_vl_8b_v1.storage.pvc.size }}
       volumeAccessMode: {{ .Values.nimOperator.llama_3_1_nemotron_nano_vl_8b_v1.storage.pvc.volumeAccessMode }}
-  resources: {{ toYaml .Values.nimOperator.llama_3_1_nemotron_nano_vl_8b_v1.resources | nindent 4 }}
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService

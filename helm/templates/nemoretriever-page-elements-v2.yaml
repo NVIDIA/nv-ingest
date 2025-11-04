@@ -15,8 +15,7 @@ spec:
       storageClass: {{ .Values.nimOperator.page_elements.storage.pvc.storageClass }}
       size: {{ .Values.nimOperator.page_elements.storage.pvc.size }}
       volumeAccessMode: {{ .Values.nimOperator.page_elements.storage.pvc.volumeAccessMode }}
-  resources:
-{{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
+  resources: {}
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
@@ -27,21 +26,16 @@ spec:
     repository: {{ .Values.nimOperator.page_elements.image.repository }}
     tag: {{ .Values.nimOperator.page_elements.image.tag }}
     pullPolicy: {{ .Values.nimOperator.page_elements.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.page_elements.image.pullSecrets | nindent 6 }}
+    pullSecrets: {{ toYaml .Values.nimOperator.page_elements.image.pullSecrets | nindent 6 }}
   authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
   storage:
     nimCache:
       name: nemoretriever-page-elements-v2
+      profile: ''
   replicas: {{ .Values.nimOperator.page_elements.replicas }}
-  nodeSelector:
-{{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}
-  resources:
-{{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.page_elements.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.page_elements.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.page_elements.env | nindent 4 }}
+  nodeSelector: {{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}
+  resources: {{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
+  tolerations: {{ toYaml .Values.nimOperator.page_elements.tolerations | nindent 4 }}
+  expose: {{ toYaml .Values.nimOperator.page_elements.expose | nindent 4 }}
+  env: {{ toYaml .Values.nimOperator.page_elements.env | nindent 4 }}
 {{- end }}

@@ -15,8 +15,6 @@ spec:
       storageClass: {{ .Values.nimOperator.table_structure.storage.pvc.storageClass }}
       size: {{ .Values.nimOperator.table_structure.storage.pvc.size }}
       volumeAccessMode: {{ .Values.nimOperator.table_structure.storage.pvc.volumeAccessMode }}
-  resources:
-{{ toYaml .Values.nimOperator.table_structure.resources | nindent 4 }}
 ---
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
