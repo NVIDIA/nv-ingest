@@ -438,10 +438,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         # Filter out bounding boxes below the final threshold
         # This final thresholding is "business logic" specific to nv-ingest
-        labels_to_check = {"table", "chart", "title", "infographic", "paragraph", "header_footer"}
         for annotation_dict in annotation_dicts:
             new_dict = {}
-            for label in labels_to_check:
+            for label in YOLOX_PAGE_CLASS_LABELS:
                 if label in annotation_dict and label in final_score:
                     if not running_v3 and label == "title":
                         continue
