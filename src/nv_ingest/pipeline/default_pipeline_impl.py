@@ -449,79 +449,79 @@ edges:
   # Intake
   - from: "source_stage"
     to: "metadata_injector"
-    queue_size: 32
+    queue_size: 4
 
   # Document Extractors
   - from: "metadata_injector"
     to: "pdf_extractor"
-    queue_size: 32
+    queue_size: 8
   - from: "pdf_extractor"
     to: "audio_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "audio_extractor"
     to: "docx_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "docx_extractor"
     to: "pptx_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "pptx_extractor"
     to: "image_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "image_extractor"
     to: "html_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "html_extractor"
     to: "infographic_extractor"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Extractors
   - from: "infographic_extractor"
     to: "table_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "table_extractor"
     to: "chart_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "chart_extractor"
     to: "ocr_extractor"
     queue_size: 32
   - from: "ocr_extractor"
     to: "image_filter"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Mutators
   - from: "image_filter"
     to: "image_dedup"
-    queue_size: 32
+    queue_size: 4
   - from: "image_dedup"
     to: "text_splitter"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Transforms
   - from: "text_splitter"
     to: "image_caption"
-    queue_size: 32
+    queue_size: 4
   - from: "image_caption"
     to: "text_embedder"
-    queue_size: 32
+    queue_size: 4
   - from: "text_embedder"
     to: "image_storage"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Storage
   - from: "image_storage"
     to: "embedding_storage"
-    queue_size: 32
+    queue_size: 4
   - from: "embedding_storage"
     to: "broker_response"
-    queue_size: 32
+    queue_size: 4
 
   # Response and Telemetry
   - from: "broker_response"
     to: "otel_tracer"
-    queue_size: 32
+    queue_size: 4
   - from: "otel_tracer"
     to: "default_drain"
-    queue_size: 32
+    queue_size: 4
 
 # Pipeline Runtime Configuration
 pipeline:
