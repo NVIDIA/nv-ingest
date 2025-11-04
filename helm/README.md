@@ -61,11 +61,11 @@ helm upgrade \
 > The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
 >
 > ```bash
-> --set redis.image.repository=redis \
-> --set redis.image.tag=8.2.1 \
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
 > ```
 >
-> This uses the Bitnami Redis 8.2.1 image. Adjust the tag as needed for your environment.
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
 
 > [!NOTE]
 > For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
