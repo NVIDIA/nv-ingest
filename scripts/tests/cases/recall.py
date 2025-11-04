@@ -27,7 +27,6 @@ def main(config=None, log_path: str = "test_results") -> int:
     use_reranker = getattr(config, "use_reranker", False)
     reranker_only = getattr(config, "reranker_only", False)
     recall_top_k = getattr(config, "recall_top_k", 10)
-    eval_modalities = getattr(config, "eval_modalities", ["multimodal"])
     recall_dataset = getattr(config, "recall_dataset", None)
     ground_truth_dir = getattr(config, "ground_truth_dir", None)
 
@@ -38,15 +37,12 @@ def main(config=None, log_path: str = "test_results") -> int:
         print("Set recall_dataset in test_configs.yaml recall section or via RECALL_DATASET environment variable")
         return 1
 
-    # Auto-generate collection names
+    # Auto-generate collection name
     if not test_name:
         test_name = os.path.basename(config.dataset_dir.rstrip("/"))
 
-    # All modalities query against the same multimodal collection
-    # This matches the research team's approach: text/table/chart queries all run
-    # against the multimodal collection for even comparison
-    multimodal_collection = f"{test_name}_multimodal"
-    collection_names = {modality: multimodal_collection for modality in eval_modalities}
+    # All datasets use multimodal collection
+    collection_name = f"{test_name}_multimodal"
 
     # Print configuration
     print("=" * 60)
@@ -54,8 +50,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     print("=" * 60)
     print(f"Dataset: {recall_dataset}")
     print(f"Test Name: {test_name}")
-    print(f"Modalities: {', '.join(eval_modalities)}")
-    print(f"Collection: {multimodal_collection} (all modalities query this collection)")
+    print(f"Collection: {collection_name}")
     print(f"Reranker: {use_reranker} (reranker_only={reranker_only})")
     print(f"Top K: {recall_top_k}")
     print(f"Model: {model_name} (sparse={sparse}, gpu_search={gpu_search})")
@@ -67,10 +62,10 @@ def main(config=None, log_path: str = "test_results") -> int:
         print(f"ERROR: Unknown dataset '{recall_dataset}'")
         return 1
 
-    # Load the multimodal collection (all modalities use the same collection)
+    # Load the multimodal collection
     milvus_uri = f"http://{hostname}:19530"
-    print(f"Loading collection: {multimodal_collection}")
-    load_collection(milvus_uri, multimodal_collection)
+    print(f"Loading collection: {collection_name}")
+    load_collection(milvus_uri, collection_name)
 
     try:
         recall_results = {}
@@ -82,9 +77,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             print("=" * 60)
             eval_start = time.time()
 
-            results_no_reranker = evaluator(
-                modalities=eval_modalities,
-                collection_names=collection_names,
+            scores_no_reranker = evaluator(
+                collection_name=collection_name,
                 hostname=hostname,
                 sparse=sparse,
                 model_name=model_name,
@@ -95,15 +89,13 @@ def main(config=None, log_path: str = "test_results") -> int:
             )
 
             eval_time = time.time() - eval_start
-            recall_results["no_reranker"] = results_no_reranker
+            recall_results["no_reranker"] = scores_no_reranker
 
-            for modality, scores in results_no_reranker.items():
-                print(f"\n{modality.upper()} Recall (no reranker):")
-                for k in [1, 3, 5, 10]:
-                    if k in scores:
-                        score = scores[k]
-                        print(f"  - Recall @{k}: {score:.3f}")
-                        kv_event_log(f"recall_{modality}_@{k}_no_reranker", score, log_path)
+            print("\nMultimodal Recall (no reranker):")
+            for k in sorted(scores_no_reranker.keys()):
+                score = scores_no_reranker[k]
+                print(f"  - Recall @{k}: {score:.3f}")
+                kv_event_log(f"recall_multimodal_@{k}_no_reranker", score, log_path)
 
             kv_event_log("recall_eval_time_s_no_reranker", eval_time, log_path)
 
@@ -114,9 +106,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             print("=" * 60)
             eval_start = time.time()
 
-            results_with_reranker = evaluator(
-                modalities=eval_modalities,
-                collection_names=collection_names,
+            scores_with_reranker = evaluator(
+                collection_name=collection_name,
                 hostname=hostname,
                 sparse=sparse,
                 model_name=model_name,
@@ -127,15 +118,13 @@ def main(config=None, log_path: str = "test_results") -> int:
             )
 
             eval_time = time.time() - eval_start
-            recall_results["with_reranker"] = results_with_reranker
+            recall_results["with_reranker"] = scores_with_reranker
 
-            for modality, scores in results_with_reranker.items():
-                print(f"\n{modality.upper()} Recall (with reranker):")
-                for k in [1, 3, 5, 10]:
-                    if k in scores:
-                        score = scores[k]
-                        print(f"  - Recall @{k}: {score:.3f}")
-                        kv_event_log(f"recall_{modality}_@{k}_with_reranker", score, log_path)
+            print("\nMultimodal Recall (with reranker):")
+            for k in sorted(scores_with_reranker.keys()):
+                score = scores_with_reranker[k]
+                print(f"  - Recall @{k}: {score:.3f}")
+                kv_event_log(f"recall_multimodal_@{k}_with_reranker", score, log_path)
 
             kv_event_log("recall_eval_time_s_with_reranker", eval_time, log_path)
 
@@ -145,8 +134,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "test_type": "recall",
             "dataset": recall_dataset,
             "test_name": test_name,
-            "modalities": eval_modalities,
-            "collection_names": collection_names,
+            "collection_name": collection_name,
             "use_reranker": use_reranker,
             "reranker_only": reranker_only,
             "recall_results": recall_results,
@@ -168,8 +156,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         return 1
     finally:
         # Unload the multimodal collection
-        print(f"Unloading collection: {multimodal_collection}")
-        unload_collection(milvus_uri, multimodal_collection)
+        print(f"Unloading collection: {collection_name}")
+        unload_collection(milvus_uri, collection_name)
 
 
 if __name__ == "__main__":

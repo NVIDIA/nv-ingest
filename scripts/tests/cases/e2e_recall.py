@@ -38,11 +38,9 @@ def main(config=None, log_path: str = "test_results") -> int:
         return 1
 
     # Recall-specific configuration
-    eval_modalities = getattr(config, "eval_modalities", ["multimodal"])
     test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
 
-    # All modalities query against the same multimodal collection
-    # Text/table/chart queries all run against multimodal collection for even comparison
+    # All datasets use multimodal collection
     collection_name = f"{test_name}_multimodal"
 
     # Temporarily override collection_name in config for e2e.main()
@@ -57,7 +55,6 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Test Name: {test_name}")
     print(f"Collection: {collection_name}")
     print(f"Recall Dataset: {recall_dataset}")
-    print(f"Modalities: {', '.join(eval_modalities)}")
     print("=" * 60)
 
     # Step 1: Run ingestion via e2e.main() - this creates the collection
@@ -109,16 +106,12 @@ def main(config=None, log_path: str = "test_results") -> int:
             pass
 
     # Combine results
-    collection_names = {modality: f"{test_name}_{modality}" for modality in eval_modalities}
-
     test_results = {
         "test_type": "e2e_recall",
         "test_config": {
             "test_name": test_name,
             "collection_name": collection_name,
-            "collection_names": collection_names,
             "recall_dataset": recall_dataset,
-            "eval_modalities": eval_modalities,
         },
         "ingestion_results": e2e_results.get("results", {}),
         "recall_results": recall_results,

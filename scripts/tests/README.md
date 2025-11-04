@@ -218,13 +218,13 @@ DATASET_DIR=/custom/path python run.py --case=e2e
 
 **For Recall-only users:**
 - Configure `active` section: `hostname`, `sparse`, `gpu_search`, etc. (for evaluation)
-- Configure `recall` section: `recall_dataset` (required), `eval_modalities`, etc.
+- Configure `recall` section: `recall_dataset` (required)
 - Set `test_name` in active to match your existing collection (collection must be `{test_name}_multimodal`)
 - `collection_name` in active is ignored (recall generates `{test_name}_multimodal`)
 
 **For E2E+Recall users:**
 - Configure `active` section: `dataset_dir`, `test_name`, extraction settings, etc.
-- Configure `recall` section: `recall_dataset` (required), `eval_modalities`, etc.
+- Configure `recall` section: `recall_dataset` (required)
 - Collection naming: e2e_recall automatically creates `{test_name}_multimodal` collection
 - `collection_name` in active is ignored (e2e_recall forces `{test_name}_multimodal` pattern)
 
@@ -279,12 +279,12 @@ Recall testing evaluates retrieval accuracy against ground truth query sets. Two
 **`recall`** - Recall-only evaluation against existing collections:
 - Skips ingestion (assumes collections already exist)
 - Loads existing collections from Milvus
-- Evaluates recall for specified modalities
+- Evaluates recall using multimodal queries (all datasets are multimodal-only)
 - Supports reranker comparison (no reranker, with reranker, or reranker-only)
 
 **`e2e_recall`** - Fresh ingestion + recall evaluation:
 - Performs full ingestion pipeline
-- Creates modality-specific collections during ingestion
+- Creates multimodal collection during ingestion
 - Evaluates recall immediately after ingestion
 - Combines ingestion metrics with recall metrics
 
@@ -308,24 +308,20 @@ Three modes via two boolean flags:
 A single multimodal collection is created for recall evaluation:
 - Pattern: `{test_name}_multimodal`
 - Example: `bo767_multimodal`
-- **All modality queries** (text, tables, charts, multimodal) query against this same collection
-- This matches the research team's approach for even comparison
+- All datasets evaluate against this multimodal collection (no modality-specific collections)
 
-### Modalities
+### Multimodal-Only Evaluation
 
-Default focus is **multimodal** evaluation. Optional modalities:
-- `multimodal`: Combined text/tables/charts (recommended for most use cases)
-- `text`: Text-only evaluation
-- `tables`: Table-only evaluation
-- `charts`: Chart-only evaluation
+All datasets use **multimodal-only** evaluation:
+- Ground truth queries contain all content types (text, tables, charts)
+- Single collection contains all extracted content types
+- Simplified evaluation interface (no modality filtering)
 
 ### Ground Truth Files
 
 **bo767 dataset:**
-- Ground truth files are in the repo `data/` directory:
-  - `text_query_answer_gt_page.csv`
-  - `table_queries_cleaned_235.csv`
-  - `charts_with_page_num_fixed.csv`
+- Ground truth file: `bo767_query_gt.csv` (consolidated multimodal queries)
+- Located in repo `data/` directory
 - Default `ground_truth_dir: null` automatically uses `data/` directory
 - Custom path can be specified via `ground_truth_dir` config
 
@@ -347,7 +343,6 @@ recall:
   # Recall evaluation settings
   recall_top_k: 10
   ground_truth_dir: null  # null = use repo data/ directory
-  eval_modalities: ["multimodal"]  # Primary focus: multimodal
   recall_dataset: bo767  # Required: must be explicitly set (bo767, finance_bench, earnings, audio)
 ```
 
@@ -366,10 +361,6 @@ python run.py --case=recall --test-name=bo767 --use-reranker
 ```bash
 # Fresh ingestion with recall evaluation
 python run.py --case=e2e_recall --dataset=/raid/jioffe/bo767
-
-# Multiple modalities (all query the same multimodal collection)
-# Edit test_configs.yaml recall section: eval_modalities: ["multimodal", "text", "tables", "charts"]
-# Note: Text/table/chart queries all run against the multimodal collection
 ```
 
 **Dataset configuration:**
@@ -378,9 +369,7 @@ python run.py --case=e2e_recall --dataset=/raid/jioffe/bo767
 - `recall_dataset` (recall section): **Required** - Which evaluator to use (bo767, finance_bench, earnings, audio)
   - Set in `test_configs.yaml` recall section: `recall_dataset: bo767`
   - Or via environment variable: `RECALL_DATASET=bo767`
-- `eval_modalities`: List of modalities to evaluate (e.g., `["multimodal"]` or `["multimodal", "text", "tables", "charts"]`)
-  - Each modality uses its respective ground truth queries
-  - All queries run against the same `{test_name}_multimodal` collection
+- All datasets evaluate against the same `{test_name}_multimodal` collection (multimodal-only)
 
 ### Output
 
@@ -389,28 +378,24 @@ Recall results are included in `results.json`:
 {
   "recall_results": {
     "no_reranker": {
-      "multimodal": {
-        "1": 0.554,
-        "3": 0.746,
-        "5": 0.807,
-        "10": 0.857
-      }
+      "1": 0.554,
+      "3": 0.746,
+      "5": 0.807,
+      "10": 0.857
     },
     "with_reranker": {
-      "multimodal": {
-        "1": 0.601,
-        "3": 0.781,
-        "5": 0.832,
-        "10": 0.874
-      }
+      "1": 0.601,
+      "3": 0.781,
+      "5": 0.832,
+      "10": 0.874
     }
   }
 }
 ```
 
 Metrics are also logged via `kv_event_log()`:
-- `recall_{modality}_@{k}_no_reranker`
-- `recall_{modality}_@{k}_with_reranker`
+- `recall_multimodal_@{k}_no_reranker`
+- `recall_multimodal_@{k}_with_reranker`
 - `recall_eval_time_s_no_reranker`
 - `recall_eval_time_s_with_reranker`
 

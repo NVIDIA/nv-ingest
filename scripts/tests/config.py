@@ -66,7 +66,6 @@ class TestConfig:
     reranker_only: bool = False
     recall_top_k: int = 10
     ground_truth_dir: Optional[str] = None
-    eval_modalities: List[str] = field(default_factory=lambda: ["multimodal"])
     recall_dataset: Optional[str] = None
 
     def validate(self) -> List[str]:
@@ -237,7 +236,6 @@ def _load_env_overrides() -> dict:
         "RERANKER_ONLY": ("reranker_only", parse_bool),
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
-        "EVAL_MODALITIES": ("eval_modalities", parse_list),
         "RECALL_DATASET": ("recall_dataset", str),
     }
 
