@@ -17,7 +17,7 @@ def create_inference_client(
     auth_token: Optional[str] = None,
     infer_protocol: Optional[str] = None,
     timeout: float = 120.0,
-    max_retries: int = 5,
+    max_retries: int = 10,
     **kwargs,
 ) -> NimClientManager:
     """
@@ -33,6 +33,12 @@ def create_inference_client(
         Authorization token for HTTP requests (default: None).
     infer_protocol : str, optional
         The protocol to use ("grpc" or "http"). If not specified, it is inferred from the endpoints.
+    timeout : float, optional
+        The timeout for the request in seconds (default: 120.0).
+    max_retries : int, optional
+        The maximum number of retries for the request (default: 10).
+    **kwargs : dict, optional
+        Additional keyword arguments to pass to the NimClientManager.
 
     Returns
     -------

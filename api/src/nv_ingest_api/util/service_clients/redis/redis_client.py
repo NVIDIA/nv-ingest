@@ -650,6 +650,22 @@ class RedisClient(MessageBrokerClientBase):
             except Exception as e:
                 logger.exception(f"{log_prefix}: Cache read error: {e}. Trying Redis.")
 
+        # If caller requests non-blocking behavior (timeout <= 0), attempt immediate pop.
+        if timeout is not None and timeout <= 0:
+            try:
+                client = self.get_client()
+                popped = client.lpop(channel_name)
+                if popped is None:
+                    return None
+                try:
+                    return json.loads(popped)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to decode JSON from non-blocking LPOP on '{channel_name}': {e}")
+                    return None
+            except Exception as e:
+                logger.warning(f"Non-blocking LPOP failed for '{channel_name}': {e}")
+                return None
+
         while True:
             try:
                 fetch_result: Union[Dict[str, Any], List[Dict[str, Any]]]
@@ -710,6 +726,150 @@ class RedisClient(MessageBrokerClientBase):
             except Exception as e:
                 logger.exception(f"{log_prefix}: Unexpected error during fetch: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}") from e
+
+    def fetch_message_from_any(self, channel_names: List[str], timeout: float = 0) -> Optional[Dict[str, Any]]:
+        """
+        Attempt to fetch a message from the first non-empty list among the provided channel names
+        using Redis BLPOP. If the popped item represents a fragmented message, this method will
+        continue popping from the same channel to reconstruct the full message.
+
+        Parameters
+        ----------
+        channel_names : List[str]
+            Ordered list of Redis list keys to attempt in priority order.
+        timeout : float, optional
+            Timeout in seconds to wait for any item across the provided lists. Redis supports
+            integer-second timeouts; sub-second values will be truncated.
+
+        Returns
+        -------
+        dict or None
+            The reconstructed message dictionary if an item was fetched; otherwise None on timeout.
+        """
+        if not channel_names:
+            return None
+
+        client = self.get_client()
+        blpop_timeout = int(max(0, timeout))
+        try:
+            res = client.blpop(channel_names, timeout=blpop_timeout)
+        except (redis.RedisError, ConnectionError) as e:
+            logger.debug(f"BLPOP error on {channel_names}: {e}")
+            return None
+
+        if res is None:
+            return None
+
+        list_key, first_bytes = res
+        if isinstance(list_key, bytes):
+            try:
+                list_key = list_key.decode("utf-8")
+            except Exception:
+                list_key = str(list_key)
+        # Decode first element
+        try:
+            first_msg = json.loads(first_bytes)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON popped from '{list_key}': {e}")
+            return None
+
+        expected_count: int = int(first_msg.get("fragment_count", 1))
+        if expected_count <= 1:
+            return first_msg
+
+        # Collect remaining fragments from the same list key
+        fragments: List[Dict[str, Any]] = [first_msg]
+        accumulated = 0.0
+        start_time = time.monotonic()
+        for i in range(1, expected_count):
+            remaining = max(0, timeout - accumulated)
+            per_frag_timeout = int(max(1, remaining)) if timeout else 1
+            try:
+                frag_res = client.blpop([list_key], timeout=per_frag_timeout)
+            except (redis.RedisError, ConnectionError) as e:
+                logger.error(f"BLPOP error while collecting fragments from '{list_key}': {e}")
+                return None
+            if frag_res is None:
+                logger.error(f"Timeout while collecting fragment {i}/{expected_count-1} from '{list_key}'")
+                return None
+            _, frag_key_bytes_or_val = frag_res
+            # Redis returns (key, value); we don't need the key here
+            frag_bytes = frag_key_bytes_or_val
+            try:
+                frag_msg = json.loads(frag_bytes)
+                fragments.append(frag_msg)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode fragment JSON from '{list_key}': {e}")
+                return None
+            accumulated = time.monotonic() - start_time
+
+        # Combine and return
+        try:
+            return self._combine_fragments(fragments)
+        except Exception as e:
+            logger.error(f"Error combining fragments from '{list_key}': {e}")
+            return None
+
+    def fetch_message_from_any_with_key(
+        self, channel_names: List[str], timeout: float = 0
+    ) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """
+        Like fetch_message_from_any(), but returns the Redis list key together with the message.
+        This is useful for higher-level schedulers that need to apply per-category quotas.
+        """
+        if not channel_names:
+            return None
+
+        client = self.get_client()
+        blpop_timeout = int(max(0, timeout))
+        try:
+            res = client.blpop(channel_names, timeout=blpop_timeout)
+        except (redis.RedisError, ConnectionError) as e:
+            logger.debug(f"BLPOP error on {channel_names}: {e}")
+            return None
+
+        if res is None:
+            return None
+
+        list_key, first_bytes = res
+        try:
+            first_msg = json.loads(first_bytes)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON popped from '{list_key}': {e}")
+            return None
+
+        expected_count: int = int(first_msg.get("fragment_count", 1))
+        if expected_count <= 1:
+            return list_key, first_msg
+
+        fragments: List[Dict[str, Any]] = [first_msg]
+        accumulated = 0.0
+        start_time = time.monotonic()
+        for i in range(1, expected_count):
+            remaining = max(0, timeout - accumulated)
+            per_frag_timeout = int(max(1, remaining)) if timeout else 1
+            try:
+                frag_res = client.blpop([list_key], timeout=per_frag_timeout)
+            except (redis.RedisError, ConnectionError) as e:
+                logger.error(f"BLPOP error while collecting fragments from '{list_key}': {e}")
+                return None
+            if frag_res is None:
+                logger.error(f"Timeout while collecting fragment {i}/{expected_count-1} from '{list_key}'")
+                return None
+            _, frag_bytes = frag_res
+            try:
+                frag_msg = json.loads(frag_bytes)
+                fragments.append(frag_msg)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode fragment JSON from '{list_key}': {e}")
+                return None
+            accumulated = time.monotonic() - start_time
+
+        try:
+            return list_key, self._combine_fragments(fragments)
+        except Exception as e:
+            logger.error(f"Error combining fragments from '{list_key}': {e}")
+            return None
 
     @staticmethod
     def _combine_fragments(fragments: List[Dict[str, Any]]) -> Dict[str, Any]:
