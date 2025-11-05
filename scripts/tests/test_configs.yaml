@@ -4,12 +4,12 @@
 # Active configuration (used by default when running tests)
 active:
   # Dataset configuration
-  dataset_dir: /raid/jioffe/bo767
-  test_name: bo767_new_test  # Auto-generated if null
+  dataset_dir: /path/to/dataset
+  test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v2  # v1 or v2
-  pdf_split_page_count: 16  # V2 only: pages per chunk (null = default 32)
+  api_version: v1  # v1 or v2
+  pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
   hostname: localhost
@@ -19,7 +19,7 @@ active:
     - table-structure
 
   # Runtime configuration
-  sparse: true  # Use sparse embeddings
+  sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
 
@@ -39,7 +39,7 @@ active:
   split_chunk_overlap: 150  # Overlap for text splitting
 
   # Storage configuration
-  spill_dir: /raid/jioffe/tmp/spill
+  spill_dir: tmp/spill
   artifacts_dir: null  # null = use default (scripts/tests/artifacts)
   collection_name: null  # null = auto-generated
 
@@ -48,18 +48,9 @@ active:
 
 # Recall configuration (only used when running recall or e2e_recall tests)
 recall:
-  recall_dataset: bo767
-  use_reranker: false
-  reranker_only: false
+  recall_dataset: null
+  reranker_mode: none  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
   ground_truth_dir: null
-  eval_modalities: ["multimodal"]
-
-# Dataset shortcuts for convenience
-# Add your commonly used dataset paths here
-datasets:
-  bo20: /path/to/bo20
-  bo767: /path/to/bo767
-  single: data/multimodal_test.pdf
