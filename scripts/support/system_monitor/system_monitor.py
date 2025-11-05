@@ -22,6 +22,7 @@ from system_tracer import (
 )
 from layout import build_layout
 from callbacks import register_callbacks
+from helpers import apply_theme, style_minimal_figure
 
 try:
     from dateutil.tz import tzlocal, gettz
@@ -243,77 +244,7 @@ def run_dashboard(datafile, port, host, interval, debug):
         except Exception:
             return pd.Timestamp.utcnow()
 
-    def apply_theme(fig, theme_value):
-        try:
-            if theme_value == "dark":
-                fig.update_layout(
-                    template="plotly_dark", paper_bgcolor="#111111", plot_bgcolor="#111111", font=dict(color="#e5e5e5")
-                )
-            else:
-                fig.update_layout(
-                    template="plotly_white", paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", font=dict(color="#222222")
-                )
-        except Exception:
-            pass
-        return fig
-
-    def style_minimal_figure(fig, theme_value):
-        """Apply a Tufte-inspired minimal style to reduce chartjunk and emphasize data.
-
-        - Remove heavy titles, rely on surrounding headings
-        - Thin margins and light gridlines
-        - Hide zero lines and reduce axis clutter
-        - Use unified hover for easier comparison across series
-        - Do not override legend visibility here; caller decides.
-        """
-        try:
-            # Remove figure title; surrounding layout already provides section headers
-            fig.update_layout(title=None)
-
-            # Compact margins and legend
-            fig.update_layout(
-                margin=dict(l=40, r=10, t=10, b=28),
-                hovermode="x unified",
-            )
-
-            # Light, subtle grids; no axis zero lines
-            grid_color = "rgba(127,127,127,0.15)" if theme_value == "dark" else "rgba(0,0,0,0.08)"
-            axis_color = "rgba(127,127,127,0.4)" if theme_value == "dark" else "rgba(0,0,0,0.35)"
-            fig.update_xaxes(
-                showgrid=True,
-                gridcolor=grid_color,
-                zeroline=False,
-                linecolor=axis_color,
-                ticks="outside",
-                tickcolor=axis_color,
-                ticklen=4,
-            )
-            fig.update_yaxes(
-                showgrid=True,
-                gridcolor=grid_color,
-                zeroline=False,
-                linecolor=axis_color,
-                ticks="outside",
-                tickcolor=axis_color,
-                ticklen=4,
-            )
-
-            # Thin lines for traces to keep focus on shape; avoid overly thick strokes
-            try:
-                for tr in fig.data:
-                    if hasattr(tr, "line") and getattr(tr, "line", None) is not None:
-                        # keep bar width as-is; only adjust scatter-like traces
-                        if getattr(tr, "type", "").lower() in ("scatter", "scattergl", "lines"):
-                            lw = getattr(tr.line, "width", None)
-                            new_w = 1.25 if lw is None else min(lw, 1.5)
-                            tr.line.width = new_w
-            except Exception:
-                pass
-
-        except Exception:
-            # Never let styling break figure rendering
-            pass
-        return fig
+    # apply_theme and style_minimal_figure are imported from helpers.py
 
     def make_sparkline(ts, series, theme_value):
         """Create a tiny sparkline figure for KPI cards.
@@ -1246,97 +1177,7 @@ def run_dashboard(datafile, port, host, interval, debug):
             figures_by_id["thread-count-graph"],
         )
 
-    # Manual process tree callback
-    @app.callback(
-        [
-            Output("proctree-totals", "children"),
-            Output("proctree-procs-by-cmd", "figure"),
-            Output("proctree-threads-by-cmd", "figure"),
-            Output("proctree-tree-md", "children"),
-            Output("proctree-last-summary", "data"),
-        ],
-        [Input("proctree-run", "n_clicks")],
-        [State("proctree-pid", "value"), State("proctree-verbose", "value"), State("theme-toggle", "value")],
-        prevent_initial_call=False,
-    )
-    def run_process_tree(n_clicks, proctree_pid, proctree_verbose_vals, theme_value):
-        try:
-            pid_val = int(proctree_pid) if proctree_pid is not None else None
-        except Exception:
-            pid_val = None
-        verbose_flag = "verbose" in (proctree_verbose_vals or [])
-
-        totals_text = "Enter a PID to inspect its process tree."
-        fig_procs = go.Figure()
-        fig_threads = go.Figure()
-        tree_md = ""
-        if pid_val is None or pid_val <= 0:
-            return totals_text, fig_procs, fig_threads, tree_md, {}
-
-        try:
-            summary = get_process_tree_summary(pid_val, verbose=verbose_flag)
-        except Exception as e:
-            totals_text = f"Error: {e}"
-            return totals_text, fig_procs, fig_threads, tree_md, {}
-
-        totals = summary.get("totals", {})
-        totals_text = (
-            f"Total Processes: {totals.get('total_processes', 0)} • Total Threads: {totals.get('total_threads', 0)}"
-        )
-        agg = summary.get("aggregated_by_command", [])
-        # Build bars
-        if agg:
-            cmds = [a.get("command", "") for a in agg]
-            procs_counts = [a.get("processes", 0) for a in agg]
-            threads_counts = [a.get("total_threads", 0) for a in agg]
-            fig_procs.add_trace(go.Bar(x=cmds, y=procs_counts, name="Processes"))
-            fig_threads.add_trace(go.Bar(x=cmds, y=threads_counts, name="Threads"))
-            fig_procs.update_layout(title="Processes by Command", xaxis_title="Command", yaxis_title="Count")
-            fig_threads.update_layout(title="Threads by Command", xaxis_title="Command", yaxis_title="Threads")
-            apply_theme(fig_procs, theme_value)
-            apply_theme(fig_threads, theme_value)
-            style_minimal_figure(fig_procs, theme_value)
-            style_minimal_figure(fig_threads, theme_value)
-            fig_procs.update_layout(showlegend=False)
-            fig_threads.update_layout(showlegend=False)
-        # Build tree text (simple PPID-based indentation)
-        plist = summary.get("processes", [])
-        if totals.get("total_processes", 0) == 0:
-            # Likely PID not visible in this namespace/container; provide a helpful hint.
-            tree_text = (
-                "No processes found. This PID may not be visible from this runtime (PID namespace). "
-                "Try using the PID search above, or run the dashboard on the same host/namespace as the target process."
-            )
-            return (
-                totals_text,
-                fig_procs,
-                fig_threads,
-                f"```text\n{tree_text}\n```",
-                summary,
-            )
-        by_ppid = {}
-        for p in plist:
-            by_ppid.setdefault(p.get("ppid"), []).append(p)
-        for k in by_ppid:
-            by_ppid[k] = sorted(by_ppid[k], key=lambda x: x.get("pid", 0))
-        root = pid_val
-        lines = []
-
-        def walk(pid, indent):
-            kids = by_ppid.get(pid, [])
-            for i, child in enumerate(kids):
-                prefix = "├─" if i < len(kids) - 1 else "└─"
-                lines.append(
-                    f"{indent}{prefix} {child.get('name','?')}({child.get('pid')}) [threads={child.get('threads',0)}]"
-                )
-                walk(child.get("pid"), indent + ("│  " if i < len(kids) - 1 else "   "))
-
-        root_entry = next((p for p in plist if p.get("pid") == root), None)
-        if root_entry:
-            lines.insert(0, f"{root_entry.get('name','?')}({root}) [threads={root_entry.get('threads',0)}]")
-            walk(root, "")
-        tree_md = f"```text\n{chr(10).join(lines)}\n```"
-        return totals_text, fig_procs, fig_threads, tree_md, summary
+    # (migrated) Manual process tree callback registered in callbacks/proctree_impl.py
 
     # (migrated) proctree style callbacks registered in callbacks/proctree.py
 

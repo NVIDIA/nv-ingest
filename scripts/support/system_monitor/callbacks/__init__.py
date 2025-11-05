@@ -15,7 +15,7 @@ def register_callbacks(app: Any, *, cy_available: bool) -> None:
         Whether dash_cytoscape is available (for Process Tree graph callbacks).
     """
     from .overview import register_overview_callbacks
-    from .proctree import register_proctree_callbacks
+    from .proctree_impl import register_proctree_callbacks
     from .events import register_events_callbacks
     from .containers import register_containers_callbacks
     from .theme import register_theme_callbacks
