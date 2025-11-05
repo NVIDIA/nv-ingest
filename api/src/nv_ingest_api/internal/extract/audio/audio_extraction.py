@@ -25,13 +25,6 @@ from nv_ingest_api.interface.utility import read_file_as_base64
 logger = logging.getLogger(__name__)
 
 
-def remove_files(row: pd.Series):
-    base64_file_path = row.get("metadata").get("content")
-    base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
-    base64_file_path = Path(base64_file_path)
-    base64_file_path.unlink(missing_ok=True)
-
-
 @unified_exception_handler
 def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, segment_audio: bool = False) -> Dict:
     """
@@ -68,11 +61,9 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
     base64_file_path = metadata.pop("content")
     if not base64_file_path:
         return [row.to_list()]
-    logger.error(f"Base64 file path: {base64_file_path}")
     base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
     if not base64_file_path:
         return [row.to_list()]
-    logger.error(f"Base64 file path decoded: {base64_file_path}")
     base64_audio = read_file_as_base64(base64_file_path)
     content_metadata = metadata.get("content_metadata", {})
 
