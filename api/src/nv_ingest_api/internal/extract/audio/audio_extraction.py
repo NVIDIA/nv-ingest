@@ -80,6 +80,9 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
     if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return [row.to_list()]
 
+    logger.error(f"Removing file {base64_file_path}")
+    Path(base64_file_path).unlink(missing_ok=True)
+
     # Get the result from the inference model
     segments, transcript = audio_client.infer(
         base64_audio,

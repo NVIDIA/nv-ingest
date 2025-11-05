@@ -170,11 +170,13 @@ else:
             """
             import ffmpeg
 
+            files_to_remove = []
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             original_input_path = input_path
             if audio_only:
                 input_path = self.get_audio_from_video(input_path, output_dir / f"{input_path.stem}.mp3")
+                files_to_remove.append(input_path)
             path_file = Path(input_path)
             file_name = path_file.stem
             suffix = path_file.suffix
@@ -227,6 +229,11 @@ else:
                     else:
                         logging.error(f"Failed to extract audio from {file}")
                 return list(zip(files, video_audio_files))
+            for to_remove in files_to_remove:
+                to_remove = Path(to_remove)
+                if to_remove.is_file():
+                    logger.error(f"Removing file {to_remove}")
+                    to_remove.unlink()
             return files
 
         def find_num_splits(
@@ -328,7 +335,7 @@ else:
             self._process()
 
         def _process(self):
-            self.files_completed = self.interface.split(
+            files_completed = self.interface.split(
                 self.path,
                 self.output_dir,
                 split_interval=self.split_interval,
@@ -338,12 +345,13 @@ else:
             )
             # get durations for files in self.files_completed
             durations = []
-            for file in self.files_completed:
+            for file in files_completed:
                 _, _, duration = self.interface.probe_media(
                     Path(file), split_interval=self.split_interval, split_type=self.split_type
                 )
                 durations.append(duration)
-            self.files_completed = list(zip(self.files_completed, durations))
+
+            self.files_completed = list(zip(files_completed, durations))
 
         def __next__(self):
             payload = self.queue.get()
