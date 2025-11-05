@@ -1,0 +1,21 @@
+nv\_ingest.framework.orchestration.ray.stages.sources package
+=============================================================
+
+Submodules
+----------
+
+nv\_ingest.framework.orchestration.ray.stages.sources.message\_broker\_task\_source module
+------------------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.orchestration.ray.stages.sources
+   :members:
+   :undoc-members:
+   :show-inheritance:

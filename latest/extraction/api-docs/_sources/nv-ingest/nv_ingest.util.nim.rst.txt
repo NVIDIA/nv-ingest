@@ -1,0 +1,85 @@
+nv\_ingest.util.nim package
+===========================
+
+Submodules
+----------
+
+nv\_ingest.util.nim.cached module
+---------------------------------
+
+.. automodule:: nv_ingest.util.nim.cached
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.decorators module
+-------------------------------------
+
+.. automodule:: nv_ingest.util.nim.decorators
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.deplot module
+---------------------------------
+
+.. automodule:: nv_ingest.util.nim.deplot
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.helpers module
+----------------------------------
+
+.. automodule:: nv_ingest.util.nim.helpers
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.nemoretriever\_parse module
+-----------------------------------------------
+
+.. automodule:: nv_ingest.util.nim.nemoretriever_parse
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.paddle module
+---------------------------------
+
+.. automodule:: nv_ingest.util.nim.paddle
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.text\_embedding module
+------------------------------------------
+
+.. automodule:: nv_ingest.util.nim.text_embedding
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.vlm module
+------------------------------
+
+.. automodule:: nv_ingest.util.nim.vlm
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.util.nim.yolox module
+--------------------------------
+
+.. automodule:: nv_ingest.util.nim.yolox
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.util.nim
+   :members:
+   :show-inheritance:
+   :undoc-members:
