@@ -164,6 +164,62 @@ def get_recall_scores_pdf_only(
     return recall_scores
 
 
+def evaluate_recall_orchestrator(
+    loader_func: Callable[[Optional[str]], pd.DataFrame],
+    scorer_func: Callable,
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = False,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    ground_truth_dir: Optional[str] = None,
+    **scorer_kwargs,
+) -> Dict[int, float]:
+    """
+    Generic orchestrator for recall evaluation.
+
+    Centralizes the common pattern: load ground truth → score → return results.
+    All parameters are passed through to the scorer function, preserving config-driven behavior.
+
+    Args:
+        loader_func: Function that loads ground truth DataFrame from optional directory.
+        scorer_func: Function that calculates recall scores (get_recall_scores or get_recall_scores_pdf_only).
+        collection_name: Milvus collection name to query.
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        ground_truth_dir: Directory containing ground truth files (optional).
+        **scorer_kwargs: Additional kwargs to pass to scorer_func (e.g., nv_ranker_endpoint, nv_ranker_model_name).
+
+    Returns:
+        Dictionary mapping k values to recall scores (float 0.0-1.0).
+    """
+    # 1. Load ground truth using dataset-specific loader
+    query_df = loader_func(ground_truth_dir)
+
+    # 2. Calculate recall scores using dataset-specific scorer
+    scores = scorer_func(
+        query_df,
+        collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        ground_truth_dir=ground_truth_dir,
+        **scorer_kwargs,
+    )
+
+    # 3. Return scores
+    return scores
+
+
 def bo767_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
     """
     Load bo767 ground truth queries from consolidated CSV file.
@@ -224,11 +280,10 @@ def bo767_recall(
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
         Only includes k values where k <= top_k.
     """
-    query_df = bo767_load_ground_truth(ground_truth_dir)
-
-    scores = get_recall_scores(
-        query_df,
-        collection_name,
+    return evaluate_recall_orchestrator(
+        loader_func=bo767_load_ground_truth,
+        scorer_func=get_recall_scores,
+        collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
         model_name=model_name,
@@ -237,8 +292,6 @@ def bo767_recall(
         nv_ranker=nv_ranker,
         ground_truth_dir=ground_truth_dir,
     )
-
-    return scores
 
 
 def finance_bench_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
@@ -298,6 +351,8 @@ def finance_bench_recall(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
 ) -> Dict[int, float]:
     """
     Evaluate recall@k for finance_bench dataset (multimodal-only).
@@ -308,34 +363,33 @@ def finance_bench_recall(
     Args:
         collection_name: Milvus collection name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Default False for finance_bench.
+        sparse: Enable hybrid sparse-dense retrieval if True.
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
         nv_ranker: Enable NVIDIA reranker for result reranking.
         ground_truth_dir: Directory containing financebench_train.json (optional).
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
 
     Returns:
         Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
         Only includes k values where k <= top_k.
     """
-    query_df = finance_bench_load_ground_truth(ground_truth_dir)
-
-    # Calculate recall using PDF-only matching
-    # Note: finance_bench uses sparse=False (hybrid=False) by default
-    scores = get_recall_scores_pdf_only(
-        query_df,
-        collection_name,
+    return evaluate_recall_orchestrator(
+        loader_func=finance_bench_load_ground_truth,
+        scorer_func=get_recall_scores_pdf_only,
+        collection_name=collection_name,
         hostname=hostname,
-        sparse=sparse,  # Default False, but can be overridden
+        sparse=sparse,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
         nv_ranker=nv_ranker,
         ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
     )
-
-    return scores
 
 
 def earnings_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
@@ -403,7 +457,7 @@ def earnings_recall(
     Args:
         collection_name: Milvus collection name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True.
+        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
@@ -414,11 +468,10 @@ def earnings_recall(
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
         Only includes k values where k <= top_k.
     """
-    query_df = earnings_load_ground_truth(ground_truth_dir)
-
-    scores = get_recall_scores(
-        query_df,
-        collection_name,
+    return evaluate_recall_orchestrator(
+        loader_func=earnings_load_ground_truth,
+        scorer_func=get_recall_scores,
+        collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
         model_name=model_name,
@@ -427,8 +480,6 @@ def earnings_recall(
         nv_ranker=nv_ranker,
         ground_truth_dir=ground_truth_dir,
     )
-
-    return scores
 
 
 def audio_recall(
@@ -447,6 +498,22 @@ def audio_recall(
     TODO: Implement audio-specific ground truth loading and evaluation.
     """
     raise NotImplementedError("audio_recall not yet implemented")
+
+
+def get_recall_collection_name(test_name: str) -> str:
+    """
+    Generate collection name for recall evaluation.
+
+    All recall evaluations use a single multimodal collection with the pattern:
+    {test_name}_multimodal
+
+    Args:
+        test_name: Test identifier (e.g., 'bo767', 'finance_bench')
+
+    Returns:
+        Collection name string (e.g., 'bo767_multimodal')
+    """
+    return f"{test_name}_multimodal"
 
 
 def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:

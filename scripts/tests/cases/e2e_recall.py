@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from e2e import main as e2e_main
 from recall import main as recall_main
+from recall_utils import get_recall_collection_name
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -40,8 +41,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Recall-specific configuration
     test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
 
-    # All datasets use multimodal collection
-    collection_name = f"{test_name}_multimodal"
+    # Generate collection name using standardized pattern
+    collection_name = get_recall_collection_name(test_name)
 
     # Temporarily override collection_name in config for e2e.main()
     original_collection_name = config.collection_name

@@ -10,7 +10,7 @@ import time
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from interact import embed_info, kv_event_log, load_collection, unload_collection
 
-from recall_utils import get_dataset_evaluator
+from recall_utils import get_dataset_evaluator, get_recall_collection_name
 from typing import Callable, Dict, Tuple
 
 
@@ -88,12 +88,13 @@ def main(config=None, log_path: str = "test_results") -> int:
         print("Set recall_dataset in test_configs.yaml recall section or via RECALL_DATASET environment variable")
         return 1
 
-    # Auto-generate collection name
+    # Auto-generate test name if not provided
     if not test_name:
         test_name = os.path.basename(config.dataset_dir.rstrip("/"))
 
-    # All datasets use multimodal collection
-    collection_name = f"{test_name}_multimodal"
+    # Use collection_name from config if set, otherwise generate using standardized pattern
+    # This allows e2e.py and recall.py to use the same collection when run separately
+    collection_name = config.collection_name or get_recall_collection_name(test_name)
 
     # Print configuration
     print("=" * 60)
