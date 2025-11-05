@@ -1705,9 +1705,6 @@ class NvIngestClient:
                     )
                     logger.error(error_msg)
                     failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
-                finally:
-                    # Clean up the job spec mapping
-                    del self._job_index_to_job_spec[job_id]
 
         if return_failures:
             return results, failures

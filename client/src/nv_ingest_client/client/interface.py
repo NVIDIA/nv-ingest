@@ -1359,3 +1359,85 @@ class Ingestor:
         terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
 
         return len(self._job_states) - terminal_jobs
+
+    def get_status(self) -> Dict[str, str]:
+        """
+        Returns a dictionary mapping document identifiers to their current status in the pipeline.
+
+        This method is designed for use with async ingestion to poll the status of submitted jobs.
+        For each document submitted to the ingestor, the method returns its current processing state.
+
+        Returns
+        -------
+        Dict[str, str]
+            A dictionary where:
+            - Keys are document identifiers (source names or source IDs)
+            - Values are status strings representing the current state:
+              * "pending": Job created but not yet submitted
+              * "submitted": Job submitted and waiting for processing
+              * "processing": Job is currently being processed
+              * "completed": Job finished successfully
+              * "failed": Job encountered an error
+              * "cancelled": Job was cancelled
+              * "unknown": Job state could not be determined (initial state)
+
+        Examples
+        --------
+        >>> ingestor = Ingestor(documents=["doc1.pdf", "doc2.pdf"], client=client)
+        >>> ingestor.extract().embed()
+        >>> future = ingestor.ingest_async()
+        >>>
+        >>> # Poll status while processing
+        >>> status = ingestor.get_status()
+        >>> print(status)
+        {'doc1.pdf': 'processing', 'doc2.pdf': 'submitted'}
+        >>>
+        >>> # Check again after some time
+        >>> status = ingestor.get_status()
+        >>> print(status)
+        {'doc1.pdf': 'completed', 'doc2.pdf': 'processing'}
+
+        Notes
+        -----
+        - This method is most useful when called after `ingest_async()` to track progress
+        - If called before any jobs are submitted, returns an empty dictionary or
+          documents with "unknown" status
+        - The method accesses internal job state from the client, so it reflects
+          the most current known state
+        """
+        status_dict = {}
+
+        if not self._job_states:
+            # If job states haven't been initialized yet (before ingest_async is called)
+            # Return unknown status for all documents
+            for doc in self._documents:
+                doc_name = os.path.basename(doc) if isinstance(doc, str) else str(doc)
+                status_dict[doc_name] = "unknown"
+            return status_dict
+
+        # Map job IDs to their states and source identifiers
+        for job_id, job_state in self._job_states.items():
+            # Get the job spec to find the source identifier
+            job_spec = self._client._job_index_to_job_spec.get(job_id)
+
+            if job_spec:
+                # Use source_name as the key (the document name)
+                source_identifier = job_spec.source_name
+            else:
+                # Fallback to job_id if we can't find the spec
+                source_identifier = f"job_{job_id}"
+
+            # Map the JobStateEnum to a user-friendly string
+            state_mapping = {
+                JobStateEnum.PENDING: "pending",
+                JobStateEnum.SUBMITTED_ASYNC: "submitted",
+                JobStateEnum.SUBMITTED: "submitted",
+                JobStateEnum.PROCESSING: "processing",
+                JobStateEnum.COMPLETED: "completed",
+                JobStateEnum.FAILED: "failed",
+                JobStateEnum.CANCELLED: "cancelled",
+            }
+
+            status_dict[source_identifier] = state_mapping.get(job_state.state, "unknown")
+
+        return status_dict
