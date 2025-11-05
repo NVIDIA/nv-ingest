@@ -19,7 +19,7 @@ active:
     - table-structure
 
   # Runtime configuration
-  sparse: true  # Use sparse embeddings
+  sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
 
@@ -46,9 +46,11 @@ active:
   # Custom UDF Configs - add specific udf configs here if needed.
   llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
-# Dataset shortcuts for convenience
-# Add your commonly used dataset paths here
-datasets:
-  bo20: /path/to/bo20
-  bo767: /path/to/bo767
-  single: data/multimodal_test.pdf
+# Recall configuration (only used when running recall or e2e_recall tests)
+recall:
+  recall_dataset: null
+  reranker_mode: none  # Options: "none", "with", "both"
+
+  # Recall evaluation settings
+  recall_top_k: 10
+  ground_truth_dir: null
