@@ -11,6 +11,7 @@ Precedence: CLI args > Env vars > YAML active config
 """
 
 import os
+import glob
 import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,6 +61,12 @@ class TestConfig:
     artifacts_dir: Optional[str] = None
     collection_name: Optional[str] = None
 
+    # Recall configuration
+    reranker_mode: str = "none"  # Options: "none", "with", "both"
+    recall_top_k: int = 10
+    ground_truth_dir: Optional[str] = None
+    recall_dataset: Optional[str] = None
+
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
         errors = []
@@ -88,23 +95,38 @@ class TestConfig:
         if self.api_version not in ["v1", "v2"]:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
 
-        # Check dataset_dir exists (can be file or directory)
-        if not os.path.exists(self.dataset_dir):
-            errors.append(f"dataset path does not exist: {self.dataset_dir}")
-        elif not (os.path.isfile(self.dataset_dir) or os.path.isdir(self.dataset_dir)):
-            errors.append(f"dataset path must be a file or directory: {self.dataset_dir}")
+        # Check reranker_mode is valid
+        if self.reranker_mode not in ["none", "with", "both"]:
+            errors.append(f"reranker_mode must be 'none', 'with', or 'both', got '{self.reranker_mode}'")
+
+        # Check dataset_dir exists (can be file, directory, or glob pattern)
+        # Check if it's a glob pattern (contains *, ?, or [)
+        is_glob = any(char in self.dataset_dir for char in ["*", "?", "["])
+
+        if is_glob:
+            # For glob patterns, check if any files match
+            matching_files = list(glob.glob(self.dataset_dir, recursive=True))
+            if not matching_files:
+                errors.append(f"glob pattern matches no files: {self.dataset_dir}")
+        else:
+            # For regular paths, check if it exists
+            if not os.path.exists(self.dataset_dir):
+                errors.append(f"dataset path does not exist: {self.dataset_dir}")
+            elif not (os.path.isfile(self.dataset_dir) or os.path.isdir(self.dataset_dir)):
+                errors.append(f"dataset path must be a file or directory: {self.dataset_dir}")
 
         return errors
 
 
-def load_config(config_file: str = "test_configs.yaml", **cli_overrides) -> TestConfig:
+def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = None, **cli_overrides) -> TestConfig:
     """
     Load test configuration from YAML with overrides.
 
-    Precedence: CLI args > Env vars > YAML active config
+    Precedence: CLI args > Env vars > YAML active config (+ recall section if recall case)
 
     Args:
         config_file: Path to YAML config file (relative to this script)
+        case: Test case name (used to determine if recall section should be merged)
         **cli_overrides: CLI argument overrides (e.g., dataset="bo767", api_version="v2")
 
     Returns:
@@ -125,10 +147,18 @@ def load_config(config_file: str = "test_configs.yaml", **cli_overrides) -> Test
         yaml_data = yaml.safe_load(f)
 
     # Start with active config from YAML
-    config_dict = yaml_data.get("active", {})
+    config_dict = yaml_data.get("active", {}).copy()
 
     if not config_dict:
         raise ValueError("Config file must have 'active' section")
+
+    # Merge recall section when running recall test cases
+    # The recall section provides additional configuration for recall evaluation
+    if case in ("recall", "e2e_recall"):
+        recall_section = yaml_data.get("recall", {})
+        if recall_section:
+            # Merge recall section (recall section overrides active section for conflicts)
+            config_dict.update(recall_section)
 
     # Handle dataset shortcuts
     if "dataset" in cli_overrides:
@@ -205,6 +235,10 @@ def _load_env_overrides() -> dict:
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
+        "RERANKER_MODE": ("reranker_mode", str),
+        "RECALL_TOP_K": ("recall_top_k", parse_int),
+        "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
+        "RECALL_DATASET": ("recall_dataset", str),
     }
 
     overrides = {}
