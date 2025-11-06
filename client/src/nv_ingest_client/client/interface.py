@@ -354,7 +354,7 @@ class Ingestor:
 
         return self
 
-    def buffers(self, buffers: List[Tuple[str, BytesIO]]) -> "Ingestor":
+    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "Ingestor":
         """
         Add buffers for processing.
 
@@ -363,6 +363,13 @@ class Ingestor:
         buffers : List[Tuple[str, BytesIO]]
             List of tuples containing the name of the buffer and the BytesIO object.
         """
+        if (
+            isinstance(buffers, tuple)
+            and len(buffers) == 2
+            and isinstance(buffers[0], str)
+            and isinstance(buffers[1], BytesIO)
+        ):
+            buffers = [buffers]
         self._buffers.extend(buffers)
         self._job_specs = BatchJobSpec(self._buffers)
         self._all_local = True

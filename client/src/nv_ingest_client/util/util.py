@@ -371,7 +371,7 @@ def create_job_specs_for_buffers(buffers: List[Tuple[str, BytesIO]]) -> List[Job
 
     job_specs = []
     for name, buffer in buffers:
-        content, file_type = extract_content_from_buffer(name, buffer)
+        content, file_type = extract_content_from_buffer((name, buffer))
         job_spec = JobSpec(
             document_type=file_type,
             payload=content,
