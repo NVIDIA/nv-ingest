@@ -265,6 +265,8 @@ services:
       - "7670:7670"
       # Simple Broker -- Uncomment if running SimpleBroker in the container
       #- "7671:7671"
+    depends_on:
+      - ray-head
     cap_add:
       - sys_nice
     environment:
@@ -278,6 +280,10 @@ services:
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
+      # Ray execution mode: local vs remote head
+      - NV_INGEST_USE_REMOTE_RAY=${NV_INGEST_USE_REMOTE_RAY:-0}
+      - NV_INGEST_RAY_ADDRESS=${NV_INGEST_RAY_ADDRESS:-ray://ray-head:10001}
+      - NV_INGEST_RAY_NAMESPACE=${NV_INGEST_RAY_NAMESPACE:-nv_ingest_ray}
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
       # Ray internals configuration

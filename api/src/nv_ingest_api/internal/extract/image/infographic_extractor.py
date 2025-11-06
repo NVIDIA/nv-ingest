@@ -14,7 +14,6 @@ import pandas as pd
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -243,9 +242,13 @@ def extract_infographic_data_from_image_internal(
 
     endpoint_config = extraction_config.endpoint_config
 
-    # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+    # Require explicit OCR model selection from configuration; do not auto-discover on worker
+    ocr_model_name = getattr(endpoint_config, "ocr_model_name", None)
+    if not ocr_model_name:
+        raise ValueError(
+            "Missing ocr_model_name in endpoint_config for InfographicExtractor. Set it in the pipeline configuration "
+            '(e.g., endpoint_config.ocr_model_name: $OCR_MODEL_NAME|"paddle").'
+        )
 
     try:
         # Identify rows that meet the infographic criteria.

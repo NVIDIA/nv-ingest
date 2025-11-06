@@ -53,6 +53,8 @@ class ChartExtractorConfigSchema(LowercaseProtocolMixin):
 
     ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     ocr_infer_protocol: str = ""
+    # Explicit OCR model selection for chart extraction; if None, stage logic may fall back to discovery
+    ocr_model_name: Optional[str] = None
 
     nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
@@ -106,6 +108,16 @@ class ChartExtractorConfigSchema(LowercaseProtocolMixin):
             values[protocol_name] = protocol_value
 
         return values
+
+    @field_validator("ocr_model_name")
+    @classmethod
+    def validate_ocr_model_name(cls, v):
+        if v is None:
+            return v
+        allowed = {"paddle", "scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        if v not in allowed:
+            raise ValueError(f"Invalid ocr_model_name '{v}'. Allowed: {sorted(allowed)}")
+        return v
 
     model_config = ConfigDict(extra="forbid")
 

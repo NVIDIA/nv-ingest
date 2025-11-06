@@ -77,6 +77,7 @@ WORKDIR /workspace
 COPY ci ci
 COPY api api
 COPY client client
+COPY src src
 
 ENV HAYSTACK_TELEMETRY_ENABLED=False
 
@@ -84,18 +85,20 @@ ENV HAYSTACK_TELEMETRY_ENABLED=False
 RUN source activate nv_ingest_runtime \
     && pip install --no-cache-dir 'build>=1.2.2'
 
-# Build wheels for api and client
+# Build wheels for api, client, and service
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     chmod +x ./ci/scripts/build_pip_packages.sh \
     && source activate nv_ingest_runtime \
     && ./ci/scripts/build_pip_packages.sh --type dev --lib api \
-    && ./ci/scripts/build_pip_packages.sh --type dev --lib client
+    && ./ci/scripts/build_pip_packages.sh --type dev --lib client \
+    && ./ci/scripts/build_pip_packages.sh --type dev --lib service
 
-# Install built wheels
+# Install built wheels (service first to provide nv_ingest package)
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
+    && pip install ./src/dist/*.whl \
     && pip install ./api/dist/*.whl \
     && pip install ./client/dist/*.whl
 

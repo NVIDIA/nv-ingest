@@ -204,6 +204,7 @@ stages:
           $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
+        ocr_model_name: $OCR_MODEL_NAME|"paddle"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
     replicas:
       min_replicas: 0
@@ -230,6 +231,7 @@ stages:
           $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
         ]
         ocr_infer_protocol: $PADDLE_INFER_PROTOCOL|"http"
+        ocr_model_name: $OCR_MODEL_NAME|"paddle"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
     replicas:
       min_replicas: 0
@@ -257,6 +259,7 @@ stages:
           $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
+        ocr_model_name: $OCR_MODEL_NAME|"paddle"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
     replicas:
       min_replicas: 0

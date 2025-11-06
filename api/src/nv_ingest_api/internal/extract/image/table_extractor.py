@@ -17,7 +17,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTabl
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
@@ -303,9 +302,13 @@ def extract_table_data_from_image_internal(
 
     endpoint_config = extraction_config.endpoint_config
 
-    # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+    # Require explicit OCR model selection from configuration; do not auto-discover on worker
+    ocr_model_name = getattr(endpoint_config, "ocr_model_name", None)
+    if not ocr_model_name:
+        raise ValueError(
+            "Missing ocr_model_name in endpoint_config for TableExtractor. Set it in the pipeline configuration "
+            '(e.g., endpoint_config.ocr_model_name: $OCR_MODEL_NAME|"paddle").'
+        )
 
     try:
         # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
