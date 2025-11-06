@@ -1,0 +1,10 @@
+nv\_ingest.util.message\_brokers.kafka package
+==============================================
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.util.message_brokers.kafka
+   :members:
+   :show-inheritance:
+   :undoc-members:

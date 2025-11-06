@@ -1,0 +1,1387 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/framework/orchestration/ray/util/pipeline/pid_controller';</script>
+    <link rel="icon" href="../../../../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.system.hardware_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SystemResourceProbe</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- Constants ---</span>
+<span class="n">DEFAULT_STAGE_COST_MB</span> <span class="o">=</span> <span class="mf">5_000.0</span>  <span class="c1"># Fallback memory cost</span>
+
+
+<div class="viewcode-block" id="StagePIDProposal">
+<a class="viewcode-back" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.util.pipeline.html#nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller.StagePIDProposal">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">StagePIDProposal</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Holds the initial proposal from the PID controller for a single stage.&quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">current_replicas</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">proposed_replicas</span><span class="p">:</span> <span class="nb">int</span>  <span class="c1"># Initial proposal based on PID / stage rate limit</span>
+    <span class="c1"># Conservative cost estimate (max(dynamic_avg, static)) used for projections</span>
+    <span class="n">conservative_cost_estimate</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># Original metrics for context</span></div>
+
+
+
+<div class="viewcode-block" id="PIDController">
+<a class="viewcode-back" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.util.pipeline.html#nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller.PIDController">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PIDController</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates initial replica adjustment proposals based on PID control logic.</span>
+
+<span class="sd">    This controller focuses on the core PID algorithm reacting to the error</span>
+<span class="sd">    between the current state (queue depth) and the desired state (target depth),</span>
+<span class="sd">    adjusted by an idle penalty. It tracks memory usage per replica to provide</span>
+<span class="sd">    a dynamic cost estimate for the ResourceConstraintManager.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">kp</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">ki</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">kd</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>  <span class="c1"># Currently unused in delta calculation</span>
+        <span class="n">target_queue_depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">penalty_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0005</span><span class="p">,</span>
+        <span class="n">error_boost_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the PID controller.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        kp : float</span>
+<span class="sd">            Proportional gain. Reacts to the current error magnitude.</span>
+<span class="sd">        ki : float</span>
+<span class="sd">            Integral gain. Accumulates past errors to eliminate steady-state offsets.</span>
+<span class="sd">        kd : float</span>
+<span class="sd">            Derivative gain. Reacts to the rate of change of the error.</span>
+<span class="sd">            (Currently set to 0 in internal calculations).</span>
+<span class="sd">        target_queue_depth : int, optional</span>
+<span class="sd">            Default target queue depth for stages if not specified in metrics,</span>
+<span class="sd">            by default 0. The PID loop tries to drive the queue depth towards</span>
+<span class="sd">            this value.</span>
+<span class="sd">        penalty_factor : float, optional</span>
+<span class="sd">            Multiplier applied to the number of consecutive idle cycles for a</span>
+<span class="sd">            stage. The resulting penalty effectively lowers the target queue</span>
+<span class="sd">            depth for idle stages, encouraging scale-down, by default 0.5.</span>
+<span class="sd">        error_boost_factor : float, optional</span>
+<span class="sd">            Factor to multiply the raw PID delta when the error is positive</span>
+<span class="sd">            (queue &gt; target), potentially speeding up scale-up response,</span>
+<span class="sd">            by default 1.5.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">kp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ki</span> <span class="o">=</span> <span class="n">ki</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="mf">0.0</span>  <span class="c1"># Explicitly disable derivative term for now</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_queue_depth</span> <span class="o">=</span> <span class="n">target_queue_depth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_boost_factor</span> <span class="o">=</span> <span class="n">error_boost_factor</span>
+
+        <span class="c1"># Per-Stage State</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_error</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Per-Stage Config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">penalty_factor</span> <span class="o">=</span> <span class="n">penalty_factor</span>
+
+    <span class="c1"># --- Private Methods ---</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_stage_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes controller state variables for a newly seen stage.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">stage</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[PID-</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">] Initializing state.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prev_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># --- Public Method ---</span>
+
+<div class="viewcode-block" id="PIDController.calculate_initial_proposals">
+<a class="viewcode-back" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.util.pipeline.html#nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller.PIDController.calculate_initial_proposals">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_initial_proposals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">StagePIDProposal</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates initial, unconstrained replica proposals for each stage.</span>
+
+<span class="sd">        Iterates through each stage, calculates its PID error and delta based</span>
+<span class="sd">        on queue depth and target, and returns the initial proposals</span>
+<span class="sd">        without considering global constraints. Includes dynamic cost estimates.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        stage_metrics : Dict[str, Dict[str, Any]]</span>
+<span class="sd">            Dictionary mapping stage names to their current metrics. Expected keys</span>
+<span class="sd">            per stage: &#39;replicas&#39;, &#39;queue_depth&#39;, &#39;ema_memory_per_replica&#39;.</span>
+<span class="sd">            Optional: &#39;target_queue_depth&#39;, &#39;processing&#39;, &#39;min_replicas&#39;, &#39;max_replicas&#39;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Dict[str, StagePIDProposal]</span>
+<span class="sd">            Dictionary mapping stage names to their initial proposals, including</span>
+<span class="sd">            current/proposed replicas, cost estimates, and original metrics.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;--- PID Controller: Calculating Initial Proposals ---&quot;</span><span class="p">)</span>
+        <span class="n">proposals</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">StagePIDProposal</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">stage</span><span class="p">,</span> <span class="n">metrics</span> <span class="ow">in</span> <span class="n">stage_metrics</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Ensure state exists and initialize if necessary</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_stage_state</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
+
+            <span class="c1"># --- Extract data and calculate current memory state ---</span>
+            <span class="n">replicas</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;replicas&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="c1"># The conservative cost is now the EMA memory passed in from the stats collector.</span>
+            <span class="c1"># Fallback to a default if not present.</span>
+            <span class="n">conservative_cost</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ema_memory_per_replica&quot;</span><span class="p">,</span> <span class="n">DEFAULT_STAGE_COST_MB</span><span class="p">)</span>
+
+            <span class="c1"># --- PID Calculation ---</span>
+            <span class="n">queue_depth</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;queue_depth&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="c1"># Allow target override per stage, else use controller default</span>
+            <span class="n">target_queue_depth</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_queue_depth&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_queue_depth</span><span class="p">)</span>
+            <span class="n">min_replicas_metric</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_replicas&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">max_replicas_metric</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_replicas&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Default max should likely be higher</span>
+
+            <span class="c1"># Idle penalty calculation</span>
+            <span class="k">if</span> <span class="n">queue_depth</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;processing&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+            <span class="c1"># Limit how much penalty can reduce the effective target below zero</span>
+            <span class="n">penalty</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">penalty_factor</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">**</span> <span class="mf">2.0</span><span class="p">))</span>
+
+            <span class="c1"># Error calculation (Queue deviation from target, adjusted by idle penalty)</span>
+            <span class="n">error</span> <span class="o">=</span> <span class="p">(</span><span class="n">queue_depth</span> <span class="o">-</span> <span class="n">target_queue_depth</span><span class="p">)</span> <span class="o">-</span> <span class="n">penalty</span>
+
+            <span class="c1"># Integral term update with basic anti-windup</span>
+            <span class="c1"># Don&#39;t accumulate integral if already at boundary AND error pushes further past boundary</span>
+            <span class="n">should_accumulate_integral</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">replicas</span> <span class="o">&gt;=</span> <span class="n">max_replicas_metric</span> <span class="ow">and</span> <span class="n">error</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># At max replicas, still have backlog</span>
+                <span class="n">should_accumulate_integral</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;[PID-</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">] At max replicas (</span><span class="si">{</span><span class="n">replicas</span><span class="si">}</span><span class="s2">) with positive error (</span><span class="si">{</span><span class="n">error</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">), pausing integral.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="p">(</span>
+                <span class="n">replicas</span> <span class="o">&lt;=</span> <span class="n">min_replicas_metric</span> <span class="ow">and</span> <span class="n">error</span> <span class="o">&lt;</span> <span class="mi">0</span>
+            <span class="p">):</span>  <span class="c1"># At min replicas, queue is below target (or penalty active)</span>
+                <span class="n">should_accumulate_integral</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;[PID-</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">] At min replicas (</span><span class="si">{</span><span class="n">replicas</span><span class="si">}</span><span class="s2">) with negative error (</span><span class="si">{</span><span class="n">error</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">), pausing integral.&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">should_accumulate_integral</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">+=</span> <span class="n">error</span>
+
+            <span class="c1"># Update previous error state for potential future derivative use</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prev_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="n">error</span>
+
+            <span class="c1"># --- Delta Calculation ---</span>
+            <span class="n">proportional_term</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kp</span> <span class="o">*</span> <span class="n">error</span>
+            <span class="n">integral_term</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ki</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span>
+            <span class="c1"># derivative_term = self.kd * derivative # Still disabled</span>
+
+            <span class="c1"># Combine terms</span>
+            <span class="n">raw_delta</span> <span class="o">=</span> <span class="n">proportional_term</span> <span class="o">+</span> <span class="n">integral_term</span>  <span class="c1"># + derivative_term</span>
+
+            <span class="c1"># Boost scale-up signals (positive error means queue &gt; target)</span>
+            <span class="k">if</span> <span class="n">error</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">boosted_delta</span> <span class="o">=</span> <span class="n">raw_delta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">error_boost_factor</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[PID-</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">] Boosting positive error delta: </span><span class="si">{</span><span class="n">raw_delta</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">boosted_delta</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">raw_delta</span> <span class="o">=</span> <span class="n">boosted_delta</span>
+
+            <span class="c1"># Round to get integer replica change</span>
+            <span class="n">delta_replicas</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">raw_delta</span><span class="p">))</span>
+            <span class="n">proposed_replicas</span> <span class="o">=</span> <span class="n">replicas</span> <span class="o">+</span> <span class="n">delta_replicas</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[PID-</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">] R=</span><span class="si">{</span><span class="n">replicas</span><span class="si">}</span><span class="s2">, Q=</span><span class="si">{</span><span class="n">queue_depth</span><span class="si">}</span><span class="s2">, Tgt=</span><span class="si">{</span><span class="n">target_queue_depth</span><span class="si">}</span><span class="s2">,&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot; Idle=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">idle_cycles</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span><span class="si">}</span><span class="s2">, Pen=</span><span class="si">{</span><span class="n">penalty</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> -&gt; &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Err=</span><span class="si">{</span><span class="n">error</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, P=</span><span class="si">{</span><span class="n">proportional_term</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, I=</span><span class="si">{</span><span class="n">integral_term</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot; (Acc=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">integral_error</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">) -&gt; &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;DeltaR=</span><span class="si">{</span><span class="n">delta_replicas</span><span class="si">}</span><span class="s2">, RawProp=</span><span class="si">{</span><span class="n">proposed_replicas</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="c1"># --- Create Final Proposal Object for this Stage ---</span>
+            <span class="n">proposal</span> <span class="o">=</span> <span class="n">StagePIDProposal</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">stage</span><span class="p">,</span>
+                <span class="n">current_replicas</span><span class="o">=</span><span class="n">replicas</span><span class="p">,</span>
+                <span class="n">proposed_replicas</span><span class="o">=</span><span class="n">proposed_replicas</span><span class="p">,</span>
+                <span class="n">conservative_cost_estimate</span><span class="o">=</span><span class="n">conservative_cost</span><span class="p">,</span>  <span class="c1"># Use updated cost</span>
+                <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>  <span class="c1"># Pass along original metrics</span>
+            <span class="p">)</span>
+
+            <span class="n">proposals</span><span class="p">[</span><span class="n">stage</span><span class="p">]</span> <span class="o">=</span> <span class="n">proposal</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;--- PID Controller: Initial Proposals Calculated ---&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">proposals</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ResourceConstraintManager">
+<a class="viewcode-back" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.util.pipeline.html#nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller.ResourceConstraintManager">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ResourceConstraintManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Applies global resource constraints and safety checks to initial proposals.</span>
+
+<span class="sd">    Takes the initial replica proposals generated by the PIDController and</span>
+<span class="sd">    adjusts them based on global limits (max replicas, available CPU cores based</span>
+<span class="sd">    on affinity, memory budget with safety buffer), and ensures pipeline</span>
+<span class="sd">    consistency (zero-replica safety). It allocates limited resources</span>
+<span class="sd">    proportionally if multiple stages request scale-ups simultaneously.</span>
+
+<span class="sd">    If current global memory usage exceeds the effective limit, it aggressively</span>
+<span class="sd">    scales down stages starting with the highest replica counts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">max_replicas</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">memory_threshold</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">memory_safety_buffer_fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the Resource Constraint Manager using CoreCountDetector.</span>
+
+<span class="sd">        Parameters are the same as before.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">memory_safety_buffer_fraction</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;memory_safety_buffer_fraction must be between 0.0 and 1.0&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span> <span class="o">=</span> <span class="n">max_replicas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory_threshold_mb</span> <span class="o">=</span> <span class="n">memory_threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory_safety_buffer_fraction</span> <span class="o">=</span> <span class="n">memory_safety_buffer_fraction</span>  <span class="c1"># Unused</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_threshold_mb</span>
+
+        <span class="n">core_detector</span> <span class="o">=</span> <span class="n">SystemResourceProbe</span><span class="p">()</span>  <span class="c1"># Instantiate the detector</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">core_detector</span><span class="o">.</span><span class="n">get_effective_cores</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">core_detection_details</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">core_detector</span><span class="o">.</span><span class="n">get_details</span><span class="p">()</span>
+
+        <span class="c1"># Determine a practical replica limit based on cores (optional, but often useful)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Treat as unlimited if detection failed</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Initialized. MaxReplicas=</span><span class="si">{</span><span class="n">max_replicas</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;EffectiveCoreLimit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> &quot;</span>  <span class="c1"># Log the potentially fractional value</span>
+            <span class="sa">f</span><span class="s2">&quot;(Method: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">core_detection_details</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;detection_method&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">), &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CoreBasedReplicaLimit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="si">}</span><span class="s2">, &quot;</span>  <span class="c1"># Log the derived integer limit</span>
+            <span class="sa">f</span><span class="s2">&quot;MemThreshold=</span><span class="si">{</span><span class="n">memory_threshold</span><span class="si">}</span><span class="s2">MB, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;EffectiveLimit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB &quot;</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Core detection details: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">core_detection_details</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Private Methods ---</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_effective_min_replicas</span><span class="p">(</span><span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">pipeline_in_flight</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to calculate the effective minimum replicas for a stage.&quot;&quot;&quot;</span>
+        <span class="n">min_replicas_metric</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_replicas&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># If the pipeline is active globally, enforce a minimum of 1 replica,</span>
+        <span class="c1"># unless min_replicas dictates higher.</span>
+        <span class="k">if</span> <span class="n">pipeline_in_flight</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">min_replicas_metric</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># Pipeline is globally idle</span>
+            <span class="c1"># Allow scaling down to zero ONLY if the pipeline is idle AND min_replicas allows it.</span>
+            <span class="k">return</span> <span class="n">min_replicas_metric</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_aggressive_memory_scale_down</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">current_proposals</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">initial_proposals_meta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;StagePIDProposal&quot;</span><span class="p">],</span>  <span class="c1"># Assuming StagePIDProposal type hint</span>
+        <span class="n">current_global_memory_usage</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">pipeline_in_flight_global</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If current memory exceeds the effective limit, force scale-downs.</span>
+
+<span class="sd">        Reduces replicas for all stages with &gt; 1 replica</span>
+<span class="sd">        by 25% (rounded down), ensuring they don&#39;t go below their effective minimum</span>
+<span class="sd">        or 1 replica. This is done in a single pass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict[str, int]: Updated replica proposals after aggressive scale-down.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">current_global_memory_usage</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">current_proposals</span>
+
+        <span class="n">memory_overrun</span> <span class="o">=</span> <span class="n">current_global_memory_usage</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Aggressive Scale-Down Triggered: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Current Mem (</span><span class="si">{</span><span class="n">current_global_memory_usage</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB) &gt; Effective Limit&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB). &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Need to reduce by </span><span class="si">{</span><span class="n">memory_overrun</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB.&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">adjusted_proposals</span> <span class="o">=</span> <span class="n">current_proposals</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">total_memory_reduced</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">stages_affected_details</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># To store details of changes</span>
+
+        <span class="c1"># Iterate through all proposals to apply the 25% reduction if applicable</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">current_replicas</span> <span class="ow">in</span> <span class="n">current_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">proposal_meta</span> <span class="o">=</span> <span class="n">initial_proposals_meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">proposal_meta</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Missing metadata for stage </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> during aggressive scale-down.&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Determine the effective minimum for this stage (ensuring at least 1)</span>
+            <span class="n">effective_min</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_effective_min_replicas</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">proposal_meta</span><span class="o">.</span><span class="n">metrics</span><span class="p">,</span> <span class="n">pipeline_in_flight_global</span><span class="p">)</span>
+
+            <span class="c1"># Cost per replica (assuming proposal_meta.conservative_cost_estimate is for ONE replica)</span>
+            <span class="c1"># If it&#39;s for all current_replicas, you&#39;d divide by current_replicas here.</span>
+            <span class="n">cost_per_replica</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                <span class="n">proposal_meta</span><span class="o">.</span><span class="n">conservative_cost_estimate</span>
+                <span class="k">if</span> <span class="n">proposal_meta</span><span class="o">.</span><span class="n">conservative_cost_estimate</span> <span class="ow">and</span> <span class="n">proposal_meta</span><span class="o">.</span><span class="n">conservative_cost_estimate</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                <span class="k">else</span> <span class="mf">1e-6</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">current_replicas</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># Only consider stages with more than 1 replica</span>
+                <span class="c1"># Calculate 25% reduction</span>
+                <span class="n">reduction_amount</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">current_replicas</span> <span class="o">*</span> <span class="mf">0.25</span><span class="p">)</span>
+
+                <span class="c1"># Ensure reduction_amount is at least 1 if current_replicas &gt; 1 and 25% is &lt; 1</span>
+                <span class="c1"># (e.g., for 2 or 3 replicas, 25% is 0, but we want to reduce by 1 if possible)</span>
+                <span class="k">if</span> <span class="n">reduction_amount</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">current_replicas</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">reduction_amount</span> <span class="o">=</span> <span class="mi">1</span>
+
+                <span class="k">if</span> <span class="n">reduction_amount</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">proposed_new_replicas</span> <span class="o">=</span> <span class="n">current_replicas</span> <span class="o">-</span> <span class="n">reduction_amount</span>
+
+                    <span class="c1"># Ensure new count doesn&#39;t go below the effective minimum (which is at least 1)</span>
+                    <span class="n">final_new_replicas</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">effective_min</span><span class="p">,</span> <span class="n">proposed_new_replicas</span><span class="p">)</span>
+
+                    <span class="c1"># Only apply if this actually results in a reduction</span>
+                    <span class="k">if</span> <span class="n">final_new_replicas</span> <span class="o">&lt;</span> <span class="n">current_replicas</span><span class="p">:</span>
+                        <span class="n">replicas_actually_reduced</span> <span class="o">=</span> <span class="n">current_replicas</span> <span class="o">-</span> <span class="n">final_new_replicas</span>
+                        <span class="n">memory_saved_for_stage</span> <span class="o">=</span> <span class="n">replicas_actually_reduced</span> <span class="o">*</span> <span class="n">cost_per_replica</span>
+
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Aggressive Scale-Down: Reducing from &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">final_new_replicas</span><span class="si">}</span><span class="s2"> &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;(by </span><span class="si">{</span><span class="n">replicas_actually_reduced</span><span class="si">}</span><span class="s2"> replicas, target 25% of &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2"> was </span><span class="si">{</span><span class="n">reduction_amount</span><span class="si">}</span><span class="s2">). &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;Est. memory saved: </span><span class="si">{</span><span class="n">memory_saved_for_stage</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">MB.&quot;</span>
+                        <span class="p">)</span>
+                        <span class="n">adjusted_proposals</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_new_replicas</span>
+                        <span class="n">total_memory_reduced</span> <span class="o">+=</span> <span class="n">memory_saved_for_stage</span>
+                        <span class="n">stages_affected_details</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="s2">&quot;from&quot;</span><span class="p">:</span> <span class="n">current_replicas</span><span class="p">,</span>
+                            <span class="s2">&quot;to&quot;</span><span class="p">:</span> <span class="n">final_new_replicas</span><span class="p">,</span>
+                            <span class="s2">&quot;saved_mem&quot;</span><span class="p">:</span> <span class="n">memory_saved_for_stage</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Aggressive Scale-Down: No reduction applied. &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;Current: </span><span class="si">{</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2">, Target 25% reduction: </span><span class="si">{</span><span class="n">reduction_amount</span><span class="si">}</span><span class="s2">, &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;Proposed: </span><span class="si">{</span><span class="n">proposed_new_replicas</span><span class="si">}</span><span class="s2">, Effective Min: </span><span class="si">{</span><span class="n">effective_min</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Aggressive Scale-Down: Calculated 25% reduction is 0 for &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2"> replicas. No change.&quot;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Aggressive Scale-Down: Stage has </span><span class="si">{</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;replica(s), not eligible for 25% reduction.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="c1"># After applying reductions, check the new memory overrun</span>
+        <span class="c1"># This is a projection based on our cost estimates.</span>
+        <span class="n">projected_new_global_memory_usage</span> <span class="o">=</span> <span class="n">current_global_memory_usage</span> <span class="o">-</span> <span class="n">total_memory_reduced</span>
+        <span class="n">new_memory_overrun</span> <span class="o">=</span> <span class="n">projected_new_global_memory_usage</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">stages_affected_details</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] Aggressive Scale-Down: No stages were eligible or changed replicas.&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">new_memory_overrun</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Aggressive Scale-Down: Completed. Reduced total </span><span class="si">{</span><span class="n">total_memory_reduced</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Stages affected: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">stages_affected_details</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Projected memory still over limit by </span><span class="si">{</span><span class="n">new_memory_overrun</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB.&quot;</span>
+                <span class="c1"># f&quot;Details: {stages_affected_details}&quot; # Potentially too verbose for warning</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Aggressive Scale-Down: Completed. Reduced total </span><span class="si">{</span><span class="n">total_memory_reduced</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Stages affected: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">stages_affected_details</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Projected memory now below limit (overrun </span><span class="si">{</span><span class="n">new_memory_overrun</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB).&quot;</span>
+                <span class="c1"># f&quot;Details: {stages_affected_details}&quot; # Potentially too verbose for info</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">stages_affected_details</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Aggressive Scale-Down Details: </span><span class="si">{</span><span class="n">stages_affected_details</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">adjusted_proposals</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_global_constraints_proportional</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">proposals_after_aggressive_sd</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>  <span class="c1"># Values from PID or after AggressiveMemSD</span>
+        <span class="n">initial_proposals_meta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;StagePIDProposal&quot;</span><span class="p">],</span>  <span class="c1"># Contains original .current_replicas</span>
+        <span class="n">current_global_memory_usage_mb</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">current_effective_mins</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>  <span class="c1"># Effective minimum for each stage</span>
+        <span class="n">room_to_scale_up_to_global_caps</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies global replica, core, and memory limits to scale-up intentions.</span>
+<span class="sd">        (Docstring from previous correct version summarizing the logic is fine)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">final_proposals_this_step</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">room_to_scale_up_to_global_caps</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;[ConstraintMgr-Proportional] Global scaling beyond effective minimums is RESTRICTED &quot;</span>
+                <span class="s2">&quot;as SumOfEffectiveMins likely meets/exceeds a global Core/MaxReplica cap. &quot;</span>
+                <span class="s2">&quot;Proposed increases from initial current values will be nullified.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop_meta</span> <span class="ow">in</span> <span class="n">initial_proposals_meta</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">val_from_prior_phases</span> <span class="o">=</span> <span class="n">proposals_after_aggressive_sd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">prop_meta</span><span class="o">.</span><span class="n">current_replicas</span><span class="p">)</span>
+                <span class="n">original_current_replicas</span> <span class="o">=</span> <span class="n">prop_meta</span><span class="o">.</span><span class="n">current_replicas</span>
+
+                <span class="k">if</span> <span class="n">val_from_prior_phases</span> <span class="o">&gt;</span> <span class="n">original_current_replicas</span><span class="p">:</span>
+                    <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">original_current_replicas</span>
+                    <span class="k">if</span> <span class="n">val_from_prior_phases</span> <span class="o">!=</span> <span class="n">original_current_replicas</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Proportional: Scaling restricted. &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;Nullified proposed increase from </span><span class="si">{</span><span class="n">original_current_replicas</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">val_from_prior_phases</span><span class="si">}</span><span class="s2">. &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;Setting to </span><span class="si">{</span><span class="n">original_current_replicas</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_from_prior_phases</span>
+            <span class="k">return</span> <span class="n">final_proposals_this_step</span>
+
+        <span class="c1"># --- ELSE: room_to_scale_up_to_global_caps is TRUE ---</span>
+        <span class="c1"># We can proportionally scale *increases above each stage&#39;s effective minimum*,</span>
+        <span class="c1"># up to the global caps. The baseline sum for headroom is sum_of_effective_mins.</span>
+
+        <span class="c1"># Stores (stage_name, proposed_increase_above_eff_min, cost_per_replica)</span>
+        <span class="n">upscale_deltas_above_eff_min</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">total_requested_increase_replicas_above_eff_mins</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">total_projected_mem_increase_for_deltas_mb</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Initialize final_proposals_this_step: each stage starts at its effective minimum,</span>
+        <span class="c1"># but not less than what aggressive_sd might have proposed (e.g., if agg_sd proposed 0 and eff_min is 0).</span>
+        <span class="c1"># And not more than what PID/agg_sd proposed if that was already below effective_min.</span>
+        <span class="c1"># Essentially, the base is max(eff_min, value_from_agg_sd_if_value_is_for_scale_down_or_no_change).</span>
+        <span class="c1"># More simply: start each stage at its effective_min. The &quot;delta&quot; is how much PID wants *above* that.</span>
+
+        <span class="n">sum_of_effective_mins_for_baseline</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop_meta</span> <span class="ow">in</span> <span class="n">initial_proposals_meta</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">eff_min_for_stage</span> <span class="o">=</span> <span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">eff_min_for_stage</span>  <span class="c1"># Initialize with effective min</span>
+            <span class="n">sum_of_effective_mins_for_baseline</span> <span class="o">+=</span> <span class="n">eff_min_for_stage</span>
+
+            <span class="c1"># What did PID (after aggressive_sd) propose for this stage?</span>
+            <span class="n">pid_proposed_val</span> <span class="o">=</span> <span class="n">proposals_after_aggressive_sd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">prop_meta</span><span class="o">.</span><span class="n">current_replicas</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">pid_proposed_val</span> <span class="o">&gt;</span> <span class="n">eff_min_for_stage</span><span class="p">:</span>
+                <span class="c1"># This stage wants to scale up beyond its effective minimum.</span>
+                <span class="n">increase_delta</span> <span class="o">=</span> <span class="n">pid_proposed_val</span> <span class="o">-</span> <span class="n">eff_min_for_stage</span>
+                <span class="n">cost</span> <span class="o">=</span> <span class="n">prop_meta</span><span class="o">.</span><span class="n">conservative_cost_estimate</span>
+                <span class="n">upscale_deltas_above_eff_min</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">increase_delta</span><span class="p">,</span> <span class="n">cost</span><span class="p">))</span>
+                <span class="n">total_requested_increase_replicas_above_eff_mins</span> <span class="o">+=</span> <span class="n">increase_delta</span>
+                <span class="n">total_projected_mem_increase_for_deltas_mb</span> <span class="o">+=</span> <span class="n">increase_delta</span> <span class="o">*</span> <span class="n">cost</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-Proportional] Room to scale. BaselineSum &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(SumOfEffMins)=</span><span class="si">{</span><span class="n">sum_of_effective_mins_for_baseline</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;NumStagesRequestingUpscaleAboveEffMin=</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">upscale_deltas_above_eff_min</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;TotalReplicaIncreaseReqAboveEffMin=</span><span class="si">{</span><span class="n">total_requested_increase_replicas_above_eff_mins</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;TotalMemIncreaseForTheseDeltas=</span><span class="si">{</span><span class="n">total_projected_mem_increase_for_deltas_mb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">MB.&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">reduction_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">limiting_reasons</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">total_requested_increase_replicas_above_eff_mins</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;[ConstraintMgr-Proportional] No upscale request beyond effective minimums. &quot;</span>
+                <span class="s2">&quot;Proposals remain at effective minimums (or prior phase values if lower and valid).&quot;</span>
+            <span class="p">)</span>
+            <span class="c1"># final_proposals_this_step already contains effective minimums.</span>
+            <span class="c1"># We need to ensure if PID proposed *lower* than effective_min (and eff_min was 0), that&#39;s respected.</span>
+            <span class="c1"># This should be: max(pid_proposed_value, eff_min_for_stage) for each stage.</span>
+            <span class="k">for</span> <span class="n">name_check</span> <span class="ow">in</span> <span class="n">final_proposals_this_step</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">pid_val</span> <span class="o">=</span> <span class="n">proposals_after_aggressive_sd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">name_check</span><span class="p">,</span> <span class="n">initial_proposals_meta</span><span class="p">[</span><span class="n">name_check</span><span class="p">]</span><span class="o">.</span><span class="n">current_replicas</span>
+                <span class="p">)</span>
+                <span class="n">eff_min_val</span> <span class="o">=</span> <span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name_check</span><span class="p">]</span>
+                <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name_check</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="nb">max</span><span class="p">(</span><span class="n">pid_val</span><span class="p">,</span> <span class="n">eff_min_val</span><span class="p">)</span> <span class="k">if</span> <span class="n">eff_min_val</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">pid_val</span>
+                <span class="p">)</span>  <span class="c1"># if eff_min is 0, allow PID to go to 0</span>
+            <span class="k">return</span> <span class="n">final_proposals_this_step</span>
+
+        <span class="n">projected_total_replicas_with_deltas</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">sum_of_effective_mins_for_baseline</span> <span class="o">+</span> <span class="n">total_requested_increase_replicas_above_eff_mins</span>
+        <span class="p">)</span>
+
+        <span class="c1"># 1. Max Replicas Config</span>
+        <span class="k">if</span> <span class="n">projected_total_replicas_with_deltas</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">:</span>
+            <span class="c1"># Headroom is how many *additional* replicas (beyond sum_of_eff_mins) we can add</span>
+            <span class="n">permissible_increase_headroom</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span> <span class="o">-</span> <span class="n">sum_of_effective_mins_for_baseline</span><span class="p">)</span>
+            <span class="n">factor</span> <span class="o">=</span> <span class="n">permissible_increase_headroom</span> <span class="o">/</span> <span class="n">total_requested_increase_replicas_above_eff_mins</span>
+            <span class="n">reduction_factor</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">reduction_factor</span><span class="p">,</span> <span class="n">factor</span><span class="p">)</span>
+            <span class="n">limiting_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;MaxReplicas (Limit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="si">}</span><span class="s2">, HeadroomAboveEffMins=</span><span class="si">{</span><span class="n">permissible_increase_headroom</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Factor=</span><span class="si">{</span><span class="n">factor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># 2. Core Based Replica Limit</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">projected_total_replicas_with_deltas</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span>
+        <span class="p">):</span>
+            <span class="n">permissible_increase_headroom</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="o">-</span> <span class="n">sum_of_effective_mins_for_baseline</span><span class="p">)</span>
+            <span class="n">factor</span> <span class="o">=</span> <span class="n">permissible_increase_headroom</span> <span class="o">/</span> <span class="n">total_requested_increase_replicas_above_eff_mins</span>
+            <span class="n">reduction_factor</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">reduction_factor</span><span class="p">,</span> <span class="n">factor</span><span class="p">)</span>
+            <span class="n">limiting_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;CoreLimit (Limit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;HeadroomAboveEffMins=</span><span class="si">{</span><span class="n">permissible_increase_headroom</span><span class="si">}</span><span class="s2">, Factor=</span><span class="si">{</span><span class="n">factor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># 3. Memory Limit</span>
+        <span class="c1"># Memory check is based on current_global_memory_usage_mb + memory_for_the_increase_deltas</span>
+        <span class="n">projected_total_global_memory_mb</span> <span class="o">=</span> <span class="n">current_global_memory_usage_mb</span> <span class="o">+</span> <span class="n">total_projected_mem_increase_for_deltas_mb</span>
+        <span class="k">if</span> <span class="n">projected_total_global_memory_mb</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="p">:</span>
+            <span class="c1"># How much memory can we actually add without breaching the effective limit?</span>
+            <span class="n">permissible_mem_increase_mb</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span> <span class="o">-</span> <span class="n">current_global_memory_usage_mb</span><span class="p">)</span>
+            <span class="n">factor_mem</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">permissible_mem_increase_mb</span> <span class="o">/</span> <span class="n">total_projected_mem_increase_for_deltas_mb</span>
+                <span class="k">if</span> <span class="n">total_projected_mem_increase_for_deltas_mb</span> <span class="o">&gt;</span> <span class="mf">1e-9</span>
+                <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="p">)</span>
+            <span class="n">reduction_factor</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">reduction_factor</span><span class="p">,</span> <span class="n">factor_mem</span><span class="p">)</span>
+            <span class="n">limiting_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;MemoryLimit (Factor=</span><span class="si">{</span><span class="n">factor_mem</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, AvailableMemForIncrease=</span><span class="si">{</span><span class="n">permissible_mem_increase_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB)&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Apply reduction to the deltas</span>
+        <span class="k">if</span> <span class="n">reduction_factor</span> <span class="o">&lt;=</span> <span class="mf">0.001</span><span class="p">:</span>  <span class="c1"># Epsilon for float</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-Proportional] Scale-up beyond effective minimums fully constrained by global limits. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Reasons: </span><span class="si">{</span><span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">limiting_reasons</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">limiting_reasons</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;None&#39;</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Final ReductionFactor=</span><span class="si">{</span><span class="n">reduction_factor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="s2">&quot; Stages will remain at their effective minimums (or prior phase values if lower and eff_min is 0).&quot;</span>
+            <span class="p">)</span>
+            <span class="c1"># final_proposals_this_step already contains effective minimums.</span>
+            <span class="c1"># Need to ensure if PID wanted lower than eff_min (and eff_min was 0), that is respected.</span>
+            <span class="k">for</span> <span class="n">name_final_check</span> <span class="ow">in</span> <span class="n">final_proposals_this_step</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">pid_val_final</span> <span class="o">=</span> <span class="n">proposals_after_aggressive_sd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">name_final_check</span><span class="p">,</span> <span class="n">initial_proposals_meta</span><span class="p">[</span><span class="n">name_final_check</span><span class="p">]</span><span class="o">.</span><span class="n">current_replicas</span>
+                <span class="p">)</span>
+                <span class="n">eff_min_final</span> <span class="o">=</span> <span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name_final_check</span><span class="p">]</span>
+                <span class="c1"># If effective min is 0, allow PID&#39;s value (which could be 0). Otherwise, floor is effective min.</span>
+                <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name_final_check</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pid_val_final</span> <span class="k">if</span> <span class="n">eff_min_final</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">max</span><span class="p">(</span><span class="n">pid_val_final</span><span class="p">,</span> <span class="n">eff_min_final</span><span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">reduction_factor</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-Proportional] Reducing requested scale-up (beyond effective_mins) by &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;factor </span><span class="si">{</span><span class="n">reduction_factor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Limiting Factors: </span><span class="si">{</span><span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">limiting_reasons</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">increase_delta_above_eff_min</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">upscale_deltas_above_eff_min</span><span class="p">:</span>
+                <span class="n">allowed_increase</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">increase_delta_above_eff_min</span> <span class="o">*</span> <span class="n">reduction_factor</span><span class="p">)</span>
+                <span class="c1"># Add this allowed increase to the stage&#39;s effective minimum</span>
+                <span class="n">final_value_for_stage</span> <span class="o">=</span> <span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">+</span> <span class="n">allowed_increase</span>
+                <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_value_for_stage</span>
+                <span class="k">if</span> <span class="n">allowed_increase</span> <span class="o">!=</span> <span class="n">increase_delta_above_eff_min</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Proportional Adj: EffMin=</span><span class="si">{</span><span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;ReqIncreaseAboveEffMin=</span><span class="si">{</span><span class="n">increase_delta_above_eff_min</span><span class="si">}</span><span class="s2">, AllowedIncrease=</span><span class="si">{</span><span class="n">allowed_increase</span><span class="si">}</span><span class="s2"> &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;-&gt; FinalVal=</span><span class="si">{</span><span class="n">final_value_for_stage</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># reduction_factor is ~1.0, meaning full requested increase (above effective_mins) is allowed</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;[ConstraintMgr-Proportional] Full requested scale-up (beyond effective_mins) &quot;</span>
+                <span class="s2">&quot;is permissible by global limits.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">increase_delta_above_eff_min</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">upscale_deltas_above_eff_min</span><span class="p">:</span>
+                <span class="c1"># The full PID-intended value (which came in as proposals_after_aggressive_sd) is applied.</span>
+                <span class="c1"># Since final_proposals_this_step was initialized with effective_mins,</span>
+                <span class="c1"># and increase_delta_above_eff_min = pid_proposed_val - eff_min_for_stage,</span>
+                <span class="c1"># then eff_min_for_stage + increase_delta_above_eff_min = pid_proposed_val.</span>
+                <span class="n">pid_intended_val</span> <span class="o">=</span> <span class="n">proposals_after_aggressive_sd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">name</span><span class="p">,</span> <span class="n">initial_proposals_meta</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">current_replicas</span>
+                <span class="p">)</span>
+                <span class="n">final_proposals_this_step</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pid_intended_val</span>  <span class="c1"># This effectively applies the PID&#39;s full wish for this stage</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">final_proposals_this_step</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_enforce_replica_bounds</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tentative_replicas</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">pipeline_in_flight</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Enforces per-stage min/max replica bounds and zero-replica safety logic.&quot;&quot;&quot;</span>
+        <span class="n">max_replicas_metric</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_replicas&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">lower_bound</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_effective_min_replicas</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="n">pipeline_in_flight</span><span class="p">)</span>
+        <span class="n">bounded_replicas</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">lower_bound</span><span class="p">,</span> <span class="n">tentative_replicas</span><span class="p">)</span>
+        <span class="n">final_replicas</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">bounded_replicas</span><span class="p">,</span> <span class="n">max_replicas_metric</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">final_replicas</span> <span class="o">!=</span> <span class="n">tentative_replicas</span><span class="p">:</span>
+            <span class="n">min_replicas_metric</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_replicas&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">] Bounds Applied: Tentative=</span><span class="si">{</span><span class="n">tentative_replicas</span><span class="si">}</span><span class="s2"> -&gt;&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot; Final=</span><span class="si">{</span><span class="n">final_replicas</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(MinConfig=</span><span class="si">{</span><span class="n">min_replicas_metric</span><span class="si">}</span><span class="s2">, MaxConfig=</span><span class="si">{</span><span class="n">max_replicas_metric</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;EffectiveLowerBound=</span><span class="si">{</span><span class="n">lower_bound</span><span class="si">}</span><span class="s2">, PipeInFlight=</span><span class="si">{</span><span class="n">pipeline_in_flight</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">final_replicas</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">lower_bound</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">] Allowing scale to 0: Pipeline Idle and MinReplicas=0.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">final_replicas</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_global_consistency</span><span class="p">(</span>
+        <span class="n">final_adjustments</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">initial_proposals</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">StagePIDProposal</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensures pipeline doesn&#39;t get stuck if one stage scales up from zero.&quot;&quot;&quot;</span>
+        <span class="n">scale_up_from_zero_triggered</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">prop</span><span class="o">.</span><span class="n">current_replicas</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">final_adjustments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">scale_up_from_zero_triggered</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] Wake-up consistency: Ensuring no stages stuck at zero.&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">prop</span><span class="o">.</span><span class="n">current_replicas</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">final_adjustments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">min_r</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_replicas&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="n">max_r</span> <span class="o">=</span> <span class="n">prop</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_replicas&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">target</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">min_r</span><span class="p">)</span>
+                    <span class="n">final_target</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">max_r</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">final_target</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] Forcing minimum </span><span class="si">{</span><span class="n">final_target</span><span class="si">}</span><span class="s2"> replica due to global wake-up.&quot;</span>
+                        <span class="p">)</span>
+                        <span class="n">final_adjustments</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_target</span>
+
+        <span class="k">return</span> <span class="n">final_adjustments</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_log_final_constraint_summary</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">final_adjustments</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">initial_proposals</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;StagePIDProposal&quot;</span><span class="p">],</span>  <span class="c1"># Forward reference</span>
+        <span class="n">global_in_flight</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">current_global_memory_usage_mb</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sum_of_effective_mins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">can_globally_scale_beyond_effective_mins</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Logs a structured and readable summary of the final state and limit checks.&quot;&quot;&quot;</span>
+
+        <span class="n">final_stage_replicas_total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">final_adjustments</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">projected_final_memory_mb</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">final_adjustments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">initial_proposals</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">conservative_cost_estimate</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">final_adjustments</span>
+        <span class="p">)</span>
+        <span class="n">num_queue_actors</span> <span class="o">=</span> <span class="n">num_edges</span>
+        <span class="n">total_ray_components_for_info</span> <span class="o">=</span> <span class="n">final_stage_replicas_total</span> <span class="o">+</span> <span class="n">num_queue_actors</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] --- Final Decision &amp; Constraint Summary ---&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- I. Overall Pipeline State ---</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Pipeline Activity: </span><span class="si">{</span><span class="n">global_in_flight</span><span class="si">}</span><span class="s2"> tasks in-flight.&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Effective Min Replicas (Sum): </span><span class="si">{</span><span class="n">sum_of_effective_mins</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     └─ Global Scaling Beyond Mins Permitted? </span><span class="si">{</span><span class="n">can_globally_scale_beyond_effective_mins</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># --- II. Final Component Counts ---</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Final Stage Replicas: </span><span class="si">{</span><span class="n">final_stage_replicas_total</span><span class="si">}</span><span class="s2"> (Target for caps)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Queue/Edge Actors   : </span><span class="si">{</span><span class="n">num_queue_actors</span><span class="si">}</span><span class="s2"> (Informational)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Total Ray Components: </span><span class="si">{</span><span class="n">total_ray_components_for_info</span><span class="si">}</span><span class="s2"> (Informational)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- III. Resource Limits &amp; Projected Usage (for Stages) ---</span>
+        <span class="c1"># Configured Limits</span>
+        <span class="n">max_r_cfg_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">)</span>
+        <span class="n">core_based_limit_str</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;N/A&quot;</span>
+        <span class="p">)</span>
+        <span class="n">eff_mem_limit_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB&quot;</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]   Global Limits (Stages):&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     ├─ MaxTotalReplicas  : </span><span class="si">{</span><span class="n">max_r_cfg_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     ├─ CoreBasedRepLimit : </span><span class="si">{</span><span class="n">core_based_limit_str</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(System EffCores: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">available_cores</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     └─ EffectiveMemLimit : </span><span class="si">{</span><span class="n">eff_mem_limit_str</span><span class="si">}</span><span class="s2"> &quot;</span><span class="p">)</span>
+
+        <span class="c1"># Usage vs Limits</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]   Projected Usage (Stages):&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     ├─ Replicas          : </span><span class="si">{</span><span class="n">final_stage_replicas_total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     └─ Memory            : </span><span class="si">{</span><span class="n">projected_final_memory_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(Current: </span><span class="si">{</span><span class="n">current_global_memory_usage_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB)&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># --- IV. Limit Adherence Analysis (for Stages) ---</span>
+        <span class="n">unexpected_breaches_details</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># 1. Max Stage Replicas</span>
+        <span class="n">status_max_r</span> <span class="o">=</span> <span class="s2">&quot;OK&quot;</span>
+        <span class="k">if</span> <span class="n">final_stage_replicas_total</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">sum_of_effective_mins</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span> <span class="ow">and</span> <span class="n">final_stage_replicas_total</span> <span class="o">&lt;=</span> <span class="n">sum_of_effective_mins</span><span class="p">):</span>
+                <span class="n">status_max_r</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;BREACHED (Final=</span><span class="si">{</span><span class="n">final_stage_replicas_total</span><span class="si">}</span><span class="s2"> &gt; Limit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="n">unexpected_breaches_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MaxReplicas: </span><span class="si">{</span><span class="n">status_max_r</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">status_max_r</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;NOTE: Limit met/exceeded by SumOfMins (</span><span class="si">{</span><span class="n">sum_of_effective_mins</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+        <span class="c1"># 2. Core-Based Stage Replica Limit</span>
+        <span class="n">status_core_r</span> <span class="o">=</span> <span class="s2">&quot;N/A&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">status_core_r</span> <span class="o">=</span> <span class="s2">&quot;OK&quot;</span>
+            <span class="k">if</span> <span class="n">final_stage_replicas_total</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+                    <span class="n">sum_of_effective_mins</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span>
+                    <span class="ow">and</span> <span class="n">final_stage_replicas_total</span> <span class="o">&lt;=</span> <span class="n">sum_of_effective_mins</span>
+                <span class="p">):</span>
+                    <span class="n">status_core_r</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;BREACHED (Final=</span><span class="si">{</span><span class="n">final_stage_replicas_total</span><span class="si">}</span><span class="s2"> &gt; Limit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="si">}</span><span class="s2">)&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">unexpected_breaches_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CoreBasedLimit: </span><span class="si">{</span><span class="n">status_core_r</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">status_core_r</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;NOTE: Limit met/exceeded by SumOfMins (</span><span class="si">{</span><span class="n">sum_of_effective_mins</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+        <span class="c1"># 3. Memory Limit</span>
+        <span class="n">tolerance</span> <span class="o">=</span> <span class="mf">0.01</span>  <span class="c1"># MB</span>
+        <span class="n">status_mem</span> <span class="o">=</span> <span class="s2">&quot;OK&quot;</span>
+        <span class="k">if</span> <span class="n">projected_final_memory_mb</span> <span class="o">&gt;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span> <span class="o">+</span> <span class="n">tolerance</span><span class="p">):</span>
+            <span class="n">status_mem</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;BREACHED (Projected=</span><span class="si">{</span><span class="n">projected_final_memory_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB &gt; Limit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_limit_mb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">MB)&quot;</span>
+            <span class="p">)</span>
+            <span class="n">unexpected_breaches_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MemoryLimit: </span><span class="si">{</span><span class="n">status_mem</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]   Limit Adherence (Stages):&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     ├─ MaxTotalReplicas  : </span><span class="si">{</span><span class="n">status_max_r</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     ├─ CoreBasedRepLimit : </span><span class="si">{</span><span class="n">status_core_r</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     └─ EffectiveMemLimit : </span><span class="si">{</span><span class="n">status_mem</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">unexpected_breaches_details</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   └─ UNEXPECTED BREACHES: </span><span class="si">{</span><span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unexpected_breaches_details</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]   └─ All hard caps (beyond tolerated minimums/wake-up) appear respected.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- V. Final Decisions Per Stage ---</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]   Final Decisions (Per Stage):&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">final_adjustments</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr]     └─ No stages to adjust.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Determine max stage name length for alignment</span>
+            <span class="n">max_name_len</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">if</span> <span class="n">final_adjustments</span><span class="p">:</span>  <span class="c1"># Check if not empty</span>
+                <span class="n">max_name_len</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">final_adjustments</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+            <span class="k">for</span> <span class="n">stage_name</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">final_adjustments</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+                <span class="n">orig_prop</span> <span class="o">=</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage_name</span><span class="p">)</span>
+                <span class="n">pid_proposed_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(PID: </span><span class="si">{</span><span class="n">orig_prop</span><span class="o">.</span><span class="n">proposed_replicas</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">orig_prop</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="n">current_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(Current: </span><span class="si">{</span><span class="n">orig_prop</span><span class="o">.</span><span class="n">current_replicas</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">orig_prop</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="n">min_replicas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_effective_min_replicas</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">orig_prop</span><span class="o">.</span><span class="n">metrics</span><span class="p">,</span> <span class="n">global_in_flight</span><span class="p">)</span>
+                <span class="n">eff_min_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(EffMin: </span><span class="si">{</span><span class="n">min_replicas</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">orig_prop</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+                <span class="c1"># Basic alignment, can be improved with more sophisticated padding</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]     └─ </span><span class="si">{</span><span class="n">stage_name</span><span class="si">:</span><span class="s2">&lt;</span><span class="si">{</span><span class="n">max_name_len</span><span class="si">}}</span><span class="s2"> : &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">count</span><span class="si">:</span><span class="s2">&lt;3</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">pid_proposed_str</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">current_str</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">eff_min_str</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] --- Constraint Summary END ---&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Public Method ---</span>
+
+<div class="viewcode-block" id="ResourceConstraintManager.apply_constraints">
+<a class="viewcode-back" href="../../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.util.pipeline.html#nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller.ResourceConstraintManager.apply_constraints">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_constraints</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">initial_proposals</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;StagePIDProposal&quot;</span><span class="p">],</span>
+        <span class="n">global_in_flight</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>  <span class="c1"># Renamed from global_in_flight</span>
+        <span class="n">current_global_memory_usage_mb</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_edges</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies all configured constraints to initial replica proposals.</span>
+<span class="sd">        (Docstring from previous version is fine)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] --- Applying Constraints START --- &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;GlobalInFlight=</span><span class="si">{</span><span class="n">global_in_flight</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CurrentGlobalMemMB=</span><span class="si">{</span><span class="n">current_global_memory_usage_mb</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;NumEdges=</span><span class="si">{</span><span class="n">num_edges</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] Initial Proposals:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr]   Stage &#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;: Current=</span><span class="si">{</span><span class="n">prop</span><span class="o">.</span><span class="n">current_replicas</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;PIDProposed=</span><span class="si">{</span><span class="n">prop</span><span class="o">.</span><span class="n">proposed_replicas</span><span class="si">}</span><span class="s2">, CostMB=</span><span class="si">{</span><span class="n">prop</span><span class="o">.</span><span class="n">conservative_cost_estimate</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;MinCfg=</span><span class="si">{</span><span class="n">prop</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;min_replicas&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">, MaxCfg=</span><span class="si">{</span><span class="n">prop</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;max_replicas&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;N/A&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># --- Phase 1: Initialize adjustments from PID proposals ---</span>
+        <span class="n">intermediate_adjustments</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="n">prop</span><span class="o">.</span><span class="n">proposed_replicas</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Intermediate Adjustments (Phase 1 - From PID): </span><span class="si">{</span><span class="n">intermediate_adjustments</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- Phase 2: Aggressive Memory Scale-Down (Optional) ---</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">intermediate_adjustments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_aggressive_memory_scale_down</span><span class="p">(</span>
+                <span class="n">intermediate_adjustments</span><span class="p">,</span> <span class="n">initial_proposals</span><span class="p">,</span> <span class="n">current_global_memory_usage_mb</span><span class="p">,</span> <span class="n">global_in_flight</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;[ConstraintMgr] Intermediate Adjustments (Phase 2 - After Aggressive Mem Scale-Down): &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">intermediate_adjustments</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_agg</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Error during aggressive memory scale-down: </span><span class="si">{</span><span class="n">e_agg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">intermediate_adjustments</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">prop</span><span class="o">.</span><span class="n">current_replicas</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="c1"># --- Calculate Current Effective Minimums and Their Sum ---</span>
+        <span class="n">current_effective_mins</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">sum_of_effective_mins</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">eff_min</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_effective_min_replicas</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">prop</span><span class="o">.</span><span class="n">metrics</span><span class="p">,</span> <span class="n">global_in_flight</span><span class="p">)</span>
+            <span class="n">current_effective_mins</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">eff_min</span>
+            <span class="n">sum_of_effective_mins</span> <span class="o">+=</span> <span class="n">eff_min</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Calculated Effective Minimums: TotalSum=</span><span class="si">{</span><span class="n">sum_of_effective_mins</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="c1"># f&quot;IndividualMins: {current_effective_mins}&quot; # Can be verbose</span>
+        <span class="p">)</span>
+
+        <span class="c1"># --- Determine if Baseline (Sum of Mins) Breaches Global Caps ---</span>
+        <span class="c1"># This logic determines if we are *allowed* to scale any stage *beyond its own effective minimum*</span>
+        <span class="c1"># if doing so would contribute to breaching a global cap that&#39;s *already threatened by the sum of minimums*.</span>
+        <span class="n">can_globally_scale_beyond_effective_mins_due_to_cores</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sum_of_effective_mins</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">core_based_replica_limit</span><span class="p">:</span>
+            <span class="n">can_globally_scale_beyond_effective_mins_due_to_cores</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">can_globally_scale_beyond_effective_mins_due_to_max_r</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">sum_of_effective_mins</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">:</span>
+            <span class="n">can_globally_scale_beyond_effective_mins_due_to_max_r</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># Combined gatekeeper for proportional scaling logic</span>
+        <span class="c1"># If either cores or max_replicas cap is hit by sum of mins, we can&#39;t scale up further.</span>
+        <span class="c1"># (Memory is handled slightly differently in proportional scaler - it looks at available headroom for increase)</span>
+        <span class="n">can_globally_scale_up_stages</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">can_globally_scale_beyond_effective_mins_due_to_cores</span>
+            <span class="ow">and</span> <span class="n">can_globally_scale_beyond_effective_mins_due_to_max_r</span>
+        <span class="p">)</span>
+
+        <span class="c1"># --- Phase 3: Apply Global Constraints &amp; Proportional Allocation ---</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">tentative_adjustments_from_prop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_global_constraints_proportional</span><span class="p">(</span>
+                <span class="n">intermediate_adjustments</span><span class="p">,</span>
+                <span class="n">initial_proposals</span><span class="p">,</span>
+                <span class="n">current_global_memory_usage_mb</span><span class="p">,</span>
+                <span class="n">current_effective_mins</span><span class="p">,</span>
+                <span class="n">can_globally_scale_up_stages</span><span class="p">,</span>  <span class="c1"># Use the combined flag</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Tentative Adjustments (Phase 3 - After Proportional Allocation): &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tentative_adjustments_from_prop</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_prop</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Error during global proportional allocation: </span><span class="si">{</span><span class="n">e_prop</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">tentative_adjustments_from_prop</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">intermediate_adjustments</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>  <span class="c1"># Fallback logic</span>
+                <span class="n">tentative_adjustments_from_prop</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">current_effective_mins</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+        <span class="c1"># --- Phase 4: Enforce Per-Stage Min/Max Replica Bounds ---</span>
+        <span class="n">final_adjustments</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">stage_name</span><span class="p">,</span> <span class="n">proposal_meta</span> <span class="ow">in</span> <span class="n">initial_proposals</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">replicas_after_proportional</span> <span class="o">=</span> <span class="n">tentative_adjustments_from_prop</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="n">stage_name</span><span class="p">,</span> <span class="n">proposal_meta</span><span class="o">.</span><span class="n">current_replicas</span>
+            <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">bounded_replicas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enforce_replica_bounds</span><span class="p">(</span>
+                    <span class="n">stage_name</span><span class="p">,</span> <span class="n">replicas_after_proportional</span><span class="p">,</span> <span class="n">proposal_meta</span><span class="o">.</span><span class="n">metrics</span><span class="p">,</span> <span class="n">global_in_flight</span>
+                <span class="p">)</span>
+                <span class="n">final_adjustments</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">bounded_replicas</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_bounds</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;[ConstraintMgr-</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">] Error during per-stage bound enforcement: </span><span class="si">{</span><span class="n">e_bounds</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+                <span class="n">final_adjustments</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="n">proposal_meta</span><span class="o">.</span><span class="n">current_replicas</span><span class="p">,</span> <span class="n">current_effective_mins</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Final Adjustments (Phase 4 - After Per-Stage Bounds): </span><span class="si">{</span><span class="n">final_adjustments</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- Phase 5: Apply Global Consistency (e.g., Wake-up Safety) ---</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">final_adjustments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_global_consistency</span><span class="p">(</span><span class="n">final_adjustments</span><span class="p">,</span> <span class="n">initial_proposals</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Final Adjustments (Phase 5 - After Global Consistency): </span><span class="si">{</span><span class="n">final_adjustments</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e_gc</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ConstraintMgr] Error during global consistency application: </span><span class="si">{</span><span class="n">e_gc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># --- Log Final Summary ---</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_final_constraint_summary</span><span class="p">(</span>
+            <span class="n">final_adjustments</span><span class="p">,</span>
+            <span class="n">initial_proposals</span><span class="p">,</span>
+            <span class="n">global_in_flight</span><span class="p">,</span>
+            <span class="n">current_global_memory_usage_mb</span><span class="p">,</span>
+            <span class="n">num_edges</span><span class="p">,</span>
+            <span class="n">sum_of_effective_mins</span><span class="p">,</span>  <span class="c1"># Pass this calculated value</span>
+            <span class="n">can_globally_scale_up_stages</span><span class="p">,</span>  <span class="c1"># Pass this for context in logging</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;[ConstraintMgr] --- Applying Constraints END ---&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">final_adjustments</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

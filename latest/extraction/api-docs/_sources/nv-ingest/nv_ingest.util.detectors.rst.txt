@@ -1,0 +1,21 @@
+nv\_ingest.util.detectors package
+=================================
+
+Submodules
+----------
+
+nv\_ingest.util.detectors.language module
+-----------------------------------------
+
+.. automodule:: nv_ingest.util.detectors.language
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.util.detectors
+   :members:
+   :show-inheritance:
+   :undoc-members:
