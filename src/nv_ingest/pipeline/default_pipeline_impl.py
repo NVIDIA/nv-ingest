@@ -317,7 +317,7 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|$NVIDIA_API_KEY
-      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/nemotron-nano-12b-v2-vl"
       endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
       prompt: "Caption the content of this image:"
     replicas:
