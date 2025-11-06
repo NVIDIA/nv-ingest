@@ -265,8 +265,6 @@ services:
       - "7670:7670"
       # Simple Broker -- Uncomment if running SimpleBroker in the container
       #- "7671:7671"
-      # Ray Dashboards
-      - "8265:8265"
     cap_add:
       - sys_nice
     environment:
@@ -358,6 +356,66 @@ services:
             - driver: nvidia
               device_ids: ["0"]
               capabilities: [gpu]
+
+  ray-head:
+    build:
+      context: ${NV_INGEST_ROOT:-.}
+      dockerfile: ./docker/ray/Dockerfile
+    image: nv-ingest-ray:latest
+    shm_size: 40gb
+    environment:
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN}
+    command: [
+      "bash",
+      "-lc",
+      ". /opt/conda/etc/profile.d/conda.sh && conda activate nv_ingest_runtime && ray start --head --port=6379 --dashboard-host=0.0.0.0 --dashboard-port=8265 --ray-client-server-port=10001 --block"
+    ]
+    ports:
+      - "8265:8265"
+      - "10001:10001"
+
+  ray-worker:
+    build:
+      context: ${NV_INGEST_ROOT:-.}
+      dockerfile: ./docker/ray/Dockerfile
+    image: nv-ingest-ray:latest
+    shm_size: 16gb
+    environment:
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN}
+    depends_on:
+      - ray-head
+    command: [
+      "bash",
+      "-lc",
+      ". /opt/conda/etc/profile.d/conda.sh && conda activate nv_ingest_runtime && until (echo > /dev/tcp/ray-head/6379) >/dev/null 2>&1; do echo 'waiting for ray-head'; sleep 1; done; ray start --address=ray-head:6379 --block"
+    ]
+
+  ray-gpu-worker:
+    build:
+      context: ${NV_INGEST_ROOT:-.}
+      dockerfile: ./docker/ray/Dockerfile.vllm
+    image: nv-ingest-ray-vllm:latest
+    shm_size: 40gb
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0", "1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    depends_on:
+      - ray-head
+    volumes:
+      - ./.volumes/models:/workspace/models
+    command: [
+      "bash",
+      "-lc",
+      ". /opt/conda/etc/profile.d/conda.sh && conda activate nv_ingest_runtime && until (echo > /dev/tcp/ray-head/6379) >/dev/null 2>&1; do echo 'waiting for ray-head'; sleep 1; done; ray start --address=ray-head:6379 --block"
+    ]
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0

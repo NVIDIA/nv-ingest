@@ -36,7 +36,7 @@ class ThroughputMonitorStage(RayActorStage):
     @nv_ingest_node_failure_try_except()
     @traceable()
     @udf_intercept_hook()
-    async def on_data(self, message: Any) -> Any:
+    def on_data(self, message: Any) -> Any:
         """
         Process an incoming control message. Increment the internal counter and, every 100 messages,
         calculate and log the throughput. The throughput value is also added to the message metadata.
