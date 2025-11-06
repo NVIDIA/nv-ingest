@@ -39,53 +39,56 @@ RUN chmod +x scripts/install_ffmpeg.sh \
     && bash scripts/install_ffmpeg.sh \
     && rm scripts/install_ffmpeg.sh
 
-RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
-    && bash /tmp/miniforge.sh -b -p /opt/conda \
-    && rm /tmp/miniforge.sh
+# Install micromamba, a faster alternative to conda at /usr/local/bin/micromamba
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+RUN set -eux; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64) m_arch="64" ;; \
+      aarch64) m_arch="aarch64" ;; \
+      *) echo "Unsupported arch: $arch" && exit 1 ;; \
+    esac; \
+    curl -L "https://micro.mamba.pm/api/micromamba/linux-${m_arch}/latest" -o /tmp/micromamba.tar.bz2; \
+    mkdir -p /usr/local/bin; \
+    tar -xvjf /tmp/micromamba.tar.bz2 -C /usr/local/bin --strip-components=1 bin/micromamba; \
+    rm -f /tmp/micromamba.tar.bz2; \
+    mkdir -p "$MAMBA_ROOT_PREFIX"
 
-# Add conda to the PATH
-ENV PATH=/opt/conda/bin:$PATH
-
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      CONDA_SUBDIR=linux-aarch64; \
-    else \
-      CONDA_SUBDIR=linux-64; \
-    fi;
-
-# Install Mamba, a faster alternative to conda, within the base environment
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
+# Cache mounts:
+#   - /opt/conda/pkgs : conda/mamba/micromamba package cache
+#   - /root/.cache/pip: pip cache
+# We’ll use micromamba-run instead of "source activate".
+SHELL ["/bin/bash", "-lc"]
 
 COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
 COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
 COPY conda/environments/nv_ingest_environment.linux_aarch64.yml /workspace/nv_ingest_environment.linux_aarch64.yml
 
-# Create nv_ingest base environment
+# Set `extract_threads 1` for QEMU+ARM build
+# https://github.com/mamba-org/mamba/issues/1611
+RUN micromamba config set extract_threads 1
+
+# Install conda-merge into base so we can merge YAMLs
 RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
+    micromamba install -y -n base -c conda-forge conda-merge
+
+# Merge env files per-arch and create nv_ingest base environment
+RUN --mount=type=cache,target=/opt/conda/pkgs \
     if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
+      micromamba run -n base conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
       rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml; \
     else \
-      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
+      micromamba run -n base conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
       rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml; \
     fi; \
-    mamba env create -f /workspace/nv_ingest_environment.yml
+    micromamba create -y -n nv_ingest_runtime -f /workspace/nv_ingest_environment.yml
 
-# Set default shell to bash
-SHELL ["/bin/bash", "-c"]
-
-# Activate the environment (make it default for subsequent commands)
-RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
-
-# Install Tini via conda from the conda-forge channel
+# Install tini in the runtime env
 RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && mamba install -y -c conda-forge tini
+    micromamba install -y -n nv_ingest_runtime -c conda-forge tini
 
 # Ensure dynamically linked libraries in the conda environment are found at runtime
+ENV PATH=/opt/conda/envs/nv_ingest_runtime/bin:/usr/local/bin:$PATH
 ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 
 # Set the working directory in the container
@@ -125,25 +128,22 @@ COPY src src
 RUN rm -rf ./src/nv_ingest/dist ./src/dist ./client/dist ./api/dist
 
 # Install python build from pip, version needed not present in conda
-RUN source activate nv_ingest_runtime \
-    && pip install 'build>=1.2.2'
+RUN --mount=type=cache,target=/root/.cache/pip \
+    micromamba run -n nv_ingest_runtime pip install 'build>=1.2.2'
 
 # Add pip cache path to match conda's package cache
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     chmod +x ./ci/scripts/build_pip_packages.sh \
-    && source activate nv_ingest_runtime \
-    && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib api \
-    && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
-    && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
+ && micromamba run -n nv_ingest_runtime ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib api \
+ && micromamba run -n nv_ingest_runtime ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
+ && micromamba run -n nv_ingest_runtime ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
 
-RUN --mount=type=cache,target=/opt/conda/pkgs\
+RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && pip install ./src/dist/*.whl \
-    && pip install ./api/dist/*.whl \
-    && pip install ./client/dist/*.whl
-
+    micromamba run -n nv_ingest_runtime pip install ./src/dist/*.whl \
+ && micromamba run -n nv_ingest_runtime pip install ./api/dist/*.whl \
+ && micromamba run -n nv_ingest_runtime pip install ./client/dist/*.whl
 
 RUN rm -rf src
 
@@ -160,13 +160,11 @@ COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_sour
 COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
 RUN  --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && python3 /workspace/docker/post_build_triggers.py
+    micromamba run -n nv_ingest_runtime python3 /workspace/docker/post_build_triggers.py
 
 # Remove graphviz and its dependencies to reduce image size
-RUN source activate nv_ingest_runtime && \
-    mamba remove graphviz python-graphviz --force -y && \
-    mamba uninstall gtk3 pango cairo fonts-conda-ecosystem -y
+RUN micromamba remove -y -n nv_ingest_runtime graphviz python-graphviz || true && \
+    micromamba remove -y -n nv_ingest_runtime gtk3 pango cairo fonts-conda-ecosystem || true
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 
@@ -175,10 +173,9 @@ ENTRYPOINT ["/opt/conda/envs/nv_ingest_runtime/bin/tini", "--", "/workspace/dock
 
 FROM nv_ingest_install AS development
 
-RUN source activate nv_ingest_runtime && \
-    --mount=type=cache,target=/opt/conda/pkgs \
+RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    pip install -e ./client
+    micromamba run -n nv_ingest_runtime pip install -e ./client
 
 CMD ["/bin/bash"]
 
@@ -197,8 +194,8 @@ COPY src src
 COPY api api
 COPY client client
 
-RUN source activate nv_ingest_runtime && \
-    pip install -r ./docs/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    micromamba run -n nv_ingest_runtime pip install -r ./docs/requirements.txt
 
 # Default command: Run `make docs`
 CMD ["bash", "-c", "cd /workspace/docs && source activate nv_ingest_runtime && make docs"]
