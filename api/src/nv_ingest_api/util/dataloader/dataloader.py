@@ -253,10 +253,6 @@ else:
             split_type: SplitType, type of split to perform, either size, time, or frame
             """
             if split_type == SplitType.SIZE:
-                logger.info(f"DATA:  file_size: {file_size}, split_interval: {split_interval}")
-                logger.info(
-                    f"DATA:  math.ceil(file_size / split_interval*10e6): {math.ceil(file_size / split_interval*10e6)}"
-                )
                 return math.ceil(file_size / split_interval)
             elif split_type == SplitType.TIME:
                 return math.ceil(duration / split_interval)

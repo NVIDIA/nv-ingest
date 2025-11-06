@@ -126,9 +126,6 @@ def extract_file_content(path: str) -> Tuple[str, DocumentTypeEnum]:
     """Extracts content from a file, supporting different formats."""
     document_type = get_or_infer_file_type(path)
 
-    # if document_type in [DocumentTypeEnum.MP4, DocumentTypeEnum.MOV, DocumentTypeEnum.AVI, DocumentTypeEnum.MKV]:
-    #     return path, DocumentTypeEnum(document_type)
-
     with open(path, "rb") as file:
         file_stream = BytesIO(file.read())
 

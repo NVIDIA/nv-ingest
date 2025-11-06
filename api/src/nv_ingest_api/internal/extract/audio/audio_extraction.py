@@ -81,7 +81,7 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         trace_info=trace_info,  # traceable_func arg
         stage_name="audio_extraction",
     )
-    # raise ValueError(f"SEGMENTS: {segments}, TRANSCRIPT: {transcript}")
+
     extracted_data = []
     if segment_audio:
         for segment in segments:
@@ -178,15 +178,7 @@ def extract_text_from_audio_internal(
         )
 
         # Apply the _extract_from_audio_partial function to each row in the DataFrame
-        logger.info(
-            f"Extracting audio data from {len(df_extraction_ledger)}"
-            f"rows and {len(df_extraction_ledger.columns)} columns"
-        )
-
         extraction_series = df_extraction_ledger.apply(_extract_from_audio_partial, axis=1)
-
-        # Remove the files after extraction
-        # df_extraction_ledger.apply(remove_files, axis=1)
 
         # Explode the results if the extraction returns lists.
         extraction_series = extraction_series.explode().dropna()

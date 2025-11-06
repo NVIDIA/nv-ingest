@@ -449,7 +449,6 @@ class Ingestor:
         # Add jobs locally first
         if self._job_specs is None:
             raise RuntimeError("Job specs missing.")
-
         self._job_ids = self._client.add_job(self._job_specs)
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
