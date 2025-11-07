@@ -284,7 +284,7 @@ nemoretriever-table-structure-v1:
 ## @param nim-vlm-image-captioning.fullnameOverride [default: "nim-vlm-image-captioning"] Override the full name of the deployment
 ## @param nim-vlm-image-captioning.customCommand [default: []] Custom command to run in the container
 ## @param nim-vlm-image-captioning.customArgs [default: []] Custom arguments to pass to the container command
-## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"] The container image repository
+## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl"] The container image repository
 ## @param nim-vlm-image-captioning.image.tag [default: "latest"] The container image tag
 ## @param nim-vlm-image-captioning.podSecurityContext [default: {}] Pod security context configuration
 ## @param nim-vlm-image-captioning.replicaCount [default: 1] Number of replicas to deploy
@@ -302,7 +302,7 @@ nim-vlm-image-captioning:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+    repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
     tag: "1"
   podSecurityContext:
     runAsUser: 1000
@@ -1009,7 +1009,7 @@ prometheus:
 ## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for embedding service
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://integrate.api.nvidia.com/v1/chat/completions"] Endpoint for VLM caption service
-## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"] Model name for VLM caption service
+## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/nemotron-nano-12b-v2-vl"] Model name for VLM caption service
 ## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
@@ -1060,7 +1060,7 @@ envVars:
   # sets this value to "nim-vlm-image-captioning:8001" to use the locally deployed NIM if the nim-vlm-image-captioning.deployed
   # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
-  VLM_CAPTION_MODEL_NAME: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+  VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
 
   AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
