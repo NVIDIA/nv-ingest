@@ -174,7 +174,7 @@ else:
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             original_input_path = input_path
-            if audio_only:
+            if audio_only and Path(input_path).suffix in [".mp4", ".mov", ".avi", ".mkv"]:
                 input_path = self.get_audio_from_video(input_path, output_dir / f"{input_path.stem}.mp3")
                 files_to_remove.append(input_path)
             path_file = Path(input_path)
@@ -228,7 +228,7 @@ else:
                         video_audio_files.append(audio_path)
                     else:
                         logging.error(f"Failed to extract audio from {file}")
-                return list(zip(files, video_audio_files))
+                return files + video_audio_files
             for to_remove in files_to_remove:
                 to_remove = Path(to_remove)
                 if to_remove.is_file():
@@ -271,28 +271,15 @@ else:
 
     def load_data(queue: queue.Queue, paths: list[str], thread_stop: threading.Event):
         file = None
+        logger.info(f"Loading data for {len(paths)} files")
         try:
             for file in paths:
                 if thread_stop.is_set():
                     return
-                if isinstance(file, tuple):
-                    video_file, audio_file = file
-                    if thread_stop.is_set():
-                        return
-                    with open(video_file, "rb") as f:
-                        video = f.read()
-                    if thread_stop.is_set():
-                        return
-                    with open(audio_file, "rb") as f:
-                        audio = f.read()
-                    queue.put((video, audio))
-                else:
-                    if thread_stop.is_set():
-                        return
-                    with open(file, "rb") as f:
-                        queue.put(f.read())
+                with open(file, "rb") as f:
+                    queue.put(f.read())
         except Exception as e:
-            logging.error(f"Error processing file {file}: {e}")
+            logging.error(f"Error processing file {file} type: {type(file)} {e}")
             queue.put(RuntimeError(f"Error processing file {file}: {e}"))
         finally:
             queue.put(StopIteration)
@@ -379,7 +366,7 @@ else:
                 target=load_data,
                 args=(
                     self.queue,
-                    self.files_completed,
+                    [file for file, _ in self.files_completed],
                     self.thread_stop,
                 ),
                 daemon=True,
@@ -391,9 +378,16 @@ else:
             return len(self.files_completed)
 
         def __getitem__(self, index):
+            file_path = self.files_completed[index]
+            if isinstance(file_path, tuple):
+                file_path = file_path[0]
+            results = None
             try:
-                with open(self.files_completed[index], "rb") as f:
-                    return f.read()
+                if isinstance(file_path, tuple):
+                    file_path = file_path[0]
+                with open(file_path, "rb") as f:
+                    results = f.read()
+                return results
             except Exception as e:
                 logging.error(f"Error getting item {index}: {e}")
                 raise e

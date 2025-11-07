@@ -58,13 +58,18 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         logger.error("Row does not contain 'metadata'.")
         raise ValueError("Row does not contain 'metadata'.")
 
-    base64_file_path = metadata.pop("content")
-    if not base64_file_path:
-        return [row.to_list()]
-    base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
-    if not base64_file_path:
-        return [row.to_list()]
-    base64_audio = read_file_as_base64(base64_file_path)
+    base64_audio = metadata.pop("content")
+    try:
+        base64_file_path = base64_audio
+        if not base64_file_path:
+            return [row.to_list()]
+        base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
+        if not base64_file_path:
+            return [row.to_list()]
+        if Path(base64_file_path).exists():
+            base64_audio = read_file_as_base64(base64_file_path)
+    except (UnicodeDecodeError, base64.binascii.Error):
+        pass
     content_metadata = metadata.get("content_metadata", {})
 
     # Only extract transcript if content type is audio
