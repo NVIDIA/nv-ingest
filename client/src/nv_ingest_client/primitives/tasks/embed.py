@@ -38,6 +38,7 @@ class EmbedTask(Task):
         audio_elements_modality: Optional[str] = None,
         custom_content_field: Optional[str] = None,
         result_target_field: Optional[str] = None,
+        dimensions: Optional[int] = None,
     ) -> None:
         """
         Initialize the EmbedTask configuration.
@@ -80,6 +81,7 @@ class EmbedTask(Task):
             audio_elements_modality=audio_elements_modality,
             custom_content_field=custom_content_field,
             result_target_field=result_target_field,
+            dimensions=dimensions,
         )
 
         self._endpoint_url = validated_data.endpoint_url
@@ -92,6 +94,7 @@ class EmbedTask(Task):
         self._audio_elements_modality = validated_data.audio_elements_modality
         self._custom_content_field = validated_data.custom_content_field
         self._result_target_field = validated_data.result_target_field
+        self._dimensions = validated_data.dimensions
 
     def __str__(self) -> str:
         """
@@ -124,6 +127,8 @@ class EmbedTask(Task):
             info += f"  custom_content_field: {self._custom_content_field}\n"
         if self._result_target_field:
             info += f"  result_target_field: {self.result_target_field}\n"
+        if self._dimensions:
+            info += f"  dimensions: {self._dimensions}\n"
         return info
 
     def to_dict(self) -> Dict[str, Any]:
@@ -163,6 +168,9 @@ class EmbedTask(Task):
             task_properties["custom_content_field"] = self._custom_content_field
 
         if self._result_target_field:
-            task_properties["result_target_field"] = self.result_target_field
+            task_properties["result_target_field"] = self._result_target_field
+
+        if self._dimensions:
+            task_properties["dimensions"] = self._dimensions
 
         return {"type": "embed", "task_properties": task_properties}
