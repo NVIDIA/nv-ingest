@@ -66,8 +66,13 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         raise ValueError("Row does not contain 'metadata'.")
 
     base64_file_path = metadata.pop("content")
+    if not base64_file_path:
+        return [row.to_list()]
+    logger.error(f"Base64 file path: {base64_file_path}")
     base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
-
+    if not base64_file_path:
+        return [row.to_list()]
+    logger.error(f"Base64 file path decoded: {base64_file_path}")
     base64_audio = read_file_as_base64(base64_file_path)
     content_metadata = metadata.get("content_metadata", {})
 
@@ -183,10 +188,11 @@ def extract_text_from_audio_internal(
             f"Extracting audio data from {len(df_extraction_ledger)}"
             f"rows and {len(df_extraction_ledger.columns)} columns"
         )
+
         extraction_series = df_extraction_ledger.apply(_extract_from_audio_partial, axis=1)
 
         # Remove the files after extraction
-        df_extraction_ledger.apply(remove_files, axis=1)
+        # df_extraction_ledger.apply(remove_files, axis=1)
 
         # Explode the results if the extraction returns lists.
         extraction_series = extraction_series.explode().dropna()
