@@ -1,5 +1,5 @@
 # Custom Summarization Pipeline Configuration
-# This is an example pipeline configuration that includes the summarization_udf_parallel_stage
+# This is an example pipeline configuration that includes the udf_parallel_helper stage
 # for high-concurrency LLM summarization workflows.
 #
 # Usage:
@@ -16,7 +16,7 @@
 #       - NGC_API_KEY=your-nvidia-api-key
 
 name: "Custom Summarization Pipeline"
-description: "Pipeline with dedicated summarization_udf_parallel_stage for LLM summarization"
+description: "Pipeline with dedicated udf_parallel_helper stage for LLM summarization"
 
 stages:
   # Source
@@ -374,10 +374,10 @@ stages:
 
   # High-concurrency UDF execution stage for summarization
   # CUSTOMIZE THIS: Adjust replica counts based on your throughput requirements
-  - name: "summarization_udf_parallel_stage"
+  - name: "udf_parallel_helper"
     type: "stage"
     phase: 5  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.meta.summarization_udf_parallel_stage:UDFParallelStage"
+    actor: "nv_ingest.framework.orchestration.ray.stages.meta.udf_parallel_helper:UDFParallelStage"
     config: {}
     replicas:
       min_replicas: 8        # Minimum workers for LLM calls
@@ -503,9 +503,9 @@ edges:
     to: "embedding_storage"
     queue_size: 32
   - from: "embedding_storage"
-    to: "summarization_udf_parallel_stage"
+    to: "udf_parallel_helper"
     queue_size: 32
-  - from: "summarization_udf_parallel_stage"
+  - from: "udf_parallel_helper"
     to: "broker_response"
     queue_size: 32
 

@@ -181,7 +181,7 @@ docker-compose up -d --build nv-ingest-ms-runtime
 
 **What's provided as an example:**
 - Sample pipeline YAML: `config/custom_summarization_pipeline.yaml`
-- Includes `summarization_udf_parallel_stage` with 8 parallel workers
+- Includes `udf_parallel_helper` stage with 8 parallel workers
 - Demonstrates how to add custom stages to a pipeline
 - Fully customizable for your specific use case
 
