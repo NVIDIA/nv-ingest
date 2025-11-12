@@ -289,7 +289,7 @@ services:
       - RAY_worker_num_grpc_internal_threads=1
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
-      # - INGEST_DYNAMIC_MEMORY_KP=0.2r
+      # - INGEST_DYNAMIC_MEMORY_KP=0.2
       # - INGEST_DYNAMIC_MEMORY_KI=0.01
       # - INGEST_DYNAMIC_MEMORY_EMA_ALPHA=0.1
       # - INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH=0
