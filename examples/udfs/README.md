@@ -147,6 +147,27 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 **Purpose**: Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline payload,
 run custom code (summarization), and inject results into the metadata for downstream usecases (such as retrieval).
 
+### High-Concurrency Setup (Recommended)
+
+For production workloads, use the dedicated summarization pipeline with a high-concurrency UDF stage (8 replicas):
+
+**Enable in `docker-compose.yaml`:**
+```yaml
+nv-ingest-ms-runtime:
+  environment:
+    - USE_SUMMARIZATION_PIPELINE=true
+    - NGC_API_KEY=your-nvidia-api-key
+```
+
+**Configuration:**
+- **Model**: `nvidia/nemotron-mini-4b-instruct` (default)
+- **Stage**: `summarization_udf_parallel_stage` (8 replicas)
+- **Pipeline**: `src/nv_ingest/pipeline/summarization_udf_pipeline_impl.py`
+- **Stage Implementation**: `src/nv_ingest/framework/orchestration/ray/stages/meta/summarization_udf_parallel_stage.py`
+- **UDF**: `api/src/udfs/llm_summarizer_udf.py`
+
+This setup provides higher throughput for batch document processing compared to the standard UDF approach below.
+
 ### Setup & Configuration
 
 Before running the nv-ingest pipeline with the LLM Content Summarizer, set the following environment variables in your shell:
