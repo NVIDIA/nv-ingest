@@ -16,7 +16,6 @@ from typing import Optional
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 from nv_ingest.pipeline.default_libmode_pipeline_impl import DEFAULT_LIBMODE_PIPELINE_YAML
 from nv_ingest.pipeline.default_pipeline_impl import DEFAULT_PIPELINE_YAML
-from nv_ingest.pipeline.summarization_udf_pipeline_impl import SUMMARIZATION_UDF_PIPELINE_YAML
 from nv_ingest.framework.orchestration.execution.options import PipelineRuntimeOverrides
 from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
 
@@ -131,42 +130,6 @@ def load_default_libmode_config() -> PipelineConfigSchema:
     return PipelineConfigSchema(**processed_config)
 
 
-def load_summarization_udf_pipeline_config() -> PipelineConfigSchema:
-    """
-    Load and validate the summarization UDF pipeline configuration.
-
-    This function loads the embedded summarization UDF pipeline YAML,
-    performs environment variable substitution, and returns a validated
-    configuration object.
-
-    Returns
-    -------
-    PipelineConfigSchema
-        Validated summarization UDF pipeline configuration.
-
-    Raises
-    ------
-    ValueError
-        If the YAML cannot be parsed or validated.
-    """
-    logger.info("Loading summarization UDF pipeline configuration")
-
-    # Substitute environment variables in the YAML content
-    substituted_content = substitute_env_vars_in_yaml_content(SUMMARIZATION_UDF_PIPELINE_YAML)
-
-    # Parse the substituted content with PyYAML
-    try:
-        processed_config = yaml.safe_load(substituted_content)
-    except yaml.YAMLError as e:
-        error_message = (
-            f"Failed to parse summarization UDF pipeline YAML after environment variable substitution. " f"Error: {e}"
-        )
-        raise ValueError(error_message) from e
-
-    # Create and return validated PipelineConfigSchema
-    return PipelineConfigSchema(**processed_config)
-
-
 def apply_runtime_overrides(config: PipelineConfigSchema, overrides: PipelineRuntimeOverrides) -> PipelineConfigSchema:
     """
     Apply runtime parameter overrides to a pipeline configuration.
@@ -236,9 +199,8 @@ def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], lib
 
     This function implements the configuration resolution logic:
     - If config provided: use it
-    - If USE_SUMMARIZATION_PIPELINE=true: load summarization pipeline
     - If libmode=True and no config: load default libmode config
-    - If libmode=False and no config: load default pipeline config
+    - If libmode=False and no config: raise error
 
     Parameters
     ----------
@@ -257,15 +219,6 @@ def resolve_pipeline_config(provided_config: Optional[PipelineConfigSchema], lib
     ValueError
         If no config provided and libmode=False.
     """
-    # Check for USE_SUMMARIZATION_PIPELINE environment variable FIRST
-    # This takes precedence over provided config
-    import os
-    use_summarization = os.getenv("USE_SUMMARIZATION_PIPELINE", "false").lower() in ("true", "1", "yes")
-    
-    if use_summarization:
-        logger.info("Loading summarization pipeline with dedicated UDF stage")
-        return load_summarization_udf_pipeline_config()
-    
     if provided_config is not None:
         return provided_config
 
