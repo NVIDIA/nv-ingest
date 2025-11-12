@@ -7,7 +7,7 @@ Loads test configuration from test_configs.yaml with support for:
 - Environment variable overrides
 - CLI argument overrides
 
-Precedence: CLI args > Env vars > YAML active config
+Precedence: CLI args > Env vars > Dataset-specific config (path + extraction + recall_dataset) > YAML active config
 """
 
 import os
@@ -119,11 +119,33 @@ class TestConfig:
         return errors
 
 
+def _get_dataset_config(yaml_data: dict, dataset_name: str) -> dict:
+    """
+    Get complete dataset configuration including path and extraction settings.
+
+    Args:
+        yaml_data: Parsed YAML data
+        dataset_name: Dataset shortcut name
+
+    Returns:
+        Dictionary with dataset path and extraction config, or empty dict if not found
+    """
+    datasets = yaml_data.get("datasets", {})
+    dataset_config = datasets.get(dataset_name, {})
+
+    # Handle backward compatibility: if datasets is a simple dict (name -> path)
+    # convert to new format
+    if isinstance(dataset_config, str):
+        return {"path": dataset_config}
+
+    return dataset_config
+
+
 def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = None, **cli_overrides) -> TestConfig:
     """
     Load test configuration from YAML with overrides.
 
-    Precedence: CLI args > Env vars > YAML active config (+ recall section if recall case)
+    Precedence: CLI args > Env vars > Dataset-specific config > YAML active config
 
     Args:
         config_file: Path to YAML config file (relative to this script)
@@ -161,12 +183,23 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
             # Merge recall section (recall section overrides active section for conflicts)
             config_dict.update(recall_section)
 
-    # Handle dataset shortcuts
+    # Handle dataset shortcuts and apply dataset-specific extraction configs
     if "dataset" in cli_overrides:
-        dataset = cli_overrides.pop("dataset")
-        if dataset is not None:  # Only override if actually provided
-            datasets = yaml_data.get("datasets", {})
-            config_dict["dataset_dir"] = datasets.get(dataset, dataset)
+        dataset_name = cli_overrides.pop("dataset")
+        if dataset_name is not None:  # Only override if actually provided
+            dataset_config = _get_dataset_config(yaml_data, dataset_name)
+
+            if dataset_config and "path" in dataset_config:
+                # Configured dataset: extract path and apply extraction settings
+                config_dict["dataset_dir"] = dataset_config["path"]
+
+                # Apply dataset-specific configs (extraction settings + recall_dataset, excluding path)
+                dataset_specific_config = {k: v for k, v in dataset_config.items() if k != "path"}
+                if dataset_specific_config:
+                    config_dict.update(dataset_specific_config)
+            else:
+                # Not a configured dataset, treat dataset_name as direct path
+                config_dict["dataset_dir"] = dataset_name
 
     # Apply environment variable overrides
     env_overrides = _load_env_overrides()

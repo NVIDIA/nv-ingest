@@ -8,7 +8,7 @@ active:
   test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v2  # v1 or v2
+  api_version: v1  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -27,8 +27,8 @@ active:
   extract_text: true
   extract_tables: true
   extract_charts: true
-  extract_images: true
-  extract_infographics: false
+  extract_images: false
+  extract_infographics: true
   text_depth: page
   table_output_format: markdown
 
@@ -37,10 +37,10 @@ active:
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
   split_chunk_overlap: 150  # Overlap for text splitting
-  enable_image_storage: true  # Enable server-side image storage (MinIO/local disk)
+  enable_image_storage: false  # Enable server-side image storage (MinIO/local disk)
 
   # Storage configuration
-  spill_dir: /raid/jioffe/tmp/spill
+  spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (scripts/tests/artifacts)
   collection_name: null  # null = auto-generated
 
@@ -55,3 +55,53 @@ recall:
   # Recall evaluation settings
   recall_top_k: 10
   ground_truth_dir: null
+
+# Pre-configured datasets
+# Each dataset includes path, extraction settings, and recall evaluator
+# Use: python run.py --case=e2e --dataset=bo767
+datasets:
+  bo767:
+    path: /path/to/bo767
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: bo767  # Evaluator for recall testing
+
+  earnings:
+    path: /path/to/earnings_consulting
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: earnings  # Evaluator for recall testing
+
+  bo20:
+    path: /path/to/bo20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: true
+    extract_infographics: false
+    recall_dataset: null  # bo20 does not have recall
+
+  financebench:
+    path: /path/to/financebench_full
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: true
+    extract_infographics: true
+    recall_dataset: finance_bench  # Evaluator for recall testing
+
+  # Single file example
+  single:
+    path: data/multimodal_test.pdf
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: true
+    extract_infographics: true
+    recall_dataset: null  # No recall evaluator for single file
