@@ -147,27 +147,58 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 **Purpose**: Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline payload,
 run custom code (summarization), and inject results into the metadata for downstream usecases (such as retrieval).
 
-### High-Concurrency Setup (Recommended)
+### Custom Pipeline Configuration (Optional)
 
-For production workloads, use the dedicated summarization pipeline with a high-concurrency UDF stage (8 replicas):
+For advanced use cases, you can load a custom pipeline configuration from a YAML file. This is **not enabled by default** but can be configured for any custom pipeline implementation.
 
-The deafult value of USE_SUMMARIZATION_PIPELINE is currently set to false in the docker compose file.
-**Enable in `docker-compose.yaml`:**
+**Example: High-Concurrency Summarization Pipeline**
+
+An example configuration (`config/custom_summarization_pipeline.yaml`) demonstrates a pipeline with a dedicated high-concurrency UDF stage (8 parallel workers) for LLM summarization.
+
+**To enable custom pipeline loading:**
+
+1. **Uncomment the volume mount** in `docker-compose.yaml`:
 ```yaml
 nv-ingest-ms-runtime:
-  environment:
-    - USE_SUMMARIZATION_PIPELINE=true 
-    - NGC_API_KEY=your-nvidia-api-key
+  volumes:
+    - ${DATASET_ROOT:-./data}:/workspace/data
+    - ./config:/workspace/config  # Uncomment this line
 ```
 
-**Configuration:**
-- **Model**: `nvidia/nemotron-mini-4b-instruct` (default)
-- **Stage**: `summarization_udf_parallel_stage` (8 replicas)
-- **Pipeline**: `src/nv_ingest/pipeline/summarization_udf_pipeline_impl.py`
-- **Stage Implementation**: `src/nv_ingest/framework/orchestration/ray/stages/meta/summarization_udf_parallel_stage.py`
-- **UDF**: `api/src/udfs/llm_summarizer_udf.py`
+2. **Uncomment and set INGEST_CONFIG_PATH** in `docker-compose.yaml`:
+```yaml
+  environment:
+    # Uncomment and specify your custom pipeline YAML file
+    - INGEST_CONFIG_PATH=/workspace/config/custom_summarization_pipeline.yaml
+```
 
-This setup provides higher throughput for batch document processing compared to the standard UDF approach below.
+3. **Rebuild and restart the nv-ingest-ms-runtime container:**
+```bash
+docker-compose up -d --build nv-ingest-ms-runtime
+```
+
+> **Important**: `INGEST_CONFIG_PATH` must point to a **YAML configuration file** inside the container (after volume mount). The file path is relative to the container's filesystem, not the host.
+
+**What's provided as an example:**
+- Sample pipeline YAML: `config/custom_summarization_pipeline.yaml`
+- Includes `summarization_udf_parallel_stage` with 8 parallel workers
+- Demonstrates how to add custom stages to a pipeline
+- Fully customizable for your specific use case
+
+**To create your own custom pipeline:**
+1. Copy the example: `cp config/custom_summarization_pipeline.yaml config/my_pipeline.yaml`
+2. Edit `config/my_pipeline.yaml` to add/modify stages for your needs
+3. Update `INGEST_CONFIG_PATH` in docker-compose: `/workspace/config/my_pipeline.yaml`
+4. Rebuild and restart: `docker-compose up -d --build nv-ingest-ms-runtime`
+
+**Pipeline customization options:**
+- Add custom stages (extractors, transformers, storage, etc.)
+- Adjust worker counts (`static_replicas: value`) per stage
+- Modify queue sizes between stages
+- Configure memory thresholds and scaling strategies
+- Change service endpoints and model configurations
+
+This approach is useful for production deployments requiring specific pipeline configurations beyond the default setup.
 
 ### Setup & Configuration
 
