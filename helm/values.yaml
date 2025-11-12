@@ -990,6 +990,11 @@ prometheus:
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
+## @param envVars.MINIO_ACCESS_KEY [default: "minioadmin"] MinIO access key for authentication
+## @param envVars.MINIO_SECRET_KEY [default: "minioadmin"] MinIO secret key for authentication
+## @param envVars.IMAGE_STORAGE_ENABLE_MINIO [default: true] Enable MinIO image storage
+## @param envVars.IMAGE_STORAGE_ENABLE_LOCAL_DISK [default: false] Enable local disk image storage via fsspec (supports file://, s3://, gs://, abfs://)
+## @param envVars.IMAGE_STORAGE_LOCAL_OUTPUT_PATH [default: "/workspace/data/artifacts/store/images"] Path for local disk image storage when enabled
 ## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
 ## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
 ## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
@@ -1031,6 +1036,16 @@ envVars:
   MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+
+  # Image Storage Configuration
+  # Set IMAGE_STORAGE_ENABLE_LOCAL_DISK to true to save images to local disk
+  # Images saved via existing volume mounts (no additional volumes needed)
+  # Supports fsspec backends: file://, s3://, gs://, abfs:// in LOCAL_OUTPUT_PATH
+  IMAGE_STORAGE_ENABLE_MINIO: true
+  IMAGE_STORAGE_ENABLE_LOCAL_DISK: false
+  IMAGE_STORAGE_LOCAL_OUTPUT_PATH: "/workspace/data/artifacts/store/images"
 
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer

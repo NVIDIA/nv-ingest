@@ -304,6 +304,8 @@ services:
       - MESSAGE_CLIENT_PORT=6379
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       # build.nvidia.com hosted nemoretriever-parse
       # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
       - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
@@ -340,6 +342,13 @@ services:
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
+      # Image Storage Configuration
+      # Set IMAGE_STORAGE_ENABLE_LOCAL_DISK=true to save images to local disk
+      # Images saved to ${DATASET_ROOT}/artifacts/store/images (defaults to ./data/artifacts/store/images)
+      # Supports fsspec backends: file://, s3://, gs://, abfs:// in LOCAL_OUTPUT_PATH
+      - IMAGE_STORAGE_ENABLE_MINIO=true
+      - IMAGE_STORAGE_ENABLE_LOCAL_DISK=false
+      - IMAGE_STORAGE_LOCAL_OUTPUT_PATH=/workspace/data/artifacts/store/images
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
@@ -399,7 +408,7 @@ services:
     volumes:
       - ./config/prometheus.yaml:/etc/prometheus/prometheus-config.yaml
     ports:
-      - "9090:9090"
+      - "9099:9090"
 
   grafana:
     container_name: grafana-service

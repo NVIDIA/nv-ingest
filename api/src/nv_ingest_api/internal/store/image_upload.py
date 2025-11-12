@@ -5,12 +5,12 @@
 import base64
 import logging
 import os
+import posixpath
 from io import BytesIO
-from typing import Any, List, Optional
-from typing import Dict
-from urllib.parse import quote
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from fsspec.core import url_to_fs
 from minio import Minio
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
@@ -58,6 +58,9 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
     params : Dict[str, Any]
         A flat dictionary of configuration parameters for the upload. Expected keys include:
             - "content_types": Dict mapping document types to booleans.
+            - "enable_minio": Boolean that toggles MinIO uploads (default True).
+            - "enable_local_disk": Boolean that toggles fsspec-backed disk persistence (default False).
+            - "local_output_path": Root directory or URL where files should be written when local disk is enabled.
             - "endpoint": URL for the MinIO service (optional; defaults to _DEFAULT_ENDPOINT).
             - "bucket_name": Bucket name for storing objects (optional; defaults to _DEFAULT_BUCKET_NAME).
             - "access_key": Access key for MinIO.
@@ -84,21 +87,42 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
     if not isinstance(content_types, dict):
         raise ValueError("Invalid configuration: 'content_types' must be provided as a dictionary in params")
 
-    endpoint: str = params.get("endpoint", _DEFAULT_ENDPOINT)
-    bucket_name: str = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
+    enable_minio: bool = params.get("enable_minio", True)
+    enable_local_disk: bool = params.get("enable_local_disk", False)
+    local_output_path: Optional[str] = params.get("local_output_path")
 
-    # Initialize MinIO client
-    client = Minio(
-        endpoint,
-        access_key=params.get("access_key"),
-        secret_key=params.get("secret_key"),
-        session_token=params.get("session_token"),
-        secure=params.get("secure", False),
-        region=params.get("region"),
-    )
+    if not enable_minio and not enable_local_disk:
+        raise ValueError("At least one storage backend must be enabled.")
 
-    # Ensure the bucket exists
-    _ensure_bucket_exists(client, bucket_name)
+    if enable_local_disk and not local_output_path:
+        raise ValueError("`local_output_path` must be provided when enable_local_disk=True.")
+
+    bucket_name: Optional[str] = None
+    client: Optional[Minio] = None
+    if enable_minio:
+        endpoint: str = params.get("endpoint", _DEFAULT_ENDPOINT)
+        bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
+
+        # Initialize MinIO client
+        # Credentials are injected by ImageStorageStage from environment
+        client = Minio(
+            endpoint,
+            access_key=params.get("access_key"),
+            secret_key=params.get("secret_key"),
+            session_token=params.get("session_token"),
+            secure=params.get("secure", False),
+            region=params.get("region"),
+        )
+
+        # Ensure the bucket exists
+        _ensure_bucket_exists(client, bucket_name)
+
+    fs = None
+    fs_base_path: Optional[str] = None
+    normalized_local_base: Optional[str] = None
+    if enable_local_disk:
+        fs, fs_base_path = url_to_fs(local_output_path)
+        normalized_local_base = local_output_path.rstrip("/")
 
     # Process each row and attempt to upload images
     for idx, row in df.iterrows():
@@ -134,35 +158,78 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
             image_type = "png"
             if doc_type == ContentTypeEnum.IMAGE:
                 image_metadata = metadata.get("image_metadata", {})
-                image_type = image_metadata.get("image_type", "png")
+                raw_image_type = image_metadata.get("image_type", "png")
+                # Handle both enum and string values
+                if hasattr(raw_image_type, "value"):
+                    # It's an enum, get the string value
+                    image_type = raw_image_type.value.lower()
+                else:
+                    image_type = str(raw_image_type).lower()
+            elif doc_type == ContentTypeEnum.STRUCTURED:
+                # Structured content (tables/charts) may also have image_type
+                table_metadata = metadata.get("table_metadata", {})
+                raw_image_type = table_metadata.get("image_type", "png")
+                # Handle both enum and string values
+                if hasattr(raw_image_type, "value"):
+                    image_type = raw_image_type.value.lower()
+                else:
+                    image_type = str(raw_image_type).lower()
 
             # Construct destination file path
-            encoded_source_id = quote(source_id, safe="")
-            encoded_image_type = quote(image_type, safe="")
-            destination_file = f"{encoded_source_id}/{idx}.{encoded_image_type}"
+            # Extract just the filename from source_id for cleaner organization
+            clean_source_name = os.path.basename(source_id).replace("/", "_")
 
-            # Upload the object to MinIO
-            source_file = BytesIO(content)
-            client.put_object(
-                bucket_name,
-                destination_file,
-                source_file,
-                length=len(content),
-            )
+            # For MinIO: Use clean paths with forward slashes (S3 object keys support / as delimiter)
+            minio_destination_file = f"{clean_source_name}/{idx}.{image_type}"
 
-            # Construct the public URL
-            public_url = f"{_DEFAULT_READ_ADDRESS}/{bucket_name}/{destination_file}"
-            source_metadata["source_location"] = public_url
+            # For local disk: Use the same clean filesystem paths
+            local_destination_file = f"{clean_source_name}/{idx}.{image_type}"
+
+            public_url: Optional[str] = None
+            if enable_minio and client is not None and bucket_name is not None:
+                # Upload the object to MinIO using URL-encoded path
+                source_file = BytesIO(content)
+                client.put_object(
+                    bucket_name,
+                    minio_destination_file,
+                    source_file,
+                    length=len(content),
+                )
+
+                # Construct the public URL
+                public_url = f"{_DEFAULT_READ_ADDRESS}/{bucket_name}/{minio_destination_file}"
+                source_metadata["source_location"] = public_url
+
+            local_uri: Optional[str] = None
+            if enable_local_disk and fs is not None and fs_base_path is not None and normalized_local_base is not None:
+                # Use clean path for local filesystem
+                disk_target_path = posixpath.join(fs_base_path.rstrip("/"), local_destination_file)
+                fs.makedirs(posixpath.dirname(disk_target_path), exist_ok=True)
+                with fs.open(disk_target_path, "wb") as local_file:
+                    local_file.write(content)
+
+                local_uri = f"{normalized_local_base}/{local_destination_file}"
+                source_metadata["local_source_location"] = local_uri
+
+                # When MinIO is disabled, fall back to local path for source_location.
+                if not enable_minio:
+                    source_metadata["source_location"] = local_uri
 
             if doc_type == ContentTypeEnum.IMAGE:
-                logger.debug("Storing image data to Minio for row %s", idx)
+                logger.debug("Persisting image data for row %s", idx)
                 image_metadata = metadata.get("image_metadata", {})
-                image_metadata["uploaded_image_url"] = public_url
+                if public_url is not None:
+                    image_metadata["uploaded_image_url"] = public_url
+                if local_uri is not None:
+                    image_metadata["uploaded_image_local_path"] = local_uri
                 metadata["image_metadata"] = image_metadata
             elif doc_type == ContentTypeEnum.STRUCTURED:
-                logger.debug("Storing structured image data to Minio for row %s", idx)
+                logger.debug("Persisting structured image data for row %s", idx)
                 table_metadata = metadata.get("table_metadata", {})
-                table_metadata["uploaded_image_url"] = public_url
+                if public_url is not None:
+                    table_metadata["uploaded_image_url"] = public_url
+                if local_uri is not None:
+                    table_metadata["uploaded_image_local_path"] = local_uri
                 metadata["table_metadata"] = table_metadata
 
             df.at[idx, "metadata"] = metadata
@@ -196,6 +263,8 @@ def store_images_to_minio_internal(
     task_config : Dict[str, Any]
         A flat dictionary containing configuration parameters for image storage. Expected to include the key
         "content_types" (a dict mapping document types to booleans) along with connection and credential details.
+        Optional keys such as "enable_minio", "enable_local_disk", and "local_output_path" control which backends
+        are used for persistence.
     storage_config : Dict[str, Any]
         A dictionary reserved for additional storage configuration (currently unused).
     execution_trace_log : Optional[List[Any]], optional

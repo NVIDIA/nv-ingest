@@ -55,6 +55,7 @@ class TestConfig:
     enable_split: bool = False
     split_chunk_size: int = 1024
     split_chunk_overlap: int = 150
+    enable_image_storage: bool = False  # Server-side image storage (MinIO/local disk)
 
     # Storage configuration
     spill_dir: str = "/tmp/spill"
@@ -232,6 +233,7 @@ def _load_env_overrides() -> dict:
         "ENABLE_SPLIT": ("enable_split", parse_bool),
         "SPLIT_CHUNK_SIZE": ("split_chunk_size", parse_int),
         "SPLIT_CHUNK_OVERLAP": ("split_chunk_overlap", parse_int),
+        "ENABLE_IMAGE_STORAGE": ("enable_image_storage", parse_bool),
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),

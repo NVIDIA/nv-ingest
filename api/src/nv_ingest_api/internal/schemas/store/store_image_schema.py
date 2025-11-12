@@ -17,8 +17,9 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -26,5 +27,18 @@ logger = logging.getLogger(__name__)
 class ImageStorageModuleSchema(BaseModel):
     structured: bool = True
     images: bool = True
+    enable_minio: bool = True
+    enable_local_disk: bool = False
+    local_output_path: Optional[str] = None
     raise_on_failure: bool = False
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_storage_targets(cls, values: "ImageStorageModuleSchema") -> "ImageStorageModuleSchema":
+        if not values.enable_minio and not values.enable_local_disk:
+            raise ValueError("At least one storage backend must be enabled.")
+
+        if values.enable_local_disk and not values.local_output_path:
+            raise ValueError("`local_output_path` is required when `enable_local_disk` is True.")
+
+        return values

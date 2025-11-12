@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Dict, Any, Optional
 
 import pandas as pd
@@ -69,8 +70,16 @@ class ImageStorageStage(RayActorStage):
         task_config = remove_task_by_type(control_message, "store")
         # logger.debug("ImageStorageStage: Task configuration extracted: %s", pprint.pformat(task_config))
 
-        store_structured: bool = task_config.get("structured", True)
-        store_unstructured: bool = task_config.get("images", False)
+        stage_defaults = {
+            "structured": self.validated_config.structured,
+            "images": self.validated_config.images,
+            "enable_minio": self.validated_config.enable_minio,
+            "enable_local_disk": self.validated_config.enable_local_disk,
+            "local_output_path": self.validated_config.local_output_path,
+        }
+
+        store_structured: bool = task_config.get("structured", stage_defaults["structured"])
+        store_unstructured: bool = task_config.get("images", stage_defaults["images"])
 
         content_types: Dict[Any, Any] = {}
         if store_structured:
@@ -79,7 +88,24 @@ class ImageStorageStage(RayActorStage):
         if store_unstructured:
             content_types[ContentTypeEnum.IMAGE] = store_unstructured
 
-        params: Dict[str, Any] = task_config.get("params", {})
+        params: Dict[str, Any] = {
+            "enable_minio": stage_defaults["enable_minio"],
+            "enable_local_disk": stage_defaults["enable_local_disk"],
+            "local_output_path": stage_defaults["local_output_path"],
+            **task_config.get("params", {}),
+        }
+        for key in ("enable_minio", "enable_local_disk", "local_output_path"):
+            if key in task_config and task_config[key] is not None:
+                params[key] = task_config[key]
+
+        # Inject MinIO credentials from environment if not provided in task params
+        # This allows stage to work without explicit credentials in every .store() call
+        if params.get("enable_minio", True):
+            if "access_key" not in params:
+                params["access_key"] = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+            if "secret_key" not in params:
+                params["secret_key"] = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+
         params["content_types"] = content_types
 
         logger.debug(f"Processing storage task with parameters: {params}")
