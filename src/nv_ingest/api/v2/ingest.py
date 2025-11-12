@@ -945,28 +945,15 @@ async def submit_job_v2(
                             "page_count": chunk.get("page_count"),
                         }
                     )
-                parent_metadata = {"total_pages": page_count}
-
-                if submission_items:
-                    burst_size, pause_ms, jitter_ms = _get_submit_burst_params()
-                    await _submit_subjobs_in_bursts(
-                        submission_items,
-                        ingest_service,
-                        burst_size=burst_size,
-                        pause_ms=pause_ms,
-                        jitter_ms=jitter_ms,
-                    )
-
-                parent_metadata: Dict[str, Any] = {
+                parent_metadata.update({
                     "total_pages": page_count,
                     "pages_per_chunk": pages_per_chunk,
                     "original_source_id": original_source_id,
                     "original_source_name": original_source_name,
                     "document_type": document_types[0] if document_types else "pdf",
                     "subjob_order": subjob_ids,
-                }
+                })
         elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav"]:
-            # print("IN AUDIO/VIDEO BLOCK")
             document_type = document_types[0]
             upload_path = f"./{Path(original_source_id).name}"
             # dump the payload to a file, just came from client
@@ -1035,7 +1022,7 @@ async def submit_job_v2(
                     "subjob_order": subjob_ids,
                 }
             )
-
+            raise ValueError(f"Setting parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
             await ingest_service.set_parent_job_mapping(
                 parent_job_id,
                 subjob_ids,
