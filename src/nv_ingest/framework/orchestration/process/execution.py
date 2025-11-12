@@ -289,30 +289,50 @@ def launch_pipeline(
             root_logger.removeHandler(handler)
         logger.info("Cleared existing root logger handlers to prevent Ray logging duplicates")
 
-        ray.init(
-            namespace="nv_ingest_ray",
-            ignore_reinit_error=True,
-            dashboard_host="0.0.0.0",
-            dashboard_port=8265,
-            logging_config=logging_config,  # Ray will add its own StreamHandler
-            _system_config={
-                "local_fs_capacity_threshold": 0.9,
-                "object_spilling_config": json.dumps(
-                    {
-                        "type": "filesystem",
-                        "params": {
-                            "directory_path": [
-                                "/tmp/ray_spill_testing_0",
-                                "/tmp/ray_spill_testing_1",
-                                "/tmp/ray_spill_testing_2",
-                                "/tmp/ray_spill_testing_3",
-                            ],
-                            "buffer_size": 100_000_000,
+        # Determine whether to connect to a remote Ray head or start a local one
+        use_remote = str_to_bool(os.environ.get("NV_INGEST_USE_REMOTE_RAY", "0"))
+        namespace = os.environ.get("NV_INGEST_RAY_NAMESPACE", "nv_ingest_ray")
+
+        if use_remote:
+            # Prefer explicit NV_INGEST_RAY_ADDRESS, then fall back to RAY_ADDRESS, then cluster default
+            address = os.environ.get(
+                "NV_INGEST_RAY_ADDRESS",
+                os.environ.get("RAY_ADDRESS", "ray://ray-head:10001"),
+            )
+            logger.info(f"Initializing Ray in remote mode: address={address}, namespace={namespace}")
+            # NOTE: In Ray client mode (ray://), kwargs are JSON-serialized. LoggingConfig is not JSON-serializable.
+            # Do NOT pass logging_config here; logging should be configured on the server side.
+            ray.init(
+                address=address,
+                namespace=namespace,
+                ignore_reinit_error=True,
+            )
+        else:
+            logger.info(f"Initializing Ray in local mode: namespace={namespace}")
+            ray.init(
+                namespace=namespace,
+                ignore_reinit_error=True,
+                dashboard_host="0.0.0.0",
+                dashboard_port=8265,
+                logging_config=logging_config,  # Ray will add its own StreamHandler
+                _system_config={
+                    "local_fs_capacity_threshold": 0.9,
+                    "object_spilling_config": json.dumps(
+                        {
+                            "type": "filesystem",
+                            "params": {
+                                "directory_path": [
+                                    "/tmp/ray_spill_testing_0",
+                                    "/tmp/ray_spill_testing_1",
+                                    "/tmp/ray_spill_testing_2",
+                                    "/tmp/ray_spill_testing_3",
+                                ],
+                                "buffer_size": 100_000_000,
+                            },
                         },
-                    },
-                ),
-            },
-        )
+                    ),
+                },
+            )
 
     # Handle disable_dynamic_scaling parameter override
     if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:

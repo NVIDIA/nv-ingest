@@ -34,7 +34,7 @@ requirements:
     - isodate>=0.7.2
     - langdetect>=1.0.9
     - openai>=1.82.0
-    - protobuf=5.28.3
+    - protobuf>=5.28.5
     - pydantic>=2.0.0
     - pypdfium2>=4.30.0
     - pytest>=8.0.2
