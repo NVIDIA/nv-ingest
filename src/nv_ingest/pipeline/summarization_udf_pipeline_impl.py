@@ -1,243 +1,533 @@
-#!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# noqa
+# flake8: noqa
+# pylint: disable=line-too-long
+
 """
-LLM Content Summarizer UDF for NV-Ingest Pipeline
+Summarization UDF pipeline implementation.
 
-This UDF uses an LLM to generate concise summaries of text content chunks. These summaries are added to the metadata
-for enhanced downstream processing and search capabilities.
-
-These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
-- NVIDIA_API_KEY: API key for NVIDIA NIM endpoints (required)
-- LLM_SUMMARIZATION_MODEL: Model to use (default: nvidia/nemotron-mini-4b-instruct)
-- LLM_SUMMARIZATION_BASE_URL: base URL (default: https://integrate.api.nvidia.com/v1)
-- LLM_SUMMARIZATION_TIMEOUT: API timeout in seconds (default: 60)
-- LLM_MIN_CONTENT_LENGTH: Minimum content length to summarize (default: 50)
-- LLM_MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
-TODO: Implement this
-- NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
-More info can be found in `examples/udfs/README.md`
+This module embeds a custom pipeline configuration with the summarization_udf_parallel_stage
+for LLM-based document summarization workflows.
 """
 
-import logging
-import os
-import time
+SUMMARIZATION_UDF_PIPELINE_YAML = """# Summarization UDF Pipeline Configuration
+# This pipeline includes a dedicated high-concurrency stage for LLM summarization UDFs
 
-logger = logging.getLogger(__name__)
+name: "NVIngest Summarization UDF Pipeline"
+description: "Pipeline with dedicated summarization_udf_parallel_stage for LLM summarization"
+stages:
+  # Source
+  - name: "source_stage"
+    type: "source"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    config:
+      broker_client:
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
+        host: $MESSAGE_CLIENT_HOST|"redis"
+        port: $MESSAGE_CLIENT_PORT|6379
+      task_queue: "ingest_task_queue"
+      poll_interval: 0.1
+    replicas:
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
 
-PROMPT = """
-Based on the contents from the first and last page of a document below, provide a single sentence summary that captures the main purpose and key topics. Do not add special characters for formatting.
+  # Pre-processing
+  - name: "metadata_injector"
+    type: "stage"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
+    config: {}
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+    runs_after:
+      - "source_stage"
 
-[CONTENT]
-{content}
-[END CONTENT]
+  # Primitive Extraction
+  - name: "pdf_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    config:
+      pdfium_config:
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+      nemoretriever_parse_config:
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+        nemoretriever_parse_endpoints: [
+          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions",
+        ]
+        nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
+        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 10000 # Heuristic max consumption
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 10000
+        limit: 16
+
+  - name: "audio_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor:AudioExtractorStage"
+    config:
+      audio_extraction_config:
+        audio_endpoints: [
+          $AUDIO_GRPC_ENDPOINT|"audio:50051",
+          $AUDIO_HTTP_ENDPOINT|"",
+        ]
+        function_id: $AUDIO_FUNCTION_ID|""
+        audio_infer_protocol: $AUDIO_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 2
+
+  - name: "docx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor:DocxExtractorStage"
+    config:
+      docx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "pptx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
+    config:
+      pptx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "image_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor:ImageExtractorStage"
+    config:
+      image_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "html_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
+    config: {}
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "infographic_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
+    config:
+      endpoint_config:
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "table_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor:TableExtractorStage"
+    config:
+      endpoint_config:
+        yolox_endpoints: [
+          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"table-structure:8001",
+          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|"http://table-structure:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|grpc
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 10000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 10000
+        limit: 6
+
+  - name: "chart_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor:ChartExtractorStage"
+    config:
+      endpoint_config:
+        yolox_endpoints: [
+          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"graphic-elements:8001",
+          $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|""
+        ]
+        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|grpc
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|""
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "memory_thresholding"
+        memory_per_replica_mb: 10000
+      static_replicas:
+        strategy: "memory_static_global_percent"
+        memory_per_replica_mb: 10000
+        limit: 6
+
+  # Post-processing / Mutators
+  - name: "image_filter"
+    type: "stage"
+    phase: 3  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "image_dedup"
+    type: "stage"
+    phase: 3  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "text_splitter"
+    type: "stage"
+    phase: 4  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
+    config:
+      chunk_size: 512
+      chunk_overlap: 20
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 3
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  # Transforms and Synthesis
+  - name: "image_caption"
+    type: "stage"
+    phase: 4  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
+    config:
+      api_key: $NGC_API_KEY|$NVIDIA_API_KEY
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      prompt: "Caption the content of this image:"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "text_embedder"
+    type: "stage"
+    phase: 4  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
+    config:
+      api_key: $NGC_API_KEY|$NVIDIA_API_KEY
+      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 4
+      static_replicas:
+        strategy: "static"
+        value: 3
+
+  # Storage and Output
+  - name: "image_storage"
+    type: "stage"
+    phase: 5  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  - name: "embedding_storage"
+    type: "stage"
+    phase: 5  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  # High-concurrency UDF execution stage for summarization
+  - name: "summarization_udf_parallel_stage"
+    type: "stage"
+    phase: 5  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.meta.summarization_udf_parallel_stage:UDFParallelStage"
+    config: {}
+    replicas:
+      min_replicas: 8
+      max_replicas:
+        strategy: "static"
+        value: 10
+      static_replicas:
+        strategy: "static"
+        value: 8
+
+  - name: "broker_response"
+    type: "stage"
+    phase: 5  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
+    config:
+      broker_client:
+        client_type: $MESSAGE_CLIENT_TYPE|"redis"
+        host: $MESSAGE_CLIENT_HOST|localhost
+        port: $MESSAGE_CLIENT_PORT|6379
+      poll_interval: 0.1
+    replicas:
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 2
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+  # Telemetry and Drain
+  - name: "otel_tracer"
+    type: "stage"
+    phase: 6  # TELEMETRY
+    actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
+    config:
+      otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+    runs_after:
+      - "broker_response"
+
+  - name: "default_drain"
+    type: "sink"
+    phase: 7  # DRAIN
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
+    config: {}
+    replicas:
+      min_replicas: 1
+      max_replicas:
+        strategy: "static"
+        value: 1
+      static_replicas:
+        strategy: "static"
+        value: 1
+
+edges:
+  # Intake
+  - from: "source_stage"
+    to: "metadata_injector"
+    queue_size: 32
+
+  # Document Extractors
+  - from: "metadata_injector"
+    to: "pdf_extractor"
+    queue_size: 32
+  - from: "pdf_extractor"
+    to: "audio_extractor"
+    queue_size: 32
+  - from: "audio_extractor"
+    to: "docx_extractor"
+    queue_size: 32
+  - from: "docx_extractor"
+    to: "pptx_extractor"
+    queue_size: 32
+  - from: "pptx_extractor"
+    to: "image_extractor"
+    queue_size: 32
+  - from: "image_extractor"
+    to: "html_extractor"
+    queue_size: 32
+  - from: "html_extractor"
+    to: "infographic_extractor"
+    queue_size: 32
+
+  # Primitive Extractors
+  - from: "infographic_extractor"
+    to: "table_extractor"
+    queue_size: 32
+  - from: "table_extractor"
+    to: "chart_extractor"
+    queue_size: 32
+  - from: "chart_extractor"
+    to: "image_filter"
+    queue_size: 32
+
+  # Primitive Mutators
+  - from: "image_filter"
+    to: "image_dedup"
+    queue_size: 32
+  - from: "image_dedup"
+    to: "text_splitter"
+    queue_size: 32
+
+  # Primitive Transforms
+  - from: "text_splitter"
+    to: "image_caption"
+    queue_size: 32
+  - from: "image_caption"
+    to: "text_embedder"
+    queue_size: 32
+  - from: "text_embedder"
+    to: "image_storage"
+    queue_size: 32
+
+  # Primitive Storage
+  - from: "image_storage"
+    to: "embedding_storage"
+    queue_size: 32
+  - from: "embedding_storage"
+    to: "summarization_udf_parallel_stage"
+    queue_size: 32
+  - from: "summarization_udf_parallel_stage"
+    to: "broker_response"
+    queue_size: 32
+
+  # Response and Telemetry
+  - from: "broker_response"
+    to: "otel_tracer"
+    queue_size: 32
+  - from: "otel_tracer"
+    to: "default_drain"
+    queue_size: 32
+
+# Pipeline Runtime Configuration
+pipeline:
+  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
+  dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
+  static_memory_threshold: $INGEST_STATIC_MEMORY_THRESHOLD|0.75
+  pid_controller:
+    kp: $INGEST_DYNAMIC_MEMORY_KP|0.2
+    ki: $INGEST_DYNAMIC_MEMORY_KI|0.01
+    ema_alpha: $INGEST_DYNAMIC_MEMORY_EMA_ALPHA|0.1
+    target_queue_depth: $INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH|0
+    penalty_factor: $INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR|0.1
+    error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
+    rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
+  launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|false
 """
-
-
-def content_summarizer(control_message: "IngestControlMessage") -> "IngestControlMessage":  # noqa: F821
-    """
-    UDF function that adds LLM-generated summaries to text content chunks.
-
-    This function processes text primitives and generates concise summaries using
-    an LLM API, storing the results in the metadata's custom_content field.
-
-    Parameters
-    ----------
-    control_message : IngestControlMessage
-        The control message containing the DataFrame payload with text content
-
-    Returns
-    -------
-    IngestControlMessage
-        The modified control message with LLM summaries added to metadata
-    """
-    udf_start_time = time.time()
-    
-    # Load configuration 
-    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NGC_API_KEY") # Using NGC_API_KEY if NVIDIA_API_KEY is not set
-    model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/nemotron-mini-4b-instruct")
-    base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
-    max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
-    timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", 60))
-
-    stats = {
-        "processed": 0,
-        "summarized": 0,
-        "skipped": 0,
-        "failed": 0,
-        "tokens": 0,
-    }
-
-    logger.info(f"Configuration: model={model_name}, base_url={base_url}")
-    logger.info(f"Configuration: timeout={timeout}s, min_content={min_content_length}, max_content={max_content_length}")
-
-    if not api_key:
-        logger.error("NVIDIA_API_KEY not set - skipping LLM summarization")
-        return control_message
-
-    df = control_message.payload()
-    if df is None or df.empty:
-        logger.warning("Empty payload - skipping LLM summarization")
-        return control_message
-
-    # Extract document name
-    doc_name = _extract_document_name(df)
-    logger.info(f"LLM summarization starting: {doc_name} ({len(df)} chunks, model={model_name})")
-    
-    # Save original dataframe to preserve all chunks
-    original_df = df.copy()
-    
-    extraction_start = time.time()
-    if len(df) > 1:
-        # Select first and last chunk for summarization
-        # TODO: add feature to select N first and last chunks
-        # According to docs/docs/extraction/user_defined_functions.md#understanding-the-dataframe-payload
-        # the rows are not necessarily pages. they are chunks of data extracted from the document. in order to select
-        # pages, it must require parsing the payload to see which chunks correspond to which pages and then selecting
-        # from there
-        logger.info(f"Selecting first and last chunks (out of {len(df)} total) for summarization")
-        selected_df = df.iloc[[0, -1]]
-    else:
-        logger.info("Document has only one chunk")
-        selected_df = df
-
-    # Combine all content into a single string
-    logger.info("Extracting and combining content from selected chunks...")
-    content = " ".join(
-        selected_df.apply(
-            _extract_content,
-            axis=1,
-            min_content_length=min_content_length,
-            max_content_length=max_content_length,
-            stats=stats,
-        )
-    )
-    stats["tokens"] = _estimate_tokens(content)
-    extraction_time = time.time() - extraction_start
-    logger.info(f"Content extraction completed: {len(content)} characters, ~{stats['tokens']} tokens (took {extraction_time:.2f}s)")
-
-    logger.info(f"Calling LLM API ({model_name}) for summarization...")
-    summary, llm_duration = _generate_llm_summary(content, model_name, base_url, api_key, timeout)
-
-    if summary:
-        tokens_per_sec = stats['tokens'] / llm_duration if llm_duration > 0 else 0
-        logger.info(f"✓ LLM API call completed: duration={llm_duration:.2f}s, tokens={stats['tokens']}, throughput={tokens_per_sec:.1f} tokens/s")
-        logger.info(f"Generated summary ({len(summary)} chars): {summary[:100]}..." if len(summary) > 100 else f"Generated summary: {summary}")
-    else:
-        logger.error(f"✗ LLM API call failed (took {llm_duration:.2f}s)")
-    
-    # Store summary in chunk 0 of the original dataframe (preserves all chunks)
-    _store_summary(original_df, summary, model_name)
-
-    # Calculate total UDF time
-    udf_total_time = time.time() - udf_start_time
-    
-    # Log summary
-    logger.info("=" * 80)
-    logger.info(f"LLM Summarization Complete - Document: {doc_name}")
-    logger.info(f"  Status: {'SUCCESS' if summary else 'FAILED'}")
-    logger.info(f"  Model: {model_name}")
-    logger.info(f"  Content extraction time: {extraction_time:.2f}s")
-    logger.info(f"  LLM API call time: {llm_duration:.2f}s")
-    logger.info(f"  Total UDF time: {udf_total_time:.2f}s")
-    logger.info(f"  Chunks preserved: {len(original_df)} (all chunks kept)")
-    if summary and llm_duration > 0:
-        logger.info(f"  Throughput: {stats['tokens']/llm_duration:.1f} tokens/s")
-    logger.info("=" * 80)
-
-    # Update the control message with modified DataFrame (all chunks preserved)
-    control_message.payload(original_df)
-    return control_message
-
-
-def _extract_content(row, min_content_length: int, max_content_length: int, stats: dict) -> str:
-    """Extract text content from row"""
-    metadata = row.get("metadata")
-    content = ""
-
-    if isinstance(metadata, dict):
-        content = metadata.get("content")
-        if content is not None:
-            content = content.strip()
-            if len(content) < min_content_length:
-                stats["skipped"] += 1
-                return ""
-            elif len(content) > max_content_length:
-                logger.debug(f"Truncating content to {max_content_length} characters")
-                content = content[:max_content_length]
-        else:
-            stats["skipped"] += 1
-
-    return content
-
-
-def _generate_llm_summary(
-    content: str,
-    model_name: str,
-    base_url: str,
-    api_key: str,
-    timeout: int,
-) -> tuple[str | None, float]:
-    """
-    Generate summary using LLM API.
-    
-    Returns
-    -------
-    tuple[str | None, float]
-        Summary text (or None if failed) and duration in seconds
-    """
-    start_time = time.time()
-    
-    try:
-        from openai import OpenAI
-
-        client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
-        
-        completion = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": PROMPT.format(content=content)}],
-            max_tokens=400,
-            temperature=0.7,
-        )
-        
-        duration = time.time() - start_time
-        
-        if completion.choices:
-            summary = completion.choices[0].message.content.strip()
-            return summary, duration
-        
-        logger.warning("LLM returned no completion choices")
-        return None, duration
-
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(f"LLM API call failed ({duration:.2f}s): {type(e).__name__}: {str(e)[:200]}")
-        return None, duration
-
-
-def _extract_document_name(df) -> str:
-    """Extract source document name from dataframe metadata"""
-    try:
-        if len(df) > 0 and "metadata" in df.iloc[0]:
-            metadata = df.iloc[0].get("metadata", {})
-            if isinstance(metadata, dict):
-                source_metadata = metadata.get("source_metadata", {})
-                if isinstance(source_metadata, dict):
-                    return source_metadata.get("source_name", "Unknown")
-    except Exception as e:
-        logger.debug(f"Could not extract document name: {e}")
-    return "Unknown"
-
-
-def _store_summary(df, summary: str, model_name: str):
-    """Add summary to metadata and store in df"""
-    row_0 = df.iloc[0]
-    metadata = row_0.get("metadata")
-
-    if metadata.get("custom_content") is None:
-        metadata["custom_content"] = {}
-    metadata["custom_content"]["llm_summarizer_udf"] = {"summary": summary, "model": model_name}
-
-
-def _estimate_tokens(text: str) -> int:
-    """Rough estimate (~4 characters per token)"""
-    return len(text) // 4

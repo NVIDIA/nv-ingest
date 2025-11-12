@@ -275,7 +275,7 @@ services:
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
-      - USE_SUMMARIZATION_PIPELINE=true
+      - USE_SUMMARIZATION_PIPELINE=false
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
@@ -289,7 +289,7 @@ services:
       - RAY_worker_num_grpc_internal_threads=1
       # Dynamic Memory Scaling Configuration
       # - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
-      # - INGEST_DYNAMIC_MEMORY_KP=0.2
+      # - INGEST_DYNAMIC_MEMORY_KP=0.2r
       # - INGEST_DYNAMIC_MEMORY_KI=0.01
       # - INGEST_DYNAMIC_MEMORY_EMA_ALPHA=0.1
       # - INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH=0

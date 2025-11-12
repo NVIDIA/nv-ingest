@@ -151,11 +151,12 @@ run custom code (summarization), and inject results into the metadata for downst
 
 For production workloads, use the dedicated summarization pipeline with a high-concurrency UDF stage (8 replicas):
 
+The deafult value of USE_SUMMARIZATION_PIPELINE is currently set to false in the docker compose file.
 **Enable in `docker-compose.yaml`:**
 ```yaml
 nv-ingest-ms-runtime:
   environment:
-    - USE_SUMMARIZATION_PIPELINE=true
+    - USE_SUMMARIZATION_PIPELINE=true 
     - NGC_API_KEY=your-nvidia-api-key
 ```
 
