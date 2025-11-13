@@ -881,6 +881,7 @@ async def submit_job_v2(
             pdf_page_count_cache = page_count  # Cache for later use
             qos_tier = get_qos_tier_for_page_count(page_count)
             pages_per_chunk = get_pdf_split_page_count(client_override=client_split_page_count)
+            document_type = DocumentTypeEnum.PDF
 
             # Split if the document has more pages than our chunk size
             if page_count > pages_per_chunk:
@@ -896,7 +897,6 @@ async def submit_job_v2(
                 subjob_ids: List[str] = []
                 subjob_descriptors: List[Dict[str, Any]] = []
                 submission_items: List[Tuple[str, MessageWrapper]] = []
-
                 try:
                     parent_uuid = uuid.UUID(parent_job_id)
                 except ValueError:
@@ -940,19 +940,21 @@ async def submit_job_v2(
                         {
                             "job_id": subjob_id,
                             "chunk_index": len(subjob_descriptors) + 1,
-                            "start_page": chunk.get("start"),
-                            "end_page": chunk.get("end"),
+                            "start_page": chunk.get("start_page"),
+                            "end_page": chunk.get("end_page"),
                             "page_count": chunk.get("page_count"),
                         }
                     )
-                parent_metadata.update({
-                    "total_pages": page_count,
-                    "pages_per_chunk": pages_per_chunk,
-                    "original_source_id": original_source_id,
-                    "original_source_name": original_source_name,
-                    "document_type": document_types[0] if document_types else "pdf",
-                    "subjob_order": subjob_ids,
-                })
+                parent_metadata.update(
+                    {
+                        "total_pages": page_count,
+                        "pages_per_chunk": pages_per_chunk,
+                        "original_source_id": original_source_id,
+                        "original_source_name": original_source_name,
+                        "document_type": document_types[0] if document_types else "pdf",
+                        "subjob_order": subjob_ids,
+                    }
+                )
         elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav"]:
             document_type = document_types[0]
             upload_path = f"./{Path(original_source_id).name}"
@@ -1022,7 +1024,7 @@ async def submit_job_v2(
                     "subjob_order": subjob_ids,
                 }
             )
-            raise ValueError(f"Setting parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
+            # raise ValueError(f"Setting parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
             await ingest_service.set_parent_job_mapping(
                 parent_job_id,
                 subjob_ids,
