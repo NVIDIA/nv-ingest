@@ -694,6 +694,7 @@ class Ingestor:
         submitted_futures = set(future_to_job_id.keys())
         completed_futures = set()
         future_results = []
+        vdb_future = None
 
         def _done_callback(future):
             job_id = future_to_job_id[future]
@@ -715,9 +716,10 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future.result())
+            executor = ThreadPoolExecutor(max_workers=1)
+            vdb_future = executor.submit(self._vdb_bulk_upload.run_async, combined_future)
 
-        return combined_future
+        return combined_future if not vdb_future else vdb_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):
@@ -834,6 +836,7 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
+        table_output_format = kwargs.pop("table_output_format", "markdown")
 
         # Defaulting to False since enabling infographic extraction reduces throughput.
         # Users have to set to True if infographic extraction is required.
@@ -856,6 +859,7 @@ class Ingestor:
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
                 extract_page_as_image=extract_page_as_image,
+                table_output_format=table_output_format,
                 **kwargs,
             )
 
