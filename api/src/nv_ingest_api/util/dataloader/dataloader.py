@@ -216,7 +216,9 @@ else:
                 logging.debug(capture_output)
                 logging.debug(f"{original_input_path} -  {capture_error}")
             except ffmpeg.Error as e:
-                logging.error(f"FFmpeg error for file {original_input_path}: {e.stderr.decode()} {capture_output} {capture_error}")
+                logging.error(
+                    f"FFmpeg error for file {original_input_path}: {e.stderr.decode()} {capture_output} {capture_error}"
+                )
                 return []
             files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
             if video_audio_separate and suffix in [".mp4", ".mov", ".avi", ".mkv"]:
