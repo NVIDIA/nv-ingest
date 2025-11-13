@@ -2058,3 +2058,24 @@ class Milvus(VDB):
                 self.write_to_index(records, collection_name=coll_name, **sub_write_params)
         else:
             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records
+
+    def run_async(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            logger.info(f"creating index - {collection_name}")
+            self.create_index(collection_name=collection_name, **create_params)
+            records = records.result()
+            logger.info(f"writing to index, for collection - {collection_name}")
+            self.write_to_index(records, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                sub_write_params.pop("collection_name", None)
+                self.create_index(collection_name=coll_name, **create_params)
+                self.write_to_index(records, collection_name=coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records
