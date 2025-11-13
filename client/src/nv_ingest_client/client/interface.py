@@ -834,6 +834,7 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
+        table_output_format = kwargs.pop("table_output_format", "markdown")
 
         # Defaulting to False since enabling infographic extraction reduces throughput.
         # Users have to set to True if infographic extraction is required.
@@ -856,6 +857,7 @@ class Ingestor:
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
                 extract_page_as_image=extract_page_as_image,
+                table_output_format=table_output_format,
                 **kwargs,
             )
 
