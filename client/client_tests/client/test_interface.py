@@ -10,6 +10,7 @@ import logging
 import os
 import tempfile
 from concurrent.futures import Future
+from io import BytesIO
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -130,6 +131,12 @@ def text_documents():
 
 
 @pytest.fixture
+def buffers(documents, text_documents):
+    all_documents = documents + text_documents
+    return [(doc, BytesIO(open(doc, "rb").read())) for doc in all_documents]
+
+
+@pytest.fixture
 def ingestor(mock_client, documents):
     return Ingestor(documents, client=mock_client)
 
@@ -238,6 +245,18 @@ def test_extract_task_text_filetypes(text_documents):
             extract_images=False,
             extract_infographics=False,
             document_type=doc.split(".")[1],
+        )
+
+
+def test_extract_task_buffers(buffers):
+    for buffer in buffers:
+        Ingestor(client=mock_client).buffers([buffer]).extract(
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_images=False,
+            extract_infographics=False,
+            document_type=buffer[0].split(".")[1],
         )
 
 
