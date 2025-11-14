@@ -34,6 +34,12 @@ EXTRACTOR_LOOKUP = {
     "pdfium": pdfium_extractor,
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
+    "ocr": pdfium_extractor,
+}
+
+METHOD_TO_CONFIG_KEY_MAP = {
+    "pdfium_hybrid": "pdfium_config",
+    "ocr": "pdfium_config",
 }
 
 
@@ -121,7 +127,7 @@ def _orchestrate_row_extraction(
     params["extract_method"] = extract_method
 
     # Construct the config key based on the extraction method
-    config_key = f"{extract_method}_config"
+    config_key = METHOD_TO_CONFIG_KEY_MAP.get(extract_method, f"{extract_method}_config")
 
     # Handle both object and dictionary cases for extractor_config
     if hasattr(extractor_config, config_key):

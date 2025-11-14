@@ -504,6 +504,7 @@ class TaskTypeEnum(str, Enum):
     EXTRACT: str = "extract"
     FILTER: str = "filter"
     INFOGRAPHIC_DATA_EXTRACT: str = "infographic_data_extract"
+    OCR_DATA_EXTRACT: str = "ocr_data_extract"
     SPLIT: str = "split"
     STORE_EMBEDDING: str = "store_embedding"
     STORE: str = "store"
