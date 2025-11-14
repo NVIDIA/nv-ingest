@@ -902,7 +902,7 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     client.flush(collection_name)
     index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
-    for index_name in index_names:
+    for index_name in set(index_names):
         indexed_rows = 0
         expected_rows = client.describe_index(collection_name, index_name)["indexed_rows"] + num_elements
         while indexed_rows < expected_rows:
