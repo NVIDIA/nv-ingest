@@ -904,27 +904,27 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     indexed_rows = 0
     for index_name in index_names:
         indexed_rows = 0
-        already_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
-        while indexed_rows < num_elements:
+        expected_rows = client.describe_index(collection_name, index_name)["indexed_rows"] + num_elements
+        while indexed_rows < expected_rows:
             pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
             for i in range(20):
-                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                current_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
                 logger.info(
-                    f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
+                    f"Indexed rows, {collection_name}, {index_name} -  {current_indexed_rows} / {expected_rows}"
                 )
-                if new_indexed_rows == already_indexed_rows + num_elements:
-                    indexed_rows = new_indexed_rows
+                if current_indexed_rows == expected_rows:
+                    indexed_rows = current_indexed_rows
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
-                if new_indexed_rows == indexed_rows:
+                if current_indexed_rows == indexed_rows:
                     pos_movement -= 1
                 else:
                     pos_movement = 10
                 # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
                 if pos_movement == 0:
-                    raise ValueError("Rows are not getting indexed as expected")
-                indexed_rows = new_indexed_rows
+                    raise ValueError(f"Rows are not getting indexed as expected for: {index_name} - {collection_name}")
+                indexed_rows = current_indexed_rows
     return indexed_rows
 
 
