@@ -8,7 +8,7 @@ active:
   test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v1 # v1 or v2
+  api_version: v1  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -37,6 +37,7 @@ active:
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
   split_chunk_overlap: 150  # Overlap for text splitting
+  enable_image_storage: false  # Enable server-side image storage (MinIO/local disk)
 
   # Storage configuration
   spill_dir: /tmp/spill

@@ -4,6 +4,7 @@
 
 import base64
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 import pandas as pd
@@ -39,6 +40,8 @@ def dummy_task_config():
         "access_key": "key",
         "secret_key": "secret",
         "endpoint": "mock_endpoint",
+        "enable_minio": True,
+        "enable_local_disk": False,
     }
 
 
@@ -113,12 +116,40 @@ def test_upload_images_to_minio_happy_path(mock_minio, mock_ensure_bucket_exists
     )
     assert updated_metadata["source_metadata"]["source_location"] == expected_url_prefix
     assert updated_metadata["image_metadata"]["uploaded_image_url"] == expected_url_prefix
+    assert "local_source_location" not in updated_metadata["source_metadata"]
+    assert "uploaded_image_local_path" not in updated_metadata["image_metadata"]
 
 
 def test_upload_images_to_minio_raises_on_invalid_content_types(dummy_df):
     with pytest.raises(ValueError) as excinfo:
         module_under_test._upload_images_to_minio(dummy_df, {})
     assert "Invalid configuration: 'content_types'" in str(excinfo.value)
+
+
+def test_upload_images_to_minio_requires_backend(dummy_df):
+    with pytest.raises(ValueError) as excinfo:
+        module_under_test._upload_images_to_minio(
+            dummy_df,
+            {
+                "content_types": {module_under_test.ContentTypeEnum.IMAGE: True},
+                "enable_minio": False,
+                "enable_local_disk": False,
+            },
+        )
+    assert "At least one storage backend must be enabled" in str(excinfo.value)
+
+
+def test_upload_images_to_minio_requires_local_path(dummy_df):
+    with pytest.raises(ValueError) as excinfo:
+        module_under_test._upload_images_to_minio(
+            dummy_df,
+            {
+                "content_types": {module_under_test.ContentTypeEnum.IMAGE: True},
+                "enable_minio": False,
+                "enable_local_disk": True,
+            },
+        )
+    assert "`local_output_path` must be provided when enable_local_disk=True" in str(excinfo.value)
 
 
 @patch(f"{MODULE_UNDER_TEST}._ensure_bucket_exists")
@@ -137,6 +168,68 @@ def test_upload_images_to_minio_skips_invalid_rows(mock_minio, mock_ensure_bucke
 
     # Ensure no put_object was called
     mock_client.put_object.assert_not_called()
+
+
+def test_upload_images_to_disk_only(tmp_path, dummy_df):
+    config = {
+        "content_types": {module_under_test.ContentTypeEnum.IMAGE: True},
+        "enable_minio": False,
+        "enable_local_disk": True,
+        "local_output_path": str(tmp_path),
+    }
+
+    result = module_under_test._upload_images_to_minio(dummy_df.copy(), config)
+
+    encoded_source_id = quote("abc123", safe="")
+    expected_file = tmp_path / encoded_source_id / "0.png"
+
+    assert expected_file.exists()
+    assert expected_file.read_bytes() == b"dummy_image_content"
+
+    updated_metadata = result.iloc[0]["metadata"]
+    source_location = Path(updated_metadata["source_metadata"]["source_location"])
+    local_source_location = Path(updated_metadata["source_metadata"]["local_source_location"])
+    image_local_path = Path(updated_metadata["image_metadata"]["uploaded_image_local_path"])
+
+    assert source_location == expected_file
+    assert local_source_location == expected_file
+    assert image_local_path == expected_file
+
+
+@patch(f"{MODULE_UNDER_TEST}._ensure_bucket_exists")
+@patch(f"{MODULE_UNDER_TEST}.Minio")
+def test_upload_images_to_minio_and_disk(mock_minio, mock_ensure_bucket_exists, tmp_path, dummy_df):
+    mock_client = mock_minio.return_value
+    mock_client.put_object = MagicMock()
+
+    config = {
+        "content_types": {module_under_test.ContentTypeEnum.IMAGE: True},
+        "enable_minio": True,
+        "enable_local_disk": True,
+        "local_output_path": str(tmp_path),
+        "access_key": "key",
+        "secret_key": "secret",
+        "endpoint": "mock_endpoint",
+    }
+
+    result = module_under_test._upload_images_to_minio(dummy_df.copy(), config)
+
+    encoded_source_id = quote("abc123", safe="")
+    expected_file = tmp_path / encoded_source_id / "0.png"
+    expected_url_prefix = (
+        f"{module_under_test._DEFAULT_READ_ADDRESS}/{module_under_test._DEFAULT_BUCKET_NAME}/"
+        f"{encoded_source_id}/0.png"
+    )
+
+    updated_metadata = result.iloc[0]["metadata"]
+
+    assert updated_metadata["source_metadata"]["source_location"] == expected_url_prefix
+    local_source_location = Path(updated_metadata["source_metadata"]["local_source_location"])
+    image_local_path = Path(updated_metadata["image_metadata"]["uploaded_image_local_path"])
+
+    assert local_source_location == expected_file
+    assert updated_metadata["image_metadata"]["uploaded_image_url"] == expected_url_prefix
+    assert image_local_path == expected_file
 
 
 def test_store_images_to_minio_internal_raises_on_missing_content_types(dummy_df_with_matching):
