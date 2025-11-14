@@ -44,6 +44,7 @@ from scipy.sparse import csr_array
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
+DENSE_INDEX_NAME = "dense_index"
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -93,7 +94,7 @@ def create_meta_collection(
     index_params = MilvusClient.prepare_index_params()
     index_params.add_index(
         field_name="vector",
-        index_name="dense_index",
+        index_name=DENSE_INDEX_NAME,
         index_type="FLAT",
         metric_type="L2",
     )
@@ -313,7 +314,7 @@ def create_nvingest_index_params(
     if local_index:
         index_params.add_index(
             field_name="vector",
-            index_name="dense_index",
+            index_name=DENSE_INDEX_NAME,
             index_type="FLAT",
             metric_type="L2",
         )
@@ -321,7 +322,7 @@ def create_nvingest_index_params(
         if gpu_index:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="GPU_CAGRA",
                 metric_type="L2",
                 params={
@@ -335,7 +336,7 @@ def create_nvingest_index_params(
         else:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="HNSW",
                 metric_type="L2",
                 params={"M": 64, "efConstruction": 512},
@@ -493,7 +494,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
     if isinstance(indexes, dict):
         # Old Milvus behavior (< 2.5.6)
         for k, v in indexes.items():
-            if k[1] == "dense_index" and hasattr(v, "_index_type"):
+            if k[1] == DENSE_INDEX_NAME and hasattr(v, "_index_type"):
                 d_idx = v._index_type
             if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
                 s_idx = v._index_type
@@ -504,7 +505,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
             index_name = getattr(idx, "index_name", None)
             index_type = getattr(idx, "index_type", None)
 
-            if index_name == "dense_index":
+            if index_name == DENSE_INDEX_NAME:
                 d_idx = index_type
             if sparse and index_name == "sparse_index":
                 s_idx = index_type
@@ -900,9 +901,10 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
     client.flush(collection_name)
-    index_names = utility.list_indexes(collection_name)
+    # index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
-    for index_name in set(index_names):
+    # observe dense_index, all indexes get populated simultaneously
+    for index_name in [DENSE_INDEX_NAME]:
         indexed_rows = 0
         expected_rows = client.describe_index(collection_name, index_name)["indexed_rows"] + num_elements
         while indexed_rows < expected_rows:
