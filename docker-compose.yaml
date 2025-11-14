@@ -97,8 +97,6 @@ services:
               device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
-    profiles:
-      - table-structure
 
   ocr:
     image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
