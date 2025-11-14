@@ -211,7 +211,7 @@ stages:
         value: 4
       static_replicas:
         strategy: "static"
-        value: 1
+        value: 3
 
   - name: "infographic_extractor"
     type: "stage"
@@ -483,7 +483,7 @@ edges:
     queue_size: 4
   - from: "chart_extractor"
     to: "ocr_extractor"
-    queue_size: 32
+    queue_size: 8
   - from: "ocr_extractor"
     to: "image_filter"
     queue_size: 4
