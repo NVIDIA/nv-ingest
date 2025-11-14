@@ -403,6 +403,7 @@ def pdfium_extractor(
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
 
+    text_extraction_method = extractor_config.get("extract_method", "pdfium")
     extract_images_method = extractor_config.get("extract_images_method", "group")
     extract_images_params = extractor_config.get("extract_images_params", {})
 
@@ -513,7 +514,10 @@ def pdfium_extractor(
 
             # Full page image extraction
             if extract_page_as_image:
-                page_text = _extract_page_text(page)
+                if text_extraction_method == "ocr":
+                    page_text = ""
+                else:
+                    page_text = _extract_page_text(page)
                 image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
                 base64_image = numpy_to_base64(image[0])
                 if len(base64_image) > 2**24 - 1:
