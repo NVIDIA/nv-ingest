@@ -215,6 +215,7 @@ def test_async_runner_happy_path(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -228,6 +229,7 @@ def test_async_runner_happy_path(mock_handler):
         "END",
         False,
         modalities=None,
+        dimensions=None,
     )
     assert result["embeddings"] == [[1, 2, 3], [4, 5, 6]]
     assert result["info_msgs"] == [None, {"msg": "partial success"}]
@@ -252,6 +254,7 @@ def test_async_runner_handles_none_embeddings(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -281,6 +284,7 @@ def test_async_runner_handles_embedding_object(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -308,6 +312,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert: called once per batch
@@ -322,6 +327,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         truncate="END",
         filter_errors=False,
         modalities=None,
+        dimensions=None,
     )
     mock_make_async_request.assert_any_call(
         prompts=["batch2_prompt"],
@@ -333,6 +339,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         truncate="END",
         filter_errors=False,
         modalities=None,
+        dimensions=None,
     )
 
     # And we get both results combined in order
@@ -354,6 +361,7 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -377,6 +385,7 @@ def test_make_async_request_happy_path(mock_openai):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert: client called as expected
@@ -386,6 +395,7 @@ def test_make_async_request_happy_path(mock_openai):
         model="dummy_model",
         encoding_format="float",
         extra_body={"input_type": "passage", "truncate": "END"},
+        dimensions=None,
     )
 
     assert result == {
@@ -411,6 +421,7 @@ def test_make_async_request_failure_returns_none_embedding_and_info_message(mock
             input_type="passage",
             truncate="END",
             filter_errors=True,
+            dimensions=None,
         )
 
     # The raised error should have our validated info message attached in text

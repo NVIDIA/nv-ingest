@@ -24,8 +24,6 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-from utils import default_collection_name
-
 
 def main(config=None, log_path: str = "test_results") -> int:
     """
@@ -49,7 +47,15 @@ def main(config=None, log_path: str = "test_results") -> int:
     spill_dir = config.spill_dir
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = config.collection_name or default_collection_name()
+    # Use consistent collection naming with recall pattern
+    # If collection_name not set, generate from test_name or dataset basename
+    if config.collection_name:
+        collection_name = config.collection_name
+    else:
+        from recall_utils import get_recall_collection_name
+
+        test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+        collection_name = get_recall_collection_name(test_name)
     hostname = config.hostname
     sparse = config.sparse
     gpu_search = config.gpu_search
@@ -124,7 +130,15 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2":
         ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
 
-    ingestor = Ingestor(**ingestor_kwargs).files(data_dir)
+    # Convert directory to recursive glob pattern to handle nested directories
+    if os.path.isdir(data_dir):
+        # Use **/*.pdf to recursively match PDF files in subdirectories
+        file_pattern = os.path.join(data_dir, "**", "*.pdf")
+    else:
+        # Already a file or glob pattern
+        file_pattern = data_dir
+
+    ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
 
     # V2-only: Configure PDF splitting (server-side page splitting)
     if api_version == "v2" and pdf_split_page_count:

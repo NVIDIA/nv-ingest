@@ -11,6 +11,7 @@ from typing import Tuple
 
 import pandas as pd
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
@@ -160,14 +161,13 @@ def _create_ocr_client(
     return ocr_client
 
 
-def _meets_text_criteria(row: pd.Series) -> bool:
+def _meets_text_ocr_criteria(row: pd.Series) -> bool:
     """
     Determines if a DataFrame row meets the criteria for text extraction.
 
     A row qualifies if:
       - It contains a 'metadata' dictionary.
-      - The 'content_metadata' in metadata has type "structured" and subtype "text".
-      - The 'table_metadata' is not None.
+      - The 'content_metadata' in metadata has type "image" and subtype "page_image".
       - The 'content' is not None or an empty string.
 
     Parameters
@@ -180,7 +180,7 @@ def _meets_text_criteria(row: pd.Series) -> bool:
     bool
         True if the row meets all criteria; False otherwise.
     """
-    text_image_subtypes = {"paragraph", "title", "header_footer"}
+    text_image_subtypes = {ContentTypeEnum.PAGE_IMAGE}
 
     metadata = row.get("metadata", {})
     if not metadata:
@@ -188,13 +188,28 @@ def _meets_text_criteria(row: pd.Series) -> bool:
 
     content_md = metadata.get("content_metadata", {})
     if (
-        content_md.get("type") == "text"
+        content_md.get("type") == ContentTypeEnum.IMAGE
         and content_md.get("subtype") in text_image_subtypes
         and metadata.get("content") not in {None, ""}
     ):
         return True
 
     return False
+
+
+def _process_page_images(df_to_process: pd.DataFrame, ocr_results: List[Tuple]):
+    valid_indices = df_to_process.index.tolist()
+
+    for result_idx, df_idx in enumerate(valid_indices):
+        # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
+        bboxes, texts, _ = ocr_results[result_idx]
+        if not bboxes or not texts:
+            df_to_process.loc[df_idx, "metadata"]["image_metadata"]["text"] = ""
+            continue
+
+        df_to_process.loc[df_idx, "metadata"]["image_metadata"]["text"] = " ".join([t for t in texts])
+
+    return df_to_process
 
 
 def extract_text_data_from_image_internal(
@@ -239,7 +254,7 @@ def extract_text_data_from_image_internal(
 
     try:
         # Identify rows that meet the text criteria.
-        mask = df_extraction_ledger.apply(_meets_text_criteria, axis=1)
+        mask = df_extraction_ledger.apply(_meets_text_ocr_criteria, axis=1)
         df_to_process = df_extraction_ledger[mask].copy()
         df_unprocessed = df_extraction_ledger[~mask].copy()
 
@@ -326,6 +341,8 @@ def extract_text_data_from_image_internal(
         for col in {"_y0", "_x0", "_page_number"}:
             if col in df_to_process:
                 df_to_process = df_to_process.drop(col, axis=1)
+
+        df_to_process = _process_page_images(df_to_process, bulk_results)
         df_final = pd.concat([df_unprocessed, df_to_process], ignore_index=True)
 
         return df_final, {"trace_info": execution_trace_log}

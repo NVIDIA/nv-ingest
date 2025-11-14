@@ -40,6 +40,7 @@ def _make_async_request(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> list:
     """
     Interacts directly with the NIM embedding service to calculate embeddings for a batch of prompts.
@@ -96,6 +97,7 @@ def _make_async_request(
             model=embedding_model,
             encoding_format=encoding_format,
             extra_body=extra_body,
+            dimensions=dimensions,
         )
 
         response["embedding"] = resp.data
@@ -124,6 +126,7 @@ def _async_request_handler(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> List[dict]:
     """
     Gathers calculated embedding results from the NIM embedding service concurrently.
@@ -168,6 +171,7 @@ def _async_request_handler(
                 truncate=truncate,
                 filter_errors=filter_errors,
                 modalities=modality_batch,
+                dimensions=dimensions,
             )
             for prompt_batch, modality_batch in zip(prompts, modalities)
         ]
@@ -186,6 +190,7 @@ def _async_runner(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> dict:
     """
     Concurrently launches all NIM embedding requests and flattens the results.
@@ -224,6 +229,7 @@ def _async_runner(
         truncate,
         filter_errors,
         modalities=modalities,
+        dimensions=dimensions,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -562,6 +568,7 @@ def transform_create_text_embeddings_internal(
     endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
     model_name = task_config.get("model_name") or transform_config.embedding_model
     custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
+    dimensions = task_config.get("dimensions") or transform_config.dimensions
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -636,6 +643,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.truncate,
                 False,
                 modalities=modality_batches,
+                dimensions=dimensions,
             )
             # Build a simple row index -> embedding map
             embeddings_dict = dict(
@@ -680,6 +688,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.input_type,
                 transform_config.truncate,
                 False,
+                dimensions=dimensions,
             )
             custom_embeddings_dict = dict(
                 zip(

@@ -152,11 +152,11 @@ if __name__ == "__main__":
     os.environ["OCR_MODEL_NAME"] = "paddle"
     os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
-    os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/nemotron-nano-12b-v2-vl"
     logger.info("Environment variables set.")
 
     image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    model_name = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    model_name = "nvidia/nemotron-nano-12b-v2-vl"
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     (
         yolox_table_structure_grpc,

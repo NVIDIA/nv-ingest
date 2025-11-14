@@ -159,19 +159,19 @@ def test_dataloader_video_audio_separate(temp_dir):
     # Create a WAV file that's 600MB
     input_file = temp_dir / "large_input.mp4"
     create_test_file(input_file, file_size_mb=test_file_size_mb, add_audio=True)
-    actual_size_mb = input_file.stat().st_size
+    actual_size_bytes = input_file.stat().st_size
     # Initialize DataLoader
-    split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
-    num_chunks = math.ceil(actual_size_mb / split_size_mb)
+    split_size_bytes = math.ceil(actual_size_bytes / 3)  # Should result in 3 chunks
+    num_chunks = math.ceil(actual_size_bytes / split_size_bytes)
     loader = DataLoader(
         path=str(input_file),
         output_dir=str(temp_dir),
-        split_interval=split_size_mb,
+        split_interval=split_size_bytes,
         interface=MediaInterface(),
         video_audio_separate=True,
     )
 
-    assert len(loader.files_completed) == num_chunks
+    assert len(loader.files_completed) == num_chunks * 2
 
     for chunk in loader:
         if isinstance(chunk, tuple):
@@ -179,18 +179,20 @@ def test_dataloader_video_audio_separate(temp_dir):
             assert len(chunk[0]) > 0
             assert len(chunk[1]) > 0
 
-    for idx, files in enumerate(loader.files_completed):
-        assert isinstance(files, tuple)
-        assert len(files) == 2
-        assert Path(files[0]).exists()
-        assert Path(files[1]).exists()
-        audio_file = Path(files[1])
-        assert audio_file.stat().st_size > 0
-        assert audio_file.suffix == ".mp3"
-        assert audio_file.stem == f"large_input_chunk_{idx:04d}"
-        assert audio_file.name == f"large_input_chunk_{idx:04d}.mp3"
-        video_file = Path(files[0])
-        assert video_file.stat().st_size > 0
-        assert video_file.suffix == ".mp4"
-        assert video_file.stem == f"large_input_chunk_{idx:04d}"
-        assert video_file.name == f"large_input_chunk_{idx:04d}.mp4"
+    for idx, res in enumerate(loader.files_completed):
+        file = res[0]
+        assert Path(file).exists()
+
+        if idx < 3:
+            video_file = Path(file)
+            assert video_file.stat().st_size > 0
+            assert video_file.suffix == ".mp4"
+            assert video_file.stem == f"large_input_chunk_{idx:04d}"
+            assert video_file.name == f"large_input_chunk_{idx:04d}.mp4"
+
+        else:
+            audio_file = Path(file)
+            assert audio_file.stat().st_size > 0
+            assert audio_file.suffix == ".mp3"
+            assert audio_file.stem == f"large_input_chunk_{idx-3:04d}"
+            assert audio_file.name == f"large_input_chunk_{idx-3:04d}.mp3"
