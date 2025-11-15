@@ -417,3 +417,12 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
             pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
 
     return extracted_images
+
+
+def is_scanned_page(page) -> bool:
+    tp = page.get_textpage()
+    text = tp.get_text_bounded() or ""
+    num_chars = len(text.strip())
+    num_images = sum(1 for obj in page.get_objects() if obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE)
+
+    return num_chars == 0 and num_images > 0

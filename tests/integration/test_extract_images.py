@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import time
+from textwrap import dedent
 
 import pytest
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
@@ -27,7 +28,6 @@ def test_images_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
     multimodal_second_table_markdown,
-    multimodal_first_chart_xaxis,
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
@@ -35,7 +35,7 @@ def test_images_extract_only(
     expected_table_jpeg_full_markdown_variants,
     expected_table_png_full_markdown_variants,
     expected_table_tiff_full_markdown_variants,
-    multimodal_first_chart_xaxis_variants_images,
+    multimodal_first_chart_xaxis_variants,
     image_file,
 ):
     client = NvIngestClient(
@@ -89,6 +89,7 @@ def test_images_extract_only(
     else:
         raise AssertionError(f"Unhandled image format for test: {image_file}")
     # Accept either exact match or sufficiently high similarity to any expected variant
+
     if extracted_table not in expected_variants:
         LEV_THR = 0.98
         TOK_THR = 0.95
@@ -101,11 +102,16 @@ def test_images_extract_only(
                 best = {"lev": lev, "jac": jac, "f1": f1, "variant": expected}
 
         if not (best["lev"] >= LEV_THR or best["jac"] >= TOK_THR or best["f1"] >= TOK_THR):
-            assert False, (
-                f"Table content differs from expected variants. "
-                f"Best similarity scores: lev={best['lev']:.3f}, jaccard={best['jac']:.3f}, token_f1={best['f1']:.3f}"
+            assert False, dedent(
+                f"""Table content differs from expected variants.
+                Actual table content:
+                {extracted_table}
+                Most similar table:
+                {best['variant']}
+                Best similarity scores: lev={best['lev']:.3f}, jaccard={best['jac']:.3f}, token_f1={best['f1']:.3f}"""
             )
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants_images)
+
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants)
     assert multimodal_first_chart_yaxis in chart_contents

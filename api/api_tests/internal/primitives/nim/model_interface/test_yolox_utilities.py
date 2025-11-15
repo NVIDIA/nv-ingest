@@ -8,12 +8,14 @@ import numpy as np
 
 # Import the module under test
 import nv_ingest_api.internal.primitives.nim.model_interface.yolox as model_interface_module
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import global_cache
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     expand_table_bboxes,
     weighted_boxes_fusion,
     expand_chart_bboxes,
     prefilter_boxes,
     find_matching_box_fast,
+    get_yolox_page_version,
 )
 
 
@@ -144,10 +146,10 @@ class TestExpandChartBboxes(unittest.TestCase):
         self.wbf_patcher = patch(f"{MODULE_UNDER_TEST}.weighted_boxes_fusion")
         self.mock_wbf = self.wbf_patcher.start()
 
-        self.match_title_patcher = patch(f"{MODULE_UNDER_TEST}.match_with_title")
+        self.match_title_patcher = patch(f"{MODULE_UNDER_TEST}.match_with_title_v1")
         self.mock_match_title = self.match_title_patcher.start()
 
-        self.expand_boxes_patcher = patch(f"{MODULE_UNDER_TEST}.expand_boxes")
+        self.expand_boxes_patcher = patch(f"{MODULE_UNDER_TEST}.expand_boxes_v1")
         self.mock_expand_boxes = self.expand_boxes_patcher.start()
 
         # Setup return values for mocks
@@ -736,6 +738,78 @@ class TestFindMatchingBoxFast(unittest.TestCase):
 
         # Since IOU is equal to threshold, should not match
         self.assertEqual(index, -1)
+
+
+class TestGetYoloxPageVersion(unittest.TestCase):
+    """
+    Unit tests for the get_yolox_page_version helper function.
+    """
+
+    def setUp(self):
+        global_cache.clear()
+
+        # Patch the get_model_name function where it is looked up
+        self.get_model_name_patcher = patch(f"{MODULE_UNDER_TEST}.get_model_name")
+        self.mock_get_model_name = self.get_model_name_patcher.start()
+
+        self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
+        self.mock_logger = self.logger_patcher.start()
+
+        # We will control the default version by passing it explicitly in each test.
+        # No need to patch the constant anymore.
+        self.default_version_for_test = "v2_default_constant"
+
+    def tearDown(self):
+        self.get_model_name_patcher.stop()
+        self.logger_patcher.stop()
+        global_cache.clear()
+
+    def test_get_version_success(self):
+        """Test the successful path where get_model_name returns a valid version."""
+        self.mock_get_model_name.return_value = "yolox-page-elements-v3"
+
+        result = get_yolox_page_version("http://dummy-endpoint", default_version=self.default_version_for_test)
+
+        self.assertEqual(result, "yolox-page-elements-v3")
+        self.mock_logger.warning.assert_not_called()
+        self.mock_get_model_name.assert_called_once_with("http://dummy-endpoint", self.default_version_for_test)
+
+    def test_get_version_fallback_on_none_return(self):
+        """Test the fallback path where get_model_name returns None."""
+        self.mock_get_model_name.return_value = None
+
+        result = get_yolox_page_version("http://dummy-endpoint", default_version=self.default_version_for_test)
+
+        self.assertEqual(result, self.default_version_for_test)
+        self.mock_logger.warning.assert_called_once()
+        self.assertIn("Failed to obtain", self.mock_logger.warning.call_args[0][0])
+
+    def test_get_version_fallback_on_exception(self):
+        """Test the fallback path where get_model_name raises an exception."""
+        self.mock_get_model_name.side_effect = RuntimeError("Simulated network error")
+
+        result = get_yolox_page_version("http://dummy-endpoint", default_version=self.default_version_for_test)
+
+        self.assertEqual(result, self.default_version_for_test)
+        self.mock_logger.warning.assert_called_once()
+
+        self.assertIn(
+            "Failed to get yolox-page-elements version after 30 seconds", self.mock_logger.warning.call_args[0][0]
+        )
+
+    def test_get_version_with_no_default_uses_real_constant(self):
+        """
+        Test that calling the function without a default_version uses the real,
+        unmocked constant from the module.
+        """
+        from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_DEFAULT_VERSION
+
+        self.mock_get_model_name.return_value = "yolox-page-elements-v3"
+
+        result = get_yolox_page_version("http://dummy-endpoint")
+
+        self.assertEqual(result, "yolox-page-elements-v3")
+        self.mock_get_model_name.assert_called_once_with("http://dummy-endpoint", YOLOX_PAGE_DEFAULT_VERSION)
 
 
 if __name__ == "__main__":

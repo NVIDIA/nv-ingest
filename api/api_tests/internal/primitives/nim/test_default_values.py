@@ -14,10 +14,6 @@ def test_yolox_max_dimensions():
     assert 64 <= YOLOX_MAX_HEIGHT <= 4096, "YOLOX_MAX_HEIGHT should be between 64 and 4096"
 
 
-def test_yolox_num_classes():
-    assert 1 <= YOLOX_NUM_CLASSES <= 1000, "YOLOX_NUM_CLASSES should be between 1 and 1000"
-
-
 def test_yolox_conf_threshold():
     assert 0.001 <= YOLOX_CONF_THRESHOLD <= 1.0, "YOLOX_CONF_THRESHOLD should be between 0.001 and 1.0"
 
@@ -28,10 +24,6 @@ def test_yolox_iou_threshold():
 
 def test_yolox_min_score():
     assert 0.0 <= YOLOX_MIN_SCORE <= 1.0, "YOLOX_MIN_SCORE should be between 0.0 and 1.0"
-
-
-def test_yolox_final_score():
-    assert 0.0 <= YOLOX_FINAL_SCORE <= 1.0, "YOLOX_FINAL_SCORE should be between 0.0 and 1.0"
 
 
 def test_yolox_score_consistency():

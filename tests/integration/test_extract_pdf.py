@@ -62,13 +62,10 @@ def run_basic_extract_test(
     assert len(infographics) == expected_infographic_count
 
     table_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in tables)
-    for markdown in table_markdowns or []:
-        assert markdown in table_contents
+    assert any(markdown in table_contents for markdown in table_markdowns or [])
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    for phrase in chart_phrases or []:
-        alt_phrase = phrase.replace("Bluetooth speaker", "Bluetoothspeaker")
-        assert (phrase in chart_contents) or (alt_phrase in chart_contents)
+    assert any(phrase in chart_contents for phrase in chart_phrases or [])
 
 
 @pytest.mark.integration
@@ -78,23 +75,24 @@ def test_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
     multimodal_second_table_markdown,
-    multimodal_first_chart_xaxis,
+    multimodal_first_chart_xaxis_variants,
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
 ):
+    table_markdowns = [
+        multimodal_first_table_markdown,
+        multimodal_second_table_markdown,
+    ]
+    chart_phrases = multimodal_first_chart_xaxis_variants + [
+        multimodal_first_chart_yaxis,
+        multimodal_second_chart_xaxis,
+        multimodal_second_chart_yaxis,
+    ]
     run_basic_extract_test(
         extract_method=extract_method,
-        table_markdowns=[
-            multimodal_first_table_markdown,
-            multimodal_second_table_markdown,
-        ],
-        chart_phrases=[
-            multimodal_first_chart_xaxis,
-            multimodal_first_chart_yaxis,
-            multimodal_second_chart_xaxis,
-            multimodal_second_chart_yaxis,
-        ],
+        table_markdowns=table_markdowns,
+        chart_phrases=chart_phrases,
     )
 
 

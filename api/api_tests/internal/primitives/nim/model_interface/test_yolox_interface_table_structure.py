@@ -28,11 +28,9 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
         self.constants_patcher = patch.multiple(
             MODULE_UNDER_TEST,
             YOLOX_TABLE_NIM_MAX_IMAGE_SIZE=1000000,
-            YOLOX_TABLE_NUM_CLASSES=3,
             YOLOX_TABLE_CONF_THRESHOLD=0.5,
             YOLOX_TABLE_IOU_THRESHOLD=0.45,
             YOLOX_TABLE_MIN_SCORE=0.3,
-            YOLOX_TABLE_FINAL_SCORE=0.3,
             YOLOX_TABLE_CLASS_LABELS=["cell", "row", "column"],
         )
         self.mocked_constants = self.constants_patcher.start()
@@ -70,11 +68,9 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
         """Test initialization of YoloxTableStructureModelInterface."""
         # Check parent class initialization
         self.assertEqual(self.model_interface.nim_max_image_size, 1000000)
-        self.assertEqual(self.model_interface.num_classes, 3)
         self.assertEqual(self.model_interface.conf_threshold, 0.5)
         self.assertEqual(self.model_interface.iou_threshold, 0.45)
         self.assertEqual(self.model_interface.min_score, 0.3)
-        self.assertEqual(self.model_interface.final_score, 0.3)
         self.assertEqual(self.model_interface.class_labels, ["cell", "row", "column"])
 
     def test_inheritance(self):

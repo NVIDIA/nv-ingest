@@ -27,11 +27,9 @@ class TestYoloxGraphicElementsModelInterface(unittest.TestCase):
         self.constants_patcher = patch.multiple(
             MODULE_UNDER_TEST,
             YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE=1000000,
-            YOLOX_GRAPHIC_NUM_CLASSES=5,
             YOLOX_GRAPHIC_CONF_THRESHOLD=0.5,
             YOLOX_GRAPHIC_IOU_THRESHOLD=0.45,
             YOLOX_GRAPHIC_MIN_SCORE=0.3,
-            YOLOX_GRAPHIC_FINAL_SCORE=0.3,
             YOLOX_GRAPHIC_CLASS_LABELS=["logo", "image", "diagram", "chart", "table"],
         )
         self.mocked_constants = self.constants_patcher.start()
@@ -69,11 +67,9 @@ class TestYoloxGraphicElementsModelInterface(unittest.TestCase):
         """Test initialization of YoloxGraphicElementsModelInterface."""
         # Check parent class initialization
         self.assertEqual(self.model_interface.nim_max_image_size, 1000000)
-        self.assertEqual(self.model_interface.num_classes, 5)
         self.assertEqual(self.model_interface.conf_threshold, 0.5)
         self.assertEqual(self.model_interface.iou_threshold, 0.45)
         self.assertEqual(self.model_interface.min_score, 0.3)
-        self.assertEqual(self.model_interface.final_score, 0.3)
         self.assertEqual(self.model_interface.class_labels, ["logo", "image", "diagram", "chart", "table"])
 
     def test_inheritance(self):

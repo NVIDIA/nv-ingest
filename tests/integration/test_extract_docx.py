@@ -63,7 +63,7 @@ def _debug_summarize_results(results) -> str:
 def test_docx_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
-    multimodal_first_chart_xaxis,
+    multimodal_first_chart_xaxis_variants,
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
@@ -144,7 +144,7 @@ def test_docx_extract_only(
     ), "Expected canonical table not found in table contents"
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    assert multimodal_first_chart_xaxis in chart_contents, "First chart x-axis label not found"
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants), "First chart x-axis label not found"
     assert multimodal_first_chart_yaxis in chart_contents, "First chart y-axis label not found"
     assert multimodal_second_chart_xaxis in chart_contents, "Second chart x-axis label not found"
     assert (
