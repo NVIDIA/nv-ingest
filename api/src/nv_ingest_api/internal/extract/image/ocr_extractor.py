@@ -363,10 +363,8 @@ def extract_text_data_from_image_internal(
         # Identify rows that meet the text criteria.
         page_images_mask = df_extraction_ledger.apply(_meets_page_image_criteria, axis=1)
         page_elements_mask = df_extraction_ledger.apply(_meets_page_elements_text_criteria, axis=1)
-        df_extraction_ledger.to_csv("/workspace/data/df_extraction_ledger.csv")
 
         df_to_process = df_extraction_ledger[page_images_mask | page_elements_mask].copy()
-        df_to_process.to_csv("/workspace/data/df_to_process.csv")
         df_unprocessed = df_extraction_ledger[~page_images_mask & ~page_elements_mask].copy()
 
         valid_indices = df_to_process.index.tolist()
@@ -394,17 +392,10 @@ def extract_text_data_from_image_internal(
         )
 
         df_page_images = df_to_process[df_to_process.apply(_meets_page_image_criteria, axis=1)]
-        page_images_results = [
-            bulk_results[idx] for idx, row in df_to_process.iterrows() if _meets_page_image_criteria(row)
-        ]
-        df_page_images = _process_page_images(df_page_images, page_images_results)
+        df_page_images = _process_page_images(df_page_images, bulk_results)
 
         df_page_elements = df_to_process[df_to_process.apply(_meets_page_elements_text_criteria, axis=1)]
-        df_page_elements.to_csv("/workspace/data/df_page_elements.csv")
-        page_elements_results = [
-            bulk_results[idx] for idx, row in df_to_process.iterrows() if _meets_page_elements_text_criteria(row)
-        ]
-        df_page_elements = _process_page_elements(df_page_elements, page_elements_results)
+        df_page_elements = _process_page_elements(df_page_elements, bulk_results)
 
         df_final = pd.concat([df_unprocessed, df_page_images, df_page_elements], ignore_index=True)
 
