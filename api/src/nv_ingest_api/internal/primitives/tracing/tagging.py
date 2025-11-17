@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def traceable(trace_name: Optional[str] = None):
     """
-    A decorator that adds entry and exit trace timestamps to a IngestControlMessage's metadata
+    A decorator that adds entry and exit trace timestamps to an IngestControlMessage's metadata
     based on the presence of a 'config::add_trace_tagging' flag.
 
     This decorator checks if the 'config::add_trace_tagging' flag is set to True in the
@@ -37,7 +37,7 @@ def traceable(trace_name: Optional[str] = None):
 
     Notes
     -----
-    The decorated function must accept a IngestControlMessage object as one of its arguments.
+    The decorated function must accept an IngestControlMessage object as one of its arguments.
     For a regular function, this is expected to be the first argument; for a class method,
     this is expected to be the second argument (after 'self'). The IngestControlMessage object
     must implement `has_metadata`, `get_metadata`, and `set_metadata` methods used by the decorator
@@ -51,7 +51,7 @@ def traceable(trace_name: Optional[str] = None):
     --------
     Automatic stage name detection (recommended):
 
-    >>> @traceable()  # Uses self.stage_name automatically
+    >>> @traceable() # Uses self.stage_name automatically
     ... def process_message(self, message):
     ...     pass
 
@@ -253,14 +253,14 @@ def set_trace_timestamps_with_parent_context(control_message, execution_trace_lo
     --------
     Basic usage in a stage:
 
-    >>> execution_trace_log = {"trace::entry::yolox_inference": ts1, "trace::exit::yolox_inference": ts2}
+    >>> execution_trace_log = {"trace::entry::yolox_inference": ts1, "trace::exit::yolox_inference": ts2} # noqa
     >>> set_trace_timestamps_with_parent_context(
     ...     control_message, execution_trace_log, "pdf_extractor", logger
     ... )
 
     This transforms:
     - trace::entry::yolox_inference -> trace::entry::pdf_extractor::yolox_inference
-    - trace::exit::yolox_inference  -> trace::exit::pdf_extractor::yolox_inference
+    - trace::exit::yolox_inference -> trace::exit::pdf_extractor::yolox_inference
     """
     if not execution_trace_log:
         return
