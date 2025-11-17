@@ -28,4 +28,4 @@ For production deployments processing large volumes of documents, consider:
 
 ### Environment Requirements
 
-Ensure your deployment environment meets these specifications before running the full NV-Ingest pipeline. Resource-constrained environments may experience performance degradation or processing failures.
+Ensure your deployment environment meets these specifications before running the full NV-Ingest pipeline. Resource-constrained environments may experience performance degradation.
