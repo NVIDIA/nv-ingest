@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Regex pattern to detect CUDA-related errors in Triton gRPC responses
 CUDA_ERROR_REGEX = re.compile(
-    r"(illegal memory access|invalid argument|failed to (copy|load|perform) .*: .*|TritonModelException: failed to copy data: .*)",  # noqa: E501
+    r"(model reload|illegal memory access|illegal instruction|invalid argument|failed to (copy|load|perform) .*: .*|TritonModelException: failed to copy data: .*)",  # noqa: E501
     re.IGNORECASE,
 )
 

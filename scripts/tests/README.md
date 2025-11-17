@@ -15,14 +15,14 @@ A configurable, dataset-agnostic testing framework for end-to-end validation of 
 # 1. Navigate to the tests directory
 cd scripts/tests
 
-# 2. Edit the configuration
-vim test_configs.yaml  # Update dataset_dir to point to your data
+# 2. Run with a pre-configured dataset (assumes services are running)
+python run.py --case=e2e --dataset=bo767
 
-# 3. Run the test (assumes services are already running)
-python run.py --case=e2e
+# Or use a custom path that uses the "active" configuration
+python run.py --case=e2e --dataset=/path/to/your/data
 
-# Or override settings via CLI
-python run.py --case=e2e --dataset=/path/to/data --api-version=v2
+# With managed infrastructure (starts/stops services)
+python run.py --case=e2e --dataset=bo767 --managed
 ```
 
 **Important**: All test commands should be run from the `scripts/tests/` directory.
@@ -78,37 +78,90 @@ active:
   collection_name: null
 ```
 
-#### Dataset Shortcuts
+#### Pre-Configured Datasets
 
-Define common dataset paths for quick access:
+Each dataset includes its path, extraction settings, and recall evaluator in one place:
 
 ```yaml
 datasets:
-  bo20: /path/to/bo20
-  bo767: /path/to/bo767
-  single: data/multimodal_test.pdf
+  bo767:
+    path: /raid/jioffe/bo767
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: bo767  # Evaluator for recall testing
+  
+  bo20:
+    path: /raid/jioffe/bo20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: true
+    extract_infographics: false
+    recall_dataset: null  # bo20 does not have recall
+  
+  earnings:
+    path: /raid/jioffe/earnings_conusulting
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: earnings  # Evaluator for recall testing
 ```
 
-Usage:
+**Automatic Configuration**: When you use `--dataset=bo767`, the framework automatically:
+- Sets the dataset path
+- Applies the correct extraction settings (text, tables, charts, images, infographics)
+- Configures the recall evaluator (if applicable)
+
+**Usage:**
 ```bash
-python run.py --case=e2e --dataset=bo767  # Uses /path/to/bo767
+# Single dataset - configs applied automatically
+python run.py --case=e2e --dataset=bo767
+
+# Multiple datasets (sweeping) - each gets its own config
+python run.py --case=e2e --dataset=bo767,earnings,bo20
+
+# Custom path still works (uses active section config)
+python run.py --case=e2e --dataset=/custom/path
 ```
+
+**Dataset Extraction Settings:**
+
+| Dataset | Text | Tables | Charts | Images | Infographics | Recall |
+|---------|------|--------|--------|--------|--------------|--------|
+| `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 ### Configuration Precedence
 
 Settings are applied in order of priority:
 
-**CLI arguments > Environment variables > YAML active config**
+**Environment variables > Dataset-specific config (path + extraction + recall_dataset) > YAML active config**
+
+**Note**: CLI arguments are only used for runtime decisions (which test to run, which dataset, execution mode). All configuration values come from YAML or environment variables.
 
 Example:
 ```bash
-# YAML has api_version: v1
-# Override via environment variable
-API_VERSION=v2 python run.py --case=e2e
-
-# Override via CLI (highest priority)
-python run.py --case=e2e --api-version=v2
+# YAML active section has api_version: v1
+# Dataset bo767 has extract_images: false
+# Override via environment variable (highest priority)
+EXTRACT_IMAGES=true API_VERSION=v2 python run.py --case=e2e --dataset=bo767
+# Result: Uses bo767 path, but extract_images=true (env override) and api_version=v2 (env override)
 ```
+
+**Precedence Details:**
+1. **Environment variables** - Highest priority, useful for CI/CD overrides
+2. **Dataset-specific config** - Applied automatically when using `--dataset=<name>`
+   - Includes: path, extraction settings, recall_dataset
+   - Only applies if dataset is defined in `datasets` section
+3. **YAML active config** - Base configuration, used as fallback
 
 ### Configuration Options Reference
 
@@ -143,7 +196,7 @@ python run.py --case=e2e --api-version=v2
 #### Storage Options
 - `spill_dir` (string): Temporary processing directory
 - `artifacts_dir` (string): Test output directory (auto-generated if null)
-- `collection_name` (string): Milvus collection name (auto-generated if null)
+- `collection_name` (string): Milvus collection name (auto-generated as `{test_name}_multimodal` if null, deterministic - no timestamp)
 
 ### Valid Configuration Values
 
@@ -160,31 +213,45 @@ Configuration is validated on load with helpful error messages.
 ### Basic Usage
 
 ```bash
-# Run with default YAML configuration
-python run.py --case=e2e
+# Run with default YAML configuration (assumes services are running)
+python run.py --case=e2e --dataset=bo767
 
 # With document-level analysis
-python run.py --case=e2e --doc-analysis
+python run.py --case=e2e --dataset=bo767 --doc-analysis
 
-# With managed infrastructure (starts/stops Docker)
-python run.py --case=e2e --managed
+# With managed infrastructure (starts/stops services)
+python run.py --case=e2e --dataset=bo767 --managed
 ```
 
-### Using CLI Overrides
+### Dataset Sweeping
+
+Run multiple datasets in a single command - each dataset automatically gets its native extraction configuration:
 
 ```bash
-# Override dataset
-python run.py --case=e2e --dataset=/path/to/data
+# Sweep multiple datasets
+python run.py --case=e2e --dataset=bo767,earnings,bo20
 
-# Override API version
-python run.py --case=e2e --api-version=v2
+# Each dataset runs sequentially with its own:
+# - Extraction settings (from dataset config)
+# - Artifact directory (timestamped per dataset)
+# - Results summary at the end
 
-# Override readiness timeout
-python run.py --case=e2e --readiness-timeout=300
+# With managed infrastructure (services start once, shared across all datasets)
+python run.py --case=e2e --dataset=bo767,earnings,bo20 --managed
 
-# Combine multiple overrides
-python run.py --case=e2e --dataset=/data/pdfs --api-version=v2 --doc-analysis
+# E2E+Recall sweep (each dataset ingests then evaluates recall)
+python run.py --case=e2e_recall --dataset=bo767,earnings
+
+# Recall-only sweep (evaluates existing collections)
+python run.py --case=recall --dataset=bo767,earnings
 ```
+
+**Sweep Behavior:**
+- Services start once (if `--managed`) before the sweep
+- Each dataset gets its own artifact directory
+- Each dataset automatically applies its extraction config from `datasets` section
+- Summary printed at end showing success/failure for each dataset
+- Services stop once at end (unless `--keep-up`)
 
 ### Using Environment Variables
 
@@ -200,12 +267,35 @@ DATASET_DIR=/custom/path python run.py --case=e2e
 
 ### Available Tests
 
-| Name | Description | Status |
-|------|-------------|--------|
-| `e2e` | Dataset-agnostic E2E test | ✅ Primary (YAML config) |
-| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | ✅ Available (YAML config) |
+| Name | Description | Configuration Needed | Status |
+|------|-------------|----------------------|--------|
+| `e2e` | Dataset-agnostic E2E ingestion | `active` section only | ✅ Primary (YAML config) |
+| `e2e_with_llm_summary` | E2E with LLM summarization via UDF | `active` section only | ✅ Available (YAML config) |
+| `recall` | Recall evaluation against existing collections | `active` + `recall` sections | ✅ Available (YAML config) |
+| `e2e_recall` | Fresh ingestion + recall evaluation | `active` + `recall` sections | ✅ Available (YAML config) |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
+
+### Configuration Synergy
+
+**For E2E-only users:**
+- Only configure `active` section
+- `collection_name` in active: auto-generates from `test_name` or dataset basename if `null` (deterministic, no timestamp)
+- Collection name pattern: `{test_name}_multimodal` (e.g., `bo767_multimodal`, `earnings_consulting_multimodal`)
+- `recall` section is optional (not used unless running recall tests)
+- **Note**: You can run `recall` later against the same collection created by `e2e`
+
+**For Recall-only users:**
+- Configure `active` section: `hostname`, `sparse`, `gpu_search`, etc. (for evaluation)
+- Configure `recall` section: `recall_dataset` (required)
+- Set `test_name` in active to match your existing collection (collection must be `{test_name}_multimodal`)
+- `collection_name` in active is ignored (recall generates `{test_name}_multimodal`)
+
+**For E2E+Recall users:**
+- Configure `active` section: `dataset_dir`, `test_name`, extraction settings, etc.
+- Configure `recall` section: `recall_dataset` (required)
+- Collection naming: e2e_recall automatically creates `{test_name}_multimodal` collection
+- `collection_name` in active is ignored (e2e_recall forces `{test_name}_multimodal` pattern)
 
 ### Example Configurations
 
@@ -249,32 +339,208 @@ active:
   enable_caption: true
 ```
 
+## Recall Testing
+
+Recall testing evaluates retrieval accuracy against ground truth query sets. Two test cases are available:
+
+### Test Cases
+
+**`recall`** - Recall-only evaluation against existing collections:
+- Skips ingestion (assumes collections already exist)
+- Loads existing collections from Milvus
+- Evaluates recall using multimodal queries (all datasets are multimodal-only)
+- Supports reranker comparison (no reranker, with reranker, or reranker-only)
+
+**`e2e_recall`** - Fresh ingestion + recall evaluation:
+- Performs full ingestion pipeline
+- Creates multimodal collection during ingestion
+- Evaluates recall immediately after ingestion
+- Combines ingestion metrics with recall metrics
+
+### Reranker Configuration
+
+Three modes via `reranker_mode` setting:
+
+1. **No reranker** (default): `reranker_mode: none`
+   - Runs evaluation without reranker only
+
+2. **Both modes**: `reranker_mode: both`
+   - Runs evaluation twice: once without reranker, once with reranker
+   - Useful for comparing reranker impact
+
+3. **Reranker only**: `reranker_mode: with`
+   - Runs evaluation with reranker only
+   - Faster when you only need reranked results
+
+### Collection Naming
+
+**Deterministic Collection Names (No Timestamps)**
+
+All test cases use deterministic collection names (no timestamps) to enable:
+- Reusing collections across test runs
+- Running recall evaluation after e2e ingestion
+- Consistent collection naming patterns
+
+**Collection Name Patterns:**
+
+All test cases use the same consistent pattern: `{test_name}_multimodal`
+
+| Test Case | Pattern | Example |
+|-----------|---------|---------|
+| `e2e` | `{test_name}_multimodal` | `bo767_multimodal` |
+| `e2e_with_llm_summary` | `{test_name}_multimodal` | `bo767_multimodal` |
+| `e2e_recall` | `{test_name}_multimodal` | `bo767_multimodal` |
+| `recall` | `{test_name}_multimodal` | `bo767_multimodal` |
+
+**Benefits:**
+- ✅ Run `e2e` then `recall` separately - they use the same collection
+- ✅ Consistent naming across all test cases
+- ✅ Deterministic names (no timestamps) enable collection reuse
+
+**Recall Collections:**
+- A single multimodal collection is created for recall evaluation
+- Pattern: `{test_name}_multimodal`
+- Example: `bo767_multimodal`
+- All datasets evaluate against this multimodal collection (no modality-specific collections)
+
+**Note**: Artifact directories still use timestamps for tracking over time (e.g., `bo767_20251106_180859_UTC`), but collection names are deterministic.
+
+### Multimodal-Only Evaluation
+
+All datasets use **multimodal-only** evaluation:
+- Ground truth queries contain all content types (text, tables, charts)
+- Single collection contains all extracted content types
+- Simplified evaluation interface (no modality filtering)
+
+### Ground Truth Files
+
+**bo767 dataset:**
+- Ground truth file: `bo767_query_gt.csv` (consolidated multimodal queries)
+- Located in repo `data/` directory
+- Default `ground_truth_dir: null` automatically uses `data/` directory
+- Custom path can be specified via `ground_truth_dir` config
+
+**Other datasets** (finance_bench, earnings, audio):
+- Ground truth files must be obtained separately (not in public repo)
+- Set `ground_truth_dir` to point to your ground truth directory
+- Dataset-specific evaluators are extensible (see `recall_utils.py`)
+
+### Configuration
+
+Edit the `recall` section in `test_configs.yaml`:
+
+```yaml
+recall:
+  # Reranker configuration
+  reranker_mode: none  # Options: "none", "with", "both"
+
+  # Recall evaluation settings
+  recall_top_k: 10
+  ground_truth_dir: null  # null = use repo data/ directory
+  recall_dataset: bo767  # Required: must be explicitly set (bo767, finance_bench, earnings, audio)
+```
+
+### Usage Examples
+
+**Recall-only (existing collections):**
+```bash
+# Evaluate existing bo767 collections (no reranker)
+# recall_dataset automatically set from dataset config
+python run.py --case=recall --dataset=bo767
+
+# With reranker only (set reranker_mode in YAML recall section)
+python run.py --case=recall --dataset=bo767
+
+# Sweep multiple datasets for recall evaluation
+python run.py --case=recall --dataset=bo767,earnings
+```
+
+**E2E + Recall (fresh ingestion):**
+```bash
+# Fresh ingestion with recall evaluation
+# recall_dataset automatically set from dataset config
+python run.py --case=e2e_recall --dataset=bo767
+
+# Sweep multiple datasets (each ingests then evaluates)
+python run.py --case=e2e_recall --dataset=bo767,earnings
+```
+
+**Dataset configuration:**
+- **Dataset path**: Automatically set from `datasets` section when using `--dataset=<name>`
+- **Extraction settings**: Automatically applied from `datasets` section
+- **recall_dataset**: Automatically set from `datasets` section (e.g., `bo767`, `earnings`, `finance_bench`)
+  - Can be overridden via environment variable: `RECALL_DATASET=bo767`
+- **test_name**: Auto-generated from dataset name or basename of path (can set in YAML `active` section)
+- **Collection naming**: `{test_name}_multimodal` (automatically generated for recall cases)
+- All datasets evaluate against the same `{test_name}_multimodal` collection (multimodal-only)
+
+### Output
+
+Recall results are included in `results.json`:
+```json
+{
+  "recall_results": {
+    "no_reranker": {
+      "1": 0.554,
+      "3": 0.746,
+      "5": 0.807,
+      "10": 0.857
+    },
+    "with_reranker": {
+      "1": 0.601,
+      "3": 0.781,
+      "5": 0.832,
+      "10": 0.874
+    }
+  }
+}
+```
+
+Metrics are also logged via `kv_event_log()`:
+- `recall_multimodal_@{k}_no_reranker`
+- `recall_multimodal_@{k}_with_reranker`
+- `recall_eval_time_s_no_reranker`
+- `recall_eval_time_s_with_reranker`
+
 ## Sweeping Parameters
+
+### Dataset Sweeping (Recommended)
+
+The easiest way to test multiple datasets is using dataset sweeping:
+
+```bash
+# Test multiple datasets - each gets its native config automatically
+python run.py --case=e2e --dataset=bo767,earnings,bo20
+
+# Each dataset runs with its pre-configured extraction settings
+# Results are organized in separate artifact directories
+```
+
+### Parameter Sweeping
 
 To sweep through different parameter values:
 
 1. **Edit** `test_configs.yaml` - Update values in the `active` section
-2. **Run** the test: `python run.py --case=e2e`
+2. **Run** the test: `python run.py --case=e2e --dataset=<name>`
 3. **Analyze** results in `artifacts/<test_name>_<timestamp>/`
 4. **Repeat** steps 1-3 for next parameter combination
 
-Example sweep workflow:
+Example parameter sweep workflow:
 ```bash
 # Test 1: Baseline V1
 vim test_configs.yaml  # Set: api_version=v1, extract_tables=true
-python run.py --case=e2e --dataset=/data/pdfs
+python run.py --case=e2e --dataset=bo767
 
 # Test 2: V2 with 32-page splitting
 vim test_configs.yaml  # Set: api_version=v2, pdf_split_page_count=32
-python run.py --case=e2e --dataset=/data/pdfs
+python run.py --case=e2e --dataset=bo767
 
 # Test 3: V2 with 8-page splitting
 vim test_configs.yaml  # Set: pdf_split_page_count=8
-python run.py --case=e2e --dataset=/data/pdfs
+python run.py --case=e2e --dataset=bo767
 
-# Test 4: Tables disabled
-vim test_configs.yaml  # Set: extract_tables=false
-python run.py --case=e2e --dataset=/data/pdfs
+# Test 4: Tables disabled (override via env var)
+EXTRACT_TABLES=false python run.py --case=e2e --dataset=bo767
 ```
 
 **Note**: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.
@@ -284,33 +550,34 @@ python run.py --case=e2e --dataset=/data/pdfs
 ### Attach Mode (Default)
 
 ```bash
-python run.py --case=e2e
+python run.py --case=e2e --dataset=bo767
 ```
 
-- Assumes services are already running (typical development workflow)
-- Runs test case only
+- **Default behavior**: Assumes services are already running
+- Runs test case only (no service management)
 - Faster for iterative testing
-- Use when Docker services are already up (e.g., via `nv-start`)
+- Use when Docker services are already up
+- `--no-build` and `--keep-up` flags are ignored in attach mode
 
 ### Managed Mode
 
 ```bash
-python run.py --case=e2e --managed
+python run.py --case=e2e --dataset=bo767 --managed
 ```
 
 - Starts Docker services automatically
 - Waits for service readiness (configurable timeout)
 - Runs test case
 - Collects artifacts
-- Optionally tears down services (use `--keep-up` to preserve)
+- Stops services after test (unless `--keep-up`)
 
-Additional managed mode options:
+**Managed mode options:**
 ```bash
 # Skip Docker image rebuild (faster startup)
-python run.py --case=e2e --managed --no-build
+python run.py --case=e2e --dataset=bo767 --managed --no-build
 
-# Keep services running after test
-python run.py --case=e2e --managed --keep-up
+# Keep services running after test (useful for multi-test scenarios)
+python run.py --case=e2e --dataset=bo767 --managed --keep-up
 ```
 
 ## Artifacts and Logging
@@ -323,6 +590,8 @@ scripts/tests/artifacts/<test_name>_<timestamp>_UTC/
 ├── stdout.txt          # Complete test output
 └── e2e.json            # Structured metrics and events
 ```
+
+**Note**: Artifact directories use timestamps for tracking test runs over time, while collection names are deterministic (no timestamps) to enable collection reuse and recall evaluation.
 
 ### Results Structure
 
@@ -382,6 +651,16 @@ This provides:
 - `cases/e2e_with_llm_summary.py` - E2E with LLM (✅ YAML-based)
   - Adds UDF-based LLM summarization
   - Same config-based architecture as e2e.py
+- `cases/recall.py` - Recall evaluation (✅ YAML-based)
+  - Evaluates retrieval accuracy against existing collections
+  - Requires `recall_dataset` in config (from dataset config or env var)
+  - Supports reranker comparison modes (none, with, both)
+  - Multimodal-only evaluation against `{test_name}_multimodal` collection
+- `cases/e2e_recall.py` - E2E + Recall (✅ YAML-based)
+  - Combines ingestion (via e2e.py) with recall evaluation (via recall.py)
+  - Automatically creates collection during ingestion
+  - Requires `recall_dataset` in config (from dataset config or env var)
+  - Merges ingestion and recall metrics in results
 
 **4. Shared Utilities**
 - `interact.py` - Common testing utilities
@@ -395,9 +674,21 @@ This provides:
 
 ```
 test_configs.yaml → load_config() → TestConfig object → test case
-                         ↑                    ↑
-                    Env overrides        CLI overrides
+    (active +        (applies          (validated,
+     datasets)        dataset config)    type-safe)
+         ↑                    ↑
+    Env overrides      Dataset configs
+    (highest)          (auto-applied)
 ```
+
+**Configuration Loading:**
+1. Start with `active` section from YAML
+2. If `--dataset=<name>` matches a configured dataset:
+   - Apply dataset path
+   - Apply dataset extraction settings
+   - Apply dataset `recall_dataset` (if set)
+3. Apply environment variable overrides (if any)
+4. Validate and create `TestConfig` object
 
 All test cases receive a validated `TestConfig` object with typed fields, eliminating string parsing errors.
 
@@ -492,30 +783,38 @@ To add new configurable parameters:
 
 The framework is dataset-agnostic and supports multiple approaches:
 
-**Option 1: Edit YAML directly**
-```yaml
-active:
-  dataset_dir: /path/to/your/dataset
+**Option 1: Use pre-configured dataset (Recommended)**
+```bash
+# Dataset configs automatically applied
+python run.py --case=e2e --dataset=bo767
 ```
 
-**Option 2: Use CLI override**
+**Option 2: Add new dataset to YAML**
+```yaml
+datasets:
+  my_dataset:
+    path: /path/to/your/dataset
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: null  # or set to evaluator name if applicable
+```
+Then use: `python run.py --case=e2e --dataset=my_dataset`
+
+**Option 3: Use custom path (uses active section config)**
 ```bash
 python run.py --case=e2e --dataset=/path/to/your/dataset
 ```
 
-**Option 3: Add dataset shortcut**
-```yaml
-datasets:
-  my_dataset: /path/to/your/dataset
-```
-Then use: `python run.py --case=e2e --dataset=my_dataset`
-
-**Option 4: Environment variable**
+**Option 4: Environment variable override**
 ```bash
-DATASET_DIR=/path/to/your/dataset python run.py --case=e2e
+# Override specific settings via env vars
+EXTRACT_IMAGES=true python run.py --case=e2e --dataset=bo767
 ```
 
-Choose the approach that fits your workflow. For repeated testing, add a dataset shortcut. For one-off tests, use CLI override.
+**Best Practice**: For repeated testing, add your dataset to the `datasets` section with its native extraction settings. This ensures consistent configuration and enables dataset sweeping.
 
 ## Additional Resources
 

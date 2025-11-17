@@ -516,6 +516,39 @@ def test_job_state_counting(ingestor):
     assert ingestor.remaining_jobs() == 0  # All jobs are in terminal states
 
 
+def test_get_status(ingestor):
+    ingestor._job_states = {
+        "job_1": MagicMock(state=JobStateEnum.SUBMITTED),
+        "job_2": MagicMock(state=JobStateEnum.SUBMITTED_ASYNC),
+        "job_3": MagicMock(state=JobStateEnum.PENDING),
+        "job_4": MagicMock(state=JobStateEnum.PROCESSING),
+        "job_5": MagicMock(state=JobStateEnum.FAILED),
+        "job_6": MagicMock(state=JobStateEnum.CANCELLED),
+        "job_7": MagicMock(state=JobStateEnum.COMPLETED),
+    }
+
+    ingestor._client._job_index_to_job_spec = {
+        "job_1": MagicMock(source_name="job_1"),
+        "job_2": MagicMock(source_name="job_2"),
+        "job_3": MagicMock(source_name="job_3"),
+        "job_4": MagicMock(source_name="job_4"),
+        "job_5": MagicMock(source_name="job_5"),
+        "job_6": MagicMock(source_name="job_6"),
+        "job_7": MagicMock(source_name="job_7"),
+    }
+    print(ingestor.get_status())
+
+    assert ingestor.get_status() == {
+        "job_1": "submitted",
+        "job_2": "submitted",
+        "job_3": "pending",
+        "job_4": "processing",
+        "job_5": "failed",
+        "job_6": "cancelled",
+        "job_7": "completed",
+    }
+
+
 @patch("glob.glob")
 @patch("os.path.exists")
 def test_check_files_local_all_local(mock_exists, mock_glob, ingestor_without_doc):

@@ -51,6 +51,10 @@ EXTENSION_TO_DOCUMENT_TYPE = {
     "txt": DocumentTypeEnum.TXT,
     "mp3": DocumentTypeEnum.MP3,
     "wav": DocumentTypeEnum.WAV,
+    "mp4": DocumentTypeEnum.MP4,
+    "mov": DocumentTypeEnum.MOV,
+    "avi": DocumentTypeEnum.AVI,
+    "mkv": DocumentTypeEnum.MKV,
     # Add more as needed
 }
 
