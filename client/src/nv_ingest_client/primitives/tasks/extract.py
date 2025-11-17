@@ -58,6 +58,7 @@ _Type_Extract_Method_PDF = Literal[
     "pdfium",
     "tika",
     "unstructured_io",
+    "ocr",
 ]
 
 _Type_Extract_Images_Method = Literal["group", "yolox"]

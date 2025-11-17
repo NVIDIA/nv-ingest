@@ -161,7 +161,45 @@ def _create_ocr_client(
     return ocr_client
 
 
-def _meets_text_ocr_criteria(row: pd.Series) -> bool:
+def _meets_page_elements_text_criteria(row: pd.Series) -> bool:
+    """
+    Determines if a DataFrame row meets the criteria for text extraction.
+
+    A row qualifies if:
+      - It contains a 'metadata' dictionary.
+      - The 'content_metadata' in metadata has type "text" and one of subtype:
+        "title", "paragraph", "header_footer".
+      - The 'content' is not None or an empty string.
+
+    Parameters
+    ----------
+    row : pd.Series
+        A row from the DataFrame.
+
+    Returns
+    -------
+    bool
+        True if the row meets all criteria; False otherwise.
+    """
+    page_element_subtypes = {"paragraph", "title", "header_footer"}
+
+    metadata = row.get("metadata", {})
+    if not metadata:
+        return False
+
+    content_md = metadata.get("content_metadata", {})
+
+    if (
+        content_md.get("type") == ContentTypeEnum.TEXT
+        and content_md.get("subtype") in page_element_subtypes
+        and metadata.get("content") not in {None, ""}
+    ):
+        return True
+
+    return False
+
+
+def _meets_page_image_criteria(row: pd.Series) -> bool:
     """
     Determines if a DataFrame row meets the criteria for text extraction.
 
@@ -180,16 +218,17 @@ def _meets_text_ocr_criteria(row: pd.Series) -> bool:
     bool
         True if the row meets all criteria; False otherwise.
     """
-    text_image_subtypes = {ContentTypeEnum.PAGE_IMAGE}
+    page_image_subtypes = {ContentTypeEnum.PAGE_IMAGE}
 
     metadata = row.get("metadata", {})
     if not metadata:
         return False
 
     content_md = metadata.get("content_metadata", {})
+
     if (
         content_md.get("type") == ContentTypeEnum.IMAGE
-        and content_md.get("subtype") in text_image_subtypes
+        and content_md.get("subtype") in page_image_subtypes
         and metadata.get("content") not in {None, ""}
     ):
         return True
@@ -208,6 +247,74 @@ def _process_page_images(df_to_process: pd.DataFrame, ocr_results: List[Tuple]):
             continue
 
         df_to_process.loc[df_idx, "metadata"]["image_metadata"]["text"] = " ".join([t for t in texts])
+
+    return df_to_process
+
+
+def _process_page_elements(df_to_process: pd.DataFrame, ocr_results: List[Tuple]):
+    valid_indices = df_to_process.index.tolist()
+    if not valid_indices:
+        return df_to_process
+
+    for result_idx, df_idx in enumerate(valid_indices):
+        # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
+        bboxes, texts, _ = ocr_results[result_idx]
+        if not bboxes or not texts:
+            df_to_process.loc[df_idx, "_x0"] = None
+            df_to_process.loc[df_idx, "_y0"] = None
+            df_to_process.loc[df_idx, "metadata"]["content"] = ""
+            continue
+
+        combined_data = list(zip(bboxes, texts))
+        try:
+            # Sort by reading order (y_min, then x_min)
+            combined_data.sort(key=lambda item: (min(p[1] for p in item[0]), min(p[0] for p in item[0])))
+        except (ValueError, IndexError):
+            logger.warning("Could not sort OCR results due to malformed bounding box.")
+        df_to_process.loc[df_idx, "_x0"] = min(point[0] for item in combined_data for point in item[0])
+        df_to_process.loc[df_idx, "_y0"] = min(point[1] for item in combined_data for point in item[0])
+        df_to_process.loc[df_idx, "metadata"]["content"] = " ".join([item[1] for item in combined_data])
+
+    df_to_process = df_to_process.drop(["_x0", "_y0"], axis=1)
+
+    df_to_process.loc[:, "_page_number"] = df_to_process["metadata"].apply(
+        lambda meta: meta["content_metadata"]["page_number"]
+    )
+
+    # Group by page number to aggregate all text blocks on each page
+    grouped = df_to_process.groupby("_page_number")
+
+    new_text = {}
+    for page_num, group_df in grouped:
+        if group_df.empty:
+            continue
+        # Sort text blocks by their original position for correct reading order
+        group_df.loc[:, "_x0"] = group_df["metadata"].apply(lambda meta: meta["text_metadata"]["text_location"][0])
+        group_df.loc[:, "_y0"] = group_df["metadata"].apply(lambda meta: meta["text_metadata"]["text_location"][1])
+
+        loc_mask = group_df[["_y0", "_x0"]].notna().all(axis=1)
+        sorted_group = group_df.loc[loc_mask].sort_values(by=["_y0", "_x0"], ascending=[True, True])
+        page_text = " ".join(sorted_group["metadata"].apply(lambda meta: meta["content"]).tolist())
+
+        if page_text.strip():
+            new_text[page_num] = page_text
+
+    df_text = df_to_process[df_to_process["document_type"] == "text"].drop_duplicates(
+        subset=["_page_number"], keep="first"
+    )
+
+    for page_num, page_text in new_text.items():
+        page_num_mask = df_text["_page_number"] == page_num
+        df_text.loc[page_num_mask, "metadata"] = df_text.loc[page_num_mask, "metadata"].apply(
+            lambda meta: {**meta, "content": page_text}
+        )
+
+    df_non_text = df_to_process[df_to_process["document_type"] != "text"]
+    df_to_process = pd.concat([df_text, df_non_text])
+
+    for col in {"_y0", "_x0", "_page_number"}:
+        if col in df_to_process:
+            df_to_process = df_to_process.drop(col, axis=1)
 
     return df_to_process
 
@@ -254,9 +361,11 @@ def extract_text_data_from_image_internal(
 
     try:
         # Identify rows that meet the text criteria.
-        mask = df_extraction_ledger.apply(_meets_text_ocr_criteria, axis=1)
-        df_to_process = df_extraction_ledger[mask].copy()
-        df_unprocessed = df_extraction_ledger[~mask].copy()
+        page_images_mask = df_extraction_ledger.apply(_meets_page_image_criteria, axis=1)
+        page_elements_mask = df_extraction_ledger.apply(_meets_page_elements_text_criteria, axis=1)
+
+        df_to_process = df_extraction_ledger[page_images_mask | page_elements_mask].copy()
+        df_unprocessed = df_extraction_ledger[~page_images_mask & ~page_elements_mask].copy()
 
         valid_indices = df_to_process.index.tolist()
         # If no rows meet the criteria, return early.
@@ -282,8 +391,13 @@ def extract_text_data_from_image_internal(
             trace_info=execution_trace_log,
         )
 
-        df_to_process = _process_page_images(df_to_process, bulk_results)
-        df_final = pd.concat([df_unprocessed, df_to_process], ignore_index=True)
+        df_page_images = df_to_process[df_to_process.apply(_meets_page_image_criteria, axis=1)]
+        df_page_images = _process_page_images(df_page_images, bulk_results)
+
+        df_page_elements = df_to_process[df_to_process.apply(_meets_page_elements_text_criteria, axis=1)]
+        df_page_elements = _process_page_elements(df_page_elements, bulk_results)
+
+        df_final = pd.concat([df_unprocessed, df_page_images, df_page_elements], ignore_index=True)
 
         return df_final, {"trace_info": execution_trace_log}
 
