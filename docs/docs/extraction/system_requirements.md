@@ -4,7 +4,7 @@
 
 The NV-Ingest full ingestion pipeline is designed to consume significant CPU and memory resources to achieve maximal parallelism. Resource usage will scale up to the limits of your deployed system.
 
-### Recommended Specifications
+### Recommended Production Deployment Specifications
 
 - **System Memory**: At least 256 GB RAM
 - **CPU Cores**: At least 32 CPU cores
