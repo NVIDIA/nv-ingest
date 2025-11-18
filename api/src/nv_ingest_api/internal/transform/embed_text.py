@@ -6,18 +6,19 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
+from urllib.parse import urlparse
 
 import glom
 import pandas as pd
-from openai import OpenAI
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.util.nim import infer_microservice
+
 
 logger = logging.getLogger(__name__)
 
 # Reduce SDK HTTP logging verbosity so request/response logs are not emitted
-logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
@@ -80,27 +81,22 @@ def _make_async_request(
         # Normalize API key to avoid sending an empty bearer token via SDK internals
         _token = (api_key or "").strip()
         _api_key = _token if _token else "<no key provided>"
-        client = OpenAI(
-            api_key=_api_key,
-            base_url=embedding_nim_endpoint,
+
+        resp = infer_microservice(
+            prompts,
+            embedding_model,
+            embedding_endpoint=embedding_nim_endpoint,
+            nvidia_api_key=_api_key,
+            input_type=input_type,
+            truncate=truncate,
+            batch_size=8191,
+            grpc="http" not in urlparse(embedding_nim_endpoint).scheme,
+            input_names=["text"],
+            output_names=["embeddings"],
+            dtypes=["BYTES"],
         )
 
-        extra_body = {
-            "input_type": input_type,
-            "truncate": truncate,
-        }
-        if modalities:
-            extra_body["modality"] = modalities
-
-        resp = client.embeddings.create(
-            input=prompts,
-            model=embedding_model,
-            encoding_format=encoding_format,
-            extra_body=extra_body,
-            dimensions=dimensions,
-        )
-
-        response["embedding"] = resp.data
+        response["embedding"] = resp
         response["info_msg"] = None
 
     except Exception as err:
