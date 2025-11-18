@@ -137,6 +137,12 @@ def main():
     )
     ap.add_argument("--top", type=int, default=0, help="Show top N entries")
     ap.add_argument(
+        "--threshold",
+        type=float,
+        default=0.0,
+        help="Minimum fraction (0..1) of total aggregate time a stage must account for to be shown",
+    )
+    ap.add_argument(
         "--exclude-channel-in",
         action="store_true",
         help="Exclude entries whose names contain 'channel_in' or 'network_in' from listings",
@@ -226,6 +232,13 @@ def main():
             "mean_ns": mean,
             "p95_ns": p95,
             "p99_ns": p99,
+        }
+
+    # Apply threshold filtering as a fraction of total aggregate time
+    total_ns_all = sum(meta["total_ns"] for meta in stats_map.values())
+    if args.threshold and total_ns_all > 0:
+        stats_map = {
+            name: meta for name, meta in stats_map.items() if (meta["total_ns"] / total_ns_all) >= args.threshold
         }
 
     # Sort by total time desc
