@@ -90,7 +90,7 @@ def _make_async_request(
             input_type=input_type,
             truncate=truncate,
             batch_size=8191,
-            grpc=urlparse(embedding_nim_endpoint).scheme != "http",
+            grpc="http" not in urlparse(embedding_nim_endpoint).scheme,
             input_names=["text"],
             output_names=["embeddings"],
             dtypes=["BYTES"],
