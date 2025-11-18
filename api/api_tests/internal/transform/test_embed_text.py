@@ -400,10 +400,7 @@ def test_make_async_request_happy_path(im_mock):
         dtypes=["BYTES"],
     )
 
-    assert result == {
-        "embedding": [[0.1, 0.2, 0.3]],
-        "info_msg": None
-    }
+    assert result == {"embedding": [[0.1, 0.2, 0.3]], "info_msg": None}
 
 
 @patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
