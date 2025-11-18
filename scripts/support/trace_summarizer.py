@@ -23,6 +23,7 @@ import re
 import argparse
 import os
 import glob
+import math
 from collections import defaultdict
 from typing import Dict, Any, List, Tuple
 
@@ -87,25 +88,34 @@ def _convert_units(ns: int, units: str) -> float:
     raise ValueError("Unsupported units: " + units)
 
 
-def summarize(trace_maps: List[Dict[str, Any]], normalize_suffixes: bool = True) -> Dict[str, int]:
+def summarize_durations(trace_maps: List[Dict[str, Any]], normalize_suffixes: bool = True) -> Dict[str, List[int]]:
     """
-    Compute total durations in nanoseconds per normalized area name across all maps.
+    Compute list of durations (in ns) per normalized area name across all maps.
     """
-    totals_ns: Dict[str, int] = defaultdict(int)
+    durations: Dict[str, List[int]] = defaultdict(list)
     for trace_map in trace_maps:
         entries = _iter_entries(trace_map)
         for name, ts_entry in entries:
             ts_exit = _get_exit_ts(trace_map, name)
             if ts_exit is None:
-                # unmatched entry; skip but print warning to stderr
                 print(f"[warn] missing exit for '{name}'", file=sys.stderr)
                 continue
             if ts_exit < ts_entry:
-                # malformed; skip
                 print(f"[warn] exit < entry for '{name}'", file=sys.stderr)
                 continue
             norm = _normalize_name(name) if normalize_suffixes else name
-            totals_ns[norm] += ts_exit - ts_entry
+            durations[norm].append(ts_exit - ts_entry)
+    return dict(durations)
+
+
+def summarize(trace_maps: List[Dict[str, Any]], normalize_suffixes: bool = True) -> Dict[str, int]:
+    """
+    Compute total durations in nanoseconds per normalized area name across all maps.
+    """
+    totals_ns: Dict[str, int] = defaultdict(int)
+    durations = summarize_durations(trace_maps, normalize_suffixes=normalize_suffixes)
+    for k, vals in durations.items():
+        totals_ns[k] = sum(vals)
     return dict(totals_ns)
 
 
@@ -126,6 +136,11 @@ def main():
         help="Tree mode: show parent totals including the sum of all descendants",
     )
     ap.add_argument("--top", type=int, default=0, help="Show top N entries")
+    ap.add_argument(
+        "--exclude-channel-in",
+        action="store_true",
+        help="Exclude entries whose names contain 'channel_in' or 'network_in' from listings",
+    )
     args = ap.parse_args()
 
     trace_maps = []
@@ -180,13 +195,53 @@ def main():
             return 2
 
     normalize_suffixes = not args.no_aggregate_suffixes
-    totals_ns = summarize(trace_maps, normalize_suffixes=normalize_suffixes)
+    durations_by_name = summarize_durations(trace_maps, normalize_suffixes=normalize_suffixes)
 
-    # Sort by total time desc (flat list of (name, total_ns))
-    items = sorted(totals_ns.items(), key=lambda kv: kv[1], reverse=True)
+    # Optionally exclude channel_in/network_in entries
+    if args.exclude_channel_in:
+        durations_by_name = {
+            k: v for k, v in durations_by_name.items() if ("channel_in" not in k and "network_in" not in k)
+        }
+
+    # Compute stats per name
+    def _percentile(values: List[int], p: float) -> float:
+        if not values:
+            return 0.0
+        vs = sorted(values)
+        n = len(vs)
+        # Nearest-rank method
+        rank = max(1, int(math.ceil(p * n)))
+        return float(vs[rank - 1])
+
+    stats_map: Dict[str, Dict[str, float]] = {}
+    for name, vals in durations_by_name.items():
+        total = float(sum(vals))
+        count = len(vals)
+        mean = (total / count) if count else 0.0
+        p95 = _percentile(vals, 0.95)
+        p99 = _percentile(vals, 0.99)
+        stats_map[name] = {
+            "total_ns": total,
+            "count": count,
+            "mean_ns": mean,
+            "p95_ns": p95,
+            "p99_ns": p99,
+        }
+
+    # Sort by total time desc
+    items = sorted(stats_map.items(), key=lambda kv: kv[1]["total_ns"], reverse=True)
 
     if args.json:
-        out = {name: _convert_units(total, args.units) for name, total in items}
+        out = {
+            name: {
+                "total": _convert_units(int(meta["total_ns"]), args.units),
+                "count": int(meta["count"]),
+                "mean": _convert_units(int(meta["mean_ns"]), args.units),
+                "p95": _convert_units(int(meta["p95_ns"]), args.units),
+                "p99": _convert_units(int(meta["p99_ns"]), args.units),
+            }
+            for name, meta in items
+        }
         print(json.dumps(out, indent=2))
         return 0
 
@@ -231,27 +286,44 @@ def main():
 
         # Apply --top to root-level only (tree mode)
         root_totals = defaultdict(int)
-        for name, total_ns in items:
+        for name, meta in items:
+            total_ns = int(meta["total_ns"])
             root = name.split("::")[0]
             root_totals[root] += total_ns
         sorted_roots = sorted(root_totals.items(), key=lambda kv: kv[1], reverse=True)
         if args.top and args.top > 0:
             keep_roots = set([r for r, _ in sorted_roots[: args.top]])
-            filtered_items = [kv for kv in items if kv[0].split("::")[0] in keep_roots]
+            filtered_items = [
+                (name, int(meta["total_ns"])) for name, meta in items if name.split("::")[0] in keep_roots
+            ]
         else:
-            filtered_items = items
+            filtered_items = [(name, int(meta["total_ns"])) for name, meta in items]
 
         tree = build_tree(filtered_items)
         rows = flatten_tree(tree)
         # Print as table with indentation for the area column
         col1 = "area"
         col2 = f"total ({args.units})"
-        print(f"{col1:<80} {col2:>16}")
-        print("-" * 98)
+        col3 = "count"
+        col4 = f"mean ({args.units})"
+        col5 = f"p95 ({args.units})"
+        col6 = f"p99 ({args.units})"
+        print(f"{col1:<60} {col2:>12} {col3:>8} {col4:>12} {col5:>12} {col6:>12}")
+        print("-" * 120)
         for level, name, total_ns in rows:
-            val = _convert_units(total_ns, args.units)
+            total_val = _convert_units(total_ns, args.units)
             display = f"{'  ' * level}{name}"
-            print(f"{display:<80} {val:>16.3f}")
+            meta = stats_map.get(name)
+            if meta:
+                count = int(meta["count"])
+                mean_val = _convert_units(int(meta["mean_ns"]), args.units)
+                p95_val = _convert_units(int(meta["p95_ns"]), args.units)
+                p99_val = _convert_units(int(meta["p99_ns"]), args.units)
+                print(
+                    f"{display:<60} {total_val:>12.3f} {count:>8} {mean_val:>12.3f} {p95_val:>12.3f} {p99_val:>12.3f}"
+                )
+            else:
+                print(f"{display:<60} {total_val:>12.3f} {'-':>8} {'-':>12} {'-':>12} {'-':>12}")
     else:
         # Print primitive distribution before flat table (non-JSON)
         print("primitive distribution")
@@ -267,15 +339,23 @@ def main():
             for k, v in sorted(structured_by_subtype.items(), key=lambda kv: kv[1], reverse=True):
                 print(f"{k:<80} {v:>16}")
         print()
-        # Flat table output (original behavior)
+        # Flat table output with stats
         flat_items = items[: args.top] if (args.top and args.top > 0) else items
         col1 = "area"
         col2 = f"total ({args.units})"
-        print(f"{col1:<80} {col2:>16}")
-        print("-" * 98)
-        for name, total_ns in flat_items:
-            val = _convert_units(total_ns, args.units)
-            print(f"{name:<80} {val:>16.3f}")
+        col3 = "count"
+        col4 = f"mean ({args.units})"
+        col5 = f"p95 ({args.units})"
+        col6 = f"p99 ({args.units})"
+        print(f"{col1:<60} {col2:>12} {col3:>8} {col4:>12} {col5:>12} {col6:>12}")
+        print("-" * 120)
+        for name, meta in flat_items:
+            total_val = _convert_units(int(meta["total_ns"]), args.units)
+            count = int(meta["count"])
+            mean_val = _convert_units(int(meta["mean_ns"]), args.units)
+            p95_val = _convert_units(int(meta["p95_ns"]), args.units)
+            p99_val = _convert_units(int(meta["p99_ns"]), args.units)
+            print(f"{name:<60} {total_val:>12.3f} {count:>8} {mean_val:>12.3f} {p95_val:>12.3f} {p99_val:>12.3f}")
 
     return 0
 
