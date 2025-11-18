@@ -70,6 +70,12 @@ services:
     - Per‑embedding size: 4,096 dims × 4 bytes (float32) = 16,384 bytes; base64 expansion × 4/3 ≈ 21,845 bytes (≈21.3 KB).
     - Total embeddings payload: ≈ 2,083 × 21.3 KB ≈ 45 MB, excluding JSON keys/metadata.
     - Takeaway: a 1 MB source can yield ≳40× memory just for embeddings, before adding extracted text, images, or other artifacts.
+  - Example: PDF rendering and extracted images (A4 @ 72 DPI)
+    - Rendering a page is a large in‑memory buffer; each extracted sub‑image adds more, and base64 inflates size.
+    - Page pixels ≈ 8.27×72 by 11.69×72 ≈ 595×842 ≈ 0.50 MP.
+    - RGB (3 bytes/pixel) ≈ 1.5 MB per page buffer; RGBA (4 bytes/pixel) ≈ 2.0 MB.
+    - Ten 1024×1024 RGB crops ≈ 3.0 MB each in memory → base64 (+33%) ≈ 4.0 MB each ⇒ ~40 MB just for crops (JSON not included).
+    - If you also base64 the full page image, expect another ~33% over the raw byte size (compression varies by format).
 - **Library behavior**
   - Components like PyArrow may retain memory longer than expected (delayed free).
 - **Queues and payloads**
