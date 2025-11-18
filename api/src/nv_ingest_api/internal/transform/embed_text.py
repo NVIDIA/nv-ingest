@@ -96,7 +96,7 @@ def _make_async_request(
             dtypes=["BYTES"],
         )
 
-        response["embedding"] = resp.data
+        response["embedding"] = resp
         response["info_msg"] = None
 
     except Exception as err:
