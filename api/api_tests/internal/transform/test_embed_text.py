@@ -372,7 +372,7 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
 @patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
 def test_make_async_request_happy_path(im_mock):
     # Assign
-    im_mock.return_value = MagicMock(data=[[0.1, 0.2, 0.3]])
+    im_mock.return_value = [[0.1, 0.2, 0.3]]
     # Act
     result = module_under_test._make_async_request(
         prompts=["Hello world"],
@@ -402,7 +402,7 @@ def test_make_async_request_happy_path(im_mock):
 
     assert result == {
         "embedding": [[0.1, 0.2, 0.3]],
-        "info_msg": None,
+        "info_msg": None
     }
 
 
