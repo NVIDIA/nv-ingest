@@ -1,8 +1,10 @@
 import json
 import logging
 import os
+import re
 import shutil
 import time
+from collections import defaultdict
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -20,6 +22,138 @@ try:
     from pymilvus import MilvusClient
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
+
+
+NS_IN_SECOND = 1_000_000_000
+
+
+def _ns_to_seconds(value):
+    if value is None:
+        return None
+    return value / NS_IN_SECOND
+
+
+def _safe_trace_filename(source_id: str | None, index: int) -> str:
+    base = source_id or f"document_{index}"
+    base = os.path.basename(str(base))
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", base)[:80]
+    if not sanitized:
+        sanitized = f"document_{index}"
+    return f"{index:03d}_{sanitized}"
+
+
+def _extract_source_id(doc_results) -> str | None:
+    if doc_results is None:
+        return None
+    try:
+        first_entry = doc_results[0]
+    except (IndexError, KeyError, TypeError):
+        return None
+    except Exception:
+        try:
+            iterator = iter(doc_results)
+            first_entry = next(iterator)
+        except Exception:
+            return None
+    metadata = first_entry.get("metadata", {}) if isinstance(first_entry, dict) else {}
+    source_meta = metadata.get("source_metadata", {})
+    return source_meta.get("source_id")
+
+
+def _summarize_traces(traces_list, results, trace_dir: str | None):
+    if not traces_list:
+        return None
+
+    valid_traces = [(idx, trace) for idx, trace in enumerate(traces_list) if trace]
+    if not valid_traces:
+        return None
+
+    stage_totals = defaultdict(list)
+    document_totals = []
+
+    if trace_dir:
+        os.makedirs(trace_dir, exist_ok=True)
+
+    for doc_index, trace_payload in valid_traces:
+        if not isinstance(trace_payload, dict):
+            continue
+
+        source_id = None
+        if results and doc_index < len(results):
+            source_id = _extract_source_id(results[doc_index])
+        if not source_id:
+            source_id = f"document_{doc_index}"
+
+        stage_breakdown = {}
+        total_resident = 0.0
+        total_wall = 0.0
+        wall_seen = False
+
+        for key, value in trace_payload.items():
+            if not key.startswith("trace::resident_time::"):
+                continue
+            stage = key.replace("trace::resident_time::", "")
+            resident_s = _ns_to_seconds(value) or 0.0
+            entry = trace_payload.get(f"trace::entry::{stage}")
+            exit_value = trace_payload.get(f"trace::exit::{stage}")
+            wall_s = None
+            if entry is not None and exit_value is not None:
+                wall_s = _ns_to_seconds(exit_value - entry)
+
+            stage_entry = {"resident_s": round(resident_s, 6)}
+            if wall_s is not None:
+                stage_entry["wall_s"] = round(wall_s, 6)
+                wall_seen = True
+                total_wall += wall_s
+
+            stage_breakdown[stage] = stage_entry
+            total_resident += resident_s
+            stage_totals[stage].append(resident_s)
+
+        document_totals.append(
+            {
+                "document_index": doc_index,
+                "source_id": source_id,
+                "total_resident_s": round(total_resident, 6),
+                **({"total_wall_s": round(total_wall, 6)} if wall_seen else {}),
+            }
+        )
+
+        if trace_dir:
+            trace_payload_path = os.path.join(trace_dir, f"{_safe_trace_filename(source_id, doc_index)}.json")
+            trace_record = {
+                "document_index": doc_index,
+                "source_id": source_id,
+                "trace": trace_payload,
+                "stage_summary": stage_breakdown,
+            }
+            try:
+                with open(trace_payload_path, "w") as fp:
+                    json.dump(trace_record, fp, indent=2)
+            except OSError as err:
+                print(f"Failed to write trace file {trace_payload_path}: {err}")
+
+    if not stage_totals:
+        return None
+
+    stage_summary = {}
+    for stage, values in stage_totals.items():
+        total = sum(values)
+        count = len(values)
+        stage_summary[stage] = {
+            "documents": count,
+            "total_resident_s": round(total, 6),
+            "avg_resident_s": round(total / count, 6),
+            "max_resident_s": round(max(values), 6),
+            "min_resident_s": round(min(values), 6),
+        }
+
+    return {
+        "documents": len(document_totals),
+        "output_dir": trace_dir,
+        "stage_totals": stage_summary,
+        "document_totals": document_totals,
+    }
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -74,6 +208,18 @@ def main(config=None, log_path: str = "test_results") -> int:
     enable_caption = config.enable_caption
     enable_split = config.enable_split
     enable_image_storage = config.enable_image_storage
+
+    # Trace capture
+    enable_traces = getattr(config, "enable_traces", False)
+    trace_output_dir = getattr(config, "trace_output_dir", None)
+    trace_dir = None
+    if enable_traces:
+        trace_dir = (
+            os.path.abspath(os.path.expanduser(trace_output_dir))
+            if trace_output_dir
+            else os.path.join(log_path, "traces")
+        )
+        print(f"Trace capture enabled. Raw traces will be written to: {trace_dir}")
 
     # Text splitting configuration
     split_chunk_size = config.split_chunk_size
@@ -201,7 +347,20 @@ def main(config=None, log_path: str = "test_results") -> int:
         purge_results_after_upload=False,
     ).save_to_disk(output_directory=spill_dir)
 
-    results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
+    ingest_kwargs = {
+        "show_progress": True,
+        "return_failures": True,
+        "save_to_disk": True,
+    }
+    if enable_traces:
+        ingest_kwargs["return_traces"] = True
+
+    ingest_result = ingestor.ingest(**ingest_kwargs)
+    if enable_traces:
+        results, failures, traces_list = ingest_result
+    else:
+        results, failures = ingest_result
+        traces_list = []
     ingestion_time = time.time() - ingestion_start
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
@@ -258,6 +417,12 @@ def main(config=None, log_path: str = "test_results") -> int:
     retrieval_time = time.time() - querying_start
     kv_event_log("retrieval_time_s", retrieval_time, log_path)
 
+    trace_summary = None
+    if enable_traces:
+        trace_summary = _summarize_traces(traces_list, results, trace_dir)
+        if trace_summary:
+            kv_event_log("trace_documents", trace_summary["documents"], log_path)
+
     # Summarize - Build comprehensive results dict
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
     test_name = config.test_name or dataset_name
@@ -302,6 +467,9 @@ def main(config=None, log_path: str = "test_results") -> int:
     if enable_split:
         test_results["test_config"]["split_chunk_size"] = split_chunk_size
         test_results["test_config"]["split_chunk_overlap"] = split_chunk_overlap
+
+    if trace_summary:
+        test_results["trace_summary"] = trace_summary
 
     print(f"\n{test_name}_e2e summary:")
     print(json.dumps(test_results, indent=2))

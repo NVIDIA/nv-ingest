@@ -212,7 +212,7 @@ def _create_subjob_dict(
     tracing_options = dict(base_tracing_options)
     tracing_options.setdefault("trace", True)
     tracing_options["trace_id"] = str(current_trace_id)
-    tracing_options["ts_send"] = int(time.time() * 1000)
+    tracing_options["ts_send"] = time.time_ns()
     tracing_options["parent_job_id"] = parent_job_id
     for key, value in start_key.items():
         tracing_options[key] = value

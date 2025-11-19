@@ -179,6 +179,8 @@ def run_datasets(
             "infrastructure": "managed" if managed else "attach",
             "api_version": config.api_version,
             "pdf_split_page_count": config.pdf_split_page_count,
+            "enable_traces": getattr(config, "enable_traces", False),
+            "trace_output_dir": getattr(config, "trace_output_dir", None),
             "return_code": rc,
         }
 

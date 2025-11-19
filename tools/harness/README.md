@@ -199,6 +199,43 @@ EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dat
 - `artifacts_dir` (string): Test output directory (auto-generated if null)
 - `collection_name` (string): Milvus collection name (auto-generated as `{test_name}_multimodal` if null, deterministic - no timestamp)
 
+#### Trace Capture Options
+- `enable_traces` (boolean): When `true`, the `e2e` case requests parent-level trace payloads from the V2 API (see `docs/docs/extraction/v2-api-guide.md`) and emits per-stage summaries.
+- `trace_output_dir` (string or null): Optional override for where raw trace JSON files are written. Defaults to `<artifact_dir>/traces` when null.
+
+When traces are enabled:
+
+1. Each processed document gets a raw payload written to `trace_output_dir/<index>_<source>.json` that contains the complete `"trace::"` dictionary plus a small stage summary. These files match the structure shown in `scripts/private_local/trace.json`.
+2. `results.json` gains a `trace_summary` block that aggregates resident-time seconds per stage and lists total compute seconds per document. Example:
+
+```json
+"trace_summary": {
+  "documents": 20,
+  "output_dir": "/raid/.../scripts/tests/artifacts/bo20_20251119_183733_UTC/traces",
+  "stage_totals": {
+    "pdf_extractor": {
+      "documents": 20,
+      "total_resident_s": 32.18,
+      "avg_resident_s": 1.61,
+      "max_resident_s": 2.04,
+      "min_resident_s": 1.42
+    }
+  },
+  "document_totals": [
+    {"document_index": 0, "source_id": "doc001.pdf", "total_resident_s": 1.58},
+    {"document_index": 1, "source_id": "doc002.pdf", "total_resident_s": 1.64}
+    // ...
+  ]
+}
+```
+
+**Enable via YAML or environment variables:**
+
+- YAML: set `enable_traces: true` (and optionally `trace_output_dir`) in the `active` section.
+- Environment: `ENABLE_TRACES=true TRACE_OUTPUT_DIR=/raid/jioffe/traces python run.py --case=e2e --dataset=bo20`
+
+> ℹ️ Tracing is most valuable with V2 + PDF splitting enabled. Follow the guidance in `docs/docs/extraction/v2-api-guide.md` to ensure `api_version=v2` and `pdf_split_page_count` are configured.
+
 ### Valid Configuration Values
 
 **text_depth**: `block`, `body`, `document`, `header`, `line`, `nearby_block`, `other`, `page`, `span`
@@ -821,6 +858,61 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 - **Configuration**: See `config.py` for complete field list and validation logic
 - **Test utilities**: See `interact.py` for shared helper functions  
+## Profiling & Trace Capture Workflow
+
+### Baseline vs RC Trace Runs
+
+1. **Prep environment**
+   ```bash
+   source ~/setup_env.sh
+   nv-restart             # baseline (local build)
+   # or
+   nv-stop && nv-start-release   # RC image
+   ```
+2. **Enable traces + V2 split settings (env vars or YAML)**
+   ```bash
+   export API_VERSION=v2
+   export PDF_SPLIT_PAGE_COUNT=32          # use 16/64/etc. as needed
+   export ENABLE_TRACES=true
+   # Optional: export TRACE_OUTPUT_DIR=/raid/jioffe/traces/baseline
+   ```
+3. **Run datasets (repeat for bo20 + bo767, baseline + RC)**
+   ```bash
+   python scripts/tests/run.py --case=e2e --dataset=bo20
+   python scripts/tests/run.py --case=e2e --dataset=bo767
+   ```
+4. **Collect artifacts**
+   - `stdout.txt` → console logs
+   - `results.json` → includes `trace_summary` with per-stage resident seconds
+   - `traces/*.json` → raw payloads identical to `scripts/private_local/trace.json`
+   - Use descriptive folder names (e.g., copy artifacts to `artifacts/baseline_bo20/`) to keep baseline vs RC side-by-side.
+5. **Visualize stage timings**
+   ```bash
+   # Generates results.stage_time.png + textual summary
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json \
+     --sort total \
+     --keep-nested \
+     --exclude-network
+   ```
+   - `--keep-nested` preserves nested entries such as chart/table OCR workloads
+   - `--exclude-network` hides broker/Redis wait time so the chart focuses on Ray stages
+
+### Future Trace Visualization Case (roadmap)
+
+With `trace_summary` + raw dumps in place, a follow-on `cases/e2e_profile.py` can:
+- Accept one or two artifact directories (baseline vs RC) as input.
+- Load each run’s `trace_summary` and optional raw trace JSON to compute deltas.
+- Emit per-stage bar/violin charts (resident vs wall clock) plus CSV summaries.
+- Store outputs under `trace_profile/` inside each artifact directory.
+
+Open questions before implementing:
+- Preferred plotting backend (`matplotlib`, `plotly`, or Altair) and whether CI should emit PNG, HTML, or both.
+- Artifact naming for comparisons (e.g., `trace_profile/baseline_vs_rc/bo20.png`).
+- Regression thresholds and alerting expectations (what % delta constitutes a failure?).
+- Should the visualization case automatically diff against the most recent baseline or just emit standalone assets?
+
+Capturing these answers (plus a few representative trace samples) will let a future sprint land the visualization workflow quickly.
 - **Docker setup**: See project root README for service management commands
 - **API documentation**: See `docs/` for API version differences
 
