@@ -192,6 +192,27 @@ stages:
         strategy: "static"
         value: 1
 
+  - name: "ocr_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor:OCRExtractorStage"
+    config:
+      endpoint_config:
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 4
+      static_replicas:
+        strategy: "static"
+        value: 3
+
   - name: "infographic_extractor"
     type: "stage"
     phase: 1  # EXTRACTION
@@ -464,6 +485,9 @@ edges:
     to: "chart_extractor"
     queue_size: 4
   - from: "chart_extractor"
+    to: "ocr_extractor"
+    queue_size: 8
+  - from: "ocr_extractor"
     to: "image_filter"
     queue_size: 4
 

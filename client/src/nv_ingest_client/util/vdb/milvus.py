@@ -44,6 +44,7 @@ from scipy.sparse import csr_array
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
+DENSE_INDEX_NAME = "dense_index"
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -93,7 +94,7 @@ def create_meta_collection(
     index_params = MilvusClient.prepare_index_params()
     index_params.add_index(
         field_name="vector",
-        index_name="dense_index",
+        index_name=DENSE_INDEX_NAME,
         index_type="FLAT",
         metric_type="L2",
     )
@@ -313,7 +314,7 @@ def create_nvingest_index_params(
     if local_index:
         index_params.add_index(
             field_name="vector",
-            index_name="dense_index",
+            index_name=DENSE_INDEX_NAME,
             index_type="FLAT",
             metric_type="L2",
         )
@@ -321,7 +322,7 @@ def create_nvingest_index_params(
         if gpu_index:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="GPU_CAGRA",
                 metric_type="L2",
                 params={
@@ -335,7 +336,7 @@ def create_nvingest_index_params(
         else:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="HNSW",
                 metric_type="L2",
                 params={"M": 64, "efConstruction": 512},
@@ -493,7 +494,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
     if isinstance(indexes, dict):
         # Old Milvus behavior (< 2.5.6)
         for k, v in indexes.items():
-            if k[1] == "dense_index" and hasattr(v, "_index_type"):
+            if k[1] == DENSE_INDEX_NAME and hasattr(v, "_index_type"):
                 d_idx = v._index_type
             if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
                 s_idx = v._index_type
@@ -504,7 +505,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
             index_name = getattr(idx, "index_name", None)
             index_type = getattr(idx, "index_type", None)
 
-            if index_name == "dense_index":
+            if index_name == DENSE_INDEX_NAME:
                 d_idx = index_type
             if sparse and index_name == "sparse_index":
                 s_idx = index_type
@@ -900,31 +901,32 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
     client.flush(collection_name)
-    index_names = utility.list_indexes(collection_name)
+    # index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
-    for index_name in index_names:
+    # observe dense_index, all indexes get populated simultaneously
+    for index_name in [DENSE_INDEX_NAME]:
         indexed_rows = 0
-        already_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
-        while indexed_rows < num_elements:
+        expected_rows = client.describe_index(collection_name, index_name)["indexed_rows"] + num_elements
+        while indexed_rows < expected_rows:
             pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
             for i in range(20):
-                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                current_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
                 logger.info(
-                    f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
+                    f"Indexed rows, {collection_name}, {index_name} -  {current_indexed_rows} / {expected_rows}"
                 )
-                if new_indexed_rows == already_indexed_rows + num_elements:
-                    indexed_rows = new_indexed_rows
+                if current_indexed_rows == expected_rows:
+                    indexed_rows = current_indexed_rows
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
-                if new_indexed_rows == indexed_rows:
+                if current_indexed_rows == indexed_rows:
                     pos_movement -= 1
                 else:
                     pos_movement = 10
                 # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
                 if pos_movement == 0:
-                    raise ValueError("Rows are not getting indexed as expected")
-                indexed_rows = new_indexed_rows
+                    raise ValueError(f"Rows are not getting indexed as expected for: {index_name} - {collection_name}")
+                indexed_rows = current_indexed_rows
     return indexed_rows
 
 
@@ -2058,3 +2060,24 @@ class Milvus(VDB):
                 self.write_to_index(records, collection_name=coll_name, **sub_write_params)
         else:
             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records
+
+    def run_async(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            logger.info(f"creating index - {collection_name}")
+            self.create_index(collection_name=collection_name, **create_params)
+            records = records.result()
+            logger.info(f"writing to index, for collection - {collection_name}")
+            self.write_to_index(records, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                sub_write_params.pop("collection_name", None)
+                self.create_index(collection_name=coll_name, **create_params)
+                self.write_to_index(records, collection_name=coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records

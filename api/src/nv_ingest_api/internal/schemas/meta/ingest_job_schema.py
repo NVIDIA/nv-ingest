@@ -181,6 +181,10 @@ class IngestTaskInfographicExtraction(BaseModelNoExt):
     params: dict = Field(default_factory=dict)
 
 
+class IngestTaskOCRExtraction(BaseModelNoExt):
+    params: dict = Field(default_factory=dict)
+
+
 class IngestTaskUDFSchema(BaseModelNoExt):
     udf_function: str
     udf_function_name: str
@@ -231,6 +235,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
+        IngestTaskOCRExtraction,
         IngestTaskUDFSchema,
     ]
     raise_on_failure: bool = False
@@ -263,6 +268,7 @@ class IngestTaskSchema(BaseModelNoExt):
             TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
             TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
             TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            TaskTypeEnum.OCR_DATA_EXTRACT: IngestTaskOCRExtraction,
             TaskTypeEnum.UDF: IngestTaskUDFSchema,
         }
 

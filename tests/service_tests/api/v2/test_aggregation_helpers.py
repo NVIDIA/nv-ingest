@@ -171,16 +171,17 @@ class TestPrepareChunkSubmission:
             parent_uuid=parent_uuid,
             parent_job_id=parent_job_id,
             current_trace_id=current_trace_id,
-            original_source_id=original_source_id,
-            original_source_name=original_source_name,
+            source_id=original_source_id,
+            source_name=original_source_name,
+            document_type=["pdf"],
         )
 
         spec = json.loads(wrapper.payload)
 
         assert spec["job_id"] == subjob_id
         assert spec["job_payload"]["content"] == [base64.b64encode(b"chunk-bytes").decode("utf-8")]
-        assert spec["job_payload"]["source_id"] == ["doc-123#pages_1-2"]
-        assert spec["job_payload"]["source_name"] == ["document.pdf#pages_1-2"]
+        assert spec["job_payload"]["source_id"] == ["doc-123"]
+        assert spec["job_payload"]["source_name"] == ["document.pdf"]
         assert spec["tracing_options"]["trace_id"] == str(current_trace_id)
         assert spec["tracing_options"]["parent_job_id"] == parent_job_id
         assert spec["tracing_options"]["page_num"] == 1
@@ -216,16 +217,21 @@ class TestPrepareChunkSubmission:
             parent_uuid=parent_uuid,
             parent_job_id=parent_job_id,
             current_trace_id=123,
-            original_source_id="doc-123",
-            original_source_name="document.pdf",
+            source_id="doc-123",
+            source_name="document.pdf",
+            document_type="pdf",
         )
 
         spec = json.loads(wrapper.payload)
 
         assert subjob_id == str(expected_uuid)
-        assert spec["job_payload"]["source_id"] == ["doc-123#page_3"]
-        assert spec["job_payload"]["source_name"] == ["document.pdf#page_3"]
+        assert spec["job_payload"]["source_id"] == ["doc-123"]
+        assert spec["job_payload"]["document_type"] == ["pdf"]
+        assert spec["job_payload"]["source_name"] == ["document.pdf"]
         assert spec["job_payload"]["content"] == [base64.b64encode(b"solo-page").decode("utf-8")]
+
+        assert spec["tracing_options"]["parent_job_id"] == parent_job_id
+        assert spec["tracing_options"]["page_num"] == 3
 
 
 class TestSubmitJobV2Splitting:

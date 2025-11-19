@@ -97,8 +97,6 @@ services:
               device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
-    profiles:
-      - table-structure
 
   ocr:
     image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
@@ -499,10 +497,10 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-attu
-    image: zilliz/attu:v2.3.5
+    image: zilliz/attu:v2.5.3
     hostname: attu
     environment:
-      MILVUS_URL: http://milvus:19530
+      MILVUS_URL: milvus:19530
     ports:
       - "3001:3000"
     depends_on:

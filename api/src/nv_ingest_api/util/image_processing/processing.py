@@ -21,7 +21,6 @@ from typing import List, Tuple, Optional
 
 from nv_ingest_api.internal.primitives.nim.default_values import (
     YOLOX_MAX_BATCH_SIZE,
-    YOLOX_NUM_CLASSES,
     YOLOX_CONF_THRESHOLD,
     YOLOX_IOU_THRESHOLD,
     YOLOX_MIN_SCORE,
@@ -144,7 +143,6 @@ def extract_tables_and_charts_yolox(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
-            num_classes=YOLOX_NUM_CLASSES,
             conf_thresh=YOLOX_CONF_THRESHOLD,
             iou_thresh=YOLOX_IOU_THRESHOLD,
             min_score=YOLOX_MIN_SCORE,

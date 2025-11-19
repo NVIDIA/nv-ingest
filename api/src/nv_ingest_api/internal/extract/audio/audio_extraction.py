@@ -11,6 +11,8 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+import base64
+from pathlib import Path
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
@@ -18,6 +20,7 @@ from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExt
 from nv_ingest_api.internal.schemas.meta.metadata_schema import MetadataSchema, AudioMetadataSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest_api.interface.utility import read_file_as_base64
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +59,25 @@ def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, seg
         raise ValueError("Row does not contain 'metadata'.")
 
     base64_audio = metadata.pop("content")
+    try:
+        base64_file_path = base64_audio
+        if not base64_file_path:
+            return [row.to_list()]
+        base64_file_path = base64.b64decode(base64_file_path).decode("utf-8")
+        if not base64_file_path:
+            return [row.to_list()]
+        if Path(base64_file_path).exists():
+            base64_audio = read_file_as_base64(base64_file_path)
+    except (UnicodeDecodeError, base64.binascii.Error):
+        pass
     content_metadata = metadata.get("content_metadata", {})
 
     # Only extract transcript if content type is audio
     if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return [row.to_list()]
+
+    logger.error(f"Removing file {base64_file_path}")
+    Path(base64_file_path).unlink(missing_ok=True)
 
     # Get the result from the inference model
     segments, transcript = audio_client.infer(

@@ -369,12 +369,10 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
     assert result == []
 
 
-@patch(f"{MODULE_UNDER_TEST}.OpenAI")
-def test_make_async_request_happy_path(mock_openai):
-    # Arrange
-    mock_client = mock_openai.return_value
-    mock_client.embeddings.create.return_value = MagicMock(data=[[0.1, 0.2, 0.3]])
-
+@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
+def test_make_async_request_happy_path(im_mock):
+    # Assign
+    im_mock.return_value = [[0.1, 0.2, 0.3]]
     # Act
     result = module_under_test._make_async_request(
         prompts=["Hello world"],
@@ -387,28 +385,28 @@ def test_make_async_request_happy_path(mock_openai):
         filter_errors=False,
         dimensions=None,
     )
-
     # Assert: client called as expected
-    mock_openai.assert_called_once_with(api_key="dummy_key", base_url="http://dummy-endpoint")
-    mock_client.embeddings.create.assert_called_once_with(
-        input=["Hello world"],
-        model="dummy_model",
-        encoding_format="float",
-        extra_body={"input_type": "passage", "truncate": "END"},
-        dimensions=None,
+    im_mock.assert_called_once_with(
+        ["Hello world"],
+        "dummy_model",
+        embedding_endpoint="http://dummy-endpoint",
+        nvidia_api_key="dummy_key",
+        input_type="passage",
+        truncate="END",
+        batch_size=8191,
+        grpc=False,
+        input_names=["text"],
+        output_names=["embeddings"],
+        dtypes=["BYTES"],
     )
 
-    assert result == {
-        "embedding": [[0.1, 0.2, 0.3]],
-        "info_msg": None,
-    }
+    assert result == {"embedding": [[0.1, 0.2, 0.3]], "info_msg": None}
 
 
-@patch(f"{MODULE_UNDER_TEST}.OpenAI")
-def test_make_async_request_failure_returns_none_embedding_and_info_message(mock_openai):
+@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
+def test_make_async_request_failure_returns_none_embedding_and_info_message(im_mock):
     # Arrange
-    mock_client = mock_openai.return_value
-    mock_client.embeddings.create.side_effect = RuntimeError("Simulated client failure")
+    im_mock.side_effect = RuntimeError("Simulated client failure")
 
     # Act & Assert
     with pytest.raises(RuntimeError) as excinfo:
