@@ -369,10 +369,12 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
     assert result == []
 
 
-@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
-def test_make_async_request_happy_path(im_mock):
+@patch("nv_ingest_api.util.nim.infer_microservice")
+@patch(f"{MODULE_UNDER_TEST}.infer_microservice", create=True)
+def test_make_async_request_happy_path(module_im_mock, nim_im_mock):
     # Assign
-    im_mock.return_value = [[0.1, 0.2, 0.3]]
+    nim_im_mock.return_value = [[0.1, 0.2, 0.3]]
+    module_im_mock.return_value = [[0.1, 0.2, 0.3]]
     # Act
     result = module_under_test._make_async_request(
         prompts=["Hello world"],
@@ -385,8 +387,8 @@ def test_make_async_request_happy_path(im_mock):
         filter_errors=False,
         dimensions=None,
     )
-    # Assert: client called as expected
-    im_mock.assert_called_once_with(
+    # Assert: client called as expected (module-level import is used in embed_text)
+    module_im_mock.assert_called_once_with(
         ["Hello world"],
         "dummy_model",
         embedding_endpoint="http://dummy-endpoint",
@@ -403,10 +405,12 @@ def test_make_async_request_happy_path(im_mock):
     assert result == {"embedding": [[0.1, 0.2, 0.3]], "info_msg": None}
 
 
-@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
-def test_make_async_request_failure_returns_none_embedding_and_info_message(im_mock):
+@patch("nv_ingest_api.util.nim.infer_microservice")
+@patch(f"{MODULE_UNDER_TEST}.infer_microservice", create=True)
+def test_make_async_request_failure_returns_none_embedding_and_info_message(module_im_mock, nim_im_mock):
     # Arrange
-    im_mock.side_effect = RuntimeError("Simulated client failure")
+    nim_im_mock.side_effect = RuntimeError("Simulated client failure")
+    module_im_mock.side_effect = RuntimeError("Simulated client failure")
 
     # Act & Assert
     with pytest.raises(RuntimeError) as excinfo:
