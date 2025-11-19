@@ -670,26 +670,35 @@ class Ingestor:
 
         return tuple(returns) if len(returns) > 1 else results
 
-    def ingest_async(self, **kwargs: Any) -> Future:
+    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **kwargs: Any) -> Future:
         """
-        Asynchronously submits jobs and returns a single future that completes when
-        all jobs have finished processing. This method is designed for in-memory
-        results and does not support disk saving or progress bars.
+        Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
-        The future's result will be a tuple: `(results, failures, traces)`. If a VDB
+        The return type of the future's result is dynamic and mirrors the behavior of the synchronous
+        `ingest()` method, controlled by the `return_failures` and `return_traces` flags. If a VDB
         upload is configured, the future will complete *after* the VDB upload finishes.
 
         Parameters
         ----------
+        return_failures : bool, optional
+            If True, return a tuple containing failures; otherwise, only return results. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
         kwargs : dict
-            Additional parameters passed to the concurrent processor, such as
-            `batch_size`, `max_job_retries`, `return_traces`, etc.
+            Additional parameters passed to the concurrent processor.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]
+        Future[Union[List[Any], Tuple[Any, ...]]]
             A future that completes when all jobs and any subsequent VDB upload
-            have finished. Its result is a tuple of (results, failures, traces).
+            have finished. Its result will be one of the following:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+
         """
         try:
             self._prepare_ingest_run()
@@ -702,28 +711,45 @@ class Ingestor:
 
             if not self._job_ids:
                 logger.warning("No job IDs to process for ingest_async.")
-                immediate_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = (
-                    Future()
-                )
-                immediate_future.set_result(([], [], []))
+                empty_returns = [[]]
+                if return_failures:
+                    empty_returns.append([])
+                if return_traces:
+                    empty_returns.append([])
+                final_empty_result = tuple(empty_returns) if len(empty_returns) > 1 else empty_returns[0]
+
+                immediate_future: Future = Future()
+                immediate_future.set_result(final_empty_result)
                 return immediate_future
 
-            # Filter kwargs for the processor and instantiate it.
-            # Unlike ingest(), async version does not support progress bar or disk callbacks.
-            proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
-            # Ensure return_failures and return_traces are handled correctly for unpacking
-            proc_kwargs["return_failures"] = True
-            proc_kwargs["return_traces"] = proc_kwargs.get("return_traces", False)
+            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
 
-            # Create the processor
+            # Establish default values for the processor, mirroring NvIngestClient.process_jobs_concurrently
+            # since we are calling the processor directly.
+            processor_args = {
+                "batch_size": kwargs.get("batch_size", None),  # Let the client validate None to its default
+                "timeout": kwargs.get("timeout", 100),
+                "max_job_retries": kwargs.get("max_job_retries", None),
+                "retry_delay": kwargs.get("retry_delay", 0.5),
+                "initial_fetch_delay": kwargs.get("initial_fetch_delay", 0.3),
+                "fail_on_submit_error": kwargs.get("fail_on_submit_error", False),
+                "verbose": kwargs.get("verbose", False),
+                "return_traces": return_traces,
+                # Arguments specific to async in-memory processing:
+                "completion_callback": None,
+                "stream_to_callback_only": False,
+                "return_full_response": kwargs.get("return_full_response", False),
+            }
+
+            processor_args["batch_size"] = self._client._validate_batch_size(processor_args["batch_size"])
+            processor_args["timeout"] = (int(processor_args["timeout"]), None)
+
             processor = _ConcurrentProcessor(
-                client=self._client, job_indices=self._job_ids, job_queue_id=self._job_queue_id, **proc_kwargs
+                client=self._client, job_indices=self._job_ids, job_queue_id=self._job_queue_id, **processor_args
             )
 
-            # This is the future we will return to the user
             final_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = Future()
 
-            # Run the processor asynchronously
             processor_future = processor.run_async()
 
             def _processor_done_callback(proc_future: Future):
@@ -738,32 +764,34 @@ class Ingestor:
                             final_future.set_exception(proc_future.exception())
                         return
 
-                    # Unpack results from the processor
-                    results, failures, traces = proc_future.result()
+                    results, failures, traces_list = proc_future.result()
 
-                    # Handle VDB upload if configured
-                    if self._vdb_bulk_upload:
-                        total_jobs = len(results) + len(failures)
-                        if failures and results:
-                            logger.warning(
-                                f"Job was not completely successful. {len(results)} out of {total_jobs} records "
-                                f"completed successfully. Uploading successful results to vector database."
-                            )
-                        if results:
-                            # This is a blocking call within the callback thread
-                            self._vdb_bulk_upload.run(results)
-                        else:
-                            logger.error(
-                                "Failed to ingest documents, unable to complete vdb bulk upload due to "
-                                f"no successful results. {len(failures)} out of {total_jobs} records failed."
-                            )
+                    if self._vdb_bulk_upload and results:
+                        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
+                            results_future = Future()
+                            results_future.set_result(results)
+                            vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
+                            vdb_future.result()
 
-                    # Set the final result after all steps are complete
+                    parent_trace_ids = (
+                        self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+                    )
+
+                    returns = [results]
+                    if return_failures:
+                        returns.append(failures)
+                    if return_traces:
+                        returns.append(traces_list)
+                    if include_parent_trace_ids:
+                        returns.append(parent_trace_ids)
+
+                    final_result = tuple(returns) if len(returns) > 1 else results
+
                     if not final_future.done():
-                        final_future.set_result((results, failures, traces))
+                        final_future.set_result(final_result)
 
                 except Exception as e:
-                    logger.exception("Error in ingest_async callback")
+                    logger.exception("Error in ingest_async processor callback")
                     if not final_future.done():
                         final_future.set_exception(e)
 
