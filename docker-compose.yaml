@@ -343,12 +343,11 @@ services:
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
       # Image Storage Configuration
-      # Set IMAGE_STORAGE_ENABLE_LOCAL_DISK=true to save images to local disk
-      # Images saved to ${DATASET_ROOT}/artifacts/store/images (defaults to ./data/artifacts/store/images)
-      # Supports fsspec backends: file://, s3://, gs://, abfs:// in LOCAL_OUTPUT_PATH
-      - IMAGE_STORAGE_ENABLE_MINIO=true
-      - IMAGE_STORAGE_ENABLE_LOCAL_DISK=false
-      - IMAGE_STORAGE_LOCAL_OUTPUT_PATH=/workspace/data/artifacts/store/images
+      # Provide a single fsspec-compatible URI (defaults to bundled MinIO)
+      # Uses existing volume mounts for file:// paths i.e. file:///workspace/data/artifacts/store/images
+      - IMAGE_STORAGE_URI=${IMAGE_STORAGE_URI:-s3://nv-ingest/artifacts/store/images}
+      # Optional public HTTP base for serving images persisted via object storage (set for download links)
+      - IMAGE_STORAGE_PUBLIC_BASE_URL=${IMAGE_STORAGE_PUBLIC_BASE_URL:-}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services

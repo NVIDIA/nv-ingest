@@ -8,7 +8,7 @@ active:
   test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v1  # v1 or v2
+  api_version: v2  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -37,10 +37,10 @@ active:
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
   split_chunk_overlap: 150  # Overlap for text splitting
-  enable_image_storage: false  # Enable server-side image storage (MinIO/local disk)
+  enable_image_storage: true  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
   # Storage configuration
-  spill_dir: /tmp/spill
+  spill_dir: /raid/jioffe/tmp/spill
   artifacts_dir: null  # null = use default (scripts/tests/artifacts)
   collection_name: null  # null = auto-generated
 
@@ -79,7 +79,7 @@ datasets:
     recall_dataset: earnings  # Evaluator for recall testing
 
   bo20:
-    path: /path/to/bo20
+    path: /raid/jioffe/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true

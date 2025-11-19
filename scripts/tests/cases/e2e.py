@@ -172,15 +172,13 @@ def main(config=None, log_path: str = "test_results") -> int:
     ingestor = ingestor.embed(model_name=model_name)
 
     # Store images to disk (server-side image storage) - optional
-    # Note: All storage config comes from docker-compose.yaml environment variables:
-    # - IMAGE_STORAGE_ENABLE_MINIO (default: true)
-    # - IMAGE_STORAGE_ENABLE_LOCAL_DISK (default: false)
-    # - IMAGE_STORAGE_LOCAL_OUTPUT_PATH (default: /workspace/data/artifacts/store/images)
+    # Note: All storage config comes from docker-compose/helm environment variables:
+    # - IMAGE_STORAGE_URI (default: s3://nv-ingest/artifacts/store/images; set to file://... to opt into disk)
+    # - IMAGE_STORAGE_PUBLIC_BASE_URL (optional HTTP gateway for object URLs)
     if enable_image_storage:
         ingestor = ingestor.store(
             structured=True,
             images=True,
-            store_method="minio",
         )
 
     # VDB upload and save results

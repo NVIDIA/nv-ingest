@@ -352,9 +352,8 @@ stages:
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     config:
-      enable_minio: $IMAGE_STORAGE_ENABLE_MINIO|true
-      enable_local_disk: $IMAGE_STORAGE_ENABLE_LOCAL_DISK|false
-      local_output_path: $IMAGE_STORAGE_LOCAL_OUTPUT_PATH|""
+      storage_uri: $IMAGE_STORAGE_URI|""
+      public_base_url: $IMAGE_STORAGE_PUBLIC_BASE_URL|""
     replicas:
       min_replicas: 0
       max_replicas:

@@ -115,25 +115,18 @@ def store_images_to_minio(
     df_ledger: pd.DataFrame,
     store_structured: bool = True,
     store_unstructured: bool = False,
-    enable_minio: bool = True,
-    enable_local_disk: bool = False,
-    local_output_path: Optional[str] = None,
-    minio_access_key: Optional[str] = None,
-    minio_bucket_name: Optional[str] = None,
-    minio_endpoint: Optional[str] = None,
-    minio_region: Optional[str] = None,
-    minio_secret_key: Optional[str] = None,
-    minio_secure: bool = False,
-    minio_session_token: Optional[str] = None,
+    storage_uri: Optional[str] = None,
+    storage_options: Optional[Dict[str, Any]] = None,
+    public_base_url: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Store images to configured storage backends (MinIO and/or fsspec-backed disk).
+    Store images to a configured fsspec-compatible backend.
 
     This function prepares a flat configuration dictionary for storing images and structured
     data to persistent storage. It determines which content types to store based on the
     provided flags and delegates the storage operation to the internal function
-    `store_images_to_minio_internal`. By default MinIO uploads are enabled; optional flags allow
-    disk persistence via fsspec or disabling individual backends.
+    `store_images_to_minio_internal`. Callers can specify a `storage_uri` (file://, s3://, etc.),
+    optional fsspec storage options, and an optional public base URL for serving assets.
 
     Parameters
     ----------
@@ -143,27 +136,12 @@ def store_images_to_minio(
         Flag indicating whether to store structured content. Defaults to True.
     store_unstructured : bool, optional
         Flag indicating whether to store unstructured image content. Defaults to False.
-    enable_minio : bool, optional
-        Flag indicating whether MinIO uploads are enabled. Defaults to True.
-    enable_local_disk : bool, optional
-        Flag indicating whether fsspec-backed disk persistence (e.g. /raid) is enabled. Defaults to False.
-    local_output_path : Optional[str], optional
-        The root directory where files should be written when `enable_local_disk` is True.
-        Must be provided when disk persistence is enabled.
-    minio_access_key : Optional[str], optional
-        Access key for authenticating with Minio. Defaults to None.
-    minio_bucket_name : Optional[str], optional
-        Name of the Minio bucket where images will be stored. Defaults to None.
-    minio_endpoint : Optional[str], optional
-        Endpoint URL for the Minio service. Defaults to None.
-    minio_region : Optional[str], optional
-        Region identifier for the Minio service. Defaults to None.
-    minio_secret_key : Optional[str], optional
-        Secret key for authenticating with Minio. Defaults to None.
-    minio_secure : bool, optional
-        Whether to use a secure connection (HTTPS) with Minio. Defaults to False.
-    minio_session_token : Optional[str], optional
-        Session token for temporary credentials with Minio. Defaults to None.
+    storage_uri : Optional[str], optional
+        fsspec-compatible URI (file://, s3://, etc.) where outputs should be written.
+    storage_options : Optional[Dict[str, Any]], optional
+        Dictionary of extra options forwarded to UPath/fsspec (e.g., credentials, client kwargs).
+    public_base_url : Optional[str], optional
+        Optional HTTP base URL used to expose stored objects.
 
     Returns
     -------
@@ -180,7 +158,7 @@ def store_images_to_minio(
     See Also
     --------
     store_images_to_minio_internal : Internal function that performs the actual image storage.
-    _upload_images_to_minio : Function that uploads images to MinIO and updates the ledger metadata.
+    _upload_images_via_fsspec : Function that uploads images via UPath/fsspec and updates the ledger metadata.
 
     Examples
     --------
@@ -195,9 +173,7 @@ def store_images_to_minio(
     ... })
     >>> result = store_images_to_minio(
     ...     df_ledger=df,
-    ...     minio_access_key='ACCESS_KEY',
-    ...     minio_secret_key='SECRET_KEY',
-    ...     minio_bucket_name='mybucket'
+    ...     storage_uri='file:///workspace/data/artifacts/store/images'
     ... )
     """
     content_types = {
@@ -207,25 +183,17 @@ def store_images_to_minio(
 
     # Build the task configuration as a flat dictionary, matching the internal function's expectations.
     task_config = {
-        "enable_minio": enable_minio,
-        "enable_local_disk": enable_local_disk,
-        "local_output_path": local_output_path,
-        "access_key": minio_access_key,
-        "bucket_name": minio_bucket_name,
         "content_types": content_types,
-        "endpoint": minio_endpoint,
-        "region": minio_region,
-        "secret_key": minio_secret_key,
-        "secure": minio_secure,
-        "session_token": minio_session_token,
+        "storage_uri": storage_uri,
+        "storage_options": storage_options or {},
     }
-
-    storage_config = {}
+    if public_base_url:
+        task_config["public_base_url"] = public_base_url
 
     result, _ = store_images_to_minio_internal(
         df_storage_ledger=df_ledger,
         task_config=task_config,
-        storage_config=storage_config,
+        storage_config={},
         execution_trace_log=None,
     )
 

@@ -5,51 +5,34 @@
 import base64
 import logging
 import os
-import posixpath
-from io import BytesIO
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-from fsspec.core import url_to_fs
-from minio import Minio
+from upath import UPath
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 
 logger = logging.getLogger(__name__)
 
-# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema
-# on startup.
-_DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
-_DEFAULT_READ_ADDRESS = os.environ.get("MINIO_PUBLIC_ADDRESS", "http://minio:9000")
-_DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
 
-
-def _ensure_bucket_exists(client: Minio, bucket_name: str) -> None:
+def _resolve_storage_root(storage_uri: str, storage_options: Dict[str, Any]) -> Tuple[UPath, str]:
     """
-    Ensure that the specified bucket exists in MinIO, and create it if it does not.
-
-    Parameters
-    ----------
-    client : Minio
-        An instance of the Minio client.
-    bucket_name : str
-        The name of the bucket to check or create.
+    Construct a UPath instance rooted at the configured URI and return both the root path and protocol.
     """
-    if not client.bucket_exists(bucket_name):
-        client.make_bucket(bucket_name)
-        logger.debug("Created bucket %s", bucket_name)
-    else:
-        logger.debug("Bucket %s already exists", bucket_name)
+    storage_root = UPath(storage_uri, **storage_options)
+    protocol = storage_root._url.scheme or "file"
+    return storage_root, protocol
 
 
-def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+def _upload_images_via_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     """
-    Identifies content within a DataFrame and uploads it to MinIO, updating the metadata with the uploaded URL.
+    Identifies content within a DataFrame and persists it using an fsspec-compatible filesystem, updating
+    metadata with the resulting URIs.
 
     This function iterates over rows of the provided DataFrame. For rows whose "document_type" is listed
-    in the provided 'content_types' configuration, it decodes the base64-encoded content, uploads the object to
-    MinIO, and updates the metadata with the public URL. Errors during individual row processing are logged and
-    skipped, so the process continues for remaining rows.
+    in the provided 'content_types' configuration, it decodes the base64-encoded content, writes the object
+    via fsspec/UPath, and updates the metadata with the resolved URL. Errors during individual row processing
+    are logged and skipped so the process continues for remaining rows.
 
     Parameters
     ----------
@@ -58,16 +41,9 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
     params : Dict[str, Any]
         A flat dictionary of configuration parameters for the upload. Expected keys include:
             - "content_types": Dict mapping document types to booleans.
-            - "enable_minio": Boolean that toggles MinIO uploads (default True).
-            - "enable_local_disk": Boolean that toggles fsspec-backed disk persistence (default False).
-            - "local_output_path": Root directory or URL where files should be written when local disk is enabled.
-            - "endpoint": URL for the MinIO service (optional; defaults to _DEFAULT_ENDPOINT).
-            - "bucket_name": Bucket name for storing objects (optional; defaults to _DEFAULT_BUCKET_NAME).
-            - "access_key": Access key for MinIO.
-            - "secret_key": Secret key for MinIO.
-            - "session_token": Session token for MinIO (optional).
-            - "secure": Boolean indicating if HTTPS should be used.
-            - "region": Region for the MinIO service (optional).
+            - "storage_uri": Base URI (file://, s3://, etc.) where images should be written.
+            - "storage_options": Optional dictionary forwarded to UPath/fsspec constructors.
+            - "public_base_url": Optional HTTP(s) base used to surface stored objects.
 
     Returns
     -------
@@ -87,42 +63,14 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
     if not isinstance(content_types, dict):
         raise ValueError("Invalid configuration: 'content_types' must be provided as a dictionary in params")
 
-    enable_minio: bool = params.get("enable_minio", True)
-    enable_local_disk: bool = params.get("enable_local_disk", False)
-    local_output_path: Optional[str] = params.get("local_output_path")
+    storage_uri: Optional[str] = params.get("storage_uri")
+    if not storage_uri or not storage_uri.strip():
+        raise ValueError("`storage_uri` must be provided in task params.")
 
-    if not enable_minio and not enable_local_disk:
-        raise ValueError("At least one storage backend must be enabled.")
+    storage_options: Dict[str, Any] = params.get("storage_options") or {}
+    public_base_url: Optional[str] = params.get("public_base_url")
 
-    if enable_local_disk and not local_output_path:
-        raise ValueError("`local_output_path` must be provided when enable_local_disk=True.")
-
-    bucket_name: Optional[str] = None
-    client: Optional[Minio] = None
-    if enable_minio:
-        endpoint: str = params.get("endpoint", _DEFAULT_ENDPOINT)
-        bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
-
-        # Initialize MinIO client
-        # Credentials are injected by ImageStorageStage from environment
-        client = Minio(
-            endpoint,
-            access_key=params.get("access_key"),
-            secret_key=params.get("secret_key"),
-            session_token=params.get("session_token"),
-            secure=params.get("secure", False),
-            region=params.get("region"),
-        )
-
-        # Ensure the bucket exists
-        _ensure_bucket_exists(client, bucket_name)
-
-    fs = None
-    fs_base_path: Optional[str] = None
-    normalized_local_base: Optional[str] = None
-    if enable_local_disk:
-        fs, fs_base_path = url_to_fs(local_output_path)
-        normalized_local_base = local_output_path.rstrip("/")
+    storage_root, protocol = _resolve_storage_root(storage_uri, storage_options)
 
     # Process each row and attempt to upload images
     for idx, row in df.iterrows():
@@ -179,41 +127,24 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
             # Extract just the filename from source_id for cleaner organization
             clean_source_name = os.path.basename(source_id).replace("/", "_")
 
-            # For MinIO: Use clean paths with forward slashes (S3 object keys support / as delimiter)
-            minio_destination_file = f"{clean_source_name}/{idx}.{image_type}"
+            destination: UPath = storage_root / clean_source_name / f"{idx}.{image_type}"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open("wb") as target_file:
+                target_file.write(content)
 
-            # For local disk: Use the same clean filesystem paths
-            local_destination_file = f"{clean_source_name}/{idx}.{image_type}"
-
+            relative_key = destination.relative_to(storage_root).as_posix()
+            destination_uri = destination.as_uri()
             public_url: Optional[str] = None
-            if enable_minio and client is not None and bucket_name is not None:
-                # Upload the object to MinIO using URL-encoded path
-                source_file = BytesIO(content)
-                client.put_object(
-                    bucket_name,
-                    minio_destination_file,
-                    source_file,
-                    length=len(content),
-                )
+            if public_base_url:
+                public_url = f"{public_base_url.rstrip('/')}/{relative_key}"
 
-                # Construct the public URL
-                public_url = f"{_DEFAULT_READ_ADDRESS}/{bucket_name}/{minio_destination_file}"
-                source_metadata["source_location"] = public_url
+            primary_uri = public_url or destination_uri
+            source_metadata["source_location"] = primary_uri
 
             local_uri: Optional[str] = None
-            if enable_local_disk and fs is not None and fs_base_path is not None and normalized_local_base is not None:
-                # Use clean path for local filesystem
-                disk_target_path = posixpath.join(fs_base_path.rstrip("/"), local_destination_file)
-                fs.makedirs(posixpath.dirname(disk_target_path), exist_ok=True)
-                with fs.open(disk_target_path, "wb") as local_file:
-                    local_file.write(content)
-
-                local_uri = f"{normalized_local_base}/{local_destination_file}"
+            if protocol == "file":
+                local_uri = destination.path
                 source_metadata["local_source_location"] = local_uri
-
-                # When MinIO is disabled, fall back to local path for source_location.
-                if not enable_minio:
-                    source_metadata["source_location"] = local_uri
 
             if doc_type == ContentTypeEnum.IMAGE:
                 logger.debug("Persisting image data for row %s", idx)
@@ -248,7 +179,8 @@ def store_images_to_minio_internal(
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
-    Processes a storage ledger DataFrame to upload images (and structured content) to MinIO.
+    Processes a storage ledger DataFrame to persist images (and structured content) via an fsspec-compatible
+    filesystem.
 
     This function validates the input DataFrame and task configuration, then creates a mask to select rows
     where the "document_type" is among the desired types specified in the configuration. If matching rows are
@@ -262,9 +194,8 @@ def store_images_to_minio_internal(
         "document_type" and "metadata".
     task_config : Dict[str, Any]
         A flat dictionary containing configuration parameters for image storage. Expected to include the key
-        "content_types" (a dict mapping document types to booleans) along with connection and credential details.
-        Optional keys such as "enable_minio", "enable_local_disk", and "local_output_path" control which backends
-        are used for persistence.
+        "content_types" (a dict mapping document types to booleans) along with `storage_uri`,
+        `storage_options`, and optional presentation hints such as `public_base_url`.
     storage_config : Dict[str, Any]
         A dictionary reserved for additional storage configuration (currently unused).
     execution_trace_log : Optional[List[Any]], optional
@@ -296,7 +227,7 @@ def store_images_to_minio_internal(
         logger.debug("No storage objects matching %s found in the DataFrame.", content_types)
         return df_storage_ledger
 
-    result, execution_trace_log = _upload_images_to_minio(df_storage_ledger, task_config), {}
+    result, execution_trace_log = _upload_images_via_fsspec(df_storage_ledger, task_config), {}
     _ = execution_trace_log
 
     return result

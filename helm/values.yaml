@@ -992,9 +992,8 @@ prometheus:
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
 ## @param envVars.MINIO_ACCESS_KEY [default: "minioadmin"] MinIO access key for authentication
 ## @param envVars.MINIO_SECRET_KEY [default: "minioadmin"] MinIO secret key for authentication
-## @param envVars.IMAGE_STORAGE_ENABLE_MINIO [default: true] Enable MinIO image storage
-## @param envVars.IMAGE_STORAGE_ENABLE_LOCAL_DISK [default: false] Enable local disk image storage via fsspec (supports file://, s3://, gs://, abfs://)
-## @param envVars.IMAGE_STORAGE_LOCAL_OUTPUT_PATH [default: "/workspace/data/artifacts/store/images"] Path for local disk image storage when enabled
+## @param envVars.IMAGE_STORAGE_URI [default: "s3://nv-ingest/artifacts/store/images"] fsspec-compatible destination for stored images
+## @param envVars.IMAGE_STORAGE_PUBLIC_BASE_URL [default: ""] Optional HTTP base URL for serving stored images when using object storage
 ## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
 ## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
 ## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
@@ -1040,12 +1039,11 @@ envVars:
   MINIO_SECRET_KEY: minioadmin
 
   # Image Storage Configuration
-  # Set IMAGE_STORAGE_ENABLE_LOCAL_DISK to true to save images to local disk
-  # Images saved via existing volume mounts (no additional volumes needed)
-  # Supports fsspec backends: file://, s3://, gs://, abfs:// in LOCAL_OUTPUT_PATH
-  IMAGE_STORAGE_ENABLE_MINIO: true
-  IMAGE_STORAGE_ENABLE_LOCAL_DISK: false
-  IMAGE_STORAGE_LOCAL_OUTPUT_PATH: "/workspace/data/artifacts/store/images"
+  # Provide a single fsspec-compatible URI (file://, s3://, etc.)
+  # Uses existing volume mounts for file:// paths i.e. file:///workspace/data/artifacts/store/images
+  IMAGE_STORAGE_URI: "s3://nv-ingest/artifacts/store/images"
+  # Optional public base URL for rendering object storage assets
+  IMAGE_STORAGE_PUBLIC_BASE_URL: ""
 
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
