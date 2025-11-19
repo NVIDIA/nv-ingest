@@ -2005,6 +2005,12 @@ class Milvus(VDB):
         """
         kwargs = locals().copy()
         kwargs.pop("self", None)
+        bucket_name = kwargs.get("bucket_name", None)
+        if bucket_name is not None and bucket_name != ClientConfigSchema().minio_bucket_name:
+            raise ValueError(
+                "You must use the environment variable MINIO_BUCKET to specify bucket_name, detected:",
+                f"`bucket_name`: {bucket_name} and MINIO_BUCKET: {ClientConfigSchema().minio_bucket_name}",
+            )
         super().__init__(**kwargs)
 
     def create_index(self, **kwargs):
