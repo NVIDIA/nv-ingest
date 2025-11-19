@@ -3,10 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import sys
-
 import cv2
 import numpy as np
 import tritonclient.grpc as grpcclient
+
+# Configure OpenCV to use a single thread for image processing
+cv2.setNumThreads(1)
 
 
 def resize_image(image, target_img_size):

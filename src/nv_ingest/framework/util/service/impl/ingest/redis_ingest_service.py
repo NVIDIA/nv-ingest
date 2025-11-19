@@ -7,9 +7,7 @@ import json
 import logging
 import os
 from json import JSONDecodeError
-from typing import Optional, Dict, Any
-
-from typing import List
+from typing import Optional, Dict, Any, List
 
 import redis
 
@@ -133,6 +131,8 @@ class RedisIngestService(IngestServiceMeta):
         self._bulk_vdb_cache_prefix: str = "vdb_bulk_upload_cache:"
         self._cache_prefix: str = "processing_cache:"
         self._state_prefix: str = "job_state:"
+        # Bound async-to-thread concurrency slightly below Redis connection pool
+        self._async_operation_semaphore: Optional[asyncio.Semaphore] = None
 
         self._ingest_client = RedisClient(
             host=self._redis_hostname,
@@ -150,6 +150,16 @@ class RedisIngestService(IngestServiceMeta):
             f"RedisClient initialized for service. Host: {redis_hostname}:{redis_port}, "
             f"FetchMode: {fetch_mode.name}, ResultTTL: {result_data_ttl_seconds}, StateTTL: {state_ttl_seconds}"
         )
+
+    def _get_async_semaphore(self) -> asyncio.Semaphore:
+        if self._async_operation_semaphore is None:
+            semaphore_limit = max(1, self._concurrency_level - 2)
+            self._async_operation_semaphore = asyncio.Semaphore(semaphore_limit)
+        return self._async_operation_semaphore
+
+    async def _run_bounded_to_thread(self, func, *args, **kwargs):
+        async with self._get_async_semaphore():
+            return await asyncio.to_thread(func, *args, **kwargs)
 
     async def submit_job(self, job_spec_wrapper: "MessageWrapper", trace_id: str) -> str:
         """
@@ -208,12 +218,33 @@ class RedisIngestService(IngestServiceMeta):
             ttl_for_result: Optional[int] = (
                 self._result_data_ttl_seconds if self._fetch_mode == FetchMode.NON_DESTRUCTIVE else None
             )
+            # Determine target queue based on optional QoS hint
+            queue_hint = None
+            try:
+                routing_opts = job_spec.get("routing_options") or {}
+                tracing_opts = job_spec.get("tracing_options") or {}
+                queue_hint = routing_opts.get("queue_hint") or tracing_opts.get("queue_hint")
+            except Exception:
+                queue_hint = None
+            allowed = {"default", "immediate", "micro", "small", "medium", "large"}
+            if isinstance(queue_hint, str) and queue_hint in allowed:
+                if queue_hint == "default":
+                    channel_name = self._redis_task_queue
+                else:
+                    channel_name = f"{self._redis_task_queue}_{queue_hint}"
+            else:
+                channel_name = self._redis_task_queue
+            logger.debug(
+                f"Submitting job {trace_id} to queue '{channel_name}' (hint={queue_hint}) "
+                f"with result TTL: {ttl_for_result}"
+            )
+
             logger.debug(
                 f"Submitting job {trace_id} to queue '{self._redis_task_queue}' with result TTL: {ttl_for_result}"
             )
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.submit_message,
-                channel_name=self._redis_task_queue,
+                channel_name=channel_name,
                 message=job_spec_json,
                 ttl_seconds=ttl_for_result,
             )
@@ -252,7 +283,7 @@ class RedisIngestService(IngestServiceMeta):
         try:
             result_channel: str = f"{job_id}"
             logger.debug(f"Attempting to fetch job result for {job_id} using mode {self._fetch_mode.name}")
-            message = await asyncio.to_thread(
+            message = await self._run_bounded_to_thread(
                 self._ingest_client.fetch_message,
                 channel_name=result_channel,
                 timeout=10,
@@ -264,7 +295,7 @@ class RedisIngestService(IngestServiceMeta):
                 logger.warning(f"fetch_message for {job_id} returned None unexpectedly.")
                 raise TimeoutError("No data found (unexpected None response).")
         except (TimeoutError, redis.RedisError, ConnectionError, ValueError, RuntimeError) as e:
-            logger.info(f"Fetch operation for job {job_id} did not complete: ({type(e).__name__}) {e}")
+            logger.debug(f"Fetch operation for job {job_id} did not complete: ({type(e).__name__}) {e}")
             raise e
         except Exception as e:
             logger.exception(f"Unexpected error during async fetch_job for {job_id}: {e}")
@@ -289,7 +320,7 @@ class RedisIngestService(IngestServiceMeta):
         ttl_to_set: Optional[int] = self._state_ttl_seconds
         try:
             logger.debug(f"Setting state for {job_id} to {state} with TTL {ttl_to_set}")
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.get_client().set,
                 state_key,
                 state,
@@ -317,7 +348,10 @@ class RedisIngestService(IngestServiceMeta):
         """
         state_key: str = f"{self._state_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await asyncio.to_thread(self._ingest_client.get_client().get, state_key)
+            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().get,
+                state_key,
+            )
             if data_bytes:
                 state: str = data_bytes.decode("utf-8")
                 logger.debug(f"Retrieved state for {job_id}: {state}")
@@ -350,7 +384,7 @@ class RedisIngestService(IngestServiceMeta):
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
             data_to_store: str = json.dumps([job.model_dump(mode="json") for job in jobs_data])
-            await asyncio.to_thread(
+            await self._run_bounded_to_thread(
                 self._ingest_client.get_client().set,
                 cache_key,
                 data_to_store,
@@ -375,7 +409,10 @@ class RedisIngestService(IngestServiceMeta):
         """
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await asyncio.to_thread(self._ingest_client.get_client().get, cache_key)
+            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().get,
+                cache_key,
+            )
             if data_bytes is None:
                 return []
             return [ProcessingJob(**job) for job in json.loads(data_bytes)]
@@ -393,3 +430,170 @@ class RedisIngestService(IngestServiceMeta):
             The current fetch mode.
         """
         return self._fetch_mode
+
+    async def set_parent_job_mapping(
+        self,
+        parent_job_id: str,
+        subjob_ids: List[str],
+        metadata: Dict[str, Any],
+        *,
+        subjob_descriptors: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """
+        Store parent-subjob mapping in Redis for V2 PDF splitting.
+
+        Parameters
+        ----------
+        parent_job_id : str
+            The parent job identifier
+        subjob_ids : List[str]
+            List of subjob identifiers
+        metadata : Dict[str, Any]
+            Metadata about the parent job (total_pages, original_source_id, etc.)
+        subjob_descriptors : List[Dict[str, Any]], optional
+            Detailed descriptors (job_id, chunk_index, start/end pages) for subjobs
+        """
+        parent_key = f"parent:{parent_job_id}:subjobs"
+        metadata_key = f"parent:{parent_job_id}:metadata"
+
+        try:
+            # Store subjob IDs as a set (only if there are subjobs)
+            if subjob_ids:
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().sadd,
+                    parent_key,
+                    *subjob_ids,
+                )
+
+            # Store metadata as hash (including original subjob ordering for deterministic fetches)
+            metadata_to_store = dict(metadata)
+            try:
+                metadata_to_store["subjob_order"] = json.dumps(subjob_ids)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Unable to serialize subjob ordering for parent %s; falling back to Redis set ordering",
+                    parent_job_id,
+                )
+                metadata_to_store.pop("subjob_order", None)
+
+            if subjob_descriptors:
+                metadata_to_store["subjob_descriptors"] = json.dumps(subjob_descriptors)
+
+            await self._run_bounded_to_thread(
+                self._ingest_client.get_client().hset,
+                metadata_key,
+                mapping=metadata_to_store,
+            )
+
+            # Set TTL on both keys to match state TTL
+            if self._state_ttl_seconds:
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().expire,
+                    parent_key,
+                    self._state_ttl_seconds,
+                )
+                await self._run_bounded_to_thread(
+                    self._ingest_client.get_client().expire,
+                    metadata_key,
+                    self._state_ttl_seconds,
+                )
+
+            logger.debug(f"Stored parent job mapping for {parent_job_id} with {len(subjob_ids)} subjobs")
+
+        except Exception as err:
+            logger.exception(f"Error storing parent job mapping for {parent_job_id}: {err}")
+            raise
+
+    async def get_parent_job_info(self, parent_job_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve parent job information including subjob IDs and metadata.
+
+        Parameters
+        ----------
+        parent_job_id : str
+            The parent job identifier
+
+        Returns
+        -------
+        Dict[str, Any] or None
+            Dictionary with 'subjob_ids' and 'metadata' keys, or None if not a parent job
+        """
+        parent_key = f"parent:{parent_job_id}:subjobs"
+        metadata_key = f"parent:{parent_job_id}:metadata"
+
+        try:
+            # Check if this is a parent job (check metadata_key since non-split PDFs may not have parent_key)
+            exists = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().exists,
+                metadata_key,  # Check metadata instead of parent_key for non-split PDF support
+            )
+
+            if not exists:
+                return None
+
+            # Get subjob IDs (may be empty for non-split PDFs)
+            subjob_ids_bytes = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().smembers,
+                parent_key,
+            )
+            subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes} if subjob_ids_bytes else set()
+
+            # Get metadata
+            metadata_dict = await self._run_bounded_to_thread(
+                self._ingest_client.get_client().hgetall,
+                metadata_key,
+            )
+            metadata = {k.decode("utf-8"): v.decode("utf-8") for k, v in metadata_dict.items()}
+
+            # Convert numeric strings back to numbers
+            if "total_pages" in metadata:
+                metadata["total_pages"] = int(metadata["total_pages"])
+            if "pages_per_chunk" in metadata:
+                try:
+                    metadata["pages_per_chunk"] = int(metadata["pages_per_chunk"])
+                except ValueError:
+                    metadata.pop("pages_per_chunk", None)
+
+            ordered_ids: Optional[List[str]] = None
+            stored_order = metadata.pop("subjob_order", None)
+            if stored_order:
+                try:
+                    candidate_order = json.loads(stored_order)
+                    if isinstance(candidate_order, list):
+                        ordered_ids = [sid for sid in candidate_order if sid in subjob_id_set]
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "Failed to parse stored subjob order for parent %s: %s",
+                        parent_job_id,
+                        exc,
+                    )
+
+            if ordered_ids is None:
+                ordered_ids = sorted(subjob_id_set)
+            else:
+                remaining_ids = sorted(subjob_id_set - set(ordered_ids))
+                ordered_ids.extend(remaining_ids)
+
+            subjob_descriptors: Optional[List[Dict[str, Any]]] = None
+            stored_descriptors = metadata.pop("subjob_descriptors", None)
+            if stored_descriptors:
+                try:
+                    decoded = json.loads(stored_descriptors)
+                    if isinstance(decoded, list):
+                        subjob_descriptors = decoded
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "Failed to parse stored subjob descriptors for parent %s: %s",
+                        parent_job_id,
+                        exc,
+                    )
+
+            return {
+                "subjob_ids": ordered_ids,
+                "metadata": metadata,
+                "subjob_descriptors": subjob_descriptors or [],
+            }
+
+        except Exception as err:
+            logger.error(f"Error retrieving parent job info for {parent_job_id}: {err}")
+            return None

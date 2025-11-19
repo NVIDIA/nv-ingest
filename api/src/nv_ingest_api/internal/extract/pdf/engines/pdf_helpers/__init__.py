@@ -4,20 +4,22 @@
 # Copyright (c) 2024, NVIDIA CORPORATION.
 
 import base64
+import inspect
 import io
+import logging
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 import pandas as pd
-from typing import Any, Dict, List, Optional
-import logging
-
-from nv_ingest_api.internal.extract.pdf.engines import (
-    adobe_extractor,
-    llama_parse_extractor,
-    nemoretriever_parse_extractor,
-    pdfium_extractor,
-    tika_extractor,
-    unstructured_io_extractor,
-)
+from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
+from nv_ingest_api.internal.extract.pdf.engines import llama_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
+from nv_ingest_api.internal.extract.pdf.engines import tika_extractor
+from nv_ingest_api.internal.extract.pdf.engines import unstructured_io_extractor
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 # Import extraction functions for different engines.
@@ -30,8 +32,15 @@ EXTRACTOR_LOOKUP = {
     "llama": llama_parse_extractor,
     "nemoretriever_parse": nemoretriever_parse_extractor,
     "pdfium": pdfium_extractor,
+    "pdfium_hybrid": pdfium_extractor,  # Uses pdfium for native text and switches to OCR pipeline only for scanned pages.  # noqa: E501
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
+    "ocr": pdfium_extractor,  # Ignores pdfium's text entirely and processes every single page through the full OCR pipline.  # noqa: E501
+}
+
+METHOD_TO_CONFIG_KEY_MAP = {
+    "pdfium_hybrid": "pdfium_config",
+    "ocr": "pdfium_config",
 }
 
 
@@ -43,6 +52,7 @@ def _work_extract_pdf(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log=None,
 ) -> Any:
@@ -52,16 +62,24 @@ def _work_extract_pdf(
 
     extract_method = extractor_config["extract_method"]
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
-    return extractor_fn(
-        pdf_stream,
-        extract_text,
-        extract_images,
-        extract_infographics,
-        extract_tables,
-        extract_charts,
-        extractor_config,
-        execution_trace_log,
+
+    extractor_fn_args = dict(
+        pdf_stream=pdf_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extractor_config=extractor_config,
+        execution_trace_log=execution_trace_log,
     )
+
+    if "extract_page_as_image" in inspect.signature(extractor_fn).parameters:
+        extractor_fn_args["extract_page_as_image"] = extract_page_as_image
+    elif extract_page_as_image:
+        logger.warning(f"`extract_page_as_image` is set to True, but {extract_method} does not support it.")
+
+    return extractor_fn(**extractor_fn_args)
 
 
 @unified_exception_handler
@@ -97,6 +115,7 @@ def _orchestrate_row_extraction(
         extract_tables = params.pop("extract_tables", False)
         extract_charts = params.pop("extract_charts", False)
         extract_infographics = params.pop("extract_infographics", False)
+        extract_page_as_image = params.pop("extract_page_as_image", False)
         extract_method = params.get("extract_method", "pdfium")
     except KeyError as e:
         raise ValueError(f"Missing required extraction flag: {e}")
@@ -109,7 +128,7 @@ def _orchestrate_row_extraction(
     params["extract_method"] = extract_method
 
     # Construct the config key based on the extraction method
-    config_key = f"{extract_method}_config"
+    config_key = METHOD_TO_CONFIG_KEY_MAP.get(extract_method, f"{extract_method}_config")
 
     # Handle both object and dictionary cases for extractor_config
     if hasattr(extractor_config, config_key):
@@ -120,7 +139,7 @@ def _orchestrate_row_extraction(
         method_config = extractor_config[config_key]
     else:
         # If no matching config is found, log a warning but don't fail
-        logger.warning(f"No {config_key} found in extractor_config: {extractor_config}")
+        logger.warning(f"No {config_key} found in extractor_config: {sanitize_for_logging(extractor_config)}")
         method_config = None
 
     # Add the method-specific config to the parameters if available
@@ -130,13 +149,14 @@ def _orchestrate_row_extraction(
 
     # The resulting parameters constitute the complete extractor_config
     extractor_config = params
-    logger.debug(f"Final extractor_config: {extractor_config}")
+    logger.debug(f"Final extractor_config: {sanitize_for_logging(extractor_config)}")
 
     result = _work_extract_pdf(
         pdf_stream=pdf_stream,
         extract_text=extract_text,
         extract_images=extract_images,
         extract_infographics=extract_infographics,
+        extract_page_as_image=extract_page_as_image,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
         extractor_config=extractor_config,

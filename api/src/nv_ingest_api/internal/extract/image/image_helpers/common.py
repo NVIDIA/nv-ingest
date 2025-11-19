@@ -32,8 +32,10 @@ from PIL import Image
 
 from nv_ingest_api.internal.enums.common import AccessLevelEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+    YOLOX_PAGE_CLASS_LABELS,
+    YOLOX_PAGE_DEFAULT_VERSION,
     YoloxPageElementsModelInterface,
-    get_yolox_model_name,
+    get_yolox_page_version,
 )
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
@@ -151,7 +153,13 @@ def extract_page_element_images(
     """
 
     width, height, *_ = original_image.shape
-    for label in ["table", "chart"]:
+
+    if annotation_dict and (set(YOLOX_PAGE_CLASS_LABELS) <= annotation_dict.keys()):
+        labels = YOLOX_PAGE_CLASS_LABELS
+    else:
+        labels = ["table", "chart", "infographics"]
+
+    for label in labels:
         if not annotation_dict or label not in annotation_dict:
             continue
 
@@ -202,11 +210,18 @@ def extract_page_elements_from_images(
 
     # Obtain yolox_version
     # Assuming that the http endpoint is at index 1
+    yolox_version = YOLOX_PAGE_DEFAULT_VERSION
+
+    # Get the HTTP endpoint to determine the model name if needed
     yolox_http_endpoint = config.yolox_endpoints[1]
-    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+    if yolox_http_endpoint:
+        try:
+            yolox_version = get_yolox_page_version(yolox_http_endpoint)
+        except Exception as e:
+            logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
     try:
-        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -220,10 +235,13 @@ def extract_page_elements_from_images(
         # Perform inference in a single call. The NimClient handles batching internally.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=trace_info,
-            stage_name="pdf_content_extractor",
+            stage_name="pdf_extraction",
         )
 
         # Process each result along with its corresponding image.
@@ -242,10 +260,6 @@ def extract_page_elements_from_images(
     except Exception as e:
         logger.exception(f"Unhandled error during table/chart extraction: {str(e)}")
         raise
-
-    finally:
-        if yolox_client:
-            yolox_client.close()
 
     logger.debug(f"Extracted {len(page_elements)} tables and charts from image.")
     return page_elements
@@ -340,6 +354,7 @@ def unstructured_image_extractor(
 
     # Optionally update the extract_infographics flag based on extraction_config.
     extract_infographics = extraction_config.get("extract_infographics", False)
+    text_extraction_method = extraction_config.get("extract_method", "ocr")
 
     # Log which primitives are requested for extraction.
     logger.debug(f"Extract text: {extract_text} (not supported yet for raw images)")
@@ -360,12 +375,15 @@ def unstructured_image_extractor(
 
     extracted_data: List[Any] = []
 
-    # Text extraction stub (not supported for raw images)
     if extract_text:
-        logger.warning("Text extraction is not supported for raw images.")
+        if text_extraction_method != "ocr":
+            logger.warning(
+                f"Text extraction method '{text_extraction_method} is not supported for raw images. "
+                "Defaulting to 'ocr'."
+            )
 
     # Extract tables, charts, or infographics if requested.
-    if extract_tables or extract_charts or extract_infographics:
+    if extract_text or extract_tables or extract_charts or extract_infographics:
         try:
             page_elements = extract_page_elements_from_images(
                 [image_array],
@@ -374,6 +392,18 @@ def unstructured_image_extractor(
             )
             for item in page_elements:
                 table_chart_data = item[1]
+
+                # Skip elements that shouldn't be extracted based on flags
+                element_type = table_chart_data.type_string
+                if (not extract_tables) and (element_type == "table"):
+                    continue
+                if (not extract_charts) and (element_type == "chart"):
+                    continue
+                if (not extract_infographics) and (element_type == "infographic"):
+                    continue
+                if (not extract_text) and (element_type in {"title", "paragraph", "header_footer"}):
+                    continue
+
                 extracted_data.append(
                     construct_page_element_metadata(
                         table_chart_data,

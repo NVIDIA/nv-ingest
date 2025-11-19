@@ -274,59 +274,70 @@ class DocxReader:
             - A list of extracted images from the paragraph.
         """
 
-        paragraph_images = []
-        if self.paragraph_format == "text":
-            paragraph_text = paragraph.text
-        else:
-            # Get the default style of the paragraph, "markdown"
+        try:
+            paragraph_images = []
+            if self.paragraph_format == "text":
+                return paragraph.text.strip(), paragraph_images
+
             font = paragraph.style.font
             default_style = (font.bold, font.italic, font.underline)
 
-            # Iterate over the runs of the paragraph and group them by style, excluding empty runs
             paragraph_text = ""
             group_text = ""
             previous_style = None
 
             for c in paragraph.iter_inner_content():
-                if isinstance(c, Hyperlink):
-                    text = f"[{c.text}]({c.address})"
-                    style = (c.runs[0].bold, c.runs[0].italic, c.runs[0].underline)
-                elif isinstance(c, Run):
-                    text = c.text
-                    style = (c.bold, c.italic, c.underline)
-                    # 1. Locate the inline shape which is stored in the <w:drawing> element.
-                    # 2. r:embed in <a.blip> has the relationship id for extracting the file where
-                    # the image is stored as bytes.
-                    # Reference:
-                    # https://python-docx.readthedocs.io/en/latest/dev/analysis/features/shapes/picture.html#specimen-xml
-                    inline_shapes = c._element.xpath(".//w:drawing//a:blip/@r:embed")
-                    for r_id in inline_shapes:
-                        text += self.image_tag.format(self.image_tag_index)
-                        self.image_tag_index += 1
-                        image = paragraph.part.related_parts[r_id].image
-                        paragraph_images.append(image)
-                else:
-                    continue
+                try:
+                    if isinstance(c, Hyperlink):
+                        text = f"[{c.text}]({c.address})"
+                        style = (c.runs[0].bold, c.runs[0].italic, c.runs[0].underline)
+                    elif isinstance(c, Run):
+                        text = c.text
+                        style = (c.bold, c.italic, c.underline)
 
-                style = tuple([s if s is not None else d for s, d in zip(style, default_style)])
+                        # 1. Locate the inline shape which is stored in the <w:drawing> element.
+                        # 2. r:embed in <a.blip> has the relationship id for extracting the file where
+                        # the image is stored as bytes.
+                        # Reference:
+                        # https://python-docx.readthedocs.io/en/latest/dev/analysis/features/shapes/picture.html#specimen-xml
+                        inline_shapes = c._element.xpath(".//w:drawing//a:blip/@r:embed")
+                        for r_id in inline_shapes:
+                            text += self.image_tag.format(self.image_tag_index)
+                            self.image_tag_index += 1
+                            try:
+                                image = paragraph.part.related_parts[r_id].image
+                                paragraph_images.append(image)
+                            except Exception as img_e:
+                                logger.warning(
+                                    "Failed to extract image with rId " "%s: %s -- object / file may be malformed",
+                                    r_id,
+                                    img_e,
+                                )
+                    else:
+                        continue
 
-                # If the style changes for a non empty text, format the previous group and start a new one
-                if (not self.is_text_empty(text)) and (previous_style is not None):
-                    if style != previous_style:
+                    style = tuple(s if s is not None else d for s, d in zip(style, default_style))
+
+                    if not self.is_text_empty(text) and previous_style is not None and style != previous_style:
                         paragraph_text += self.format_text(group_text, *previous_style)
                         group_text = ""
 
-                group_text += text
-                if not self.is_text_empty(text):
-                    previous_style = style
+                    group_text += text
+                    if not self.is_text_empty(text):
+                        previous_style = style
 
-            # Format the last group
-            if group_text:
-                paragraph_text += self.format_text(group_text, *style)
+                except Exception as e:
+                    logger.error("format_paragraph: failed to process run: %s", e)
+                    continue
 
-        # Remove trailing spaces
-        paragraph_text = paragraph_text.strip()
-        return paragraph_text, paragraph_images
+            if group_text and previous_style:
+                paragraph_text += self.format_text(group_text, *previous_style)
+
+            return paragraph_text.strip(), paragraph_images
+
+        except Exception as e:
+            logger.error("format_paragraph: failed for paragraph: %s", e)
+            return "", []
 
     def format_cell(self, cell: "_Cell") -> Tuple[str, List["Image"]]:
         """
@@ -344,12 +355,23 @@ class DocxReader:
             - A list of images extracted from the cell.
         """
 
-        if self.paragraph_format == "markdown":
-            newline = "<br>"
-        else:
-            newline = "\n"
-        paragraph_texts, paragraph_images = zip(*[self.format_paragraph(p) for p in cell.paragraphs])
-        return newline.join(paragraph_texts), paragraph_images
+        try:
+            newline = "<br>" if self.paragraph_format == "markdown" else "\n"
+            texts, images = [], []
+
+            for p in cell.paragraphs:
+                try:
+                    t, imgs = self.format_paragraph(p)
+                    texts.append(t)
+                    images.extend(imgs)
+                except Exception as e:
+                    logger.error("format_cell: failed to format paragraph in cell: %s", e)
+
+            return newline.join(texts), images
+
+        except Exception as e:
+            logger.error("format_cell: failed entirely: %s", e)
+            return "", []
 
     def format_table(self, table: "Table") -> Tuple[Optional[str], List["Image"], DataFrame]:
         """
@@ -368,25 +390,50 @@ class DocxReader:
             - A DataFrame representation of the table's content.
         """
 
-        rows = [[self.format_cell(cell) for cell in row.cells] for row in table.rows]
-        texts = [[text for text, _ in row] for row in rows]
-        table_images = [image for row in rows for _, images in row for image in images]
+        try:
+            rows_data = []
+            all_images = []
 
-        table = pd.DataFrame(texts[1:], columns=texts[0])
-        if "markdown" in self.table_format:
-            table_text = table.to_markdown(index=False)
-            if self.table_format == "markdown_light":
-                table_text = re.sub(r"\s{2,}", " ", table_text)
-                table_text = re.sub(r"-{2,}", "-", table_text)
-        elif self.table_format == "csv":
-            table_text = table.to_csv()
-        elif self.table_format == "tag":
-            table_text = self.table_tag.format(self.table_tag_index)
-            self.table_tag_index += 1
-        else:
-            raise ValueError(f"Unknown table format {format}")
+            for row in table.rows:
+                row_texts = []
+                row_images = []
+                for cell in row.cells:
+                    try:
+                        cell_text, cell_imgs = self.format_cell(cell)
+                        row_texts.append(cell_text)
+                        row_images.extend(cell_imgs)
+                    except Exception as e:
+                        logger.error("format_table: failed to process cell: %s", e)
+                        row_texts.append("")  # pad for column alignment
 
-        return table_text, table_images, table
+                rows_data.append(row_texts)
+                all_images.extend(row_images)
+
+            if not rows_data or not rows_data[0]:
+                return None, [], pd.DataFrame()
+
+            header = rows_data[0]
+            body = rows_data[1:]
+            df = pd.DataFrame(body, columns=header) if body else pd.DataFrame(columns=header)
+
+            if "markdown" in self.table_format:
+                table_text = df.to_markdown(index=False)
+                if self.table_format == "markdown_light":
+                    table_text = re.sub(r"\s{2,}", " ", table_text)
+                    table_text = re.sub(r"-{2,}", "-", table_text)
+            elif self.table_format == "csv":
+                table_text = df.to_csv(index=False)
+            elif self.table_format == "tag":
+                table_text = self.table_tag.format(self.table_tag_index)
+                self.table_tag_index += 1
+            else:
+                raise ValueError(f"Unknown table format {self.table_format}")
+
+            return table_text, all_images, df
+
+        except Exception as e:
+            logger.error("format_table: failed to format table: %s", e)
+            return None, [], pd.DataFrame()
 
     @staticmethod
     def apply_text_style(style: str, text: str, level: int = 0) -> str:
@@ -841,30 +888,39 @@ class DocxReader:
         self._prev_para_image_idx = 0
 
         para_idx = 0
-
         for child in self.document.element.body.iterchildren():
-            if isinstance(child, CT_P):
-                paragraph = Paragraph(child, self.document)
-                paragraph_text, paragraph_images = self.format_paragraph(paragraph)
+            try:
+                if isinstance(child, CT_P):
+                    paragraph = Paragraph(child, self.document)
+                    paragraph_text, paragraph_images = self.format_paragraph(paragraph)
 
-                if extract_text:
-                    self._extract_para_text(
-                        paragraph,
-                        paragraph_text,
-                        base_unified_metadata,
-                        text_depth,
-                        para_idx,
-                    )
+                    if extract_text:
+                        try:
+                            self._extract_para_text(
+                                paragraph,
+                                paragraph_text,
+                                base_unified_metadata,
+                                text_depth,
+                                para_idx,
+                            )
+                        except Exception as e:
+                            logger.error("extract_data: _extract_para_text failed: %s", e)
 
-                if (extract_charts or extract_images or extract_tables) and paragraph_images:
-                    self._prev_para_images = paragraph_images
-                    self._prev_para_image_idx = para_idx
-                    self._pending_images += [(image, para_idx, "", base_unified_metadata) for image in paragraph_images]
-                    self.images += paragraph_images
+                    if (extract_images or extract_charts or extract_tables) and paragraph_images:
+                        self._pending_images += [
+                            (image, para_idx, "", base_unified_metadata) for image in paragraph_images
+                        ]
+                        self.images.extend(paragraph_images)
 
-            elif isinstance(child, CT_Tbl):
-                if extract_tables or extract_charts:
-                    self._extract_table_data(child, base_unified_metadata)
+                elif isinstance(child, CT_Tbl):
+                    if extract_tables or extract_charts:
+                        try:
+                            self._extract_table_data(child, base_unified_metadata)
+                        except Exception as e:
+                            logger.error("extract_data: _extract_table_data failed: %s", e)
+
+            except Exception as e:
+                logger.error("extract_data: failed to process element at index %d: %s", para_idx, e)
 
             para_idx += 1
 

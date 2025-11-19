@@ -7,7 +7,6 @@ from typing import List, Any
 from typing import Optional
 from typing import Tuple
 
-import PIL
 import numpy as np
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
@@ -20,8 +19,9 @@ from nv_ingest_api.util.image_processing.clustering import (
     combine_groups_into_bboxes,
     remove_superset_bboxes,
 )
-from nv_ingest_api.util.image_processing.transforms import pad_image, numpy_to_base64, crop_image
+from nv_ingest_api.util.image_processing.transforms import pad_image, numpy_to_base64, crop_image, scale_numpy_image
 from nv_ingest_api.util.metadata.aggregators import Base64Image
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_IMAGE_FORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
     return img_array
 
 
-@traceable_func(trace_name="pdf_content_extractor::pdfium_pages_to_numpy")
+@traceable_func(trace_name="pdf_extraction::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
     render_dpi: int = 300,
@@ -176,18 +176,10 @@ def pdfium_pages_to_numpy(
     for idx, page in enumerate(pages):
         # Render the page as a bitmap with the specified scale and rotation
         page_bitmap = page.render(scale=scale, rotation=rotation)
-
-        # Convert the bitmap to a PIL image
-        pil_image = page_bitmap.to_pil()
-
+        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
-            pil_image.thumbnail(scale_tuple, PIL.Image.LANCZOS)
-
-        # Convert the PIL image to a NumPy array and force a full copy,
-        # ensuring the returned array is entirely independent of the original buffer.
-        img_arr = np.array(pil_image).copy()
-
+            img_arr = scale_numpy_image(img_arr, scale_tuple)
         # Apply padding if specified
         if padding_tuple:
             img_arr, (pad_width, pad_height) = pad_image(
@@ -250,7 +242,7 @@ def extract_simple_images_from_pdfium_page(page, max_depth):
         try:
             # Attempt to retrieve the image bitmap
             image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
-            image_base64: str = numpy_to_base64(image_numpy)
+            image_base64: str = numpy_to_base64(image_numpy, format=YOLOX_PAGE_IMAGE_FORMAT)
             image_bbox = obj.get_pos()
             image_size = obj.get_size()
             if image_size[0] < 10 and image_size[1] < 10:
@@ -394,7 +386,7 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
     try:
         original_images, _ = pdfium_pages_to_numpy(
             [page],  # A batch with a single image.
-            render_dpi=300,  # dpi = 72 is equivalent to scale = 1.
+            render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
             rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
         )
         image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge, **kwargs)
@@ -425,3 +417,12 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
             pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
 
     return extracted_images
+
+
+def is_scanned_page(page) -> bool:
+    tp = page.get_textpage()
+    text = tp.get_text_bounded() or ""
+    num_chars = len(text.strip())
+    num_images = sum(1 for obj in page.get_objects() if obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE)
+
+    return num_chars == 0 and num_images > 0

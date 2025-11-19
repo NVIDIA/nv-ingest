@@ -1,10 +1,11 @@
 site_name: NeMo Retriever Documentation
-# site_url:
-repo_url: https://github.com/NVIDIA/nv-ingest
-# repo_name:
+site_url: https://docs.nvidia.com/nemo/retriever/
+
+repo_name: NVIDIA/nv-ingest
+repo_url: https://github.com/NVIDIA/nv-ingest/
 
 theme:
-  name: "material"
+  name: material
   custom_dir: overrides
   features:
     - content.code.annotate
@@ -47,11 +48,16 @@ extra_css:
   - assets/css/fonts.css
   - assets/css/custom-material.css
   - assets/css/jupyter-themes.css
+#  - assets/css/chatbot.css
+
+# extra_javascript:
+#   - assets/js/chatbot.js
+
 
 nav:
   - NeMo Retriever: 
     - Overview: 
-      - Overview: overview.md
+      - Overview: index.md
     - NeMo Retriever Extraction:
       - Overview: extraction/overview.md
       - Release Notes: extraction/releasenotes-nv-ingest.md
@@ -66,17 +72,24 @@ nav:
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
         - Split Documents: extraction/chunking.md
+        - Upload Data: extraction/data-store.md
+        - Filter Search Results: extraction/custom-metadata.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
-        - Upload Data: extraction/data-store.md
+        - Use Multimodal Embedding: extraction/vlm-embed.md
+        - Configure Ray Logging: extraction/ray-logging.md
         - Telemetry: extraction/telemetry.md
+      - Customize Your Pipeline:
+        - Add User-defined Stages: extraction/user-defined-stages.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Content Metadata: extraction/content-metadata.md
         - Environment Variables: extraction/environment-config.md
         - API Reference: extraction/api-docs
+      - Troubleshoot: extraction/troubleshoot.md
       - FAQ: extraction/faq.md
       - Contribute: extraction/contributing.md
+
 
 plugins:
   - search
@@ -85,6 +98,12 @@ plugins:
   #     scripts:
   #       - scripts/gen_ref_pages.py
   - macros
+  - mike:
+      alias_type: copy
+      canonical_version: "latest"
+      version_selector: true
+      css_dir: assets/css
+      javascript_dir: assets/js
   - mkdocstrings:
       handlers:
         python:
@@ -123,17 +142,17 @@ markdown_extensions:
   - admonition
   - footnotes
 
-# extra:
-#   social:
-#     - icon: fontawesome/brands/github
-#       link:
-#   version:
-#     provider: mike
-#     default: stable
-#     alias: true
+extra:
+   version:
+     provider: mike
+     default: latest
+     alias: true
+   social:
+     - icon: fontawesome/brands/github
+       link: https://github.com/NVIDIA/nv-ingest/
 #   docker_url: nvcr.io/nvidia/clara/bionemo-framework
 #   docker_tag: main--nightly
-#   github_url:
+#   github_url: https://github.com/NVIDIA/nv-ingest/
 
 copyright: |
   &copy; Copyright 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

@@ -41,7 +41,7 @@
       "MESSAGE_CLIENT_TYPE": "simple",
       "MINIO_BUCKET": "${MINIO_BUCKET:-nv-ingest}",
       "NGC_API_KEY": "${NGC_API_KEY:-ngcapikey}",
-      "NVIDIA_BUILD_API_KEY": "${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
+      "NVIDIA_API_KEY": "${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
       "PADDLE_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr",
       "PADDLE_INFER_PROTOCOL": "http",
       "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1",

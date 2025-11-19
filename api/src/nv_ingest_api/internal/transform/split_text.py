@@ -31,9 +31,16 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
         metadata = row.metadata if hasattr(row, "metadata") and isinstance(row.metadata, dict) else {}
         metadata = copy.deepcopy(metadata)
 
-        metadata["content"] = text
-
-        documents.append({"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())})
+        if row.document_type == ContentTypeEnum.AUDIO:
+            metadata["audio_metadata"]["audio_transcript"] = text
+            documents.append(
+                {"document_type": ContentTypeEnum.AUDIO.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
+        else:
+            metadata["content"] = text
+            documents.append(
+                {"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
 
     return documents
 
@@ -118,9 +125,15 @@ def transform_text_split_and_tokenize_internal(
     )
 
     # Filter to documents with text content.
-    bool_index = (df_transform_ledger["document_type"] == ContentTypeEnum.TEXT) & (
-        pd.json_normalize(df_transform_ledger["metadata"])["source_metadata.source_type"].isin(split_source_types)
-    )
+    text_type_condition = df_transform_ledger["document_type"].isin([ContentTypeEnum.TEXT, ContentTypeEnum.AUDIO])
+
+    normalized_meta_df = pd.json_normalize(df_transform_ledger["metadata"], errors="ignore")
+    if "source_metadata.source_type" in normalized_meta_df.columns:
+        source_type_condition = normalized_meta_df["source_metadata.source_type"].isin(split_source_types)
+    else:
+        source_type_condition = False
+
+    bool_index = text_type_condition & source_type_condition
     df_filtered: pd.DataFrame = df_transform_ledger.loc[bool_index]
 
     if df_filtered.empty:
@@ -128,20 +141,32 @@ def transform_text_split_and_tokenize_internal(
 
     model_predownload_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
 
-    if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
-        tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
-    ):
-        tokenizer_identifier = os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/")
-    elif os.path.exists(os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")) and (
-        tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"
-    ):
-        tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
+    if model_predownload_path is not None:
+        if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
+            tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
+        ):
+            tokenizer_identifier = os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/")
+        elif os.path.exists(
+            os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")
+        ) and (tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"):
+            tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
+
+    # Defaulto to intfloat/e5-large-unsupervised if no tokenizer predownloaded or specified
+    if tokenizer_identifier is None:
+        tokenizer_identifier = "intfloat/e5-large-unsupervised"
 
     tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
 
     split_docs: List[Dict[str, Any]] = []
     for _, row in df_filtered.iterrows():
-        content: str = row["metadata"]["content"] if row["metadata"]["content"] is not None else ""
+        if row["document_type"] == ContentTypeEnum.AUDIO:
+            content: str = (
+                row["metadata"]["audio_metadata"]["audio_transcript"]
+                if row["metadata"]["audio_metadata"]["audio_transcript"] is not None
+                else ""
+            )
+        else:
+            content: str = row["metadata"]["content"] if row["metadata"]["content"] is not None else ""
         chunks: List[str] = _split_into_chunks(content, tokenizer_model, chunk_size, chunk_overlap)
         split_docs.extend(_build_split_documents(row, chunks))
 

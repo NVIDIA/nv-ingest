@@ -30,12 +30,9 @@ SRC_FILE="/opt/docker/bin/entrypoint_source"
 SRC_EXT="/workspace/docker/entrypoint_source_ext.sh"
 [ -f "${SRC_EXT}" ] && . "${SRC_EXT}"
 
-# Determine edge buffer size (default: 32)
-EDGE_BUFFER_SIZE="${INGEST_EDGE_BUFFER_SIZE:-32}"
-
 # Determine ingest config path, if exists and is a valid file.
 if [ -n "${INGEST_CONFIG_PATH}" ] && [ -f "${INGEST_CONFIG_PATH}" ]; then
-    CONFIG_ARG="--ingest_config_path=${INGEST_CONFIG_PATH}"
+    CONFIG_ARG="--pipeline-config-path=${INGEST_CONFIG_PATH}"
 else
     CONFIG_ARG=""
 fi
@@ -99,9 +96,9 @@ else
 
     if [ "${MEM_TRACE}" = true ]; then
         # Run the entrypoint wrapped in memray
-        python -m memray run -o memray_trace.bin /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
+        python -m memray run -o memray_trace.bin /workspace/microservice_entrypoint.py ${CONFIG_ARG}
     else
         # Run without memray
-        python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
+        python /workspace/microservice_entrypoint.py ${CONFIG_ARG}
     fi
 fi

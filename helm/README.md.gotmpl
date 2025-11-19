@@ -7,20 +7,19 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 ## Prerequisites
 
-### Hardware/Software
+Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-## Setup Environment
+## Initial Environment Setup
 
-- First create your namespace
+1. Create your namespace by running the following code.
 
 ```bash
 NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
-- Install the Helm repos
+2. Add the Helm repos by running the following code.
 
 ```bash
 # NVIDIA nemo-microservices NGC repository
@@ -29,17 +28,22 @@ helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microse
 # NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
 
+# NVIDIA NIM Base repository
+helm repo add nim https://helm.ngc.nvidia.com/nim --username='$oauthtoken' --password=<NGC_API_KEY>
+
 # NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
-- Install the chart
+## Install or Upgrade the Helm Chart
+
+To install or upgrade the Helm chart, run the following code.
 
 ```bash
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -47,9 +51,28 @@ helm upgrade \
     --set ngcImagePullSecret.password="${NGC_API_KEY}" \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
+    --set paddleocr-nim.deployed=true \
+    --set nemoretriever-ocr.deployed=false \
+    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.3.0"
+    --set image.tag="25.9.0"
 ```
+
+> [!NOTE]
+> The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
+>
+> ```bash
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
+> ```
+>
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
+
+> [!NOTE]
+> For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
+> Currently, the NemoRetriever OCR v1 container is in early access preview.
+> To use nemoretriever-ocr-v1, in the preceding code, change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`, and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](https://docs.nvidia.com/nemo/retriever/25.9.0/extraction/quickstart-guide/).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
@@ -85,16 +108,6 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
-### Minikube Setup
-
-The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
-
-```bash
-minikube start --driver docker --container-runtime docker --gpus all --nodes 3
-minikube addons enable nvidia-gpu-device-plugin
-minikube addons enable storage-provisioner-rancher
-```
-
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.
@@ -110,7 +123,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==25.3.0
+pip install nv-ingest-client==25.9.0
 ```
 
 #### Rest Endpoint Ingress
@@ -260,7 +273,9 @@ Validate that the configuration was applied by running the following code.
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
 
-#### Executing Jobs
+You can adjust Kubernetes request and limit resources for MIG by using a Helm values file. To use a MIG values file in conjunction with other values files, append `-f mig/nv-ingest-mig-values.yaml` to your Helm command. For an example Helm values file for MIG settings, refer to [mig/nv-ingest-mig-config.yaml](mig/nv-ingest-mig-config.yaml). This file is only an example, and you should adjust the values for your environment and specific needs.
+
+#### Running Jobs
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
 

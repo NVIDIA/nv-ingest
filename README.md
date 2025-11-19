@@ -4,42 +4,50 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# NVIDIA Ingest: Multi-modal data extraction
+# What is NeMo Retriever Extraction?
 
-NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, text files, Microsoft Word and PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts, and unstructured images that you can use in downstream generative applications.
+NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
+NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
+to find, contextualize, and extract text, tables, charts and infographics that you can use in downstream generative applications.
 
 > [!Note]
-> NVIDIA Ingest is also known as NV-Ingest and [NeMo Retriever extraction](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+> NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database, such as [Milvus](https://milvus.io/).
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
+and optionally manage storing into a vector database [Milvus](https://milvus.io/).
+
+> [!Note]
+> Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
 
 The following diagram shows the Nemo Retriever extraction pipeline.
 
 ![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
 
 ## Table of Contents
-1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
+1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#library-mode-quickstart)
-4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
+4. [GitHub Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
 
-## What NVIDIA-Ingest Is
+## What NeMo Retriever Extraction Is
 
-NV-Ingest is a library and microservice service that does the following:
+NeMo Retriever Extraction is a library and microservice service that does the following:
 
 - Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents nv-ingest supports extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of before and after processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 
-NV-Ingest supports the following file types:
+NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
-- `html` (treated as text)
+- `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
@@ -50,7 +58,16 @@ NV-Ingest supports the following file types:
 - `tiff`
 - `txt`
 
-For more information, see the [full NV Ingest documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+
+### What NeMo Retriever Extraction Isn't
+
+NeMo Retriever extraction does not do the following:
+
+- Run a static pipeline or fixed set of operations on every submitted document.
+- Act as a wrapper for any specific document parsing library.
+
+
+For more information, see the [full NeMo Retriever Extraction documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
 
 ## Prerequisites
@@ -64,26 +81,23 @@ For small-scale workloads, such as workloads of fewer than 100 PDFs, you can use
 
 Library mode deployment of nv-ingest requires:
 
-- Linux operating systems (Ubuntu 22.04 or later recommended)
-- [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
+- Linux operating systems (Ubuntu 22.04 or later recommended) or MacOS
 - Python 3.12
+- We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
 
 ### Step 1: Prepare Your Environment
 
-Create a fresh Conda environment to install nv-ingest and dependencies.
+Create a fresh Python environment to install nv-ingest and dependencies.
 
 ```shell
-conda create -y --name nvingest python=3.12 && \
-    conda activate nvingest && \
-    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.4.2 nv_ingest_client=25.4.2 nv_ingest_api=25.4.2 && \
-    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient
+uv venv --python 3.12 nvingest && \
+  source nvingest/bin/activate && \
+  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
 ```
 
-Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
+Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
 
 ```
-#Note: these should be the same value
-export NVIDIA_BUILD_API_KEY=nvapi-...
 export NVIDIA_API_KEY=nvapi-...
 ```
 
@@ -91,11 +105,11 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
+To confirm that you have activated your Python environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
 ```
 which python
-/home/dev/miniforge3/envs/nvingest/bin/python
+/home/dev/projects/nv-ingest/nvingest/bin/python
 ```
 
 If you have a very high number of CPUs, and see the process hang without progress, we recommend that you use `taskset` to limit the number of CPUs visible to the process. Use the following code.
@@ -107,73 +121,83 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
-import logging, os, time, sys
+import time
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
-    PipelineCreationSchema,
-    start_pipeline_subprocess_morpheus
-)
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-# Start the pipeline subprocess for library mode                       
-config = PipelineCreationSchema()
+def main():
+    # Start the pipeline subprocess for library mode
+    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
-pipeline_process = start_pipeline_subprocess_morpheus(config)
-# you can configure the subprocesses to log stderr to stdout for debugging purposes
-# pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
-
-client = NvIngestClient(
-    message_client_allocator=SimpleClient,
-    message_client_port=7671,
-    message_client_hostname="localhost"
-)
-
-# gpu_cagra accelerated indexing is not available in milvus-lite
-# Provide a filename for milvus_uri to use milvus-lite
-milvus_uri = "milvus.db"
-collection_name = "test"
-sparse = False
-
-# do content extraction from files                                
-ingestor = (
-    Ingestor(client=client)
-    .files("data/multimodal_test.pdf")
-    .extract(
-        extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
-        extract_images=True,
-        paddle_output_format="markdown",
-        extract_infographics=True,
-        # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        text_depth="page"
-    ).embed()
-    .vdb_upload(
-        collection_name=collection_name,
-        milvus_uri=milvus_uri,
-        sparse=sparse,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost",
     )
-)
 
-print("Starting ingestion..")
-t0 = time.time()
-results = ingestor.ingest(show_progress=True)
-t1 = time.time()
-print(f"Time taken: {t1 - t0} seconds")
+    # gpu_cagra accelerated indexing is not available in milvus-lite
+    # Provide a filename for milvus_uri to use milvus-lite
+    milvus_uri = "milvus.db"
+    collection_name = "test"
+    sparse = False
 
-# results blob is directly inspectable
-print(ingest_json_results_to_blob(results[0]))
+    # do content extraction from files
+    ingestor = (
+        Ingestor(client=client)
+        .files("data/multimodal_test.pdf")
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            table_output_format="markdown",
+            extract_infographics=True,
+            # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            text_depth="page",
+        )
+        .embed()
+        .vdb_upload(
+            collection_name=collection_name,
+            milvus_uri=milvus_uri,
+            sparse=sparse,
+            # for llama-3.2 embedder, use 1024 for e5-v5
+            dense_dim=2048,
+        )
+    )
+
+    print("Starting ingestion..")
+    t0 = time.time()
+
+    # Return both successes and failures
+    # Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+    results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+    # Return only successes
+    # results = ingestor.ingest(show_progress=True)
+
+    t1 = time.time()
+    print(f"Total time: {t1 - t0} seconds")
+
+    # results blob is directly inspectable
+    if results:
+        print(ingest_json_results_to_blob(results[0]))
+
+    # (optional) Review any failures that were returned
+    if failures:
+        print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 You can see the extracted text that represents the content of the ingested test document.
 
 ```shell
 Starting ingestion..
-Time taken: 9.243880033493042 seconds
+Total time: 9.243880033493042 seconds
 
 TestingDocument
 A sample document with headings and placeholder text
@@ -200,13 +224,13 @@ This chart shows some gadgets, and some very fictitious costs.
 To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
 
 ```python
+import os
 from openai import OpenAI
 from nv_ingest_client.util.milvus import nvingest_retrieval
-import os
 
 milvus_uri = "milvus.db"
 collection_name = "test"
-sparse=False
+sparse = False
 
 queries = ["Which animal is responsible for the typos?"]
 
@@ -221,15 +245,15 @@ retrieved_docs = nvingest_retrieval(
 # simple generation example
 extract = retrieved_docs[0][0]["entity"]["text"]
 client = OpenAI(
-  base_url = "https://integrate.api.nvidia.com/v1",
-  api_key = os.environ["NVIDIA_BUILD_API_KEY"]
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=os.environ["NVIDIA_API_KEY"],
 )
 
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-  model="nvidia/llama-3.1-nemotron-70b-instruct",
-  messages=[{"role":"user","content": prompt}],
+    model="nvidia/llama-3.1-nemotron-70b-instruct",
+    messages=[{"role": "user", "content": prompt}],
 )
 response = completion.choices[0].message.content
 
@@ -237,35 +261,33 @@ print(f"Answer: {response}")
 ```
 
 ```shell
-Prompt: Using the following content: TestingDocument
-A sample document with headings and placeholder text
-Introduction
-This is a placeholder document that can be used for any purpose. It contains some 
-headings and some placeholder text to fill the space. The text is not important and contains 
-no real value, but it is useful for testing. Below, we will have some simple tables and charts 
-that we can use to confirm Ingest is working as expected.
-Table 1
-This table describes some animals, and some activities they might be doing in specific 
-locations.
-Animal Activity Place
-Gira@e Driving a car At the beach
-Lion Putting on sunscreen At the park
-Cat Jumping onto a laptop In a home o@ice
-Dog Chasing a squirrel In the front yard
-Chart 1
-This chart shows some gadgets, and some very fictitious costs.
+Prompt: Using the following content: Table 1
+| This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
+| Animal | Activity | Place |
+| Giraffe | Driving a car | At the beach |
+| Lion | Putting on sunscreen | At the park |
+| Cat | Jumping onto a laptop | In a home office |
+| Dog | Chasing a squirrel | In the front yard |
 
  Answer the user query: Which animal is responsible for the typos?
 Answer: A clever query!
 
-After carefully examining the provided content, I'd like to point out the potential "typos" (assuming you're referring to the unusual or intentionally incorrect text) and attempt to playfully "assign blame" to an animal based on the context:
+Based on the provided Table 1, I'd make an educated inference to answer your question. Since the activities listed are quite unconventional for the respective animals (e.g., a giraffe driving a car, a lion putting on sunscreen), it's likely that the table is using humor or hypothetical scenarios.
 
-1. **Gira@e** (instead of Giraffe) - **Animal blamed: Giraffe** (Table 1, first row)
-	* The "@" symbol in "Gira@e" suggests a possible typo or placeholder character, which we'll humorously attribute to the Giraffe's alleged carelessness.
-2. **o@ice** (instead of Office) - **Animal blamed: Cat**
-	* The same "@" symbol appears in "o@ice", which is related to the Cat's activity in the same table. Perhaps the Cat was in a hurry while typing and introduced the error?
+Given this context, the question "Which animal is responsible for the typos?" is probably a tongue-in-cheek inquiry, as there's no direct information in the table about typos or typing activities.
 
-So, according to this whimsical analysis, both the **Giraffe** and the **Cat** are "responsible" for the typos, with the Giraffe possibly being the more egregious offender given the more blatant character substitution in its name.
+However, if we were to make a playful connection, we could look for an animal that's:
+
+1. Typically found in a setting where typing might occur (e.g., an office).
+2. Engaging in an activity that could potentially lead to typos (e.g., interacting with a typing device).
+
+Based on these loose criteria, I'd jokingly point to:
+
+**Cat** as the potential culprit, since it's:
+        * Located "In a home office"
+        * Engaged in "Jumping onto a laptop", which could theoretically lead to accidental keystrokes or typos if the cat were to start "walking" on the keyboard!
+
+Please keep in mind that this response is purely humorous and interpretative, as the table doesn't explicitly mention typos or provide a straightforward answer to the question.
 ```
 
 > [!TIP]
@@ -274,9 +296,10 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 
-## NV Ingest Repository Structure
 
-The following is a description of the folders in the nv-ingest repository.
+## GitHub Repository Structure
+
+The following is a description of the folders in the GitHub repository.
 
 - [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer) — VSCode containers for local development
 - [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github) — GitHub repo configuration files
@@ -367,3 +390,15 @@ The following is the full text of the Developer Certificate of Origin (DCO)
 
   (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
 ```
+
+
+## Security Considerations
+
+- NeMo Retriever Extraction doesn't generate any code that may require sandboxing.
+- NeMo Retriever Extraction is shared as a reference and is provided "as is". The security in the production environment is the responsibility of the end users deploying it. When deploying in a production environment, please have security experts review any potential risks and threats; define the trust boundaries, implement logging and monitoring capabilities, secure the communication channels, integrate AuthN & AuthZ with appropriate access controls, keep the deployment up to date, ensure the containers/source code are secure and free of known vulnerabilities.
+- A frontend that handles AuthN & AuthZ should be in place as missing AuthN & AuthZ could provide ungated access to customer models if directly exposed to e.g. the internet, resulting in either cost to the customer, resource exhaustion, or denial of service.
+- NeMo Retriever Extraction doesn't require any privileged access to the system.
+- The end users are responsible for ensuring the availability of their deployment.
+- The end users are responsible for building the container images and keeping them up to date.
+- The end users are responsible for ensuring that OSS packages used by the developer blueprint are current.
+- The logs from nginx proxy, backend, and demo app are printed to standard out. They can include input prompts and output completions for development purposes. The end users are advised to handle logging securely and avoid information leakage for production use cases.

@@ -46,14 +46,14 @@ def process_yolox_graphic_elements(yolox_text_dict):
     return chart_content.strip()
 
 
-def match_bboxes(yolox_box, paddle_ocr_boxes, already_matched=None, delta=2.0):
+def match_bboxes(yolox_box, ocr_boxes, already_matched=None, delta=2.0):
     """
     Associates a yolox-graphic-elements box to PaddleOCR bboxes, by taking overlapping boxes.
     Criterion is iou > max_iou / delta where max_iou is the biggest found overlap.
     Boxes are expeceted in format (x0, y0, x1, y1)
     Args:
         yolox_box (np array [4]): Cached Bbox.
-        paddle_ocr_boxes (np array [n x 4]): PaddleOCR boxes
+        ocr_boxes (np array [n x 4]): PaddleOCR boxes
         already_matched (list or None, Optional): Already matched ids to ignore.
         delta (float, Optional): IoU delta for considering several boxes. Defaults to 2..
     Returns:
@@ -61,10 +61,10 @@ def match_bboxes(yolox_box, paddle_ocr_boxes, already_matched=None, delta=2.0):
     """
     x0_1, y0_1, x1_1, y1_1 = yolox_box
     x0_2, y0_2, x1_2, y1_2 = (
-        paddle_ocr_boxes[:, 0],
-        paddle_ocr_boxes[:, 1],
-        paddle_ocr_boxes[:, 2],
-        paddle_ocr_boxes[:, 3],
+        ocr_boxes[:, 0],
+        ocr_boxes[:, 1],
+        ocr_boxes[:, 2],
+        ocr_boxes[:, 3],
     )
 
     # Intersection
@@ -92,10 +92,10 @@ def match_bboxes(yolox_box, paddle_ocr_boxes, already_matched=None, delta=2.0):
     return matches
 
 
-def join_yolox_graphic_elements_and_paddle_output(yolox_output, paddle_boxes, paddle_txts):
+def join_yolox_graphic_elements_and_ocr_output(yolox_output, ocr_boxes, ocr_txts):
     """
     Matching boxes
-    We need to associate a text to the paddle detections.
+    We need to associate a text to the ocr detections.
     For each class and for each CACHED detections, we look for overlapping text bboxes
     with  IoU > max_iou / delta where max_iou is the biggest found overlap.
     Found texts are added to the class representation, and removed from the texts to match
@@ -113,18 +113,18 @@ def join_yolox_graphic_elements_and_paddle_output(yolox_output, paddle_boxes, pa
         "value_label",
     ]
 
-    paddle_txts = np.array(paddle_txts)
-    paddle_boxes = np.array(paddle_boxes)
+    ocr_txts = np.array(ocr_txts)
+    ocr_boxes = np.array(ocr_boxes)
 
-    if (paddle_txts.size == 0) or (paddle_boxes.size == 0):
+    if (ocr_txts.size == 0) or (ocr_boxes.size == 0):
         return {}
 
-    paddle_boxes = np.array(
+    ocr_boxes = np.array(
         [
-            paddle_boxes[:, :, 0].min(-1),
-            paddle_boxes[:, :, 1].min(-1),
-            paddle_boxes[:, :, 0].max(-1),
-            paddle_boxes[:, :, 1].max(-1),
+            ocr_boxes[:, :, 0].min(-1),
+            ocr_boxes[:, :, 1].min(-1),
+            ocr_boxes[:, :, 0].max(-1),
+            ocr_boxes[:, :, 1].max(-1),
         ]
     ).T
 
@@ -139,10 +139,10 @@ def join_yolox_graphic_elements_and_paddle_output(yolox_output, paddle_boxes, pa
         for yolox_box in yolox_output[k]:
             # if there's a score at the end, drop the score.
             yolox_box = yolox_box[:4]
-            paddle_ids = match_bboxes(yolox_box, paddle_boxes, already_matched=already_matched, delta=4)
+            ocr_ids = match_bboxes(yolox_box, ocr_boxes, already_matched=already_matched, delta=4)
 
-            if len(paddle_ids) > 0:
-                text = " ".join(paddle_txts[paddle_ids].tolist())
+            if len(ocr_ids) > 0:
+                text = " ".join(ocr_txts[ocr_ids].tolist())
                 texts.append(text)
 
         processed_texts = []
@@ -161,7 +161,7 @@ def join_yolox_graphic_elements_and_paddle_output(yolox_output, paddle_boxes, pa
     return results
 
 
-def convert_paddle_response_to_psuedo_markdown(bboxes, texts):
+def convert_ocr_response_to_psuedo_markdown(bboxes, texts):
     if (not bboxes) or (not texts):
         return ""
 
@@ -186,22 +186,22 @@ def convert_paddle_response_to_psuedo_markdown(bboxes, texts):
     return results
 
 
-def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_boxes, paddle_ocr_txts):
-    if (not paddle_ocr_boxes) or (not paddle_ocr_txts):
+def join_yolox_table_structure_and_ocr_output(yolox_cell_preds, ocr_boxes, ocr_txts):
+    if (not ocr_boxes) or (not ocr_txts):
         return ""
 
-    paddle_ocr_boxes = np.array(paddle_ocr_boxes)
-    paddle_ocr_boxes_ = np.array(
+    ocr_boxes = np.array(ocr_boxes)
+    ocr_boxes_ = np.array(
         [
-            paddle_ocr_boxes[:, :, 0].min(-1),
-            paddle_ocr_boxes[:, :, 1].min(-1),
-            paddle_ocr_boxes[:, :, 0].max(-1),
-            paddle_ocr_boxes[:, :, 1].max(-1),
+            ocr_boxes[:, :, 0].min(-1),
+            ocr_boxes[:, :, 1].min(-1),
+            ocr_boxes[:, :, 0].max(-1),
+            ocr_boxes[:, :, 1].max(-1),
         ]
     ).T
 
     assignments = []
-    for i, (b, t) in enumerate(zip(paddle_ocr_boxes_, paddle_ocr_txts)):
+    for i, (b, t) in enumerate(zip(ocr_boxes_, ocr_txts)):
         # Find a cell
         matches_cell = assign_boxes(b, yolox_cell_preds["cell"], delta=1)
         cell = yolox_cell_preds["cell"][matches_cell[0]] if len(matches_cell) else b
@@ -221,7 +221,7 @@ def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_bo
         assignments.append(
             {
                 "index": i,
-                "paddle_box": b,
+                "ocr_box": b,
                 "is_table": isinstance(col_ids, np.ndarray) and isinstance(row_ids, np.ndarray),
                 "cell_id": matches_cell[0] if len(matches_cell) else -1,
                 "cell": cell,
@@ -249,13 +249,13 @@ def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_bo
         mat = build_markdown(df_table)
         markdown_table = display_markdown(mat, use_header=False)
 
-        all_boxes = np.stack(df_table.paddle_box.values)
+        all_boxes = np.stack(df_table.ocr_box.values)
         table_box = np.concatenate([all_boxes[:, [0, 1]].min(0), all_boxes[:, [2, 3]].max(0)])
 
         df_table_to_text = pd.DataFrame(
             [
                 {
-                    "paddle_box": table_box,
+                    "ocr_box": table_box,
                     "text": markdown_table,
                     "is_table": True,
                 }
@@ -264,7 +264,7 @@ def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_bo
         # Final text representations dataframe
         df_text = pd.concat([df_text, df_table_to_text], ignore_index=True)
 
-    df_text = df_text.rename(columns={"paddle_box": "box"})
+    df_text = df_text.rename(columns={"ocr_box": "box"})
 
     # Sort by y and x
     df_text["x"] = df_text["box"].apply(lambda x: (x[0] + x[2]) / 2)
@@ -297,12 +297,12 @@ def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_bo
     return result
 
 
-def assign_boxes(paddle_box, boxes, delta=2.0, min_overlap=0.25):
+def assign_boxes(ocr_box, boxes, delta=2.0, min_overlap=0.25):
     """
-    Assigns the closest bounding boxes to a reference `paddle_box` based on overlap.
+    Assigns the closest bounding boxes to a reference `ocr_box` based on overlap.
 
     Args:
-        paddle_box (list or numpy.ndarray): Reference bounding box [x_min, y_min, x_max, y_max].
+        ocr_box (list or numpy.ndarray): Reference bounding box [x_min, y_min, x_max, y_max].
         boxes (numpy.ndarray): Array of candidate bounding boxes with shape (N, 4).
         delta (float, optional): Factor for matches relative to the best overlap. Defaults to 2.0.
         min_overlap (float, optional): Minimum required overlap for a match. Defaults to 0.25.
@@ -316,7 +316,7 @@ def assign_boxes(paddle_box, boxes, delta=2.0, min_overlap=0.25):
 
     boxes = np.array(boxes)
 
-    x0_1, y0_1, x1_1, y1_1 = paddle_box
+    x0_1, y0_1, x1_1, y1_1 = ocr_box
     x0_2, y0_2, x1_2, y1_2 = (
         boxes[:, 0],
         boxes[:, 1],
@@ -331,7 +331,7 @@ def assign_boxes(paddle_box, boxes, delta=2.0, min_overlap=0.25):
     inter_x1 = np.minimum(x1_1, x1_2)
     inter_area = np.maximum(0, inter_y1 - inter_y0) * np.maximum(0, inter_x1 - inter_x0)
 
-    # Normalize by paddle_box size
+    # Normalize by ocr_box size
     area_1 = (y1_1 - y0_1) * (x1_1 - x0_1)
     ious = inter_area / (area_1 + 1e-6)
 
@@ -385,16 +385,16 @@ def merge_text_in_cell(df_cell):
     Returns:
         pandas.DataFrame: Updated DataFrame with merged text and a single bounding box.
     """
-    paddle_boxes = np.stack(df_cell["paddle_box"].values)
+    ocr_boxes = np.stack(df_cell["ocr_box"].values)
 
-    df_cell["x"] = (paddle_boxes[:, 0] - paddle_boxes[:, 0].min()) // 10
-    df_cell["y"] = (paddle_boxes[:, 1] - paddle_boxes[:, 1].min()) // 10
+    df_cell["x"] = (ocr_boxes[:, 0] - ocr_boxes[:, 0].min()) // 10
+    df_cell["y"] = (ocr_boxes[:, 1] - ocr_boxes[:, 1].min()) // 10
     df_cell = df_cell.sort_values(["y", "x"])
 
     text = " ".join(df_cell["text"].values.tolist())
     df_cell["text"] = text
     df_cell = df_cell.head(1)
-    df_cell["paddle_box"] = df_cell["cell"]
+    df_cell["ocr_box"] = df_cell["cell"]
     df_cell.drop(["x", "y"], axis=1, inplace=True)
 
     return df_cell
@@ -447,3 +447,58 @@ def display_markdown(
         markdown_table = "\n".join("| " + " | ".join(row) + " |" for row in data)
 
     return markdown_table
+
+
+def reorder_boxes(boxes, texts, confs, mode="top_left", dbscan_eps=10):
+    """
+    Reorders the boxes in reading order.
+    If mode is "center", the boxes are reordered using bbox center.
+    If mode is "top_left", the boxes are reordered using the top left corner.
+    If dbscan_eps is not 0, the boxes are reordered using DBSCAN clustering.
+
+    Args:
+        boxes (np array [n x 4 x 2]): The bounding boxes of the OCR results.
+        texts (np array [n]): The text of the OCR results.
+        confs (np array [n]): The confidence scores of the OCR results.
+        mode (str, optional): The mode to reorder the boxes. Defaults to "center".
+        dbscan_eps (float, optional): The epsilon parameter for DBSCAN. Defaults to 10.
+
+    Returns:
+        List[List[int, ...]]: The reordered bounding boxes.
+        List[str]: The reordered texts.
+        List[float]: The reordered confidence scores.
+    """
+    df = pd.DataFrame(
+        [[b, t, c] for b, t, c in zip(boxes, texts, confs)],
+        columns=["bbox", "text", "conf"],
+    )
+
+    if mode == "center":
+        df["x"] = df["bbox"].apply(lambda box: (box[0][0] + box[2][0]) / 2)
+        df["y"] = df["bbox"].apply(lambda box: (box[0][1] + box[2][1]) / 2)
+    elif mode == "top_left":
+        df["x"] = df["bbox"].apply(lambda box: (box[0][0]))
+        df["y"] = df["bbox"].apply(lambda box: (box[0][1]))
+
+    if dbscan_eps:
+        do_naive_sorting = False
+        try:
+            dbscan = DBSCAN(eps=dbscan_eps, min_samples=1)
+            dbscan.fit(df["y"].values[:, None])
+            df["cluster"] = dbscan.labels_
+            df["cluster_centers"] = df.groupby("cluster")["y"].transform("mean").astype(int)
+            df = df.sort_values(["cluster_centers", "x"], ascending=[True, True], ignore_index=True)
+        except ValueError:
+            do_naive_sorting = True
+    else:
+        do_naive_sorting = True
+
+    if do_naive_sorting:
+        df["y"] = np.round((df["y"] - df["y"].min()) // 5, 0)
+        df = df.sort_values(["y", "x"], ascending=[True, True], ignore_index=True)
+
+    bboxes = df["bbox"].values.tolist()
+    texts = df["text"].values.tolist()
+    confs = df["conf"].values.tolist()
+
+    return bboxes, texts, confs

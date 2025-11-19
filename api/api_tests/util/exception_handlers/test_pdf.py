@@ -40,6 +40,7 @@ def test_create_exception_tag_with_source_id():
         "status": StatusEnum.ERROR,
         "source_id": source_id,
         "error_msg": error_message,
+        "custom_content": None,
     }
 
     # Assuming validate_schema function works as intended or is mocked accordingly

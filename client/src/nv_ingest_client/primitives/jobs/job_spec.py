@@ -18,6 +18,7 @@ from nv_ingest_client.primitives.tasks.audio_extraction import AudioExtractionTa
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
+from nv_ingest_client.primitives.tasks.ocr_extraction import OCRExtractionTask
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 
@@ -110,6 +111,7 @@ class JobSpec:
             "job_id": str(self._job_id),
             "tasks": [task.to_dict() for task in self._tasks],
             "tracing_options": self._extended_options.get("tracing_options", {}),
+            "pdf_config": self._extended_options.get("pdf_config", {}),
         }
 
     @property
@@ -150,29 +152,56 @@ class JobSpec:
 
     def add_task(self, task) -> None:
         """
-        Adds a task to the job specification.
+        Adds a task or list of tasks to the job specification.
 
         Parameters
         ----------
-        task
-            The task to add to the job specification. Assumes the task has a to_dict method.
+        task : Task or list of Task
+            The task(s) to add to the job specification. Can be a single task or a list of tasks.
+            Each task must derive from the Task class and have a to_dict method.
 
         Raises
         ------
         ValueError
-            If the task does not have a to_dict method.
+            If any task does not derive from the Task class.
+        """
+        # Handle both single tasks and lists of tasks
+        if isinstance(task, list):
+            # Process each task in the list
+            for single_task in task:
+                self._add_single_task(single_task)
+        else:
+            # Process single task
+            self._add_single_task(task)
+
+    def _add_single_task(self, task) -> None:
+        """
+        Adds a single task to the job specification with automatic task expansion.
+
+        Parameters
+        ----------
+        task : Task
+            The task to add to the job specification.
+
+        Raises
+        ------
+        ValueError
+            If the task does not derive from the Task class.
         """
         if not isinstance(task, Task):
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
         self._tasks.append(task)
 
+        # Automatic task expansion for ExtractTask
         if isinstance(task, ExtractTask) and (task._extract_tables is True):
             self._tasks.append(TableExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_charts is True):
             self._tasks.append(ChartExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
+        if isinstance(task, ExtractTask) and (task._extract_method in {"pdfium_hybrid", "ocr"}):
+            self._tasks.append(OCRExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_method == "audio"):
             extract_audio_params = task._extract_audio_params or {}
             self._tasks.append(AudioExtractionTask(**extract_audio_params))
@@ -239,15 +268,16 @@ class BatchJobSpec:
         """
         from nv_ingest_client.util.util import create_job_specs_for_batch
         from nv_ingest_client.util.util import generate_matching_files
+        from nv_ingest_client.util.util import balanced_groups_flat_order
 
         if isinstance(files, str):
             files = [files]
 
         matching_files = list(generate_matching_files(files))
+        matching_files = balanced_groups_flat_order(matching_files)
         if not matching_files:
             logger.warning(f"No files found matching {files}.")
             return
-
         job_specs = create_job_specs_for_batch(matching_files)
         for job_spec in job_specs:
             self.add_job_spec(job_spec)
@@ -321,11 +351,6 @@ class BatchJobSpec:
         document_type : str, optional
             The document type used to filter job specifications. If not provided, the
             `document_type` is inferred from the task, or the task is applied to all job specifications.
-
-        Raises
-        ------
-        ValueError
-            If the task does not derive from the `Task` class.
         """
         if not isinstance(task, Task):
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")

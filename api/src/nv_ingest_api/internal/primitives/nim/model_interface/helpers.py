@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import backoff
 import cv2
@@ -13,6 +14,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.decorators import mul
 from nv_ingest_api.util.image_processing.transforms import pad_image, normalize_image
 from nv_ingest_api.util.string_processing import generate_url, remove_url_endpoints
 
+cv2.setNumThreads(1)
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +81,67 @@ def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 96
     }
 
     return transposed, metadata
+
+
+def preprocess_image_for_ocr(
+    array: np.ndarray,
+    target_height: Optional[int] = None,
+    target_width: Optional[int] = None,
+    pad_how: str = "bottom_right",
+    normalize: bool = False,
+    channel_first: bool = False,
+) -> np.ndarray:
+    """
+    Preprocesses an input image to be suitable for use with NemoRetriever-OCR.
+
+    This function is intended for preprocessing images to be passed as input to NemoRetriever-OCR using GRPC.
+    It is not necessary when using the HTTP endpoint.
+
+    Parameters:
+    ----------
+    array : np.ndarray
+        The input image array of shape (height, width, channels). It should have pixel values in the range [0, 255].
+
+    Returns:
+    -------
+    np.ndarray
+        A preprocessed image with the shape (channels, height, width).
+    """
+    height, width = array.shape[:2]
+
+    if target_height is None:
+        target_height = height
+
+    if target_width is None:
+        target_width = width
+
+    padded, (pad_width, pad_height) = pad_image(
+        array,
+        target_height=target_height,
+        target_width=target_width,
+        background_color=255,
+        dtype=np.float32,
+        how=pad_how,
+    )
+
+    if normalize:
+        padded = padded / 255.0
+
+    if channel_first:
+        # NemoRetriever-OCR NIM (GRPC) requires input to be (channel, height, width).
+        padded = padded.transpose((2, 0, 1))
+
+    # Metadata can used for inverting transformations on the resulting bounding boxes.
+    metadata = {
+        "original_height": height,
+        "original_width": width,
+        "new_height": target_height,
+        "new_width": target_width,
+        "pad_height": pad_height,
+        "pad_width": pad_width,
+    }
+
+    return padded, metadata
 
 
 def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:

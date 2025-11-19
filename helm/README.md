@@ -7,20 +7,18 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 ## Prerequisites
 
-### Hardware/Software
+Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
+## Initial Environment Setup
 
-## Setup Environment
-
-- First create your namespace
+1. Create your namespace by running the following code.
 
 ```bash
 NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
-- Install the Helm repos
+2. Add the Helm repos by running the following code.
 
 ```bash
 # NVIDIA nemo-microservices NGC repository
@@ -29,17 +27,22 @@ helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microse
 # NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
 
+# NVIDIA NIM Base repository
+helm repo add nim https://helm.ngc.nvidia.com/nim --username='$oauthtoken' --password=<NGC_API_KEY>
+
 # NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
-- Install the chart
+## Install or Upgrade the Helm Chart
+
+To install or upgrade the Helm chart, run the following code.
 
 ```bash
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -47,9 +50,28 @@ helm upgrade \
     --set ngcImagePullSecret.password="${NGC_API_KEY}" \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
+    --set paddleocr-nim.deployed=true \
+    --set nemoretriever-ocr.deployed=false \
+    --set envVars.OCR_MODEL_NAME="paddle" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.3.0"
+    --set image.tag="25.9.0"
 ```
+
+> [!NOTE]
+> The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
+>
+> ```bash
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
+> ```
+>
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
+
+> [!NOTE]
+> For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
+> Currently, the NemoRetriever OCR v1 container is in early access preview.
+> To use nemoretriever-ocr-v1, in the preceding code, change `paddleocr-nim.deployed` to `false`, `nemoretriever-ocr.deployed` to `true`, and `envVars.OCR_MODEL_NAME` to `"scene_text_ensemble"`.
+> For more information, see [Deploy With Docker Compose (Self-Hosted)](https://docs.nvidia.com/nemo/retriever/25.9.0/extraction/quickstart-guide/).
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
@@ -84,16 +106,6 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
-### Minikube Setup
-
-The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
-
-```bash
-minikube start --driver docker --container-runtime docker --gpus all --nodes 3
-minikube addons enable nvidia-gpu-device-plugin
-minikube addons enable storage-provisioner-rancher
-```
-
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.
@@ -109,7 +121,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==25.3.0
+pip install nv-ingest-client==25.9.0
 ```
 
 #### Rest Endpoint Ingress
@@ -258,7 +270,9 @@ Validate that the configuration was applied by running the following code.
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
 
-#### Executing Jobs
+You can adjust Kubernetes request and limit resources for MIG by using a Helm values file. To use a MIG values file in conjunction with other values files, append `-f mig/nv-ingest-mig-values.yaml` to your Helm command. For an example Helm values file for MIG settings, refer to [mig/nv-ingest-mig-config.yaml](mig/nv-ingest-mig-config.yaml). This file is only an example, and you should adjust the values for your environment and specific needs.
+
+#### Running Jobs
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
 
@@ -279,18 +293,22 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 
 | Repository | Name | Version |
 |------------|------|---------|
-| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.3.0 |
-| alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
-| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.6.0 |
-| alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.5.0 |
-| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.3.0 |
-| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.3.0 |
-| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.3.0 |
+| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.4.0 |
+| alias:nemo-microservices | vlm-embedding-nim(nvidia-nim-llama-32-nemoretriever-1b-vlm-embed-v1) | 1.7.0 |
+| alias:nemo-microservices | nemoretriever-ocr(nvidia-nim-nemoretriever-ocr-v1) | 1.0.0 |
+| alias:nim | nim-vlm-image-captioning(nim-vlm) | 1.2.1 |
+| alias:nim | nim-vlm-text-extraction(nim-vlm) | 1.2.1 |
+| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.9.0 |
+| alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.7.0 |
+| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.4.0 |
+| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.4.0 |
+| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.4.0 |
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
-| https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
+| https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.133.0 |
+| https://prometheus-community.github.io/helm-charts | prometheus | 27.12.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
-| https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
+| https://zipkin.io/zipkin-helm | zipkin | 0.4.0 |
 | oci://registry-1.docker.io/bitnamicharts | redis | 19.1.3 |
 
 ## Values
@@ -304,15 +322,20 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | autoscaling.minReplicas | int | `1` |  |
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
-| envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
+| envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
+| envVars.AUDIO_GRPC_ENDPOINT | string | `"nv-ingest-riva-nim:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| envVars.INGEST_DISABLE_DYNAMIC_SCALING | bool | `false` |  |
+| envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
+| envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
 | envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
+| envVars.MESSAGE_CLIENT_TYPE | string | `"redis"` |  |
 | envVars.MILVUS_ENDPOINT | string | `"http://nv-ingest-milvus:19530"` |  |
 | envVars.MINIO_BUCKET | string | `"nv-ingest"` |  |
 | envVars.MINIO_INTERNAL_ADDRESS | string | `"nv-ingest-minio:9000"` |  |
@@ -320,14 +343,18 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
 | envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"` |  |
 | envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
+| envVars.NEMORETRIEVER_PARSE_MODEL_NAME | string | `"nvidia/nemoretriever-parse"` |  |
 | envVars.NV_INGEST_DEFAULT_TIMEOUT_MS | string | `"1234"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
+| envVars.OCR_GRPC_ENDPOINT | string | `"nv-ingest-ocr:8001"` |  |
+| envVars.OCR_HTTP_ENDPOINT | string | `"http://nv-ingest-ocr:8000/v1/infer"` |  |
+| envVars.OCR_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.OCR_MODEL_NAME | string | `"paddle"` |  |
 | envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
-| envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
-| envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
+| envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |
@@ -344,7 +371,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.3.0"` |  |
+| image.tag | string | `"latest"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -371,10 +398,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | llama-32-nv-rerankqa-1b-v2.deployed | bool | `false` |  |
 | llama-32-nv-rerankqa-1b-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | llama-32-nv-rerankqa-1b-v2.env[0].value | string | `"8000"` |  |
-| llama-32-nv-rerankqa-1b-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| llama-32-nv-rerankqa-1b-v2.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
 | llama-32-nv-rerankqa-1b-v2.env[1].value | string | `"1"` |  |
 | llama-32-nv-rerankqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2"` |  |
-| llama-32-nv-rerankqa-1b-v2.image.tag | string | `"1.3.1"` |  |
+| llama-32-nv-rerankqa-1b-v2.image.tag | string | `"1.7.0"` |  |
 | llama-32-nv-rerankqa-1b-v2.nim.grpcPort | int | `8001` |  |
 | llama-32-nv-rerankqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
 | llama-32-nv-rerankqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -391,15 +418,20 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | llama-32-nv-rerankqa-1b-v2.statefuleSet.enabled | bool | `false` |  |
 | logLevel | string | `"DEFAULT"` |  |
 | milvus.cluster.enabled | bool | `false` |  |
+| milvus.etcd.image.repository | string | `"milvusdb/etcd"` |  |
+| milvus.etcd.image.tag | string | `"3.5.22-r1"` |  |
 | milvus.etcd.persistence.storageClass | string | `nil` |  |
 | milvus.etcd.replicaCount | int | `1` |  |
 | milvus.image.all.repository | string | `"milvusdb/milvus"` |  |
-| milvus.image.all.tag | string | `"v2.5.3-gpu"` |  |
-| milvus.minio.bucketName | string | `"a-bucket"` |  |
+| milvus.image.all.tag | string | `"v2.5.17-gpu"` |  |
+| milvus.minio.bucketName | string | `"nv-ingest"` |  |
+| milvus.minio.enabled | bool | `true` |  |
+| milvus.minio.image.tag | string | `"RELEASE.2025-09-07T16-13-09Z"` |  |
 | milvus.minio.mode | string | `"standalone"` |  |
 | milvus.minio.persistence.size | string | `"50Gi"` |  |
 | milvus.minio.persistence.storageClass | string | `nil` |  |
 | milvus.pulsar.enabled | bool | `false` |  |
+| milvus.pulsarv3.enabled | bool | `false` |  |
 | milvus.standalone.extraEnv[0].name | string | `"LOG_LEVEL"` |  |
 | milvus.standalone.extraEnv[0].value | string | `"error"` |  |
 | milvus.standalone.persistence.persistentVolumeClaim.size | string | `"50Gi"` |  |
@@ -418,10 +450,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-graphic-elements-v1.deployed | bool | `true` |  |
 | nemoretriever-graphic-elements-v1.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nemoretriever-graphic-elements-v1.env[0].value | string | `"8000"` |  |
-| nemoretriever-graphic-elements-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| nemoretriever-graphic-elements-v1.env[1].value | string | `"1"` |  |
+| nemoretriever-graphic-elements-v1.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nemoretriever-graphic-elements-v1.env[1].value | string | `"vram_opt"` |  |
+| nemoretriever-graphic-elements-v1.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nemoretriever-graphic-elements-v1.env[2].value | string | `"768"` |  |
+| nemoretriever-graphic-elements-v1.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nemoretriever-graphic-elements-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1"` |  |
-| nemoretriever-graphic-elements-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-graphic-elements-v1.image.tag | string | `"1.4.0"` |  |
 | nemoretriever-graphic-elements-v1.nim.grpcPort | int | `8001` |  |
 | nemoretriever-graphic-elements-v1.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-graphic-elements-v1.podSecurityContext.fsGroup | int | `1000` |  |
@@ -436,6 +471,36 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-graphic-elements-v1.serviceAccount.create | bool | `false` |  |
 | nemoretriever-graphic-elements-v1.serviceAccount.name | string | `""` |  |
 | nemoretriever-graphic-elements-v1.statefuleSet.enabled | bool | `false` |  |
+| nemoretriever-ocr.autoscaling.enabled | bool | `false` |  |
+| nemoretriever-ocr.autoscaling.maxReplicas | int | `10` |  |
+| nemoretriever-ocr.autoscaling.metrics | list | `[]` |  |
+| nemoretriever-ocr.autoscaling.minReplicas | int | `1` |  |
+| nemoretriever-ocr.customArgs | list | `[]` |  |
+| nemoretriever-ocr.customCommand | list | `[]` |  |
+| nemoretriever-ocr.deployed | bool | `false` |  |
+| nemoretriever-ocr.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nemoretriever-ocr.env[0].value | string | `"8000"` |  |
+| nemoretriever-ocr.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nemoretriever-ocr.env[1].value | string | `"vram_opt"` |  |
+| nemoretriever-ocr.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nemoretriever-ocr.env[2].value | string | `"768"` |  |
+| nemoretriever-ocr.fullnameOverride | string | `"nv-ingest-ocr"` |  |
+| nemoretriever-ocr.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1"` |  |
+| nemoretriever-ocr.image.tag | string | `"1.0.0"` |  |
+| nemoretriever-ocr.nim.grpcPort | int | `8001` |  |
+| nemoretriever-ocr.nim.logLevel | string | `"INFO"` |  |
+| nemoretriever-ocr.podSecurityContext.fsGroup | int | `1000` |  |
+| nemoretriever-ocr.podSecurityContext.runAsGroup | int | `1000` |  |
+| nemoretriever-ocr.podSecurityContext.runAsUser | int | `1000` |  |
+| nemoretriever-ocr.replicaCount | int | `1` |  |
+| nemoretriever-ocr.service.grpcPort | int | `8001` |  |
+| nemoretriever-ocr.service.httpPort | int | `8000` |  |
+| nemoretriever-ocr.service.metricsPort | int | `0` |  |
+| nemoretriever-ocr.service.name | string | `"nv-ingest-ocr"` |  |
+| nemoretriever-ocr.service.type | string | `"ClusterIP"` |  |
+| nemoretriever-ocr.serviceAccount.create | bool | `false` |  |
+| nemoretriever-ocr.serviceAccount.name | string | `""` |  |
+| nemoretriever-ocr.statefuleSet.enabled | bool | `false` |  |
 | nemoretriever-page-elements-v2.autoscaling.enabled | bool | `false` |  |
 | nemoretriever-page-elements-v2.autoscaling.maxReplicas | int | `10` |  |
 | nemoretriever-page-elements-v2.autoscaling.metrics | list | `[]` |  |
@@ -443,11 +508,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-page-elements-v2.deployed | bool | `true` |  |
 | nemoretriever-page-elements-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nemoretriever-page-elements-v2.env[0].value | string | `"8000"` |  |
-| nemoretriever-page-elements-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| nemoretriever-page-elements-v2.env[1].value | string | `"1"` |  |
+| nemoretriever-page-elements-v2.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nemoretriever-page-elements-v2.env[1].value | string | `"vram_opt"` |  |
+| nemoretriever-page-elements-v2.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nemoretriever-page-elements-v2.env[2].value | string | `"768"` |  |
 | nemoretriever-page-elements-v2.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nemoretriever-page-elements-v2.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v2"` |  |
-| nemoretriever-page-elements-v2.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-page-elements-v2.image.tag | string | `"1.4.0"` |  |
 | nemoretriever-page-elements-v2.nim.grpcPort | int | `8001` |  |
 | nemoretriever-page-elements-v2.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-page-elements-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -471,10 +538,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-table-structure-v1.deployed | bool | `true` |  |
 | nemoretriever-table-structure-v1.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nemoretriever-table-structure-v1.env[0].value | string | `"8000"` |  |
-| nemoretriever-table-structure-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| nemoretriever-table-structure-v1.env[1].value | string | `"1"` |  |
+| nemoretriever-table-structure-v1.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nemoretriever-table-structure-v1.env[1].value | string | `"vram_opt"` |  |
+| nemoretriever-table-structure-v1.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nemoretriever-table-structure-v1.env[2].value | string | `"768"` |  |
+| nemoretriever-table-structure-v1.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nemoretriever-table-structure-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-table-structure-v1"` |  |
-| nemoretriever-table-structure-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-table-structure-v1.image.tag | string | `"1.4.0"` |  |
 | nemoretriever-table-structure-v1.nim.grpcPort | int | `8001` |  |
 | nemoretriever-table-structure-v1.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-table-structure-v1.podSecurityContext.fsGroup | int | `1000` |  |
@@ -501,11 +571,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nim-vlm-image-captioning.deployed | bool | `false` |  |
 | nim-vlm-image-captioning.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nim-vlm-image-captioning.env[0].value | string | `"8000"` |  |
-| nim-vlm-image-captioning.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| nim-vlm-image-captioning.env[1].value | string | `"1"` |  |
+| nim-vlm-image-captioning.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nim-vlm-image-captioning.env[1].value | string | `"vram_opt"` |  |
+| nim-vlm-image-captioning.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nim-vlm-image-captioning.env[2].value | string | `"768"` |  |
 | nim-vlm-image-captioning.fullnameOverride | string | `"nim-vlm-image-captioning"` |  |
-| nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"` |  |
-| nim-vlm-image-captioning.image.tag | string | `"latest"` |  |
+| nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
+| nim-vlm-image-captioning.image.tag | string | `"1"` |  |
 | nim-vlm-image-captioning.nim.grpcPort | int | `8001` |  |
 | nim-vlm-image-captioning.nim.logLevel | string | `"INFO"` |  |
 | nim-vlm-image-captioning.podSecurityContext.fsGroup | int | `1000` |  |
@@ -522,8 +594,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nim-vlm-text-extraction.deployed | bool | `false` |  |
 | nim-vlm-text-extraction.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nim-vlm-text-extraction.env[0].value | string | `"8000"` |  |
-| nim-vlm-text-extraction.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| nim-vlm-text-extraction.env[1].value | string | `"1"` |  |
+| nim-vlm-text-extraction.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nim-vlm-text-extraction.env[1].value | string | `"vram_opt"` |  |
+| nim-vlm-text-extraction.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nim-vlm-text-extraction.env[2].value | string | `"768"` |  |
 | nim-vlm-text-extraction.fullnameOverride | string | `"nim-vlm-text-extraction-nemoretriever-parse"` |  |
 | nim-vlm-text-extraction.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemoretriever-parse"` |  |
 | nim-vlm-text-extraction.image.tag | string | `"1.2.0ea"` |  |
@@ -552,7 +626,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].value | string | `"1"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
-| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag | string | `"1.5.0"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag | string | `"1.9.0"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.grpcPort | int | `8001` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -576,7 +650,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.enabled_regex_matching | bool | `true` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.invert_match | bool | `true` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.key | string | `"http.target"` |  |
-| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.values[0] | string | `"\\/health"` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.values[0] | string | `"/health"` |  |
 | opentelemetry-collector.config.processors.tail_sampling.policies[0].type | string | `"string_attribute"` |  |
 | opentelemetry-collector.config.processors.transform.trace_statements[0].context | string | `"span"` |  |
 | opentelemetry-collector.config.processors.transform.trace_statements[0].statements[0] | string | `"set(status.code, 1) where attributes[\"http.path\"] == \"/health\""` |  |
@@ -585,6 +659,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.processors.transform.trace_statements[0].statements[3] | string | `"set(name, Concat([name, attributes[\"http.url\"]], \" \")) where name == \"POST\""` |  |
 | opentelemetry-collector.config.receivers.otlp.protocols.grpc.endpoint | string | `"${env:MY_POD_IP}:4317"` |  |
 | opentelemetry-collector.config.receivers.otlp.protocols.http.cors.allowed_origins[0] | string | `"*"` |  |
+| opentelemetry-collector.config.receivers.otlp.protocols.http.endpoint | string | `"${env:MY_POD_IP}:4318"` |  |
 | opentelemetry-collector.config.service.extensions[0] | string | `"zpages"` |  |
 | opentelemetry-collector.config.service.extensions[1] | string | `"health_check"` |  |
 | opentelemetry-collector.config.service.pipelines.logs.exporters[0] | string | `"debug"` |  |
@@ -595,9 +670,13 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | opentelemetry-collector.config.service.pipelines.metrics.receivers[0] | string | `"otlp"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.exporters[0] | string | `"debug"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.exporters[1] | string | `"zipkin"` |  |
-| opentelemetry-collector.config.service.pipelines.traces.processors[0] | string | `"tail_sampling"` |  |
-| opentelemetry-collector.config.service.pipelines.traces.processors[1] | string | `"transform"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[0] | string | `"batch"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[1] | string | `"tail_sampling"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[2] | string | `"transform"` |  |
 | opentelemetry-collector.config.service.pipelines.traces.receivers[0] | string | `"otlp"` |  |
+| opentelemetry-collector.config.service.telemetry.logs.level | string | `"debug"` |  |
+| opentelemetry-collector.image.repository | string | `"otel/opentelemetry-collector-contrib"` |  |
+| opentelemetry-collector.image.tag | string | `"0.133.0"` |  |
 | opentelemetry-collector.mode | string | `"deployment"` |  |
 | otelDeployed | bool | `true` |  |
 | otelEnabled | bool | `true` |  |
@@ -608,20 +687,22 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | otelEnvVars.OTEL_RESOURCE_ATTRIBUTES | string | `"deployment.environment=$(NAMESPACE)"` |  |
 | otelEnvVars.OTEL_SERVICE_NAME | string | `"nemo-retrieval-service"` |  |
 | otelEnvVars.OTEL_TRACES_EXPORTER | string | `"otlp"` |  |
-| paddleocr-nim."paddleocr-nim.deployed" | bool | `true` |  |
 | paddleocr-nim.autoscaling.enabled | bool | `false` |  |
 | paddleocr-nim.autoscaling.maxReplicas | int | `10` |  |
 | paddleocr-nim.autoscaling.metrics | list | `[]` |  |
 | paddleocr-nim.autoscaling.minReplicas | int | `1` |  |
 | paddleocr-nim.customArgs | list | `[]` |  |
 | paddleocr-nim.customCommand | list | `[]` |  |
+| paddleocr-nim.deployed | bool | `true` |  |
 | paddleocr-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | paddleocr-nim.env[0].value | string | `"8000"` |  |
-| paddleocr-nim.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
-| paddleocr-nim.env[1].value | string | `"1"` |  |
-| paddleocr-nim.fullnameOverride | string | `"nv-ingest-paddle"` |  |
+| paddleocr-nim.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| paddleocr-nim.env[1].value | string | `"vram_opt"` |  |
+| paddleocr-nim.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| paddleocr-nim.env[2].value | string | `"768"` |  |
+| paddleocr-nim.fullnameOverride | string | `"nv-ingest-ocr"` |  |
 | paddleocr-nim.image.repository | string | `"nvcr.io/nim/baidu/paddleocr"` |  |
-| paddleocr-nim.image.tag | string | `"1.2.0"` |  |
+| paddleocr-nim.image.tag | string | `"1.4.0"` |  |
 | paddleocr-nim.nim.grpcPort | int | `8001` |  |
 | paddleocr-nim.nim.logLevel | string | `"INFO"` |  |
 | paddleocr-nim.podSecurityContext.fsGroup | int | `1000` |  |
@@ -631,7 +712,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | paddleocr-nim.service.grpcPort | int | `8001` |  |
 | paddleocr-nim.service.httpPort | int | `8000` |  |
 | paddleocr-nim.service.metricsPort | int | `0` |  |
-| paddleocr-nim.service.name | string | `"nv-ingest-paddle"` |  |
+| paddleocr-nim.service.name | string | `"nv-ingest-ocr"` |  |
 | paddleocr-nim.service.type | string | `"ClusterIP"` |  |
 | paddleocr-nim.serviceAccount.create | bool | `false` |  |
 | paddleocr-nim.serviceAccount.name | string | `""` |  |
@@ -639,6 +720,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | podAnnotations."traffic.sidecar.istio.io/excludeOutboundPorts" | string | `"8007"` |  |
 | podLabels | object | `{}` |  |
 | podSecurityContext.fsGroup | int | `1000` |  |
+| prometheus.alertmanager.enabled | bool | `false` |  |
+| prometheus.enabled | bool | `false` |  |
+| prometheus.server.enabled | bool | `false` |  |
 | readinessProbe.enabled | bool | `false` |  |
 | readinessProbe.failureThreshold | int | `220` |  |
 | readinessProbe.httpGet.path | string | `"/v1/health/ready"` |  |
@@ -648,6 +732,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | readinessProbe.successThreshold | int | `1` |  |
 | readinessProbe.timeoutSeconds | int | `10` |  |
 | redis.auth.enabled | bool | `false` |  |
+| redis.image.tag | string | `"8.2.1-debian-12-r0"` |  |
 | redis.master.configmap | string | `"protected-mode no"` |  |
 | redis.master.persistence.size | string | `"50Gi"` |  |
 | redis.master.resources.limits.memory | string | `"12Gi"` |  |
@@ -670,20 +755,22 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | riva-nim.customCommand | list | `[]` |  |
 | riva-nim.deployed | bool | `false` |  |
 | riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
-| riva-nim.env[0].value | string | `"8000"` |  |
-| riva-nim.fullnameOverride | string | `"riva-nim"` |  |
-| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.env[0].value | string | `"9000"` |  |
+| riva-nim.env[1].name | string | `"NIM_TAGS_SELECTOR"` |  |
+| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
+| riva-nim.fullnameOverride | string | `"nv-ingest-riva-nim"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us"` |  |
 | riva-nim.image.tag | string | `"1.3.0"` |  |
-| riva-nim.nim.grpcPort | int | `8001` |  |
+| riva-nim.nim.grpcPort | int | `50051` |  |
 | riva-nim.nim.logLevel | string | `"INFO"` |  |
 | riva-nim.podSecurityContext.fsGroup | int | `1000` |  |
 | riva-nim.podSecurityContext.runAsGroup | int | `1000` |  |
 | riva-nim.podSecurityContext.runAsUser | int | `1000` |  |
 | riva-nim.replicaCount | int | `1` |  |
-| riva-nim.service.grpcPort | int | `8001` |  |
-| riva-nim.service.httpPort | int | `8000` |  |
+| riva-nim.service.grpcPort | int | `50051` |  |
+| riva-nim.service.httpPort | int | `9000` |  |
 | riva-nim.service.metricsPort | int | `0` |  |
-| riva-nim.service.name | string | `"riva-nim"` |  |
+| riva-nim.service.name | string | `"nv-ingest-riva-nim"` |  |
 | riva-nim.service.type | string | `"ClusterIP"` |  |
 | riva-nim.serviceAccount.create | bool | `false` |  |
 | riva-nim.serviceAccount.name | string | `""` |  |
@@ -707,11 +794,11 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.deployed | bool | `false` |  |
 | text-embedding-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | text-embedding-nim.env[0].value | string | `"8000"` |  |
-| text-embedding-nim.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| text-embedding-nim.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
 | text-embedding-nim.env[1].value | string | `"1"` |  |
 | text-embedding-nim.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | text-embedding-nim.image.repository | string | `"nvcr.io/nim/nvidia/nv-embedqa-e5-v5"` |  |
-| text-embedding-nim.image.tag | string | `"1.5.0"` |  |
+| text-embedding-nim.image.tag | string | `"1.9.0"` |  |
 | text-embedding-nim.nim.grpcPort | int | `8001` |  |
 | text-embedding-nim.nim.logLevel | string | `"INFO"` |  |
 | text-embedding-nim.podSecurityContext.fsGroup | int | `1000` |  |
@@ -728,4 +815,39 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.statefuleSet.enabled | bool | `false` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
+| vlm-embedding-nim.autoscaling.enabled | bool | `false` |  |
+| vlm-embedding-nim.autoscaling.maxReplicas | int | `10` |  |
+| vlm-embedding-nim.autoscaling.metrics | list | `[]` |  |
+| vlm-embedding-nim.autoscaling.minReplicas | int | `1` |  |
+| vlm-embedding-nim.customArgs | list | `[]` |  |
+| vlm-embedding-nim.customCommand | list | `[]` |  |
+| vlm-embedding-nim.deployed | bool | `false` |  |
+| vlm-embedding-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| vlm-embedding-nim.env[0].value | string | `"8000"` |  |
+| vlm-embedding-nim.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
+| vlm-embedding-nim.env[1].value | string | `"1"` |  |
+| vlm-embedding-nim.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
+| vlm-embedding-nim.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/llama-3.2-nemoretriever-1b-vlm-embed-v1"` |  |
+| vlm-embedding-nim.image.tag | string | `"1.7.0"` |  |
+| vlm-embedding-nim.nim.grpcPort | int | `8001` |  |
+| vlm-embedding-nim.nim.logLevel | string | `"INFO"` |  |
+| vlm-embedding-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| vlm-embedding-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| vlm-embedding-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| vlm-embedding-nim.replicaCount | int | `1` |  |
+| vlm-embedding-nim.service.grpcPort | int | `8001` |  |
+| vlm-embedding-nim.service.httpPort | int | `8000` |  |
+| vlm-embedding-nim.service.metricsPort | int | `0` |  |
+| vlm-embedding-nim.service.name | string | `"nv-ingest-embedqa"` |  |
+| vlm-embedding-nim.service.type | string | `"ClusterIP"` |  |
+| vlm-embedding-nim.serviceAccount.create | bool | `false` |  |
+| vlm-embedding-nim.serviceAccount.name | string | `""` |  |
+| vlm-embedding-nim.statefuleSet.enabled | bool | `false` |  |
+| zipkin.image.repository | string | `"openzipkin/zipkin"` |  |
+| zipkin.image.tag | string | `"3.5.0"` |  |
+| zipkin.resources.limits.cpu | string | `"500m"` |  |
+| zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
+| zipkin.resources.requests.cpu | string | `"100m"` |  |
+| zipkin.resources.requests.memory | string | `"2.5Gi"` |  |
+| zipkin.zipkin.extraEnv.JAVA_OPTS | string | `"-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"` |  |
 | zipkinDeployed | bool | `true` |  |

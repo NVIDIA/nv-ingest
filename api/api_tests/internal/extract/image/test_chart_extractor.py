@@ -33,7 +33,7 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
 
         # Mock clients
         self.mock_yolox_client = Mock()
-        self.mock_paddle_client = Mock()
+        self.mock_ocr_client = Mock()
 
         # Sample task config (not used by the function but required in signature)
         self.task_config = {"param": "value"}
@@ -43,15 +43,16 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         endpoint_config = Mock()
         endpoint_config.yolox_endpoints = ("yolox_grpc", "yolox_http")
         endpoint_config.yolox_infer_protocol = "grpc"
-        endpoint_config.paddle_endpoints = ("paddle_grpc", "paddle_http")
-        endpoint_config.paddle_infer_protocol = "http"
+        endpoint_config.ocr_endpoints = ("ocr_grpc", "ocr_http")
+        endpoint_config.ocr_infer_protocol = "http"
         endpoint_config.auth_token = "test_token"
         endpoint_config.workers_per_progress_engine = 8
         self.extraction_config.endpoint_config = endpoint_config
 
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
+    @patch(f"{MODULE_UNDER_TEST}._create_yolox_client")
+    @patch(f"{MODULE_UNDER_TEST}._create_ocr_client")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_empty_dataframe(self, mock_update_chart_metadata, mock_create_clients):
+    def test_empty_dataframe(self, mock_update_chart_metadata, mock_ocr_client, mock_yolox_client):
         """Test behavior with an empty DataFrame."""
         # Create empty DataFrame
         df = pd.DataFrame()
@@ -62,7 +63,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         )
 
         # Verify clients were not created
-        mock_create_clients.assert_not_called()
+        mock_yolox_client.assert_not_called()
+        mock_ocr_client.assert_not_called()
 
         # Verify _update_chart_metadata was not called
         mock_update_chart_metadata.assert_not_called()
@@ -73,13 +75,9 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         # Verify trace info was returned
         self.assertEqual(result_trace, self.trace_info)
 
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_no_matching_rows(self, mock_update_chart_metadata, mock_create_clients):
+    def test_no_matching_rows(self, mock_update_chart_metadata):
         """Test behavior when no rows match the extraction criteria."""
-        # Configure _create_clients to return our mock clients
-        mock_create_clients.return_value = (self.mock_yolox_client, self.mock_paddle_client)
-
         # Create DataFrame with rows that don't meet criteria
         df = pd.DataFrame(
             [
@@ -112,15 +110,6 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
             df, self.task_config, self.extraction_config, self.trace_info
         )
 
-        # Verify clients were created
-        mock_create_clients.assert_called_once_with(
-            self.extraction_config.endpoint_config.yolox_endpoints,
-            self.extraction_config.endpoint_config.yolox_infer_protocol,
-            self.extraction_config.endpoint_config.paddle_endpoints,
-            self.extraction_config.endpoint_config.paddle_infer_protocol,
-            self.extraction_config.endpoint_config.auth_token,
-        )
-
         # Verify _update_chart_metadata was not called
         mock_update_chart_metadata.assert_not_called()
 
@@ -130,16 +119,14 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         # Verify trace info was returned
         self.assertEqual(result_trace, {"trace_info": self.trace_info})
 
-        # Verify clients were closed
-        self.mock_yolox_client.close.assert_called_once()
-        self.mock_paddle_client.close.assert_called_once()
-
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
+    @patch(f"{MODULE_UNDER_TEST}._create_yolox_client")
+    @patch(f"{MODULE_UNDER_TEST}._create_ocr_client")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_successful_extraction(self, mock_update_chart_metadata, mock_create_clients):
+    def test_successful_extraction(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test successful chart data extraction and DataFrame update."""
         # Configure _create_clients to return our mock clients
-        mock_create_clients.return_value = (self.mock_yolox_client, self.mock_paddle_client)
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content), ("base64_image2", self.chart_content)]
@@ -171,14 +158,15 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         )
 
         # Verify clients were created
-        mock_create_clients.assert_called_once()
+        mock_create_yolox_client.assert_called_once()
+        mock_create_ocr_client.assert_called_once()
 
         # Verify _update_chart_metadata was called with correct parameters
         mock_update_chart_metadata.assert_called_once()
         call_args = mock_update_chart_metadata.call_args[1]
         self.assertEqual(call_args["base64_images"], ["base64_image1", "base64_image2"])
         self.assertEqual(call_args["yolox_client"], self.mock_yolox_client)
-        self.assertEqual(call_args["paddle_client"], self.mock_paddle_client)
+        self.assertEqual(call_args["ocr_client"], self.mock_ocr_client)
         self.assertEqual(
             call_args["worker_pool_size"], self.extraction_config.endpoint_config.workers_per_progress_engine
         )
@@ -191,16 +179,14 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         # Verify trace info was returned
         self.assertEqual(result_trace, {"trace_info": self.trace_info})
 
-        # Verify clients were closed
-        self.mock_yolox_client.close.assert_called_once()
-        self.mock_paddle_client.close.assert_called_once()
-
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
+    @patch(f"{MODULE_UNDER_TEST}._create_yolox_client")
+    @patch(f"{MODULE_UNDER_TEST}._create_ocr_client")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_mixed_rows(self, mock_update_chart_metadata, mock_create_clients):
+    def test_mixed_rows(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior with a mix of matching and non-matching rows."""
         # Configure _create_clients to return our mock clients
-        mock_create_clients.return_value = (self.mock_yolox_client, self.mock_paddle_client)
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content)]
@@ -240,12 +226,14 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         # Non-matching row should be unchanged
         self.assertEqual(result_df.iloc[1]["metadata"]["content_metadata"]["type"], "text")
 
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
+    @patch(f"{MODULE_UNDER_TEST}._create_yolox_client")
+    @patch(f"{MODULE_UNDER_TEST}._create_ocr_client")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_null_trace_info(self, mock_update_chart_metadata, mock_create_clients):
+    def test_null_trace_info(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior when trace_info is None."""
         # Configure _create_clients to return our mock clients
-        mock_create_clients.return_value = (self.mock_yolox_client, self.mock_paddle_client)
+        mock_create_yolox_client.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to return chart results
         chart_results = [("base64_image1", self.chart_content)]
@@ -270,7 +258,8 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         )
 
         # Verify clients were created
-        mock_create_clients.assert_called_once()
+        mock_create_yolox_client.assert_called_once()
+        mock_create_ocr_client.assert_called_once()
 
         # Verify _update_chart_metadata was called with empty trace_info
         mock_update_chart_metadata.assert_called_once()
@@ -280,12 +269,14 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
         # Verify trace info was returned
         self.assertEqual(result_trace, {"trace_info": {}})
 
-    @patch(f"{MODULE_UNDER_TEST}._create_clients")
+    @patch(f"{MODULE_UNDER_TEST}._create_yolox_client")
+    @patch(f"{MODULE_UNDER_TEST}._create_ocr_client")
     @patch(f"{MODULE_UNDER_TEST}._update_chart_metadata")
-    def test_extraction_error(self, mock_update_chart_metadata, mock_create_clients):
+    def test_extraction_error(self, mock_update_chart_metadata, mock_create_ocr_client, mock_create_yolox_client):
         """Test behavior when an error occurs during extraction."""
         # Configure _create_clients to return our mock clients
-        mock_create_clients.return_value = (self.mock_yolox_client, self.mock_paddle_client)
+        mock_create_yolox_client.return_value.return_value = self.mock_yolox_client
+        mock_create_ocr_client.return_value.return_value = self.mock_ocr_client
 
         # Configure _update_chart_metadata to raise an exception
         mock_update_chart_metadata.side_effect = Exception("Chart extraction failed")
@@ -309,36 +300,6 @@ class TestExtractChartDataFromImageInternal(unittest.TestCase):
 
         # Verify exception was propagated
         self.assertEqual(str(context.exception), "Chart extraction failed")
-
-        # Verify clients were closed
-        self.mock_yolox_client.close.assert_called_once()
-        self.mock_paddle_client.close.assert_called_once()
-
-    @patch(f"{MODULE_UNDER_TEST}._create_clients", side_effect=Exception("Client creation failed"))
-    def test_client_creation_error(self, mock_create_clients):
-        """Test behavior when an error occurs during client creation."""
-        # Create DataFrame with a matching row
-        df = pd.DataFrame(
-            [
-                {
-                    "metadata": {
-                        "content": "base64_image1",
-                        "content_metadata": {"type": "structured", "subtype": "chart"},
-                        "table_metadata": {"table_type": "chart"},
-                    }
-                }
-            ]
-        )
-
-        # Call the function and expect exception to be propagated
-        with self.assertRaises(Exception) as context:
-            extract_chart_data_from_image_internal(df, self.task_config, self.extraction_config, self.trace_info)
-
-        # Verify exception was propagated
-        self.assertEqual(str(context.exception), "Client creation failed")
-
-        # Verify _create_clients was called
-        mock_create_clients.assert_called_once()
 
 
 if __name__ == "__main__":

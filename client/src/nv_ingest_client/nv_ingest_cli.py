@@ -25,13 +25,14 @@ from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
 from nv_ingest_client.cli.util.click import click_validate_file_exists
 from nv_ingest_client.cli.util.click import click_validate_task
-from nv_ingest_client.cli.util.processing import create_and_process_jobs
 from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
-from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.client.ingest_job_handler import IngestJobHandler
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
+from nv_ingest_client.util.system import ensure_directory_with_permissions
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 try:
     NV_INGEST_VERSION = version("nv_ingest")
@@ -73,6 +74,12 @@ logger = logging.getLogger(__name__)
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
 @click.option("--client_port", default=7670, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
+@click.option(
+    "--api_version",
+    default="v1",
+    type=click.Choice(["v1", "v2"], case_sensitive=False),
+    help="API version to use (v1 or v2). V2 required for PDF split page count feature.",
+)
 @click.option(
     "--client_type",
     default="rest",
@@ -118,15 +125,17 @@ Example:
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'embed'
   --task 'caption:{}'
+  --pdf_split_page_count 64  # Configure PDF splitting (requires --api_version v2)
+  --api_version v2           # Use V2 API for PDF splitting support
 
 \b
 Tasks and Options:
 - caption: Attempts to extract captions for unstructured images extracted from documents.
     Options:
       - api_key (str): API key for captioning service.
-      Default: os.environ(NVIDIA_BUILD_API_KEY).'
+      Default: os.environ(NVIDIA_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
+      Default: 'https://integrate.api.nvidia.com/v1/chat/completions'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b
@@ -169,6 +178,22 @@ Tasks and Options:
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
 \b
+- udf: Executes user-defined functions (UDFs) for custom processing logic.
+    Options:
+    - udf_function (str): UDF specification. Supports three formats:
+        1. Inline function: 'def my_func(control_message): ...'
+        2. Import path: 'my_module.my_function'
+        3. File path: '/path/to/file.py:function_name' or '/path/to/file.py' (assumes 'process' function)
+    - udf_function_name (str): Name of the function to execute from the UDF specification. Required.
+    - target_stage (str): Specific pipeline stage name to target for UDF execution (e.g.,
+        'text_extractor', 'text_embedder', 'image_extractor'). Cannot be used with phase.
+    - run_before (bool): If True and target_stage is specified, run UDF before the target stage. Default: False.
+    - run_after (bool): If True and target_stage is specified, run UDF after the target stage. Default: False.
+    Examples:
+        --task 'udf:{"udf_function": "my_file.py:my_func", "target_stage": "text_embedder", "run_before": true}'
+        --task 'udf:{"udf_function": "def process(cm): return cm",
+            "target_stage": "image_extractor", "run_after": true}'
+\b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
 )
@@ -190,6 +215,12 @@ for locating portions of the system that might be bottlenecks for the overall ru
 )
 @click.option("--zipkin_host", default="localhost", help="DNS name or Zipkin API.")
 @click.option("--zipkin_port", default=9411, type=int, help="Port for the Zipkin trace API")
+@click.option(
+    "--pdf_split_page_count",
+    default=None,
+    type=int,
+    help="Number of pages per PDF chunk for splitting. Allows per-request tuning of PDF split size in v2 api.",
+)
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
@@ -198,6 +229,7 @@ def main(
     client_host: str,
     client_kwargs: str,
     client_port: int,
+    api_version: str,
     client_type: str,
     concurrency_n: int,
     dataset: str,
@@ -211,6 +243,7 @@ def main(
     collect_profiling_traces: bool,
     zipkin_host: str,
     zipkin_port: int,
+    pdf_split_page_count: int,
     task: [str],
     version: [bool],
 ):
@@ -221,7 +254,9 @@ def main(
 
     try:
         configure_logging(logger, log_level)
-        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(ctx.params, indent=2, default=repr)}")
+        # Sanitize CLI params before logging to avoid leaking secrets
+        _sanitized_params = sanitize_for_logging(dict(ctx.params))
+        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(_sanitized_params, indent=2, default=repr)}")
 
         docs = list(doc)
         if dataset:
@@ -244,7 +279,20 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
+            # Sanitize client kwargs (JSON string) before logging
+            try:
+                _client_kwargs_obj = json.loads(client_kwargs)
+            except Exception:
+                _client_kwargs_obj = {"raw": client_kwargs}
+
+            # Merge api_version into client_kwargs
+            _client_kwargs_obj["api_version"] = api_version
+
+            _sanitized_client_kwargs = sanitize_for_logging(_client_kwargs_obj)
+            logging.debug(
+                f"Creating message client: {client_host} and port: {client_port} -> "
+                f"{json.dumps(_sanitized_client_kwargs, indent=2, default=repr)}"
+            )
 
             if client_type == "rest":
                 client_allocator = RestClient
@@ -257,20 +305,24 @@ def main(
                 message_client_allocator=client_allocator,
                 message_client_hostname=client_host,
                 message_client_port=client_port,
-                message_client_kwargs=json.loads(client_kwargs),
+                message_client_kwargs=_client_kwargs_obj,
                 worker_pool_size=concurrency_n,
             )
 
             start_time_ns = time.time_ns()
-            (total_files, trace_times, pages_processed, trace_ids) = create_and_process_jobs(
-                files=docs,
+            handler = IngestJobHandler(
                 client=ingest_client,
+                files=docs,
                 tasks=task,
                 output_directory=output_directory,
                 batch_size=batch_size,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
+                show_progress=True,
+                show_telemetry=True,
+                pdf_split_page_count=pdf_split_page_count,
             )
+            (total_files, trace_times, pages_processed, trace_ids) = handler.run()
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
 

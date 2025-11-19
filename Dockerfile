@@ -3,18 +3,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 
-ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.5.1-base-ubuntu22.04
+ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
+ARG BASE_IMG_TAG=jammy-20250619
+ARG TARGETPLATFORM
 
-# Use NVIDIA cuda as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
+ARG TARGETPLATFORM
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
-ARG DOWNLOAD_LLAMA_TOKENIZER=""
+ARG DOWNLOAD_LLAMA_TOKENIZER="False"
 ARG HF_ACCESS_TOKEN=""
-ARG MODEL_PREDOWNLOAD_PATH=""
+ARG MODEL_PREDOWNLOAD_PATH="/workspace/models/"
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
@@ -32,6 +33,12 @@ RUN apt-get update && apt-get install -y \
       wget \
     && apt-get clean
 
+# Install ffmpeg
+COPY ./docker/scripts/install_ffmpeg.sh scripts/install_ffmpeg.sh
+RUN chmod +x scripts/install_ffmpeg.sh \
+    && bash scripts/install_ffmpeg.sh \
+    && rm scripts/install_ffmpeg.sh
+
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
@@ -39,15 +46,31 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
 # Add conda to the PATH
 ENV PATH=/opt/conda/bin:$PATH
 
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      CONDA_SUBDIR=linux-aarch64; \
+    else \
+      CONDA_SUBDIR=linux-64; \
+    fi;
+
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 -n base -c conda-forge
+    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
-COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
+COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
+COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
+COPY conda/environments/nv_ingest_environment.linux_aarch64.yml /workspace/nv_ingest_environment.linux_aarch64.yml
+
 # Create nv_ingest base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
+    if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
+      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml; \
+    else \
+      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
+      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml; \
+    fi; \
     mamba env create -f /workspace/nv_ingest_environment.yml
 
 # Set default shell to bash
@@ -70,7 +93,6 @@ WORKDIR /workspace
 
 FROM base AS nv_ingest_install
 # Copy the module code
-COPY setup.py setup.py
 COPY ci ci
 
 # Prevent haystack from sending telemetry data
@@ -94,12 +116,13 @@ ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
 SHELL ["/bin/bash", "-c"]
 
+COPY scripts scripts
 COPY tests tests
 COPY data data
 COPY api api
 COPY client client
-COPY src/nv_ingest src/nv_ingest
-RUN rm -rf ./src/nv_ingest/dist ./client/dist ./api/dist
+COPY src src
+RUN rm -rf ./src/nv_ingest/dist ./src/dist ./client/dist ./api/dist
 
 # Install python build from pip, version needed not present in conda
 RUN source activate nv_ingest_runtime \
@@ -117,7 +140,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
 RUN --mount=type=cache,target=/opt/conda/pkgs\
     --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
-    && pip install ./dist/*.whl \
+    && pip install ./src/dist/*.whl \
     && pip install ./api/dist/*.whl \
     && pip install ./client/dist/*.whl
 
@@ -127,7 +150,7 @@ RUN rm -rf src
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
-COPY pyproject.toml ./
+COPY config/default_pipeline.yaml ./config/
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh

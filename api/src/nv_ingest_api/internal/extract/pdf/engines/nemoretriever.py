@@ -40,6 +40,7 @@ from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadat
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+    YOLOX_PAGE_IMAGE_FORMAT,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemoRetrieverParseConfigSchema
 from nv_ingest_api.util.metadata.aggregators import (
@@ -100,7 +101,7 @@ def nemoretriever_parse_extractor(
             - text_depth : str, optional (default is "page")
             - extract_tables_method : str, optional (default is "yolox")
             - identify_nearby_objects : bool, optional (default is True)
-            - paddle_output_format : str, optional (default is "pseudo_markdown")
+            - table_output_format : str, optional (default is "pseudo_markdown")
             - pdfium_config : dict, optional (configuration for PDFium)
             - nemoretriever_parse_config : dict, optional (configuration for NemoRetrieverParse)
             - metadata_column : str, optional (default is "metadata")
@@ -145,14 +146,14 @@ def nemoretriever_parse_extractor(
     # Flag for identifying nearby objects.
     identify_nearby_objects = extractor_config.get("identify_nearby_objects", True)
 
-    # Get and validate paddle_output_format.
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    # Get and validate table_output_format.
+    table_output_format_str = extractor_config.get("table_output_format", "pseudo_markdown")
     try:
-        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+        table_output_format = TableFormatEnum[table_output_format_str.upper()]
     except KeyError:
         valid_options = [e.name.lower() for e in TableFormatEnum]
         raise ValueError(
-            f"Invalid paddle_output_format value: {paddle_output_format_str}. Expected one of: {valid_options}"
+            f"Invalid table_output_format value: {table_output_format_str}. Expected one of: {valid_options}"
         )
 
     # Process nemoretriever_parse configuration.
@@ -253,7 +254,7 @@ def nemoretriever_parse_extractor(
                     extract_tables,
                     extract_charts,
                     extract_infographics,
-                    paddle_output_format,
+                    table_output_format,
                     nemoretriever_parse_config.yolox_endpoints,
                     nemoretriever_parse_config.yolox_infer_protocol,
                     nemoretriever_parse_config.auth_token,
@@ -287,7 +288,7 @@ def nemoretriever_parse_extractor(
                 extract_tables,
                 extract_charts,
                 extract_infographics,
-                paddle_output_format,
+                table_output_format,
                 nemoretriever_parse_config.yolox_endpoints,
                 nemoretriever_parse_config.yolox_infer_protocol,
                 nemoretriever_parse_config.auth_token,
@@ -355,7 +356,7 @@ def nemoretriever_parse_extractor(
                 img_numpy = crop_image(page_image, transformed_bbox)
 
                 if img_numpy is not None:
-                    base64_img = numpy_to_base64(img_numpy)
+                    base64_img = numpy_to_base64(img_numpy, format=YOLOX_PAGE_IMAGE_FORMAT)
                     image = Base64Image(
                         image=base64_img,
                         bbox=transformed_bbox,
@@ -466,7 +467,7 @@ def _extract_text_and_bounding_boxes(
     inference_results = nemoretriever_parse_client.infer(
         data=data,
         model_name="nemoretriever_parse",
-        stage_name="pdf_content_extractor",
+        stage_name="pdf_extraction",
         max_batch_size=NEMORETRIEVER_PARSE_MAX_BATCH_SIZE,
         execution_trace_log=execution_trace_log,
     )

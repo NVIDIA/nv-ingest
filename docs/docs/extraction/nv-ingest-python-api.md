@@ -1,10 +1,15 @@
-# Use the NV-Ingest Python API
+# Use the NeMo Retriever Extraction Python API
 
-The [NV-Ingest](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 !!! tip
 
     There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
 
 ## Summary of Key Methods
 
@@ -12,15 +17,77 @@ The main class in the nv-ingest API is `Ingestor`.
 The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
 The following table describes methods of the `Ingestor` class.
 
-| Method | Description |
-| ------ | ----------- |
-| `files` | Add document paths for processing. |
-| `load` | Ensure files are locally accessible (downloads if needed). |
-| `extract` | Add an extraction task (text, tables, charts). |
-| `split` | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `embed` | Generate embeddings from extracted content. |
-| `caption` | Extract captions from images within the document. |
-| `ingest` | Submit jobs and retrieve results synchronously. |
+| Method         | Description                       |
+|----------------|-----------------------------------|
+| `caption`      | Extract captions from images within the document. |
+| `embed`        | Generate embeddings from extracted content. |
+| `extract`      | Add an extraction task (text, tables, charts, infographics). |
+| `files`        | Add document paths for processing. |
+| `ingest`       | Submit jobs and retrieve results synchronously. |
+| `load`         | Ensure files are locally accessible (downloads if needed). |
+| `save_to_disk` | Save ingestion results to disk instead of memory. |
+| `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
+| `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+
+
+
+## Track Job Progress
+
+For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+Use the following code.
+
+```python
+# Return only successes
+results = ingestor.ingest(show_progress=True)
+
+print(len(results), "successful documents")
+```
+
+
+
+## Capture Job Failures
+
+You can capture job failures by setting `return_failures` to true. 
+Use the following code.
+
+```python
+# Return both successes and failures
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+print(f"{len(results)} successful docs; {len(failures)} failures")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
+When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
+The behavior of the upload depends on the following values of `return_failures`:
+
+- **False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
+- **True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
+
+
+The following example uploads data to Milvus and returns any failures.
+
+```python
+ingestor = (
+    Ingestor(client=client)
+    .files(["/path/doc1.pdf", "/path/doc2.pdf"])
+    .extract()
+    .embed()
+    .vdb_upload(collection_name="my_collection", milvus_uri="milvus.db")
+)
+
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(return_failures=True)
+
+print(f"Uploaded {len(results)} successful docs; {len(failures)} failures")
+
+if failures:
+    print("Failures:", failures[:1])
+```
+
+
 
 ## Quick Start: Extracting PDFs
 
@@ -75,7 +142,7 @@ ingestor = ingestor.extract(
 
 ### Extract Non-standard Document Types
 
-NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
+Use the following code to extract text from `.md`, `.sh`, and `.html` files.
 
 ```python
 ingestor = Ingestor().files(["path/to/doc1.md", "path/to/doc2.html"])
@@ -102,13 +169,89 @@ ingestor = ingestor.extract(document_type="pdf")
 
 
 
-## Track Job Progress
+## Work with Large Datasets: Save to Disk
 
-For large document batches, you can enable a progress bar by setting `show_progress` to true. 
-Use the following code.
+By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+The `save_to_disk` method configures the extraction pipeline to write the output for each document to a separate JSONL file on disk.
+
+
+### Basic Usage: Save to a Directory
+
+To save results to disk, simply chain the `save_to_disk` method to your ingestion task.
+By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects, 
+which are memory-efficient proxies that read from the result files on disk.
+
+In the following example, the results are saved to a directory named `my_ingest_results`. 
+You are responsible for managing the created files.
 
 ```python
-result = ingestor.extract().ingest(show_progress=True)
+ingestor = Ingestor().files("large_dataset/*.pdf")
+
+# Use save_to_disk to configure the ingestor to save results to a specific directory.
+# Set cleanup=False to ensure that the directory is not deleted by any automatic process.
+ingestor.save_to_disk(output_directory="./my_ingest_results", cleanup=False)  # Offload results to disk to prevent OOM errors
+
+# 'results' is a list of LazyLoadedList objects that point to the new jsonl files.
+results = ingestor.extract().ingest()
+
+print("Ingestion results saved in ./my_ingest_results")
+# You can now iterate over the results or inspect the files directly.
+```
+
+### Managing Disk Space with Automatic Cleanup
+
+When you use `save_to_disk`, NeMo Retriever extraction creates intermediate files. 
+For workflows where these files are temporary, NeMo Retriever extraction provides two automatic cleanup mechanisms.
+
+- **Directory Cleanup with Context Manager** — While not required for general use, the Ingestor can be used as a context manager (`with` statement). This enables the automatic cleanup of the entire output directory when `save_to_disk(cleanup=True)` is set (which is the default).
+
+- **File Purge After VDB Upload** – The `vdb_upload` method includes a `purge_results_after_upload: bool = True` parameter (the default). After a successful VDB upload, this feature deletes the individual `.jsonl` files that were just uploaded.
+
+You can also configure the output directory by using the `NV_INGEST_CLIENT_SAVE_TO_DISK_OUTPUT_DIRECTORY` environment variable.
+
+
+#### Example (Fully Automatic Cleanup)
+
+Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed. 
+The entire process is temporary, and no files are left on disk.
+The following example includes automatic file purge. 
+
+```python
+# After the 'with' block finishes, 
+# the temporary directory and all its contents are automatically deleted.
+
+with (
+    Ingestor()
+    .files("/path/to/large_dataset/*.pdf")
+    .extract()
+    .embed()
+    .save_to_disk()  # cleanup=True is the default, enables directory deletion on exit
+    .vdb_upload()  # purge_results_after_upload=True is the default, deletes files after upload
+) as ingestor:
+    results = ingestor.ingest()
+
+```
+
+
+#### Example (Preserve Results on Disk)
+
+In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features. 
+The following example disables automatic file purge. 
+
+```python
+# After the 'with' block finishes, 
+# the './permanent_results' directory and all jsonl files are preserved for inspection or other uses.
+
+with (
+    Ingestor()
+    .files("/path/to/large_dataset/*.pdf")
+    .extract()
+    .embed()
+    .save_to_disk(output_directory="./permanent_results", cleanup=False)  # Specify a directory and disable directory-level cleanup
+    .vdb_upload(purge_results_after_upload=False)  # Disable automatic file purge after the VDB upload
+) as ingestor:
+    results = ingestor.ingest()
 ```
 
 
@@ -120,7 +263,7 @@ This can be used to describe images extracted from documents.
 
 !!! note
 
-    The default model used by `caption` is `meta/llama-3.2-11b-vision-instruct`.
+    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`.
 
 ```python
 ingestor = ingestor.caption()
@@ -130,8 +273,8 @@ To specify a different API endpoint, pass additional parameters to `caption`.
 
 ```python
 ingestor = ingestor.caption(
-    endpoint_url="https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
-    model_name="meta/llama-3.2-11b-vision-instruct",
+    endpoint_url="https://integrate.api.nvidia.com/v1/chat/completions",
+    model_name="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     api_key="nvapi-"
 )
 ```
@@ -159,3 +302,41 @@ ingestor = ingestor.embed(
     api_key="nvapi-"
 )
 ```
+
+
+
+## Extract Audio
+
+Use the following code to extract mp3 audio content.
+
+```python
+from nv_ingest_client.client import Ingestor
+
+ingestor = Ingestor().files("audio_file.mp3")
+
+ingestor = ingestor.extract(
+        document_type="mp3",
+        extract_text=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images=False,
+        extract_infographics=False,
+    ).split(
+        tokenizer="meta-llama/Llama-3.2-1B",
+        chunk_size=150,
+        chunk_overlap=0,
+        params={"split_source_types": ["mp3"], "hf_access_token": "hf_***"}
+    )
+
+results = ingestor.ingest()
+```
+
+
+
+## Related Topics
+
+- [Split Documents](chunking.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Multimodal Embedding](vlm-embed.md)

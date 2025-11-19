@@ -43,12 +43,23 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
+
+
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
+
+    ```
+    OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    OCR_TAG=latest
+    OCR_MODEL_NAME=scene_text_ensemble
+    ```
+        
+   Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
    
-5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+6. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -56,7 +67,19 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+    !!! tip
+
+    	For optimal performance on specific hardware, you can use `docker-compose` override files. Override files adjust settings, such as memory allocation, for different GPU architectures. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+
+    The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
+    ```shell
+    docker compose \
+      -f docker-compose.yaml \
+      -f docker-compose.a100-40gb.yaml \
+      --profile retrieval --profile table-structure up
+    ```
+
+8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -74,24 +97,24 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Observe the started containers with `docker ps`:
+9. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
-    CONTAINER ID   IMAGE                                                                                                  COMMAND                  CREATED          STATUS                   PORTS                                                                                                                                                                                                                                                                                                       NAMES
-    1b885f37c991   nvcr.io/nvidia/nemo-microservices/nv-ingest:25.03                                                      "/opt/conda/envs/nv_…"   3 minutes ago    Up 3 minutes (healthy)   0.0.0.0:7670-7671->7670-7671/tcp, :::7670-7671->7670-7671/tcp                                                                                                                                                                                                                                               nv-ingest-nv-ingest-ms-runtime-1
-    62c6b999c413   zilliz/attu:v2.3.5                                                                                     "docker-entrypoint.s…"   13 minutes ago   Up 3 minutes             0.0.0.0:3001->3000/tcp, :::3001->3000/tcp                                                                                                                                                                                                                                                                   milvus-attu
-    14ef31ed7f49   milvusdb/milvus:v2.5.3-gpu                                                                             "/tini -- milvus run…"   13 minutes ago   Up 3 minutes (healthy)   0.0.0.0:9091->9091/tcp, :::9091->9091/tcp, 0.0.0.0:19530->19530/tcp, :::19530->19530/tcp                                                                                                                                                                                                                    milvus-standalone
-    dceaf36cc5df   otel/opentelemetry-collector-contrib:0.91.0                                                            "/otelcol-contrib --…"   13 minutes ago   Up 3 minutes             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8889->8889/tcp, :::8889->8889/tcp, 0.0.0.0:9988->9988/tcp, :::9988->9988/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:33249->9411/tcp, :::33247->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-    fb252020e4d2   nvcr.io/nvidia/nim/nemoretriever-graphic-elements-v1:1.2.0-rc1-latest-datacenter-release-24734263   "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                                             nv-ingest-graphic-elements-1
-    c944a9d76831   nvcr.io/nvidia/nim/paddleocr:1.2.0-latest-datacenter-release-24685083                               "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                                             nv-ingest-paddle-1
-    5bea344526a2   nvcr.io/nvidia/nim/nemoretriever-page-elements-v2:1.2.0-rc0-latest-datacenter-release-24730057      "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                                               nv-ingest-page-elements-1
-    16dc2311a6cc   nvcr.io/nvidia/nim/llama-3.2-nv-embedqa-1b-v2:1.5.0-rc0-latest-datacenter-release-24738403          "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                                             nv-ingest-embedding-1
-    cea3ce001888   nvcr.io/nvidia/nim/nemoretriever-table-structure-v1:1.2.0-rc1-latest-datacenter-release-24826492    "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                                             nv-ingest-table-structure-1
-    7ddbf7690036   openzipkin/zipkin                                                                                      "start-zipkin"           13 minutes ago   Up 3 minutes (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                                         nv-ingest-zipkin-1
-    b73bbe0c202d   minio/minio:RELEASE.2023-03-20T20-16-18Z                                                               "/usr/bin/docker-ent…"   13 minutes ago   Up 3 minutes (healthy)   0.0.0.0:9000-9001->9000-9001/tcp, :::9000-9001->9000-9001/tcp                                                                                                                                                                                                                                               minio
-    97fa798dbe4f   prom/prometheus:latest                                                                                 "/bin/prometheus --w…"   13 minutes ago   Up 3 minutes             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                                                   nv-ingest-prometheus-1
-    f17cb556b086   grafana/grafana                                                                                        "/run.sh"                13 minutes ago   Up 3 minutes             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                                                   grafana-service
-    3403c5a0e7be   redis/redis-stack                                                                                      "/entrypoint.sh"         13 minutes ago   Up 3 minutes             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                                         nv-ingest-redis-1
+    CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
+    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  3 minutes ago   Up 3 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
+    62c6b999c413  zilliz/attu:...                                  "docker-entrypoint.s…"  13 minutes ago  Up 3 minutes            0.0.0.0:3001...  milvus-attu
+    14ef31ed7f49  milvusdb/milvus:...                              "/tini -- milvus run…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
+    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  13 minutes ago  Up 3 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
+    fb252020e4d2  nvcr.io/nvidia/nim/nemoretriever-graphic-ele...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
+    c944a9d76831  nvcr.io/nvidia/nim/paddleocr:...                 "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8009...  nv-ingest-paddle-1
+    5bea344526a2  nvcr.io/nvidia/nim/nemoretriever-page-elements   "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
+    16dc2311a6cc  nvcr.io/nvidia/nim/llama-3.2-nv-embedqa...       "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
+    cea3ce001888  nvcr.io/nvidia/nim/nemoretriever-table-struc...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
+    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          13 minutes ago  Up 3 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
+    b73bbe0c202d  minio/minio:RELEASE...                           "/usr/bin/docker-ent…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9000...  minio
+    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  13 minutes ago  Up 3 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
+    f17cb556b086  grafana/grafana                                  "/run.sh"               13 minutes ago  Up 3 minutes            0.0.0.0:3000...  grafana-service
+    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        13 minutes ago  Up 3 minutes            0.0.0.0:6379...  nv-ingest-redis-1
     ```
 
 
@@ -103,9 +126,9 @@ To interact from the host, you'll need a Python environment and install the clie
 
 ```
 # conda not required but makes it easy to create a fresh Python environment
-conda create --name nv-ingest-dev python=3.10
+conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest-client==2025.3.10.dev20250310
+pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 ```
 
 !!! tip
@@ -122,11 +145,11 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
-In the below examples, we are doing text, chart, table, and image extraction:
+In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) for table extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and either [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) or NemoRetriever OCR for table extraction.
 - **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
@@ -154,7 +177,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
@@ -166,13 +189,25 @@ ingestor = (
         dense_dim=2048
     )
 )
+
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+
+# Return both successes and failures
+# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+
+# Return only successes
+# results = ingestor.ingest(show_progress=True)
+
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Total time: {t1-t0} seconds")
+
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
+
+if failures:
+    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
 ```
 
 !!! note
@@ -180,11 +215,13 @@ print(ingest_json_results_to_blob(results[0]))
     To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
 
 
+The output looks similar to the following.
+
 ```
 Starting ingestion..
 1 records to insert to milvus
 logged 8 records
-Time taken: 5.479151725769043 seconds
+Total time: 5.479151725769043 seconds
 This chart shows some gadgets, and some very fictitious costs. Gadgets and their cost   Chart 1 - Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost
 Table 1
 | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
@@ -271,7 +308,8 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
+You should see output that indicates the document processing status followed by a breakdown of time spent during job execution.
+
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to
@@ -383,60 +421,27 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 ## Profile Information
 
-The Nemo Retriever extraction core pipeline profiles run on a single A10G or better GPU. 
-This includes text, table, chart, infographic extraction, embedding and indexing into Milvus. 
-The advanced profiles require additional GPU support. 
-This includes audio extraction and VLM integrations. 
-For more information, refer to [Support Matrix](support-matrix.md).
-
 The values that you specify in the `--profile` option of your `docker compose up` command are explained in the following table. 
 You can specify multiple `--profile` options.
 
-
-| Name                  | Type     | Description                                                       | GPU Requirements | Disk Space Requirements |
-|-----------------------|----------|-------------------------------------------------------------------|-----------------------|-----------------------------------|
-| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus. | [1 GPU](support-matrix.md) total for all core profiles. | ~150GB total for all core profiles. |
-| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | [1 GPU](support-matrix.md) total for all core profiles. | ~150GB total for all core profiles. |
-| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~37GB additional space |
-| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~16 GB additional space |
-| `vlm`                 | Advanced | Uses llama 3.2 11B VLM for experimental image captioning of unstructured images. | [1 additional dedicated GPU](support-matrix.md) | ~16GB additional space |
-
+| Profile               | Type     | Description                                                       | 
+|-----------------------|----------|-------------------------------------------------------------------| 
+| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
+| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | 
+| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
 
-## Troubleshooting
+!!! important
 
-### Too Many Open Files Error
-
-In rare cases, when you run a job you might an see an error similar to `too many open files` or `max open file descriptor`. 
-This error occurs when the open file descriptor limit for your service user account is too low.
-To resolve the issue, set or raise the maximum number of open file descriptors (`-n`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
-Before you change the `-n` setting, consider the following:
-
-- Apply the `-n` setting directly to the user (or the Docker container environment) that runs your ingest service.
-- For `-n` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
-
-```bash
-ulimit -n 10,000
-```
-
-### Can't Start New Thread Error
-
-In rare cases, when you run a job you might an see an error similar to `can't start new thread`. 
-This error occurs when the maximum number of processes available to a single user is too low.
-To resolve the issue, set or raise the maximum number of processes (`-u`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
-Before you change the `-u` setting, consider the following:
-
-- Apply the `-u` setting directly to the user (or the Docker container environment) that runs your ingest service.
-- For `-u` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
-
-```bash
-ulimit -u 10,000
-```
+    Advanced features require additional GPU support and disk space. For more information, refer to [Support Matrix](support-matrix.md).
 
 
 
 ## Related Topics
 
+- [Troubleshoot](troubleshoot.md)
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)

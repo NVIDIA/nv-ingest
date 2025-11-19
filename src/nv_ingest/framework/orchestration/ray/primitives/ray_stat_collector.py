@@ -26,6 +26,7 @@ class RayStatsCollector:
         interval: float = 30.0,
         actor_timeout: float = 5.0,
         queue_timeout: float = 2.0,
+        ema_alpha: float = 0.1,  # Alpha for EMA memory cost calculation
     ):
         """
         Initializes the RayStatsCollector.
@@ -40,11 +41,14 @@ class RayStatsCollector:
             - `get_edge_queues() -> Dict[str, Tuple[Any, int]]`
             These methods should return snapshots suitable for iteration.
         interval : float, optional
-            The interval in seconds between stats collection attempts, by default 5.0.
+            The interval in seconds between stat collection attempts, by default 5.0.
         actor_timeout : float, optional
             Timeout in seconds for waiting for stats from a single actor, by default 5.0.
         queue_timeout : float, optional
             Timeout in seconds for waiting for qsize from a single queue, by default 2.0.
+        ema_alpha : float, optional
+            The smoothing factor for the Exponential Moving Average (EMA)
+            calculation of memory cost. Defaults to 0.1.
         """
         if not ray:
             logger.warning("RayStatsCollector initialized but Ray is not available.")
@@ -53,6 +57,7 @@ class RayStatsCollector:
         self._interval = interval
         self._actor_timeout = actor_timeout
         self._queue_timeout = queue_timeout
+        self.ema_alpha = ema_alpha
 
         self._lock: threading.Lock = threading.Lock()  # Protects access to collected stats and status
         self._running: bool = False
@@ -65,10 +70,12 @@ class RayStatsCollector:
         self._last_update_successful: bool = False
 
         self._cumulative_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"processed": 0})
+        self.ema_memory_per_replica: Dict[str, float] = {}  # EMA of memory per replica
 
-        logger.info(
+        logger.debug(
             f"RayStatsCollector initialized (Interval: {self._interval}s, "
-            f"Actor Timeout: {self._actor_timeout}s, Queue Timeout: {self._queue_timeout}s)"
+            f"Actor Timeout: {self._actor_timeout}s, Queue Timeout: {self._queue_timeout}s, "
+            f"EMA Alpha: {self.ema_alpha})"
         )
 
         # --- Helper function to be run in threads ---
@@ -104,7 +111,7 @@ class RayStatsCollector:
             self._running = False  # Correct inconsistent state
 
         if not self._running:
-            logger.info("Starting stats collector thread...")
+            logger.debug("Starting stats collector thread...")
             self._running = True
             with self._lock:
                 self._last_update_successful = False  # Mark as stale until first collection
@@ -122,7 +129,7 @@ class RayStatsCollector:
     def stop(self) -> None:
         """Signals the background stats collection thread to stop and waits for it."""
         if self._running:
-            logger.info("Stopping stats collector thread...")
+            logger.debug("Stopping stats collector thread...")
             self._running = False  # Signal loop to stop
 
             if self._thread is not None:
@@ -143,7 +150,7 @@ class RayStatsCollector:
             with self._lock:
                 self._last_update_successful = False
                 self._collected_stats = {}  # Clear last collected stats
-            logger.info("Stats collector thread stopped.")
+            logger.debug("Stats collector thread stopped.")
         else:
             logger.debug("Stats collector thread already stopped or never started.")
 
@@ -223,7 +230,7 @@ class RayStatsCollector:
             # but time.sleep is simpler for now.
             time.sleep(sleep_time)
 
-        logger.info("Stats collector loop finished.")
+        logger.debug("Stats collector loop finished.")
 
     def collect_stats_now(self) -> Tuple[Dict[str, Dict[str, int]], int, bool]:
         """
@@ -243,6 +250,7 @@ class RayStatsCollector:
         stage_stats_updates: Dict[str, Dict[str, int]] = {}
         actor_tasks: Dict[ray.ObjectRef, Tuple[Any, str]] = {}
         queue_sizes: Dict[str, int] = {}
+        stage_memory_samples: Dict[str, list[float]] = defaultdict(list)
 
         try:
             current_stages = self._pipeline.get_stages_info()
@@ -257,7 +265,7 @@ class RayStatsCollector:
         # --- 1. Prepare Actor Stat Requests ---
         for stage_info in current_stages:
             stage_name = stage_info.name
-            stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0}
+            stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0, "memory_mb": 0}
 
             if stage_info.pending_shutdown:
                 logger.debug(f"[StatsCollectNow] Stage '{stage_name}' pending shutdown. Skipping actor queries.")
@@ -285,7 +293,7 @@ class RayStatsCollector:
                 q_size_val = queue_actor.qsize()
                 queue_sizes[q_name] = int(q_size_val)
             except Exception as e:
-                logger.error(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
+                logger.warning(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
                 queue_sizes[q_name] = 0
                 overall_success = False
 
@@ -302,6 +310,8 @@ class RayStatsCollector:
                         stats = ray.get(ref)
                         active = int(stats.get("active_processing", 0))
                         delta = int(stats.get("delta_processed", 0))
+                        memory_mb = float(stats.get("memory_mb", 0.0))
+
                         processed = stage_stats_updates[stage_name].get("processed", 0)
                         processing = stage_stats_updates[stage_name].get("processing", 0)
                         stage_stats_updates[stage_name]["processing"] = processing + active
@@ -309,6 +319,7 @@ class RayStatsCollector:
                         stage_stats_updates[stage_name]["delta_processed"] = (
                             stage_stats_updates[stage_name].get("delta_processed", 0) + delta
                         )
+                        stage_memory_samples[stage_name].append(memory_mb)
 
                     except Exception as e:
                         logger.warning(
@@ -324,7 +335,23 @@ class RayStatsCollector:
                 logger.error(f"[StatsCollectNow] Error during actor stats collection: {e}", exc_info=True)
                 overall_success = False
 
-        # --- 4. Aggregate In-Flight Stats ---
+        # --- 4. Aggregate Memory and Update EMA ---
+        for stage_name, samples in stage_memory_samples.items():
+            if not samples:
+                continue
+
+            total_memory = sum(samples)
+            num_replicas = len(samples)
+            current_memory_per_replica = total_memory / num_replicas
+            stage_stats_updates[stage_name]["memory_mb"] = total_memory
+
+            # Update EMA
+            current_ema = self.ema_memory_per_replica.get(stage_name, current_memory_per_replica)
+            new_ema = (self.ema_alpha * current_memory_per_replica) + ((1 - self.ema_alpha) * current_ema)
+            self.ema_memory_per_replica[stage_name] = new_ema
+            stage_stats_updates[stage_name]["ema_memory_per_replica"] = new_ema
+
+        # --- 5. Aggregate In-Flight Stats ---
         _total_inflight = 0
         for stage_info in current_stages:
             stage_name = stage_info.name

@@ -18,22 +18,29 @@
 
 import concurrent.futures
 import logging
-from typing import List, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
-    get_yolox_model_name,
     YoloxPageElementsModelInterface,
+    YOLOX_PAGE_IMAGE_FORMAT,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+    YOLOX_PAGE_DEFAULT_VERSION,
+    YOLOX_PAGE_CLASS_LABELS,
+    get_yolox_page_version,
+)
 from nv_ingest_api.util.metadata.aggregators import (
+    construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,
     construct_text_metadata,
@@ -44,8 +51,10 @@ from nv_ingest_api.util.nim import create_inference_client
 from nv_ingest_api.util.pdf.pdfium import (
     extract_nested_simple_images_from_pdfium_page,
     extract_image_like_objects_from_pdfium_page,
+    is_scanned_page,
+    pdfium_pages_to_numpy,
 )
-from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
 logger = logging.getLogger(__name__)
@@ -54,7 +63,6 @@ logger = logging.getLogger(__name__)
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     yolox_client,
-    yolox_model_name: str = "yolox",
     execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
@@ -68,8 +76,6 @@ def _extract_page_elements_using_image_ensemble(
         and optional padding offset information.
     yolox_client : object
         A pre-configured client instance for the YOLOX inference service.
-    yolox_model_name : str, default="yolox"
-        The name of the YOLOX model to use for inference.
     execution_trace_log : Optional[List], default=None
         List for accumulating execution trace information.
 
@@ -102,10 +108,13 @@ def _extract_page_elements_using_image_ensemble(
         # Perform inference using the NimClient.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=execution_trace_log,
-            stage_name="pdf_content_extractor",
+            stage_name="pdf_extraction",
         )
 
         # Process results: iterate over each image's inference output.
@@ -169,7 +178,12 @@ def _extract_page_element_images(
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
 
-    for label in ["table", "chart", "infographic"]:
+    if annotation_dict and (set(YOLOX_PAGE_CLASS_LABELS) <= annotation_dict.keys()):
+        labels = YOLOX_PAGE_CLASS_LABELS
+    else:
+        labels = ["table", "chart", "infographics"]
+
+    for label in labels:
         if not annotation_dict:
             continue
 
@@ -186,7 +200,7 @@ def _extract_page_element_images(
             if cropped is None:
                 continue
 
-            base64_img = numpy_to_base64(cropped)
+            base64_img = numpy_to_base64(cropped, format=YOLOX_PAGE_IMAGE_FORMAT)
 
             bbox_in_orig_coord = (
                 int(w1) - pad_width,
@@ -263,7 +277,8 @@ def _extract_page_elements(
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
-    paddle_output_format: str,
+    page_to_text_flag_map: Dict[int, bool],
+    table_output_format: str,
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
@@ -292,7 +307,7 @@ def _extract_page_elements(
         Flag indicating whether to extract charts.
     extract_infographics : bool
         Flag indicating whether to extract infographics.
-    paddle_output_format : str
+    table_output_format : str
         Format to use for table content.
     yolox_endpoints : Tuple[Optional[str], Optional[str]]
         A tuple containing the gRPC and HTTP endpoints for the YOLOX service.
@@ -313,19 +328,18 @@ def _extract_page_elements(
 
     try:
         # Default model name
-        yolox_model_name = "yolox"
+        yolox_version = YOLOX_PAGE_DEFAULT_VERSION
 
         # Get the HTTP endpoint to determine the model name if needed
         yolox_http_endpoint = yolox_endpoints[1]
         if yolox_http_endpoint:
             try:
-                yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+                yolox_version = get_yolox_page_version(yolox_http_endpoint)
             except Exception as e:
                 logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
         # Create the model interface
-        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
-
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
         # Create the inference client
         yolox_client = create_inference_client(
             yolox_endpoints,
@@ -336,27 +350,34 @@ def _extract_page_elements(
 
         # Extract page elements using the client
         page_element_results = _extract_page_elements_using_image_ensemble(
-            pages, yolox_client, yolox_model_name, execution_trace_log=execution_trace_log
+            pages, yolox_client, execution_trace_log=execution_trace_log
         )
 
         # Process each extracted element based on extraction flags
         for page_idx, page_element in page_element_results:
+            process_text_for_this_page = page_to_text_flag_map.get(page_idx, False)
+            element_type = page_element.type_string
+
+            page_reading_index = page_idx + 1
+
             # Skip elements that shouldn't be extracted based on flags
-            if (not extract_tables) and (page_element.type_string == "table"):
+            if (not extract_tables) and (element_type == "table"):
                 continue
-            if (not extract_charts) and (page_element.type_string == "chart"):
+            if (not extract_charts) and (element_type == "chart"):
                 continue
-            if (not extract_infographics) and (page_element.type_string == "infographic"):
+            if (not extract_infographics) and (element_type == "infographic"):
+                continue
+            if (not process_text_for_this_page) and (element_type in {"title", "paragraph", "header_footer"}):
                 continue
 
             # Set content format for tables
             if page_element.type_string == "table":
-                page_element.content_format = paddle_output_format
+                page_element.content_format = table_output_format
 
             # Construct metadata for the page element
             page_element_meta = construct_page_element_metadata(
                 page_element,
-                page_idx,
+                page_reading_index,
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -366,13 +387,6 @@ def _extract_page_elements(
     except Exception as e:
         logger.exception(f"Error in page element extraction: {str(e)}")
         raise
-    finally:
-        # Ensure client is closed properly
-        if yolox_client:
-            try:
-                yolox_client.close()
-            except Exception as e:
-                logger.warning(f"Error closing YOLOX client: {str(e)}")
 
     return extracted_page_elements
 
@@ -384,6 +398,7 @@ def pdfium_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
@@ -407,16 +422,17 @@ def pdfium_extractor(
             f"Invalid text_depth: {text_depth_str}. Valid options: {list(TextTypeEnum.__members__.keys())}"
         )
 
-    # Validate and extract paddle_output_format
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    # Validate and extract table_output_format
+    table_output_format_str = extractor_config.get("table_output_format", "pseudo_markdown")
     try:
-        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+        table_output_format = TableFormatEnum[table_output_format_str.upper()]
     except KeyError:
         raise ValueError(
-            f"Invalid paddle_output_format: {paddle_output_format_str}. "
+            f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
 
+    text_extraction_method = extractor_config.get("extract_method", "pdfium")
     extract_images_method = extractor_config.get("extract_images_method", "group")
     extract_images_params = extractor_config.get("extract_images_params", {})
 
@@ -479,8 +495,9 @@ def pdfium_extractor(
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for table/chart extraction
-    pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
+    # Prepare for table/chart/infographic/text OCR extraction
+    pages_for_extractions = []  # Accumulate tuples of (page_idx, np_image)
+    page_to_text_flag_map = {}  # Maps page_idx -> bool (True if OCR text extraction is needed)
     futures = []  # To track asynchronous table/chart extraction tasks
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
@@ -488,15 +505,23 @@ def pdfium_extractor(
         for page_idx in range(page_count):
             page = doc.get_page(page_idx)
             page_width, page_height = page.get_size()
+            page_reading_index = page_idx + 1
+
+            is_scanned = is_scanned_page(page)
+            extraction_needed_for_text = extract_text and (
+                (text_extraction_method == "pdfium_hybrid" and is_scanned) or text_extraction_method == "ocr"
+            )
+            extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
+            page_to_text_flag_map[page_idx] = extraction_needed_for_text
 
             # Text extraction
-            if extract_text:
+            if extract_text and not extraction_needed_for_text:
                 page_text = _extract_page_text(page)
                 if text_depth == TextTypeEnum.PAGE:
                     text_meta = construct_text_metadata(
                         [page_text],
                         pdf_metadata.keywords,
-                        page_idx,
+                        page_reading_index,
                         -1,
                         -1,
                         -1,
@@ -514,7 +539,7 @@ def pdfium_extractor(
                 image_data = _extract_page_images(
                     extract_images_method,
                     page,
-                    page_idx,
+                    page_reading_index,
                     page_width,
                     page_height,
                     page_count,
@@ -524,57 +549,81 @@ def pdfium_extractor(
                 )
                 extracted_data.extend(image_data)
 
-            # If we want tables or charts, rasterize the page and store it
-            if extract_tables or extract_charts or extract_infographics:
+            # Full page image extraction
+            if extract_page_as_image:
+                if text_extraction_method == "ocr":
+                    page_text = ""
+                else:
+                    page_text = _extract_page_text(page)
+                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
+                image_meta = construct_image_metadata_from_base64(
+                    base64_image,
+                    page_reading_index,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
+                )
+                extracted_data.append(image_meta)
+
+            # If we want OCR extraction, rasterize the page and store it
+            if extraction_needed_for_text or extraction_needed_for_structured:
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     trace_info=execution_trace_log,
                 )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                pages_for_extractions.append((page_idx, image[0], padding_offsets[0]))
 
-                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
-                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                # Whenever pages_for_extractions hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_for_extractions) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
                         _extract_page_elements,
-                        pages_for_tables[:],  # pass a copy
+                        pages_for_extractions[:],  # pass a copy
                         page_count,
                         source_metadata,
                         base_unified_metadata,
-                        extract_tables,
-                        extract_charts,
-                        extract_infographics,
-                        paddle_output_format,
-                        pdfium_config.yolox_endpoints,
-                        pdfium_config.yolox_infer_protocol,
-                        pdfium_config.auth_token,
+                        extract_tables=extract_tables,
+                        extract_charts=extract_charts,
+                        extract_infographics=extract_infographics,
+                        page_to_text_flag_map=page_to_text_flag_map,
+                        table_output_format=table_output_format,
+                        yolox_endpoints=pdfium_config.yolox_endpoints,
+                        yolox_infer_protocol=pdfium_config.yolox_infer_protocol,
+                        auth_token=pdfium_config.auth_token,
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
-                    pages_for_tables.clear()
+                    pages_for_extractions.clear()
 
             page.close()
 
-        # After page loop, if we still have leftover pages_for_tables, submit one last job
-        if (extract_tables or extract_charts or extract_infographics) and pages_for_tables:
+        # After page loop, if we still have leftover pages_for_extractions, submit one last job
+        if (extraction_needed_for_text or extraction_needed_for_structured) and pages_for_extractions:
             future = executor.submit(
                 _extract_page_elements,
-                pages_for_tables[:],
+                pages_for_extractions[:],
                 page_count,
                 source_metadata,
                 base_unified_metadata,
-                extract_tables,
-                extract_charts,
-                extract_infographics,
-                paddle_output_format,
-                pdfium_config.yolox_endpoints,
-                pdfium_config.yolox_infer_protocol,
-                pdfium_config.auth_token,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                page_to_text_flag_map=page_to_text_flag_map,
+                table_output_format=table_output_format,
+                yolox_endpoints=pdfium_config.yolox_endpoints,
+                yolox_infer_protocol=pdfium_config.yolox_infer_protocol,
+                auth_token=pdfium_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
-            pages_for_tables.clear()
+
+            pages_for_extractions.clear()
 
         # Wait for all asynchronous jobs to complete.
         for fut in concurrent.futures.as_completed(futures):

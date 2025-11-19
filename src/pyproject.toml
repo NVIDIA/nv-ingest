@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+managed = true
+
+[project]
+name = "nv-ingest"
+description = "Python module for multimodal document ingestion"
+dynamic = ["version"]  # Declare attrs that will be generated at build time
+readme = "README.md"
+authors = [
+    {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
+]
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "azure-core>=1.32.0",
+    "click>=8.1.7",
+    "diskcache>=5.6.3",
+    "fastapi>=0.115.6",
+    "fastparquet>=2024.11.0",
+    "fsspec>=2024.10.0",
+    "gunicorn",
+    "h11>=0.16.0", # Must pin at or above 0.16.0 for CVE mitigation
+    "httpx>=0.28.1",
+    "isodate>=0.7.2",
+    "langdetect>=1.0.9",
+    "minio>=7.2.12",
+    "librosa>=0.10.2",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "psutil>=7.1.0",
+    "pydantic>2.0.0",
+    "pydantic-settings>2.0.0",
+    "pypdfium2==4.30.0",
+    "pytest>=8.0.2",
+    "pytest-mock>=3.14.0",
+    "pytest-cov>=6.0.0",
+    "build>=1.2.2",
+    "python-docx>=1.1.2",
+    "python-dotenv>=1.0.1",
+    "python-pptx>=1.0.2",
+    "prometheus-client",
+    "ray[all]>=2.49.0",
+    "redis>=5.2.1",
+    "requests>=2.28.2",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.15.1",
+    "setuptools>=78.1.1",
+    "tabulate>=0.9.0",
+    "transformers>=4.47.0",
+    "tqdm>=4.67.1",
+    "uvicorn",
+    "pip",
+    "llama-index-embeddings-nvidia",
+    "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
+    "pymilvus>=2.5.10",
+    "pymilvus[bulk_writer, model]",
+    "tritonclient",
+    "nvidia-riva-client==2.20.0",
+    "unstructured-client",
+    "markitdown",
+]
+
+[project.urls]
+homepage = "https://github.com/NVIDIA/nv-ingest"
+repository = "https://github.com/NVIDIA/nv-ingest"
+documentation = "https://docs.nvidia.com/nv-ingest"
+
+[tool.setuptools.dynamic]
+version = {attr = "nv_ingest.version.get_version"}

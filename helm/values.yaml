@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.3.0"
+  tag: "latest"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -114,7 +114,7 @@ nemoretriever-page-elements-v2:
   deployed: true
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.2.0"
+    tag: "1.4.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -143,8 +143,10 @@ nemoretriever-page-elements-v2:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
 ## @skip nemoretriever-graphic-elements-v1
 ## @param nemoretriever-graphic-elements-v1.deployed [default: true] true if the nemoretriever-graphic-elements NIM should be deployed and false otherwise
@@ -175,7 +177,8 @@ nemoretriever-graphic-elements-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-    tag: "1.2.0"
+    tag: "1.4.0"
+    pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -203,8 +206,10 @@ nemoretriever-graphic-elements-v1:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
 ## @skip nemoretriever-table-structure-v1
 ## @param nemoretriever-table-structure-v1.deployed [default: true] true if the nemoretriever-table-structure NIM should be deployed and false otherwise
@@ -236,7 +241,8 @@ nemoretriever-table-structure-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-    tag: "1.2.0"
+    tag: "1.4.0"
+    pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -264,8 +270,10 @@ nemoretriever-table-structure-v1:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
 ## @section NIM VLM Image Captioning Configuration
 ## @descriptionStart
@@ -276,7 +284,7 @@ nemoretriever-table-structure-v1:
 ## @param nim-vlm-image-captioning.fullnameOverride [default: "nim-vlm-image-captioning"] Override the full name of the deployment
 ## @param nim-vlm-image-captioning.customCommand [default: []] Custom command to run in the container
 ## @param nim-vlm-image-captioning.customArgs [default: []] Custom arguments to pass to the container command
-## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"] The container image repository
+## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl"] The container image repository
 ## @param nim-vlm-image-captioning.image.tag [default: "latest"] The container image tag
 ## @param nim-vlm-image-captioning.podSecurityContext [default: {}] Pod security context configuration
 ## @param nim-vlm-image-captioning.replicaCount [default: 1] Number of replicas to deploy
@@ -294,8 +302,8 @@ nim-vlm-image-captioning:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/meta/llama-3.2-11b-vision-instruct
-    tag: "latest"
+    repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
+    tag: "1"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -313,8 +321,10 @@ nim-vlm-image-captioning:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
 ## @section NIM VLM Text Extraction Configuration
 ## @descriptionStart
@@ -362,41 +372,43 @@ nim-vlm-text-extraction:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
-## @section PaddleOCR NIM Configuration
+## @section NemoRetriever OCR NIM Configuration
 ## @descriptionStart
-## Configuration for the PaddleOCR NIM service.
-## This service provides OCR (Optical Character Recognition) capabilities using PaddleOCR.
+## Configuration for the NemoRetriever OCR NIM service.
+## This service provides OCR (Optical Character Recognition) capabilities using NemoRetriever OCR.
 ## @descriptionEnd
-## @param paddleocr-nim.deployed [default: true] Whether to deploy the PaddleOCR NIM service
-## @param paddleocr-nim.fullnameOverride [default: "nv-ingest-paddle"] Override the full name of the deployment
-## @param paddleocr-nim.customCommand [default: []] Custom command to run in the container
-## @param paddleocr-nim.customArgs [default: []] Custom arguments to pass to the container command
-## @param paddleocr-nim.image.repository [default: "nvcr.io/nim/baidu/paddleocr"] The container image repository
-## @param paddleocr-nim.image.tag [default: "1.2.0"] The container image tag
-## @param paddleocr-nim.podSecurityContext [default: {}] Pod security context configuration
-## @param paddleocr-nim.replicaCount [default: 1] Number of replicas to deploy
-## @param paddleocr-nim.serviceAccount.create [default: false] Whether to create a service account
-## @param paddleocr-nim.serviceAccount.name [default: ""] The name of the service account
-## @param paddleocr-nim.statefuleSet.enabled [default: false] Whether to deploy as a StatefulSet
-## @param paddleocr-nim.service.type [default: "ClusterIP"] The type of Kubernetes service to create
-## @param paddleocr-nim.service.name [default: "nv-ingest-paddle"] The name of the service
-## @param paddleocr-nim.service.httpPort [default: 8000] The HTTP port for the service
-## @param paddleocr-nim.service.grpcPort [default: 8001] The gRPC port for the service
-## @param paddleocr-nim.service.metricsPort [default: 0] The metrics port for the service
-## @param paddleocr-nim.nim.grpcPort [default: 8001] The gRPC port for NIM communication
-## @param paddleocr-nim.nim.logLevel [default: "INFO"] The log level for NIM
-## @param paddleocr-nim.env [default: []] Environment variables for the container
-paddleocr-nim:
-  paddleocr-nim.deployed: true
-  fullnameOverride: nv-ingest-paddle
+## @param nemoretriever-ocr.deployed [default: false] Whether to deploy the PaddleOCR NIM service
+## @param nemoretriever-ocr.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
+## @param nemoretriever-ocr.customCommand [default: []] Custom command to run in the container
+## @param nemoretriever-ocr.customArgs [default: []] Custom arguments to pass to the container command
+## @param nemoretriever-ocr.image.repository [default: "nvcr.io/nim/baidu/paddleocr"] The container image repository
+## @param nemoretriever-ocr.image.tag [default: "1.2.0"] The container image tag
+## @param nemoretriever-ocr.podSecurityContext [default: {}] Pod security context configuration
+## @param nemoretriever-ocr.replicaCount [default: 1] Number of replicas to deploy
+## @param nemoretriever-ocr.serviceAccount.create [default: false] Whether to create a service account
+## @param nemoretriever-ocr.serviceAccount.name [default: ""] The name of the service account
+## @param nemoretriever-ocr.statefuleSet.enabled [default: false] Whether to deploy as a StatefulSet
+## @param nemoretriever-ocr.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param nemoretriever-ocr.service.name [default: "nv-ingest-ocr"] The name of the service
+## @param nemoretriever-ocr.service.httpPort [default: 8000] The HTTP port for the service
+## @param nemoretriever-ocr.service.grpcPort [default: 8001] The gRPC port for the service
+## @param nemoretriever-ocr.service.metricsPort [default: 0] The metrics port for the service
+## @param nemoretriever-ocr.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param nemoretriever-ocr.nim.logLevel [default: "INFO"] The log level for NIM
+## @param nemoretriever-ocr.env [default: []] Environment variables for the container
+nemoretriever-ocr:
+  deployed: false
+  fullnameOverride: nv-ingest-ocr
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/baidu/paddleocr
-    tag: "1.2.0"
+    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    tag: "1.0.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -414,7 +426,7 @@ paddleocr-nim:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nv-ingest-paddle
+    name: nv-ingest-ocr
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -424,8 +436,76 @@ paddleocr-nim:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
-      value: "1"
+    # - name: NIM_TRITON_MAX_BATCH_SIZE
+    #   value: "32"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
+
+## @section PaddleOCR NIM Configuration
+## @descriptionStart
+## Configuration for the PaddleOCR NIM service.
+## This service provides OCR (Optical Character Recognition) capabilities using PaddleOCR.
+## @descriptionEnd
+## @param paddleocr-nim.deployed [default: true] Whether to deploy the PaddleOCR NIM service
+## @param paddleocr-nim.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
+## @param paddleocr-nim.customCommand [default: []] Custom command to run in the container
+## @param paddleocr-nim.customArgs [default: []] Custom arguments to pass to the container command
+## @param paddleocr-nim.image.repository [default: "nvcr.io/nim/baidu/paddleocr"] The container image repository
+## @param paddleocr-nim.image.tag [default: "1.2.0"] The container image tag
+## @param paddleocr-nim.podSecurityContext [default: {}] Pod security context configuration
+## @param paddleocr-nim.replicaCount [default: 1] Number of replicas to deploy
+## @param paddleocr-nim.serviceAccount.create [default: false] Whether to create a service account
+## @param paddleocr-nim.serviceAccount.name [default: ""] The name of the service account
+## @param paddleocr-nim.statefuleSet.enabled [default: false] Whether to deploy as a StatefulSet
+## @param paddleocr-nim.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param paddleocr-nim.service.name [default: "nv-ingest-ocr"] The name of the service
+## @param paddleocr-nim.service.httpPort [default: 8000] The HTTP port for the service
+## @param paddleocr-nim.service.grpcPort [default: 8001] The gRPC port for the service
+## @param paddleocr-nim.service.metricsPort [default: 0] The metrics port for the service
+## @param paddleocr-nim.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param paddleocr-nim.nim.logLevel [default: "INFO"] The log level for NIM
+## @param paddleocr-nim.env [default: []] Environment variables for the container
+paddleocr-nim:
+  deployed: true
+  fullnameOverride: nv-ingest-ocr
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nim/baidu/paddleocr
+    tag: "1.4.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: nv-ingest-ocr
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_OPTIMIZATION_MODE
+      value: vram_opt
+    - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+      value: "768"
 
 
 ## @skip text-embedding-nim
@@ -459,7 +539,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.5.0"
+    tag: "1.9.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -487,7 +567,7 @@ text-embedding-nim:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
+    - name: NIM_TRITON_MAX_BATCH_SIZE
       value: "1"
 
 
@@ -524,7 +604,70 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: "1.5.0"
+    tag: "1.9.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: nv-ingest-embedqa
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_MAX_BATCH_SIZE
+      value: "1"
+
+
+## @skip vlm-embedding-nim
+## @param vlm-embedding-nim.deployed [default: false] true if the vlm-embedding-nim should be deployed and false otherwise
+## @param vlm-embedding-nim.image.repository The repository to override the location of the vlm-embedding-nim
+## @param vlm-embedding-nim.image.tag The tag override for vlm-embedding-nim
+## @param vlm-embedding-nim.fullnameOverride [default: "nv-ingest-embedqa"] The name override for the deployment
+## @param vlm-embedding-nim.customCommand [default: []] Custom command to override container entrypoint
+## @param vlm-embedding-nim.customArgs [default: []] Custom arguments to pass to the container
+## @param vlm-embedding-nim.podSecurityContext Security context for the pod
+## @param vlm-embedding-nim.replicaCount [default: 1] Number of replicas to deploy
+## @param vlm-embedding-nim.serviceAccount.create [default: false] Whether to create a service account
+## @param vlm-embedding-nim.serviceAccount.name [default: ""] The name of the service account
+## @param vlm-embedding-nim.statefuleSet.enabled [default: false] Whether to deploy as a StatefulSet
+## @param vlm-embedding-nim.autoscaling.enabled [default: false] Enable autoscaling
+## @param vlm-embedding-nim.autoscaling.minReplicas [default: 1] Minimum number of replicas
+## @param vlm-embedding-nim.autoscaling.maxReplicas [default: 10] Maximum number of replicas
+## @param vlm-embedding-nim.autoscaling.metrics [default: []] Metrics for autoscaling
+## @param vlm-embedding-nim.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param vlm-embedding-nim.service.name [default: "nv-ingest-embedqa"] The name of the service
+## @param vlm-embedding-nim.service.httpPort [default: 8000] The HTTP port for the service
+## @param vlm-embedding-nim.service.grpcPort [default: 8001] The gRPC port for the service
+## @param vlm-embedding-nim.service.metricsPort [default: 0] The metrics port for the service
+## @param vlm-embedding-nim.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param vlm-embedding-nim.nim.logLevel [default: "INFO"] The log level for NIM
+## @param vlm-embedding-nim.env [default: []] Environment variables for the container
+vlm-embedding-nim:
+  deployed: false
+  fullnameOverride: nv-ingest-embedqa # Share name with nvidia-nim-llama-32-nv-embedqa-1b-v2 to ease configuration
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nvidia/nemo-microservices/llama-3.2-nemoretriever-1b-vlm-embed-v1
+    tag: "1.7.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -582,12 +725,11 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
 ## @param llama-32-nv-rerankqa-1b-v2.env [default: []] Environment variables for the container
 llama-32-nv-rerankqa-1b-v2:
   deployed: false
-  # fullnameOverride: llama-32-nv-rerankqa-1b-v2
   customCommand: []
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-    tag: "1.3.1"
+    tag: "1.7.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -615,7 +757,7 @@ llama-32-nv-rerankqa-1b-v2:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
+    - name: NIM_TRITON_MAX_BATCH_SIZE
       value: "1"
 
 
@@ -645,11 +787,11 @@ llama-32-nv-rerankqa-1b-v2:
 ## @param riva-nim.env [default: []] Environment variables for the container
 riva-nim:
   deployed: false
-  fullnameOverride: riva-nim
+  fullnameOverride: nv-ingest-riva-nim
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/nvidia/riva-asr
+    repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
     tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
@@ -668,16 +810,18 @@ riva-nim:
     metrics: []
   service:
     type: "ClusterIP"
-    name: riva-nim
-    httpPort: 8000
-    grpcPort: 8001
+    name: nv-ingest-riva-nim
+    httpPort: 9000
+    grpcPort: 50051
     metricsPort: 0  # Generally unused and defaults to 0
   nim:
-    grpcPort: 8001
+    grpcPort: 50051
     logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
-      value: "8000"
+      value: "9000"
+    - name: NIM_TAGS_SELECTOR
+      value: "name=parakeet-1-1b-ctc-en-us,mode=ofl"
 
 
 ## @section Milvus Deployment parameters
@@ -701,26 +845,34 @@ milvusDeployed: true
 ## @param milvus.standalone.persistence.persistentVolumeClaim.size [default: 50Gi] Size of the PVC for Milvus data
 ## @param milvus.standalone.persistence.persistentVolumeClaim.storageClass Storage class to use for the PVC
 ## @param milvus.minio.mode [default: standalone] MinIO deployment mode
-## @param milvus.minio.bucketName [default: a-bucket] Name of the MinIO bucket to create
+## @param milvus.minio.bucketName [default: nv-ingest] Name of the MinIO bucket to create
 ## @param milvus.minio.persistence.size [default: 50Gi] Size of the PVC for MinIO data
 ## @param milvus.minio.persistence.storageClass Storage class to use for MinIO PVC
 milvus:
   image:
     all:
       repository: milvusdb/milvus
-      tag: v2.5.3-gpu
+      tag: v2.5.17-gpu
   cluster:
     enabled: false
   etcd:
+    image:
+      repository: "milvusdb/etcd"
+      tag: "3.5.22-r1"
     replicaCount: 1
     persistence:
       storageClass: null
   minio:
+    enabled: true
     mode: standalone
-    bucketName: a-bucket
+    image:
+      tag: "RELEASE.2025-09-07T16-13-09Z"
+    bucketName: nv-ingest
     persistence:
       size: 50Gi
       storageClass: null
+  pulsarv3:
+    enabled: false
   pulsar:
     enabled: false
   standalone:
@@ -778,6 +930,8 @@ redisDeployed: true
 ## @param redis.master.configmap [default: "protected-mode no"] Redis master configuration
 
 redis:
+  image:
+    tag: "8.2.1-debian-12-r0"
   auth:
     enabled: false
   replica:
@@ -800,50 +954,77 @@ redis:
     configmap: |-
       protected-mode no
 
+## @section Prometheus configurations
+## @descriptionStart
+## Include any Prometheus configuration that you'd like with the deployed Prometheus
+## For a complete list of configuration options see: https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus/values.yaml
+## @descriptionEnd
+## @param prometheus Prometheus configuration options
+## @param prometheus.enabled [default: true] Whether to deploy Prometheus from this helm chart
+## @param prometheus.server.enabled [default: true] Enable the Prometheus server
+## @param prometheus.alertmanager.enabled [default: false] Enable the Prometheus alertmanager
+
+prometheus:
+  enabled: false
+  server:
+    enabled: false
+  alertmanager:
+    enabled: false
+
 ## @section Environment Variables
 ## @descriptionStart
 ## Define environment variables as key/value dictionary pairs
 ## @descriptionEnd
 ## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
+## @param envVars.ARROW_DEFAULT_MEMORY_POOL [default: "system"] Memory pool configuration for Apache Arrow
+## @param envVars.INGEST_LOG_LEVEL [default: "DEFAULT"] Log level for the ingest service
 ## @param envVars.INGEST_EDGE_BUFFER_SIZE [default: "64"] Size of the edge buffer for ingestion
+## @param envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD [default: "0.80"] Dynamic memory threshold for ingestion
 ## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
-## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differeing REST endpoint host.
-## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port.
-## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"]
-## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
-## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set.
+## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differing REST endpoint host
+## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port
+## @param envVars.MESSAGE_CLIENT_TYPE [default: "redis"] Type of message client to use
+## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"] Name of the Redis queue for ingest tasks
+## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests
+## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
-## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"]
-## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"]
-## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint
-## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"]
-## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"]
-## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"]
-## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"]
-## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"]
-## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"]
-## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"]
-## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
-## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"]
-## @param envVars.AUDIO_GRPC_ENDPOINT [default: "audio:50051"]
-## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.READY_CHECK_ALL_COMPONENTS [default: "true"]
-## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"]
+## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
+## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
+## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
+## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"] HTTP endpoint for NeMo Retriever Parse service
+## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"] Protocol for NeMo Retriever Parse service
+## @param envVars.NEMORETRIEVER_PARSE_MODEL_NAME [default: "nvidia/nemoretriever-parse"] Model name for NeMo Retriever Parse
+## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"] gRPC endpoint for YOLOX page elements
+## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"] HTTP endpoint for YOLOX page elements
+## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"] gRPC endpoint for YOLOX graphic elements
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"] HTTP endpoint for YOLOX graphic elements
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX graphic elements
+## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"] gRPC endpoint for YOLOX table structure
+## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"] HTTP endpoint for YOLOX table structure
+## @param envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX table structure
+## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"] Endpoint for embedding service
+## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for embedding service
+## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
+## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://integrate.api.nvidia.com/v1/chat/completions"] Endpoint for VLM caption service
+## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/nemotron-nano-12b-v2-vl"] Model name for VLM caption service
+## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
+## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
+## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
+## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
 envVars:
+  ARROW_DEFAULT_MEMORY_POOL: "system"
+  INGEST_LOG_LEVEL: "DEFAULT"
   INGEST_EDGE_BUFFER_SIZE: 64
+  INGEST_DYNAMIC_MEMORY_THRESHOLD: 0.80
+  INGEST_DISABLE_DYNAMIC_SCALING: false
   MAX_INGEST_PROCESS_WORKERS: 16
   NV_INGEST_MAX_UTIL: 48
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
+  MESSAGE_CLIENT_TYPE: "redis"
   REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
   NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
 
@@ -856,6 +1037,7 @@ envVars:
   PADDLE_INFER_PROTOCOL: grpc
   NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
   NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
+  NEMORETRIEVER_PARSE_MODEL_NAME: nvidia/nemoretriever-parse
   YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
   YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
@@ -865,15 +1047,22 @@ envVars:
   YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
   YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
+  OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
+  OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
+  OCR_INFER_PROTOCOL: grpc
+  OCR_MODEL_NAME: paddle
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
-  VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
+  # This environment variable is controled in the helm/deployment.yaml. There is a ternary operator that
+  # sets this value to "nim-vlm-image-captioning:8001" to use the locally deployed NIM if the nim-vlm-image-captioning.deployed
+  # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
+  # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
+  VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
 
-  AUDIO_GRPC_ENDPOINT: "audio:50051"
+  AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
   COMPONENTS_TO_READY_CHECK: "ALL"
@@ -894,39 +1083,41 @@ otelDeployed: true
 ## @skip opentelemetry-collector
 ## @extra opentelemetry-collector [default: sane {}] Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml
 opentelemetry-collector:
+  image:
+    repository: "otel/opentelemetry-collector-contrib"
+    tag: "0.133.0"
   mode: deployment
   config:
     receivers:
       otlp:
         protocols:
           grpc:
-            endpoint: '${env:MY_POD_IP}:4317'
+            endpoint: "${env:MY_POD_IP}:4317"
           http:
+            endpoint: "${env:MY_POD_IP}:4318"
             cors:
-              allowed_origins:
-                - "*"
+              allowed_origins: ["*"]
+
     exporters:
-      # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
       zipkin:
         endpoint: "http://nv-ingest-zipkin:9411/api/v2/spans"
       debug:
         verbosity: detailed
+
     extensions:
       health_check: {}
       zpages:
         endpoint: 0.0.0.0:55679
+
     processors:
       batch: {}
       tail_sampling:
-        # filter out health checks
-        # https://github.com/open-telemetry/opentelemetry-collector/issues/2310#issuecomment-1268157484
         policies:
           - name: drop_noisy_traces_url
             type: string_attribute
             string_attribute:
               key: http.target
-              values:
-                - \/health
+              values: ["/health"]
               enabled_regex_matching: true
               invert_match: true
       transform:
@@ -935,29 +1126,29 @@ opentelemetry-collector:
             statements:
               - set(status.code, 1) where attributes["http.path"] == "/health"
 
-              # after the http target has been anonymized, replace other aspects of the span
+              # replace aspects of the span after anonymization
               - replace_match(attributes["http.route"], "/v1", attributes["http.target"]) where attributes["http.target"] != nil
-
-              # replace the title of the span with the route to be more descriptive
               - replace_pattern(name, "/v1", attributes["http.route"]) where attributes["http.route"] != nil
-
-              # set the route to equal the URL if it's nondescriptive (for the embedding case)
               - set(name, Concat([name, attributes["http.url"]], " ")) where name == "POST"
+
     service:
       extensions: [zpages, health_check]
+      telemetry:
+        logs:
+          level: "debug"
       pipelines:
         traces:
           receivers: [otlp]
+          processors: [batch, tail_sampling, transform]
           exporters: [debug, zipkin]
-          processors: [tail_sampling, transform]
         metrics:
           receivers: [otlp]
-          exporters: [debug]
           processors: [batch]
+          exporters: [debug]
         logs:
           receivers: [otlp]
-          exporters: [debug]
           processors: [batch]
+          exporters: [debug]
 
 ## @param otelEnvVars [default: sane {}] Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value
 ## @extra otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT Default deployment target for GRPC otel - Default "http://{{ .Release.Name }}-opentelemetry-collector:4317"
@@ -981,6 +1172,21 @@ otelEnvVars:
 
 ## @param zipkinDeployed [default: true] Whether to deploy Zipkin with OpenTelemetry from this helm chart
 zipkinDeployed: true
+
+zipkin:
+  image:
+    repository: "openzipkin/zipkin"
+    tag: "3.5.0"
+  zipkin:
+    extraEnv:
+      JAVA_OPTS: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 4.5Gi
+    requests:
+      cpu: 100m
+      memory: 2.5Gi
 
 ## @section Ingress parameters
 ## @param ingress.enabled Enables ingress.

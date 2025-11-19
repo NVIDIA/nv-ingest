@@ -4,12 +4,13 @@
 
 import logging
 import pprint
-from typing import Any
+from typing import Any, Optional
 
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
@@ -17,6 +18,7 @@ from nv_ingest_api.internal.transform.caption_image import transform_image_creat
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +33,8 @@ class ImageCaptionTransformStage(RayActorStage):
     are stored in the control message.
     """
 
-    def __init__(self, config: ImageCaptionExtractionSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageCaptionExtractionSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageCaptionTransformStage configuration validated.")
@@ -40,9 +42,10 @@ class ImageCaptionTransformStage(RayActorStage):
             logger.exception("Error validating caption extraction config")
             raise e
 
-    @traceable("image_captioning")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=["caption"])
-    @nv_ingest_node_failure_try_except(annotation_id="image_captioning", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting image captions.
@@ -65,7 +68,10 @@ class ImageCaptionTransformStage(RayActorStage):
 
         # Remove the "caption" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "caption")
-        logger.debug("ImageCaptionTransformStage: Task configuration extracted: %s", pprint.pformat(task_config))
+        logger.debug(
+            "ImageCaptionTransformStage: Task configuration extracted: %s",
+            pprint.pformat(sanitize_for_logging(task_config)),
+        )
 
         # Call the caption extraction function.
         new_df = transform_image_create_vlm_caption_internal(

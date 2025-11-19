@@ -129,6 +129,7 @@ extract_tables=False)`
     - `extract_text`: Boolean indicating if text should be extracted. Default is False.
     - `extract_images`: Boolean indicating if images should be extracted. Default is False.
     - `extract_tables`: Boolean indicating if tables should be extracted. Default is False.
+    - `extract_page_as_image`: Boolean indicating if each page should be rendered as an image for embedding. Default is False.
   - **Description**: Sets up configuration for the extraction task.
 
 - **Method: `to_dict()`**

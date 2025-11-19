@@ -1,0 +1,86 @@
+
+# Main NV-Ingest service resources - Using MIG
+resources:
+  limits:
+    nvidia.com/gpu: 0              # Set GPU to 0 when using MIG
+    nvidia.com/mig-1g.10gb: 1      # Use MIG instance
+  requests:
+    nvidia.com/gpu: 0              # Set GPU to 0 when using MIG
+    nvidia.com/mig-1g.10gb: 1      # Use MIG instance
+
+# Configure NIM components to use MIG
+nemoretriever-page-elements-v2:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+nemoretriever-graphic-elements-v1:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+nemoretriever-table-structure-v1:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+nvidia-nim-llama-32-nv-embedqa-1b-v2:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+paddleocr-nim:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+# text-embedding-nim is disabled because we use llama-3.2-nv-embedqa-1b-v2 for embedding
+text-embedding-nim:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+# If you want to deploy llama-32-nv-rerankqa-1b-v2
+llama-32-nv-rerankqa-1b-v2:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
+# Configure Milvus to use MIG
+milvus:
+  standalone:
+    resources:
+      limits:
+        nvidia.com/gpu: 0
+        nvidia.com/mig-1g.10gb: 1
+      requests:
+        nvidia.com/gpu: 0
+        nvidia.com/mig-1g.10gb: 1

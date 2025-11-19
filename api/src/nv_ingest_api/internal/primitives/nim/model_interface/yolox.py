@@ -2,9 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-import base64
-import io
+import os
 import logging
 import warnings
 from math import log
@@ -14,39 +12,50 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import cv2
+import backoff
 import numpy as np
-import packaging
+import json
 import pandas as pd
-import torch
-import torchvision
-from PIL import Image
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
+import tritonclient.grpc as grpcclient
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
-# yolox-page-elements-v1 and v2 common contants
+YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v2"
+
+# yolox-page-elements-v2 and v3 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
+YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
-# yolox-page-elements-v1 contants
-YOLOX_PAGE_V1_NUM_CLASSES = 4
-YOLOX_PAGE_V1_FINAL_SCORE = {"table": 0.48, "chart": 0.48}
-YOLOX_PAGE_V1_CLASS_LABELS = [
+# yolox-page-elements-v3 contants
+YOLOX_PAGE_FINAL_SCORE = YOLOX_PAGE_V3_FINAL_SCORE = {
+    "table": 0.1,
+    "chart": 0.01,
+    "title": 0.1,
+    "infographic": 0.01,
+    "paragraph": 0.1,
+    "header_footer": 0.1,
+}
+YOLOX_PAGE_CLASS_LABELS = YOLOX_PAGE_V3_CLASS_LABELS = [
     "table",
     "chart",
     "title",
+    "infographic",
+    "paragraph",
+    "header_footer",
 ]
 
 # yolox-page-elements-v2 contants
-YOLOX_PAGE_V2_NUM_CLASSES = 4
 YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
 YOLOX_PAGE_V2_CLASS_LABELS = [
     "table",
@@ -57,18 +66,11 @@ YOLOX_PAGE_V2_CLASS_LABELS = [
 
 
 # yolox-graphic-elements-v1 contants
-YOLOX_GRAPHIC_NUM_CLASSES = 10
 YOLOX_GRAPHIC_CONF_THRESHOLD = 0.01
 YOLOX_GRAPHIC_IOU_THRESHOLD = 0.25
 YOLOX_GRAPHIC_MIN_SCORE = 0.1
-YOLOX_GRAPHIC_FINAL_SCORE = 0.0
 YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
 
-# TODO(Devin): Legacy items aren't working right for me. Double check these.
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
-YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
-YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
 
 YOLOX_GRAPHIC_CLASS_LABELS = [
     "chart_title",
@@ -85,11 +87,9 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 
 
 # yolox-table-structure-v1 contants
-YOLOX_TABLE_NUM_CLASSES = 5
 YOLOX_TABLE_CONF_THRESHOLD = 0.01
 YOLOX_TABLE_IOU_THRESHOLD = 0.25
 YOLOX_TABLE_MIN_SCORE = 0.1
-YOLOX_TABLE_FINAL_SCORE = 0.0
 YOLOX_TABLE_NIM_MAX_IMAGE_SIZE = 512_000
 
 YOLOX_TABLE_IMAGE_PREPROC_HEIGHT = 1024
@@ -112,14 +112,10 @@ class YoloxModelInterfaceBase(ModelInterface):
 
     def __init__(
         self,
-        image_preproc_width: Optional[int] = None,
-        image_preproc_height: Optional[int] = None,
         nim_max_image_size: Optional[int] = None,
-        num_classes: Optional[int] = None,
         conf_threshold: Optional[float] = None,
         iou_threshold: Optional[float] = None,
         min_score: Optional[float] = None,
-        final_score: Optional[float] = None,
         class_labels: Optional[List[str]] = None,
     ):
         """
@@ -127,14 +123,10 @@ class YoloxModelInterfaceBase(ModelInterface):
         Parameters
         ----------
         """
-        self.image_preproc_width = image_preproc_width
-        self.image_preproc_height = image_preproc_height
         self.nim_max_image_size = nim_max_image_size
-        self.num_classes = num_classes
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.min_score = min_score
-        self.final_score = final_score
         self.class_labels = class_labels
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -200,6 +192,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         # Helper functions to chunk a list into sublists of length up to chunk_size.
         def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            chunk_size = max(1, chunk_size)
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
         def chunk_list_geometrically(lst: list, max_size: int) -> List[list]:
@@ -207,29 +200,28 @@ class YoloxModelInterfaceBase(ModelInterface):
             chunks = []
             i = 0
             while i < len(lst):
-                chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+                chunk_size = max(1, min(2 ** int(log(len(lst) - i, 2)), max_size))
                 chunks.append(lst[i : i + chunk_size])
                 i += chunk_size
             return chunks
 
         if protocol == "grpc":
-            logger.debug("Formatting input for gRPC Yolox model")
-            # Resize images for model input (Yolox expects 1024x1024).
-            resized_images = [
-                resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
-            ]
-            # Chunk the resized images, the original images, and their shapes.
-            resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
+            logger.debug("Formatting input for gRPC Yolox Ensemble model")
+            b64_images = [numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT) for image in data["images"]]
+            b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
             original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
             shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
             batched_inputs = []
             formatted_batch_data = []
-            for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
-                # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
-                input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
-                batched_inputs.append(input_array)
+            for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
+                input_array = np.array(b64_chunk, dtype=np.object_)
+                current_batch_size = input_array.shape[0]
+                single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+                batched_inputs.append([input_array, thresholds])
                 formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+
             return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
@@ -239,15 +231,11 @@ class YoloxModelInterfaceBase(ModelInterface):
                 # Convert to uint8 if needed.
                 if image.dtype != np.uint8:
                     image = (image * 255).astype(np.uint8)
-                # Convert the numpy array to a PIL Image.
-                image_pil = Image.fromarray(image)
-                original_size = image_pil.size
 
-                # Save the image to a buffer and encode to base64.
-                buffered = io.BytesIO()
-                image_pil.save(buffered, format="PNG")
-                image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
+                # Get original size directly from numpy array (width, height)
+                original_size = (image.shape[1], image.shape[0])
+                # Convert numpy array directly to base64 using OpenCV
+                image_b64 = numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT)
                 # Scale the image if necessary.
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
                     image_b64, max_base64_size=self.nim_max_image_size
@@ -342,32 +330,20 @@ class YoloxModelInterfaceBase(ModelInterface):
         list[dict]
             A list of annotation dictionaries for each image in the batch.
         """
-        original_image_shapes = kwargs.get("original_image_shapes", [])
-
         if protocol == "http":
             # For http, the output already has postprocessing applied. Skip to table/chart expansion.
             results = output
 
         elif protocol == "grpc":
+            results = []
             # For grpc, apply the same NIM postprocessing.
-            pred = postprocess_model_prediction(
-                output,
-                self.num_classes,
-                self.conf_threshold,
-                self.iou_threshold,
-                class_agnostic=False,
-            )
-            results = postprocess_results(
-                pred,
-                original_image_shapes,
-                self.image_preproc_width,
-                self.image_preproc_height,
-                self.class_labels,
-                min_score=self.min_score,
-            )
-
+            for out in output:
+                if isinstance(out, bytes):
+                    out = out.decode("utf-8")
+                if isinstance(out, dict):
+                    continue
+                results.append(json.loads(out))
         inference_results = self.postprocess_annotations(results, **kwargs)
-
         return inference_results
 
     def postprocess_annotations(self, annotation_dicts, **kwargs):
@@ -401,28 +377,20 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_model_name: str = "nemoretriever-page-elements-v2"):
+    def __init__(self, version: str = YOLOX_PAGE_DEFAULT_VERSION):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if yolox_model_name.endswith("-v1"):
-            num_classes = YOLOX_PAGE_V1_NUM_CLASSES
-            final_score = YOLOX_PAGE_V1_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V1_CLASS_LABELS
+        if version.endswith("-v3"):
+            class_labels = YOLOX_PAGE_V3_CLASS_LABELS
         else:
-            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-            final_score = YOLOX_PAGE_V2_FINAL_SCORE
             class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
-            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
-            image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
-            num_classes=num_classes,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
-            final_score=final_score,
             class_labels=class_labels,
         )
 
@@ -440,37 +408,58 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         return "yolox-page-elements"
 
-    def postprocess_annotations(self, annotation_dicts, **kwargs):
+    def postprocess_annotations(self, annotation_dicts, final_score=None, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        expected_final_score_keys = [x for x in self.class_labels if x != "title"]
-        if (not isinstance(self.final_score, dict)) or (
-            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
-        ):
+        running_v3 = annotation_dicts and set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
+
+        if not final_score:
+            if running_v3:
+                final_score = YOLOX_PAGE_V3_FINAL_SCORE
+            else:
+                final_score = YOLOX_PAGE_V2_FINAL_SCORE
+
+        if running_v3:
+            expected_final_score_keys = YOLOX_PAGE_V3_FINAL_SCORE
+        else:
+            expected_final_score_keys = [x for x in YOLOX_PAGE_V2_FINAL_SCORE if x != "title"]
+
+        if (not isinstance(final_score, dict)) or (sorted(final_score.keys()) != sorted(expected_final_score_keys)):
             raise ValueError(
-                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
+                "yolox-page-elements requires a dictionary of thresholds per each class: "
                 f"{expected_final_score_keys}"
             )
 
-        # Table/chart expansion is "business logic" specific to nv-ingest
-        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
-        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        if annotation_dicts and running_v3:
+            annotation_dicts = [
+                postprocess_page_elements_v3(annotation_dict, labels=YOLOX_PAGE_V3_CLASS_LABELS)
+                for annotation_dict in annotation_dicts
+            ]
+        else:
+            # Table/chart expansion is "business logic" specific to nv-ingest
+            annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+            annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+
         inference_results = []
 
         # Filter out bounding boxes below the final threshold
         # This final thresholding is "business logic" specific to nv-ingest
         for annotation_dict in annotation_dicts:
             new_dict = {}
-            if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score["table"]]
-            if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score["chart"]]
-            if "infographic" in annotation_dict:
-                new_dict["infographic"] = [
-                    bb for bb in annotation_dict["infographic"] if bb[4] >= self.final_score["infographic"]
-                ]
-            if "title" in annotation_dict:
-                new_dict["title"] = annotation_dict["title"]
+            if running_v3:
+                for label in YOLOX_PAGE_V3_CLASS_LABELS:
+                    if label in annotation_dict and label in final_score:
+                        threshold = final_score[label]
+                        new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= threshold]
+            else:
+                for label in YOLOX_PAGE_V2_CLASS_LABELS:
+                    if label in annotation_dict:
+                        if label == "title":
+                            new_dict[label] = annotation_dict[label]
+                        elif label in final_score:
+                            threshold = final_score[label]
+                            new_dict[label] = [bb for bb in annotation_dict[label] if bb[4] >= threshold]
+
             inference_results.append(new_dict)
 
         inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
@@ -483,28 +472,15 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_version: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the yolox-graphic-elements model interface.
         """
-        if yolox_version and (
-            packaging.version.Version(yolox_version) >= packaging.version.Version("1.2.0-rc5")  # gtc release
-        ):
-            image_preproc_width = YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-        else:
-            image_preproc_width = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-
         super().__init__(
-            image_preproc_width=image_preproc_width,
-            image_preproc_height=image_preproc_height,
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
             iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
             min_score=YOLOX_GRAPHIC_MIN_SCORE,
-            final_score=YOLOX_GRAPHIC_FINAL_SCORE,
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
         )
 
@@ -556,14 +532,10 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
         Initialize the yolox-graphic-elements model interface.
         """
         super().__init__(
-            image_preproc_width=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
-            image_preproc_height=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_TABLE_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_TABLE_NUM_CLASSES,
             conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
             iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
             min_score=YOLOX_TABLE_MIN_SCORE,
-            final_score=YOLOX_TABLE_FINAL_SCORE,
             class_labels=YOLOX_TABLE_CLASS_LABELS,
         )
 
@@ -603,144 +575,6 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             inference_results.append(bbox_dict)
 
         return inference_results
-
-
-def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
-    # Convert numpy array to torch tensor
-    prediction = torch.from_numpy(prediction.copy())
-
-    # Compute box corners
-    box_corner = prediction.new(prediction.shape)
-    box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
-    box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
-    box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
-    box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
-    prediction[:, :, :4] = box_corner[:, :, :4]
-
-    output = [None for _ in range(len(prediction))]
-
-    for i, image_pred in enumerate(prediction):
-        # If no detections, continue to the next image
-        if not image_pred.size(0):
-            continue
-
-        # Ensure image_pred is 2D
-        if image_pred.ndim == 1:
-            image_pred = image_pred.unsqueeze(0)
-
-        # Get score and class with highest confidence
-        class_conf, class_pred = torch.max(image_pred[:, 5 : 5 + num_classes], 1, keepdim=True)
-
-        # Confidence mask
-        squeezed_conf = class_conf.squeeze(dim=1)
-        conf_mask = image_pred[:, 4] * squeezed_conf >= conf_thre
-
-        # Apply confidence mask
-        detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
-        detections = detections[conf_mask]
-
-        if not detections.size(0):
-            continue
-
-        # Apply Non-Maximum Suppression (NMS)
-        if class_agnostic:
-            nms_out_index = torchvision.ops.nms(
-                detections[:, :4],
-                detections[:, 4] * detections[:, 5],
-                nms_thre,
-            )
-        else:
-            nms_out_index = torchvision.ops.batched_nms(
-                detections[:, :4],
-                detections[:, 4] * detections[:, 5],
-                detections[:, 6],
-                nms_thre,
-            )
-        detections = detections[nms_out_index]
-
-        # Append detections to output
-        output[i] = detections
-
-    return output
-
-
-def postprocess_results(
-    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, min_score=0.0
-):
-    """
-    For each item (==image) in results, computes annotations in the form
-
-     {"table": [[0.0107, 0.0859, 0.7537, 0.1219, 0.9861], ...],
-      "figure": [...],
-      "title": [...]
-      }
-    where each list of 5 floats represents a bounding box in the format [x1, y1, x2, y2, confidence]
-
-    Keep only bboxes with high enough confidence.
-    """
-    out = []
-
-    for original_image_shape, result in zip(original_image_shapes, results):
-        annotation_dict = {label: [] for label in class_labels}
-
-        if result is None:
-            out.append(annotation_dict)
-            continue
-
-        try:
-            result = result.cpu().numpy()
-            scores = result[:, 4] * result[:, 5]
-            result = result[scores > min_score]
-
-            # ratio is used when image was padded
-            ratio = min(
-                image_preproc_width / original_image_shape[0],
-                image_preproc_height / original_image_shape[1],
-            )
-            bboxes = result[:, :4] / ratio
-
-            bboxes[:, [0, 2]] /= original_image_shape[1]
-            bboxes[:, [1, 3]] /= original_image_shape[0]
-            bboxes = np.clip(bboxes, 0.0, 1.0)
-
-            labels = result[:, 6]
-            scores = scores[scores > min_score]
-        except Exception as e:
-            raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
-
-        for box, score, label in zip(bboxes, scores, labels):
-            # TODO(Devin): Sometimes we get back unexpected class labels?
-            if (label < 0) or (label >= len(class_labels)):
-                logger.warning(f"Invalid class label {label} found in postprocessing")
-                continue
-            else:
-                class_name = class_labels[int(label)]
-
-            annotation_dict[class_name].append([round(float(x), 4) for x in np.concatenate((box, [score]))])
-
-        out.append(annotation_dict)
-
-    return out
-
-
-def resize_image(image, target_img_size):
-    w, h, _ = np.array(image).shape
-
-    if target_img_size is not None:  # Resize + Pad
-        r = min(target_img_size[0] / w, target_img_size[1] / h)
-        image = cv2.resize(
-            image,
-            (int(h * r), int(w * r)),
-            interpolation=cv2.INTER_LINEAR,
-        ).astype(np.uint8)
-        image = np.pad(
-            image,
-            ((0, target_img_size[0] - image.shape[0]), (0, target_img_size[1] - image.shape[1]), (0, 0)),
-            mode="constant",
-            constant_values=114,
-        )
-
-    return image
 
 
 def expand_table_bboxes(annotation_dict, labels=None):
@@ -813,13 +647,14 @@ def expand_chart_bboxes(annotation_dict, labels=None):
         iou_thr=0.01,
         class_agnostic=False,
     )
+
     chart_bboxes = pred_wbf[labels_wbf == 1]
     chart_confidences = confidences_wbf[labels_wbf == 1]
     title_bboxes = pred_wbf[labels_wbf == 2]
 
     found_title_idxs, no_found_title_idxs = [], []
     for i in range(len(chart_bboxes)):
-        match = match_with_title(chart_bboxes[i], title_bboxes, iou_th=0.01)
+        match = match_with_title_v1(chart_bboxes[i], title_bboxes, iou_th=0.01)
         if match is not None:
             chart_bboxes[i] = match[0]
             title_bboxes = match[1]
@@ -827,15 +662,74 @@ def expand_chart_bboxes(annotation_dict, labels=None):
         else:
             no_found_title_idxs.append(i)
 
-    chart_bboxes[found_title_idxs] = expand_boxes(chart_bboxes[found_title_idxs], r_x=1.05, r_y=1.1)
-    chart_bboxes[no_found_title_idxs] = expand_boxes(chart_bboxes[no_found_title_idxs], r_x=1.1, r_y=1.25)
+    chart_bboxes[found_title_idxs] = expand_boxes_v1(chart_bboxes[found_title_idxs], r_x=1.05, r_y=1.1)
+    chart_bboxes[no_found_title_idxs] = expand_boxes_v1(chart_bboxes[no_found_title_idxs], r_x=1.1, r_y=1.25)
 
     annotation_dict = {
         "table": annotation_dict["table"],
         "chart": np.concatenate([chart_bboxes, chart_confidences[:, None]], axis=1).tolist(),
         "title": annotation_dict["title"],
     }
+
     return annotation_dict
+
+
+def postprocess_page_elements_v3(annotation_dict, labels=None):
+    """
+    Expand bounding boxes of tables/charts/infographics and titles based on the bounding boxes of the other class.
+    Args:
+        annotation_dict: output of postprocess_results, a dictionary with keys:
+        "table", "chart", "infographics", "title", "paragraph", "header_footer".
+
+    Returns:
+        annotation_dict: same as input, with expanded bboxes for page elements.
+
+    """
+    if not labels:
+        labels = list(annotation_dict.keys())
+
+    if not annotation_dict:
+        return annotation_dict
+
+    bboxes = []
+    confidences = []
+    label_idxs = []
+
+    for i, label in enumerate(labels):
+        if label not in annotation_dict:
+            continue
+
+        label_annotations = np.array(annotation_dict[label])
+
+        if len(label_annotations) > 0:
+            bboxes.append(label_annotations[:, :4])
+            confidences.append(label_annotations[:, 4])
+            label_idxs.append(np.full(len(label_annotations), i))
+
+    if not bboxes:
+        return annotation_dict
+
+    bboxes = np.concatenate(bboxes)
+    confidences = np.concatenate(confidences)
+    label_idxs = np.concatenate(label_idxs)
+
+    bboxes, confidences, label_idxs = remove_overlapping_boxes_using_wbf(bboxes, confidences, label_idxs)
+    bboxes, confidences, label_idxs, found_title = match_structured_boxes_with_title(
+        bboxes, confidences, label_idxs, labels
+    )
+    bboxes, confidences, label_idxs = expand_tables_and_charts(bboxes, confidences, label_idxs, labels, found_title)
+    bboxes, confidences, label_idxs = postprocess_included_texts(bboxes, confidences, label_idxs, labels)
+
+    order = np.argsort(bboxes[:, 1] * 10 + bboxes[:, 0])
+    bboxes, confidences, label_idxs = bboxes[order], confidences[order], label_idxs[order]
+
+    new_annotation_dict = {}
+    for i, label in enumerate(labels):
+        selected_bboxes = bboxes[label_idxs == i]
+        selected_confidences = confidences[label_idxs == i]
+        new_annotation_dict[label] = np.concatenate([selected_bboxes, selected_confidences[:, None]], axis=1).tolist()
+
+    return new_annotation_dict
 
 
 def weighted_boxes_fusion(
@@ -1119,7 +1013,7 @@ def merge_labels(labels, confs):
         return labels[np.argmax(confs)]
 
 
-def match_with_title(chart_bbox, title_bboxes, iou_th=0.01):
+def match_with_title_v1(chart_bbox, title_bboxes, iou_th=0.01):
     if not len(title_bboxes):
         return None
 
@@ -1178,7 +1072,7 @@ def merge_boxes(b1, b2):
     return b
 
 
-def expand_boxes(boxes, r_x=1, r_y=1):
+def expand_boxes_v1(boxes, r_x=1, r_y=1):
     dw = (boxes[:, 2] - boxes[:, 0]) / 2 * (r_x - 1)
     boxes[:, 0] -= dw
     boxes[:, 2] += dw
@@ -1280,6 +1174,9 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
     bbox_dict = {label: np.array([]) for label in class_labels}
 
     for i, label in enumerate(class_labels):
+        if label not in preds:
+            continue
+
         bboxes_class = np.array(preds[label])
 
         if bboxes_class.size == 0:
@@ -1388,19 +1285,383 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def get_yolox_model_name(yolox_http_endpoint, default_model_name="nemoretriever-page-elements-v2"):
+def match_with_title_v3(bbox, title_bboxes, match_dist=0.1, delta=1.5, already_matched=[]):
+    """
+    Matches a bounding box with a title bounding box based on IoU or proximity.
+
+    Args:
+        bbox (numpy.ndarray): Bounding box to match with title [x_min, y_min, x_max, y_max].
+        title_bboxes (numpy.ndarray): Array of title bounding boxes with shape (N, 4).
+        match_dist (float, optional): Maximum distance for matching. Defaults to 0.1.
+        delta (float, optional): Multiplier for matching several titles. Defaults to 1.5.
+        already_matched (list, optional): List of already matched title indices. Defaults to [].
+
+    Returns:
+        tuple or None: If matched, returns a tuple of (merged_bbox, updated_title_bboxes).
+                       If no match is found, returns None, None.
+    """
+    if not len(title_bboxes):
+        return None, None
+
+    dist_above = np.abs(title_bboxes[:, 3] - bbox[1])
+    dist_below = np.abs(bbox[3] - title_bboxes[:, 1])
+
+    dist_left = np.abs(title_bboxes[:, 0] - bbox[0])
+    dist_center = np.abs(title_bboxes[:, 0] + title_bboxes[:, 2] - bbox[0] - bbox[2]) / 2
+
+    dists = np.min([dist_above, dist_below], 0)
+    dists += np.min([dist_left, dist_center], 0) / 2
+
+    ious = bb_iou_array(title_bboxes, bbox)
+    dists = np.where(ious > 0, min(match_dist, np.min(dists)), dists)
+
+    if len(already_matched):
+        dists[already_matched] = match_dist * 10  # Remove already matched titles
+
+    # print(dists)
+    matches = None  # noqa
+    if np.min(dists) <= match_dist:
+        matches = np.where(dists <= min(match_dist, np.min(dists) * delta))[0]
+
+    if matches is not None:
+        new_bbox = bbox
+        for match in matches:
+            new_bbox = merge_boxes(new_bbox, title_bboxes[match])
+        return new_bbox, list(matches)
+    else:
+        return None, None
+
+
+def match_boxes_with_title(boxes, confs, labels, classes, to_match_labels=["chart"], remove_matched_titles=False):
+    """
+    Matches charts with title.
+
+    Args:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (N, 4).
+        confs (numpy.ndarray): Array of confidence scores with shape (N,).
+        labels (numpy.ndarray): Array of labels with shape (N,).
+        classes (list): List of class names.
+        to_match_labels (list): List of class names to match with titles.
+        remove_matched_titles (bool): Whether to remove matched titles from the boxes.
+
+    Returns:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (M, 4).
+        confs (numpy.ndarray): Array of confidence scores with shape (M,).
+        labels (numpy.ndarray): Array of labels with shape (M,).
+        found_title (list): List of indices of matched titles.
+        no_found_title (list): List of indices of unmatched titles.
+    """
+    # Put titles at the end
+    title_ids = np.where(labels == classes.index("title"))[0]
+    order = np.concatenate([np.delete(np.arange(len(boxes)), title_ids), title_ids])
+    boxes = boxes[order]
+    confs = confs[order]
+    labels = labels[order]
+
+    # Ids
+    title_ids = np.where(labels == classes.index("title"))[0]
+    to_match = np.where(np.isin(labels, [classes.index(c) for c in to_match_labels]))[0]
+
+    # Matching
+    found_title, already_matched = [], []
+    for i in range(len(boxes)):
+        if i not in to_match:
+            continue
+        merged_box, matched_title_ids = match_with_title_v3(
+            boxes[i],
+            boxes[title_ids],
+            already_matched=already_matched,
+        )
+        if matched_title_ids is not None:
+            # print(f'Merged {classes[int(labels[i])]} at idx #{i} with title {matched_title_ids[-1]}')  # noqa
+            boxes[i] = merged_box
+            already_matched += matched_title_ids
+            found_title.append(i)
+
+    if remove_matched_titles and len(already_matched):
+        boxes = np.delete(boxes, title_ids[already_matched], axis=0)
+        confs = np.delete(confs, title_ids[already_matched], axis=0)
+        labels = np.delete(labels, title_ids[already_matched], axis=0)
+
+    return boxes, confs, labels, found_title
+
+
+def expand_boxes_v3(boxes, r_x=(1, 1), r_y=(1, 1), size_agnostic=True):
+    """
+    Expands bounding boxes by a specified ratio.
+    Expected box format is normalized [x_min, y_min, x_max, y_max].
+
+    Args:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (N, 4).
+        r_x (tuple, optional): Left, right expansion ratios. Defaults to (1, 1) (no expansion).
+        r_y (tuple, optional): Up, down expansion ratios. Defaults to (1, 1) (no expansion).
+        size_agnostic (bool, optional): Expand independently of the bbox shape. Defaults to True.
+
+    Returns:
+        numpy.ndarray: Adjusted bounding boxes clipped to the [0, 1] range.
+    """
+    old_boxes = boxes.copy()
+
+    if not size_agnostic:
+        h = boxes[:, 3] - boxes[:, 1]
+        w = boxes[:, 2] - boxes[:, 0]
+    else:
+        h, w = 1, 1
+
+    boxes[:, 0] -= w * (r_x[0] - 1)  # left
+    boxes[:, 2] += w * (r_x[1] - 1)  # right
+    boxes[:, 1] -= h * (r_y[0] - 1)  # up
+    boxes[:, 3] += h * (r_y[1] - 1)  # down
+
+    boxes = np.clip(boxes, 0, 1)
+
+    # Enforce non-overlapping boxes
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            iou = bb_iou_array(boxes[i][None], boxes[j])[0]
+            old_iou = bb_iou_array(old_boxes[i][None], old_boxes[j])[0]
+            # print(iou, old_iou)
+            if iou > 0.05 and old_iou < 0.1:
+                if boxes[i, 1] < boxes[j, 1]:  # i above j
+                    boxes[j, 1] = min(old_boxes[j, 1], boxes[i, 3])
+                    if old_iou > 0:
+                        boxes[i, 3] = max(old_boxes[i, 3], boxes[j, 1])
+                else:
+                    boxes[i, 1] = min(old_boxes[i, 1], boxes[j, 3])
+                    if old_iou > 0:
+                        boxes[j, 3] = max(old_boxes[j, 3], boxes[i, 1])
+
+    return boxes
+
+
+def get_overlaps(boxes, other_boxes, normalize="box_only"):
+    """
+    Checks if a box overlaps with any other box.
+    Boxes are expeceted in format (x0, y0, x1, y1)
+
+    Args:
+        boxes (np array [4] or [n x 4]): Boxes.
+        other_boxes (np array [m x 4]): Other boxes.
+
+    Returns:
+        np array [n x m]: Overlaps.
+    """
+    if boxes.ndim == 1:
+        boxes = boxes[None, :]
+
+    x0, y0, x1, y1 = (boxes[:, 0][:, None], boxes[:, 1][:, None], boxes[:, 2][:, None], boxes[:, 3][:, None])
+    areas = (y1 - y0) * (x1 - x0)
+
+    x0_other, y0_other, x1_other, y1_other = (
+        other_boxes[:, 0][None, :],
+        other_boxes[:, 1][None, :],
+        other_boxes[:, 2][None, :],
+        other_boxes[:, 3][None, :],
+    )
+    areas_other = (y1_other - y0_other) * (x1_other - x0_other)
+
+    # Intersection
+    inter_y0 = np.maximum(y0, y0_other)
+    inter_y1 = np.minimum(y1, y1_other)
+    inter_x0 = np.maximum(x0, x0_other)
+    inter_x1 = np.minimum(x1, x1_other)
+    inter_area = np.maximum(0, inter_y1 - inter_y0) * np.maximum(0, inter_x1 - inter_x0)
+
+    # Overlap
+    if normalize == "box_only":  # Only consider box included in other box
+        overlaps = inter_area / areas
+    elif normalize == "all":  # Consider box included in other box and other box included in box
+        overlaps = inter_area / np.minimum(areas, areas_other[:, None])
+    else:
+        raise ValueError(f"Invalid normalization: {normalize}")
+    return overlaps
+
+
+def postprocess_included(boxes, labels, confs, class_="title", classes=["table", "chart", "title", "infographic"]):
+    """
+    Post process title predictions.
+    - Remove titles that are included in other boxes
+
+    Args:
+        boxes (numpy.ndarray [N, 4]): Array of bounding boxes.
+        labels (numpy.ndarray [N]): Array of labels.
+        confs (numpy.ndarray [N]): Array of confidences.
+        class_ (str, optional): Class to postprocess. Defaults to "title".
+        classes (list, optional): Classes. Defaults to ["table", "chart", "title", "infographic"].
+
+    Returns:
+        boxes (numpy.ndarray): Array of bounding boxes.
+        labels (numpy.ndarray): Array of labels.
+        confs (numpy.ndarray): Array of confidences.
+    """
+    boxes_to_pp = boxes[labels == classes.index(class_)]
+    confs_to_pp = confs[labels == classes.index(class_)]
+
+    order = np.argsort(confs_to_pp)  # least to most confident for NMS
+    boxes_to_pp, confs_to_pp = boxes_to_pp[order], confs_to_pp[order]
+
+    if len(boxes_to_pp) == 0:
+        return boxes, labels, confs
+
+    # other_boxes = boxes[labels != classes.index("title")]
+
+    inclusion_classes = ["table", "infographic", "chart"]
+    if class_ in ["header_footer", "title"]:
+        inclusion_classes.append("paragraph")
+
+    other_boxes = boxes[np.isin(labels, [classes.index(c) for c in inclusion_classes])]
+
+    # Remove boxes included in other_boxes
+    kept_boxes, kept_confs = [], []
+    for i, b in enumerate(boxes_to_pp):
+        if len(other_boxes) > 0:
+            overlaps = get_overlaps(b, other_boxes, normalize="box_only")
+            if overlaps.max() > 0.9:
+                continue
+
+        kept_boxes.append(b)
+        kept_confs.append(confs_to_pp[i])
+
+    # Aggregate
+    kept_boxes = np.stack(kept_boxes) if len(kept_boxes) else np.empty((0, 4))
+    kept_confs = np.stack(kept_confs) if len(kept_confs) else np.empty(0)
+
+    boxes_pp = np.concatenate([boxes[labels != classes.index(class_)], kept_boxes])
+    confs_pp = np.concatenate([confs[labels != classes.index(class_)], kept_confs])
+    labels_pp = np.concatenate(
+        [labels[labels != classes.index(class_)], np.ones(len(kept_boxes)) * classes.index(class_)]
+    )
+
+    return boxes_pp, labels_pp, confs_pp
+
+
+def remove_overlapping_boxes_using_wbf(boxes, confs, labels):
+    """
+    Remove overlapping boxes using WBF
+    """
+    # Applied twice because once is not enough in some rare cases
+    for _ in range(2):
+        boxes, confs, labels = weighted_boxes_fusion(
+            boxes[:, None],
+            confs[:, None],
+            labels[:, None],
+            merge_type="biggest",
+            conf_type="max",
+            iou_thr=0.01,
+            class_agnostic=False,
+        )
+
+    return boxes, confs, labels
+
+
+def match_structured_boxes_with_title(boxes, confs, labels, classes):
+    # Reorder by y, x
+    order = np.argsort(boxes[:, 1] * 10 + boxes[:, 0])
+    boxes, confs, labels = boxes[order], confs[order], labels[order]
+
+    # Match with title
+    # Although the model should detect titles, additional post-processing helps retrieve FNs
+    found_title = []
+    boxes, confs, labels, found_title = match_boxes_with_title(
+        boxes,
+        confs,
+        labels,
+        classes,
+        to_match_labels=["chart", "table", "infographic"],
+        remove_matched_titles=True,
+    )
+
+    return boxes, confs, labels, found_title
+
+
+def expand_tables_and_charts(boxes, confs, labels, classes, found_title):
+    # This is mostly to retrieve titles, but this also helps when YOLOX boxes are too tight.
+    # Boxes with titles matched are expanded less.
+    # Expansion is different for tables and charts
+    no_found_title = [i for i in range(len(boxes)) if i not in found_title]
+    ids = np.arange(len(boxes))
+
+    if len(found_title):  # Boxes with title matched are expanded less
+        ids_ = ids[found_title][labels[found_title] == classes.index("chart")]
+        boxes[ids_] = expand_boxes_v3(
+            boxes[ids_],
+            r_x=(1.025, 1.025),
+            r_y=(1.05, 1.05),
+            size_agnostic=False,
+        )
+        ids_ = ids[found_title][labels[found_title] == classes.index("table")]
+        boxes[ids_] = expand_boxes_v3(
+            boxes[ids_],
+            r_x=(1.01, 1.01),
+            r_y=(1.05, 1.01),
+        )
+
+    ids_ = ids[no_found_title][labels[no_found_title] == classes.index("chart")]
+    boxes[ids_] = expand_boxes_v3(
+        boxes[ids_],
+        r_x=(1.05, 1.05),
+        r_y=(1.125, 1.125),
+        size_agnostic=False,
+    )
+
+    ids_ = ids[no_found_title][labels[no_found_title] == classes.index("table")]
+    boxes[ids_] = expand_boxes_v3(
+        boxes[ids_],
+        r_x=(1.02, 1.02),
+        r_y=(1.05, 1.05),
+    )
+
+    order = np.argsort(boxes[:, 1] * 10 + boxes[:, 0])
+    boxes, labels, confs = boxes[order], labels[order], confs[order]
+
+    return boxes, labels, confs
+
+
+def postprocess_included_texts(boxes, confs, labels, classes):
+    for c in ["title", "paragraph", "header_footer"]:
+        boxes, labels, confs = postprocess_included(boxes, labels, confs, c, classes)
+    return boxes, labels, confs
+
+
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
     try:
-        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
-        if not yolox_model_name:
-            logger.warning(
-                "Failed to obtain yolox-page-elements model name from the endpoint. "
-                f"Falling back to '{default_model_name}'."
-            )
+        client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
+        model_index = client.get_model_repository_index(as_json=True)
+        model_names = [x["name"] for x in model_index.get("models", [])]
+        if "yolox_ensemble" in model_names:
+            yolox_model_name = "yolox_ensemble"
+        else:
             yolox_model_name = default_model_name
     except Exception:
         logger.warning(
-            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
+            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_model_name}'."
         )
         yolox_model_name = default_model_name
 
     return yolox_model_name
+
+
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_yolox_page_version(yolox_http_endpoint, default_version=YOLOX_PAGE_DEFAULT_VERSION):
+    """
+    Determines the YOLOX page elements model version by querying the endpoint.
+    Falls back to a default version on failure.
+    """
+    try:
+        yolox_version = get_model_name(yolox_http_endpoint, default_version)
+        if not yolox_version:
+            logger.warning(
+                "Failed to obtain yolox-page-elements version from the endpoint. "
+                f"Falling back to '{default_version}'."
+            )
+            return default_version
+
+        return yolox_version
+    except Exception:
+        logger.warning(
+            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_version}'."
+        )
+        return default_version

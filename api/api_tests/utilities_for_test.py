@@ -45,7 +45,7 @@ def find_root_by_pattern(pattern, start_dir=None):
 
     Returns:
         str: The absolute path of the first directory where pattern exists,
-             or "./" if not found.
+             or None if not found.
     """
     if start_dir is None:
         start_dir = os.getcwd()
@@ -64,3 +64,44 @@ def find_root_by_pattern(pattern, start_dir=None):
         current_dir = parent_dir
 
     return None
+
+
+def get_project_root(file_path):
+    """
+    Attempts to get the project root directory, trying git first and falling back to pattern matching.
+
+    This function first tries to use git to find the repository root. If that fails (e.g., not in a git
+    repository or git not available), it falls back to searching for common project patterns.
+
+    Parameters:
+        file_path (str): The path of the file to determine the project root for.
+
+    Returns:
+        str: The absolute path to the project root if found, otherwise None.
+    """
+    # First try git-based detection
+    git_root = get_git_root(file_path)
+    if git_root is not None:
+        return git_root
+
+    # Fall back to pattern-based detection
+    start_dir = os.path.dirname(os.path.abspath(file_path))
+
+    # Try common project patterns in order of preference
+    patterns = [
+        "data",  # Look for data directory (common in this project)
+        "pyproject.toml",  # Python project file
+        "setup.py",  # Python setup file
+        "requirements.txt",  # Python requirements
+        "Dockerfile",  # Docker project
+        "README.md",  # Common project file
+        ".gitignore",  # Git ignore file
+    ]
+
+    for pattern in patterns:
+        root = find_root_by_pattern(pattern, start_dir)
+        if root is not None:
+            return root
+
+    # If all else fails, return the directory containing the file
+    return start_dir

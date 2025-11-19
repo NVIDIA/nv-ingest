@@ -24,6 +24,7 @@ from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_fail
 
 from nv_ingest_api.internal.primitives.tracing.logging import TaskResultStatus
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 
 @ray.remote
@@ -35,8 +36,8 @@ class OpenTelemetryTracerStage(RayActorStage):
     It creates spans for tasks and exports them to a configured OpenTelemetry endpoint.
     """
 
-    def __init__(self, config: OpenTelemetryTracerSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: OpenTelemetryTracerSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
 
         # self._logger.info(f"[Telemetry] Initializing OpenTelemetry tracer stage with config: {config}")
 
@@ -81,7 +82,7 @@ class OpenTelemetryTracerStage(RayActorStage):
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(span_context))
         parent_span = self.tracer.start_span(str(job_id), context=parent_ctx, start_time=start_time)
 
-        event_count = create_span_with_timestamps(self.tracer, parent_span, message)
+        event_count = create_span_with_timestamps(self.tracer, parent_span, message, self._logger)
 
         if message.has_metadata("cm_failed") and message.get_metadata("cm_failed"):
             parent_span.set_status(Status(StatusCode.ERROR))
@@ -96,7 +97,8 @@ class OpenTelemetryTracerStage(RayActorStage):
 
         self._logger.debug(f"[Telemetry] Exported spans for message {job_id} with {event_count} total events.")
 
-    @nv_ingest_node_failure_try_except(annotation_id="otel_tracer", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except()
+    @udf_intercept_hook()
     def on_data(self, control_message: IngestControlMessage) -> Optional[Any]:
         try:
             do_trace_tagging = bool(control_message.get_metadata("config::add_trace_tagging"))
@@ -160,7 +162,7 @@ def extract_annotated_task_results(message):
     return task_results
 
 
-def create_span_with_timestamps(tracer, parent_span, message) -> int:
+def create_span_with_timestamps(tracer, parent_span, message, logger) -> int:
     timestamps = extract_timestamps_from_message(message)
     task_results = extract_annotated_task_results(message)
 
@@ -175,8 +177,16 @@ def create_span_with_timestamps(tracer, parent_span, message) -> int:
         if not subtask:
             span = tracer.start_span(main_task, context=child_ctx, start_time=ts_entry)
         else:
-            subtask_ctx = trace.set_span_in_context(ctx_store[main_task][0])
-            span = tracer.start_span(subtask, context=subtask_ctx, start_time=ts_entry)
+            # Check if parent context exists, otherwise create standalone span with warning
+            if main_task in ctx_store:
+                subtask_ctx = trace.set_span_in_context(ctx_store[main_task][0])
+                span = tracer.start_span(subtask, context=subtask_ctx, start_time=ts_entry)
+            else:
+                logger.warning(
+                    f"Missing parent context for subtask '{subtask}'"
+                    f" (expected parent: '{main_task}'). Creating standalone span."
+                )
+                span = tracer.start_span(f"{main_task}::{subtask}", context=child_ctx, start_time=ts_entry)
 
         span.add_event("entry", timestamp=ts_entry)
         span.add_event("exit", timestamp=ts_exit)

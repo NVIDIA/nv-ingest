@@ -101,7 +101,7 @@ class ParakeetClient:
         segments, transcript = process_transcription_response(response)
         logger.debug("Processing Parakeet inference results (pass-through).")
 
-        return transcript
+        return segments, transcript
 
     def transcribe(
         self,
@@ -227,11 +227,7 @@ def convert_to_mono_wav(audio_bytes):
     """
 
     if librosa is None:
-        raise ImportError(
-            "Librosa is required for audio processing. "
-            "If you are running this code with the ingest container, it can be installed by setting "
-            "the environment variable. INSTALL_AUDIO_EXTRACTION_DEPS=true"
-        )
+        raise ImportError("Librosa is required for audio processing. ")
 
     # Create a BytesIO object from the audio bytes
     byte_io = io.BytesIO(audio_bytes)
@@ -358,6 +354,10 @@ def create_audio_inference_client(
 
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
         infer_protocol = "grpc"
+
+    # Normalize protocol to lowercase for case-insensitive comparison
+    if infer_protocol:
+        infer_protocol = infer_protocol.lower()
 
     if infer_protocol == "http":
         raise ValueError("`http` endpoints are not supported for audio. Use `grpc`.")

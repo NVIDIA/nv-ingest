@@ -207,7 +207,7 @@ def transform_image_create_vlm_caption(
         "api_key": api_key,
         "prompt": prompt,
         "endpoint_url": endpoint_url,
-        "image_caption_model_name": model_name,
+        "model_name": model_name,
     }
     filtered_task_config: Dict[str, str] = {k: v for k, v in task_config.items() if v is not None}
 

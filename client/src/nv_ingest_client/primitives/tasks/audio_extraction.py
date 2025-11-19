@@ -10,25 +10,11 @@ import logging
 from typing import Dict
 from typing import Optional
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskAudioExtraction
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class AudioExtractionSchema(BaseModel):
-    auth_token: Optional[str] = None
-    grpc_endpoint: Optional[str] = None
-    http_endpoint: Optional[str] = None
-    infer_protocol: Optional[str] = None
-    function_id: Optional[str] = None
-    use_ssl: Optional[bool] = None
-    ssl_cert: Optional[str] = None
-
-    model_config = ConfigDict(extra="forbid")
-    model_config["protected_namespaces"] = ()
 
 
 class AudioExtractionTask(Task):
@@ -36,19 +22,35 @@ class AudioExtractionTask(Task):
         self,
         auth_token: str = None,
         grpc_endpoint: str = None,
+        http_endpoint: str = None,
         infer_protocol: str = None,
         function_id: Optional[str] = None,
         use_ssl: bool = None,
         ssl_cert: str = None,
+        segment_audio: bool = None,
     ) -> None:
         super().__init__()
 
-        self._auth_token = auth_token
-        self._grpc_endpoint = grpc_endpoint
-        self._infer_protocol = infer_protocol
-        self._function_id = function_id
-        self._use_ssl = use_ssl
-        self._ssl_cert = ssl_cert
+        # Use the API schema for validation
+        validated_data = IngestTaskAudioExtraction(
+            auth_token=auth_token,
+            grpc_endpoint=grpc_endpoint,
+            http_endpoint=http_endpoint,
+            infer_protocol=infer_protocol,
+            function_id=function_id,
+            use_ssl=use_ssl,
+            ssl_cert=ssl_cert,
+            segment_audio=segment_audio,
+        )
+
+        self._auth_token = validated_data.auth_token
+        self._grpc_endpoint = validated_data.grpc_endpoint
+        self._http_endpoint = validated_data.http_endpoint
+        self._infer_protocol = validated_data.infer_protocol
+        self._function_id = validated_data.function_id
+        self._use_ssl = validated_data.use_ssl
+        self._ssl_cert = validated_data.ssl_cert
+        self._segment_audio = validated_data.segment_audio
 
     def __str__(self) -> str:
         """
@@ -61,6 +63,8 @@ class AudioExtractionTask(Task):
             info += "  auth_token: [redacted]\n"
         if self._grpc_endpoint:
             info += f"  grpc_endpoint: {self._grpc_endpoint}\n"
+        if self._http_endpoint:
+            info += f"  http_endpoint: {self._http_endpoint}\n"
         if self._infer_protocol:
             info += f"  infer_protocol: {self._infer_protocol}\n"
         if self._function_id:
@@ -69,6 +73,8 @@ class AudioExtractionTask(Task):
             info += f"  use_ssl: {self._use_ssl}\n"
         if self._ssl_cert:
             info += "  ssl_cert: [redacted]\n"
+        if self._segment_audio:
+            info += f"  segment_audio: {self._segment_audio}\n"
 
         return info
 
@@ -84,6 +90,9 @@ class AudioExtractionTask(Task):
         if self._grpc_endpoint:
             task_properties["grpc_endpoint"] = self._grpc_endpoint
 
+        if self._http_endpoint:
+            task_properties["http_endpoint"] = self._http_endpoint
+
         if self._infer_protocol:
             task_properties["infer_protocol"] = self._infer_protocol
 
@@ -95,5 +104,8 @@ class AudioExtractionTask(Task):
 
         if self._ssl_cert:
             task_properties["ssl_cert"] = self._ssl_cert
+
+        if self._segment_audio:
+            task_properties["segment_audio"] = self._segment_audio
 
         return {"type": "audio_data_extract", "task_properties": task_properties}

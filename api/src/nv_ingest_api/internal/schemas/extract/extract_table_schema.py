@@ -7,13 +7,14 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import field_validator, model_validator, ConfigDict, BaseModel
+from pydantic import field_validator, model_validator, ConfigDict, BaseModel, Field
 
+from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TableExtractorConfigSchema(BaseModel):
+class TableExtractorConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for the table extraction stage settings.
 
@@ -22,8 +23,8 @@ class TableExtractorConfigSchema(BaseModel):
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the paddle endpoint.
+    ocr_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the ocr endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -42,13 +43,13 @@ class TableExtractorConfigSchema(BaseModel):
         Pydantic config option to forbid extra fields.
     """
 
-    auth_token: Optional[str] = None
+    auth_token: Optional[str] = Field(default=None, repr=False)
 
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    paddle_infer_protocol: str = ""
+    ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    ocr_infer_protocol: str = ""
 
     nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
@@ -81,7 +82,7 @@ class TableExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["yolox_endpoints", "paddle_endpoints"]:
+        for endpoint_name in ["yolox_endpoints", "ocr_endpoints"]:
             grpc_service, http_service = values.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
@@ -90,6 +91,13 @@ class TableExtractorConfigSchema(BaseModel):
                 raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
 
             values[endpoint_name] = (grpc_service, http_service)
+
+            # Auto-infer protocol from endpoints if not specified
+            protocol_name = endpoint_name.replace("_endpoints", "_infer_protocol")
+            protocol_value = values.get(protocol_name)
+            if not protocol_value:
+                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+            values[protocol_name] = protocol_value
 
         return values
 
@@ -122,7 +130,7 @@ class TableExtractorSchema(BaseModel):
     @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):
         if v <= 0:
-            raise ValueError(f"{field.field_name} must be greater than 10.")
+            raise ValueError(f"{field.field_name} must be greater than 0.")
         return v
 
     endpoint_config: Optional[TableExtractorConfigSchema] = None

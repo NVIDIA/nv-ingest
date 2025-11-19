@@ -1,348 +1,444 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+import threading
+import time
+from typing import Literal
+from unittest.mock import patch, MagicMock
 
-import copy
-from datetime import datetime
-import json
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
 import pytest
-from pydantic import BaseModel
+import ray
+from pydantic import ValidationError
 
-# Skip entire test module if morpheus is not present.
-pytest.importorskip("mrc")
-
-from nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source import (  # noqa: E402
-    process_message,
-    fetch_and_process_messages,
+from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import (
+    RedisClientConfig,
+    BrokerParamsRedis,
+    SimpleClientConfig,
+    MessageBrokerTaskSourceConfig,
+    MessageBrokerTaskSourceStage,
 )
 
-import nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source as module_under_test  # noqa: E402, E501
 
-# Define the module under test.
-MODULE_UNDER_TEST = f"{module_under_test.__name__}"
-
-
-# -----------------------------------------------------------------------------
-# Dummy Classes for Testing (for client and BaseModel response simulation)
-# -----------------------------------------------------------------------------
-
-
-class DummyValidatedConfig:
-    def __init__(self, task_queue):
-        self.task_queue = task_queue
+# Initialize Ray once at the module level
+@pytest.fixture(scope="module", autouse=True)
+def ray_fixture():
+    """Initialize Ray for the entire test module."""
+    if not ray.is_initialized():
+        ray.init(local_mode=True, ignore_reinit_error=True)
+    yield
+    if ray.is_initialized():
+        ray.shutdown()
 
 
-class DummyResponse(BaseModel):
-    response_code: int
-    response: str  # JSON string
+class TestMessageBrokerConfiguration:
+    """Black box tests for message broker configuration classes."""
+
+    def test_redis_config_valid(self):
+        """
+        Test that a valid Redis configuration can be created.
+
+        This test verifies that a RedisClientConfig can be instantiated with
+        valid parameters and that default values are applied correctly.
+        """
+        # Create a minimal valid configuration
+        config = RedisClientConfig(client_type="redis", host="localhost", port=6379)
+
+        # Check required fields are set correctly
+        assert config.client_type == "redis"
+        assert config.host == "localhost"
+        assert config.port == 6379
+
+        # Check default values are applied
+        assert config.max_retries == 5
+        assert config.max_backoff == 5.0
+        assert config.connection_timeout == 30.0
+
+        # Check nested broker_params defaults
+        assert config.broker_params.db == 0
+        assert config.broker_params.use_ssl is False
+
+    def test_redis_config_custom_values(self):
+        """
+        Test that a Redis configuration accepts custom values.
+
+        This test verifies that a RedisClientConfig properly stores custom values
+        for all configurable parameters, including nested broker_params.
+        """
+        # Create configuration with custom values
+        config = RedisClientConfig(
+            client_type="redis",
+            host="redis.example.com",
+            port=7000,
+            max_retries=10,
+            max_backoff=2.5,
+            connection_timeout=15.0,
+            broker_params=BrokerParamsRedis(db=3, use_ssl=True),
+        )
+
+        # Check all values are set correctly
+        assert config.client_type == "redis"
+        assert config.host == "redis.example.com"
+        assert config.port == 7000
+        assert config.max_retries == 10
+        assert config.max_backoff == 2.5
+        assert config.connection_timeout == 15.0
+        assert config.broker_params.db == 3
+        assert config.broker_params.use_ssl is True
+
+    def test_simple_config_valid(self):
+        """
+        Test that a valid Simple configuration can be created.
+
+        This test verifies that a SimpleClientConfig can be instantiated with
+        valid parameters and that default values are applied correctly.
+        """
+        # Create a minimal valid configuration
+        config = SimpleClientConfig(client_type="simple", host="localhost", port=7671)
+
+        # Check required fields are set correctly
+        assert config.client_type == "simple"
+        assert config.host == "localhost"
+        assert config.port == 7671
+
+        # Check default values are applied
+        assert config.max_retries == 5
+        assert config.max_backoff == 5.0
+        assert config.connection_timeout == 30.0
+        assert config.broker_params == {}
+
+    def test_broker_task_source_config_with_redis(self):
+        """
+        Test MessageBrokerTaskSourceConfig with Redis client configuration.
+
+        This test verifies that a MessageBrokerTaskSourceConfig can be instantiated
+        with a Redis client configuration and that all values are set correctly.
+        """
+        # Create a task source config with Redis client
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=RedisClientConfig(client_type="redis", host="redis.example.com", port=6379),
+            task_queue="test_queue",
+            poll_interval=0.5,
+        )
+
+        # Check values are set correctly
+        assert config.broker_client.client_type == "redis"
+        assert config.broker_client.host == "redis.example.com"
+        assert config.broker_client.port == 6379
+        assert config.task_queue == "test_queue"
+        assert config.poll_interval == 0.5
+
+    def test_broker_task_source_config_with_simple(self):
+        """
+        Test MessageBrokerTaskSourceConfig with Simple client configuration.
+
+        This test verifies that a MessageBrokerTaskSourceConfig can be instantiated
+        with a Simple client configuration and that all values are set correctly.
+        """
+        # Create a task source config with Simple client
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=SimpleClientConfig(client_type="simple", host="localhost", port=7671),
+            task_queue="simple_queue",
+        )
+
+        # Check values are set correctly
+        assert config.broker_client.client_type == "simple"
+        assert config.broker_client.host == "localhost"
+        assert config.broker_client.port == 7671
+        assert config.task_queue == "simple_queue"
+
+    def test_invalid_redis_config(self):
+        """
+        Test that invalid Redis configurations are rejected.
+
+        This test verifies that a RedisClientConfig raises appropriate validation
+        errors when required fields are missing or invalid values are provided.
+        """
+        # Missing required host
+        with pytest.raises(ValidationError):
+            RedisClientConfig(client_type="redis", port=6379)
+
+        # Missing required port
+        with pytest.raises(ValidationError):
+            RedisClientConfig(client_type="redis", host="localhost")
+
+        # Invalid max_retries (negative)
+        with pytest.raises(ValidationError):
+            RedisClientConfig(client_type="redis", host="localhost", port=6379, max_retries=-1)
+
+        # Invalid max_backoff (zero)
+        with pytest.raises(ValidationError):
+            RedisClientConfig(client_type="redis", host="localhost", port=6379, max_backoff=0)
+
+        # Invalid connection_timeout (zero)
+        with pytest.raises(ValidationError):
+            RedisClientConfig(client_type="redis", host="localhost", port=6379, connection_timeout=0)
+
+    def test_invalid_broker_task_source_config(self):
+        """
+        Test that invalid MessageBrokerTaskSourceConfig are rejected.
+
+        This test verifies that a MessageBrokerTaskSourceConfig raises appropriate
+        validation errors when required fields are missing or invalid values are provided.
+        """
+        # Missing required broker_client
+        with pytest.raises(ValidationError):
+            MessageBrokerTaskSourceConfig(task_queue="test_queue")
+
+        # Missing required task_queue
+        with pytest.raises(ValidationError):
+            MessageBrokerTaskSourceConfig(
+                broker_client=RedisClientConfig(client_type="redis", host="localhost", port=6379)
+            )
+
+        # Invalid poll_interval (zero)
+        with pytest.raises(ValidationError):
+            MessageBrokerTaskSourceConfig(
+                broker_client=RedisClientConfig(client_type="redis", host="localhost", port=6379),
+                task_queue="test_queue",
+                poll_interval=0,
+            )
+
+        # Invalid poll_interval (negative)
+        with pytest.raises(ValidationError):
+            MessageBrokerTaskSourceConfig(
+                broker_client=RedisClientConfig(client_type="redis", host="localhost", port=6379),
+                task_queue="test_queue",
+                poll_interval=-0.1,
+            )
 
 
-class DummyClient:
-    """
-    A dummy client whose fetch_message method returns values from a given list.
-    Instead of raising KeyboardInterrupt when responses are exhausted,
-    it returns None (which in production causes the loop to continue).
-    """
+class TestMessageBrokerTaskSourceStage:
+    """Black box tests for MessageBrokerTaskSourceStage."""
 
-    def __init__(self, responses):
-        self.responses = responses
-        self.call_count = 0
+    def test_stage_initialization(self):
+        """
+        Test that the MessageBrokerTaskSourceStage can be initialized.
 
-    def fetch_message(self, task_queue, count, override_fetch_mode=None):
-        if self.call_count < len(self.responses):
-            response = self.responses[self.call_count]
-            self.call_count += 1
-            return response
-        else:
-            return None
+        This test verifies that a MessageBrokerTaskSourceStage can be created
+        as a Ray actor with a valid configuration.
+        """
+        # Create a valid configuration
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=SimpleClientConfig(client_type="simple", host="localhost", port=7671),
+            task_queue="test_queue",
+            poll_interval=0.01,  # Fast polling for testing
+        )
 
+        # Create the stage as a Ray actor
+        stage_ref = MessageBrokerTaskSourceStage.remote(config)
 
-# -----------------------------------------------------------------------------
-# Tests for process_message using mocks
-# -----------------------------------------------------------------------------
+        # Verify the stage was created by checking if it has the expected methods
+        assert hasattr(stage_ref, "start")
+        assert hasattr(stage_ref, "stop")
+        assert hasattr(stage_ref, "get_stats")
+        assert hasattr(stage_ref, "set_output_queue")
+        assert hasattr(stage_ref, "pause")
+        assert hasattr(stage_ref, "resume")
 
+        # Get initial stats to verify the stage is accessible
+        stats = ray.get(stage_ref.get_stats.remote())
 
-@patch(f"{MODULE_UNDER_TEST}.MODULE_NAME", new="dummy_module")
-@patch(f"{MODULE_UNDER_TEST}.format_trace_id", return_value="trace-98765")
-@patch(f"{MODULE_UNDER_TEST}.annotate_cm")
-@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job")
-@patch(f"{MODULE_UNDER_TEST}.ControlMessageTask")
-@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
-def test_process_message_normal(
-    mock_IngestControlMessage,
-    mock_ControlMessageTask,
-    mock_validate_ingest_job,
-    mock_annotate_cm,
-    mock_format_trace_id,
-):
-    """
-    Test that process_message correctly processes a valid job.
-    The job dict contains:
-      - "job_id": identifier
-      - "job_payload": a list of dicts to be converted to a DataFrame
-      - "tasks": a list of task dicts (each with optional id, type, task_properties)
-      - "tracing_options": options that trigger trace tagging.
-    Expect that the returned control message:
-      - receives a payload DataFrame built from job_payload,
-      - has metadata "job_id" and "response_channel" set to the job_id,
-      - is annotated with message "Created",
-      - has tasks added (one per task in the job),
-      - and has trace-related metadata/timestamps set.
-    """
-    # Create a fake control message instance.
-    fake_cm = MagicMock()
-    mock_IngestControlMessage.return_value = fake_cm
+        # Check that stats has the expected structure
+        assert isinstance(stats, dict)
+        assert "processed" in stats
+        assert stats["processed"] == 0  # No messages processed yet
 
-    # Simulate ControlMessageTask instances.
-    fake_task_instance = MagicMock()
-    fake_task_instance.model_dump.return_value = {"id": "task1", "type": "process", "properties": {"p": 1}}
-    fake_task_instance2 = MagicMock()
-    fake_task_instance2.model_dump.return_value = {"id": "auto", "type": "unknown", "properties": {"p": 2}}
-    mock_ControlMessageTask.side_effect = [fake_task_instance, fake_task_instance2]
+        # Cleanup
+        ray.kill(stage_ref)
 
-    # Build a valid job dictionary.
-    job = {
-        "job_id": "job123",
-        "job_payload": [{"field": "value1"}, {"field": "value2"}],
-        "tasks": [
-            {"id": "task1", "type": "process", "task_properties": {"p": 1}},
-            {"task_properties": {"p": 2}},
-        ],
-        "tracing_options": {
-            "trace": True,
-            "ts_send": datetime.now().timestamp() * 1e9,  # nanoseconds
-            "trace_id": 98765,
-        },
-    }
-    # Make a copy because process_message pops keys.
-    job_copy = copy.deepcopy(job)
-    ts_fetched = datetime.now()
+    def test_stage_lifecycle_methods(self):
+        """
+        Test the lifecycle methods of MessageBrokerTaskSourceStage.
 
-    result_cm = process_message(job_copy, ts_fetched)
+        This test verifies that the start, stop, pause, and resume methods
+        of the stage work as expected from a black box perspective.
+        """
+        # Create a valid configuration
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=SimpleClientConfig(client_type="simple", host="localhost", port=7671),
+            task_queue="test_queue",
+            poll_interval=0.01,
+        )
 
-    # Verify that payload() was called with a DataFrame built from job_payload.
-    fake_cm.payload.assert_called_once()
-    df_arg = fake_cm.payload.call_args[0][0]
-    pd.testing.assert_frame_equal(df_arg, pd.DataFrame(job["job_payload"]))
+        # Create the stage
+        stage_ref = MessageBrokerTaskSourceStage.remote(config)
 
-    # Verify metadata calls.
-    fake_cm.set_metadata.assert_any_call("job_id", "job123")
-    fake_cm.set_metadata.assert_any_call("response_channel", "job123")
-    mock_annotate_cm.assert_called_with(fake_cm, message="Created")
-    # Verify that tasks were added.
-    assert fake_cm.add_task.call_count == 2
-    # Check trace-related metadata/timestamps.
-    trace_meta_calls = [call for call in fake_cm.set_metadata.call_args_list if "trace" in call[0][0]]
-    trace_timestamp_calls = [call for call in fake_cm.set_timestamp.call_args_list if "trace" in call[0][0]]
-    assert trace_meta_calls or trace_timestamp_calls
-    fake_cm.set_metadata.assert_any_call("trace_id", "trace-98765")
+        # Test start method
+        start_result = ray.get(stage_ref.start.remote())
+        assert start_result is True, "Start method should return True on success"
 
+        # Test that calling start again returns False (already started)
+        start_again_result = ray.get(stage_ref.start.remote())
+        assert start_again_result is False, "Start method should return False when already started"
 
-@patch(f"{MODULE_UNDER_TEST}.MODULE_NAME", new="dummy_module")
-@patch(f"{MODULE_UNDER_TEST}.annotate_cm")
-@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job", side_effect=ValueError("Invalid job"))
-@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
-def test_process_message_validation_failure_with_job_id(
-    mock_IngestControlMessage, mock_validate_ingest_job, mock_annotate_cm
-):
-    """
-    Test that when validate_ingest_job fails—even if the job dict contains a 'job_id'—
-    process_message re‑raises the exception.
-    """
-    fake_cm = MagicMock()
-    mock_IngestControlMessage.return_value = fake_cm
+        # Test pause method
+        pause_result = ray.get(stage_ref.pause.remote())
+        assert pause_result is True, "Pause method should return True on success"
 
-    job = {
-        "job_id": "job_fail",
-        "job_payload": [{"a": "b"}],
-        "tasks": [],
-        "tracing_options": {},
-        "invalid": True,  # Triggers failure.
-    }
-    job_copy = copy.deepcopy(job)
-    ts_fetched = datetime.now()
+        # Test resume method
+        resume_result = ray.get(stage_ref.resume.remote())
+        assert resume_result is True, "Resume method should return True on success"
 
-    with pytest.raises(ValueError, match="Invalid job"):
-        process_message(job_copy, ts_fetched)
+        # Test stop method
+        stop_result = ray.get(stage_ref.stop.remote())
+        assert stop_result is True, "Stop method should return True on success"
 
+        # Cleanup
+        ray.kill(stage_ref)
 
-@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job", side_effect=ValueError("Invalid job"))
-@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
-def test_process_message_validation_failure_no_job_id(mock_IngestControlJob, mock_validate_ingest_job):
-    """
-    Test that if validate_ingest_job fails and there is no 'job_id' in the job dict,
-    process_message re‑raises the exception.
-    """
-    fake_cm = MagicMock()
-    mock_IngestControlJob.return_value = fake_cm
+    def test_set_output_queue(self):
+        """
+        Test the set_output_queue method of MessageBrokerTaskSourceStage.
 
-    job = {
-        "job_payload": [{"a": "b"}],
-        "tasks": [],
-        "tracing_options": {},
-        "invalid": True,
-    }
-    ts_fetched = datetime.now()
+        This test verifies that the set_output_queue method correctly accepts
+        a queue handle and returns True on success.
+        """
+        # Create a valid configuration
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=RedisClientConfig(client_type="redis", host="localhost", port=6379), task_queue="test_queue"
+        )
 
-    with pytest.raises(ValueError, match="Invalid job"):
-        process_message(copy.deepcopy(job), ts_fetched)
+        # Create the stage
+        stage_ref = MessageBrokerTaskSourceStage.remote(config)
 
+        # Create a mock queue (just use an object for black box testing)
+        mock_queue = object()
 
-# -----------------------------------------------------------------------------
-# Tests for fetch_and_process_messages using mocks
-# -----------------------------------------------------------------------------
+        # Test set_output_queue method
+        set_queue_result = ray.get(stage_ref.set_output_queue.remote(mock_queue))
+        assert set_queue_result is True, "set_output_queue should return True on success"
 
+        # Cleanup
+        ray.kill(stage_ref)
 
-@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
-def test_fetch_and_process_messages_dict_job(mock_process_message):
-    """
-    Test that when the client returns a job as a dictionary,
-    fetch_and_process_messages yields a processed control message.
-    """
-    job = {
-        "job_id": "job_dict",
-        "job_payload": [{"x": 1}, {"x": 2}],
-        "tasks": [],
-        "tracing_options": {},
-    }
-    client = DummyClient([job])
-    config = DummyValidatedConfig(task_queue="queue1")
+    def test_swap_queues(self):
+        """
+        Test the swap_queues method of MessageBrokerTaskSourceStage.
 
-    gen = fetch_and_process_messages(client, config)
-    result = next(gen)
-    gen.close()
-    assert result == "processed"
-    mock_process_message.assert_called_once()
+        This test verifies that the swap_queues method correctly accepts
+        a new queue handle and returns True on success.
+        """
+        # Create a valid configuration
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=RedisClientConfig(client_type="redis", host="localhost", port=6379), task_queue="test_queue"
+        )
 
+        # Create the stage
+        stage_ref = MessageBrokerTaskSourceStage.remote(config)
 
-@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
-def test_fetch_and_process_messages_base_model_job(mock_process_message):
-    """
-    Test that when the client returns a job as a BaseModel with response_code 0,
-    the job.response is JSON-decoded and processed.
-    """
-    job_dict = {
-        "job_id": "job_bm",
-        "job_payload": [{"y": "a"}],
-        "tasks": [],
-        "tracing_options": {},
-    }
-    response_obj = DummyResponse(response_code=0, response=json.dumps(job_dict))
-    client = DummyClient([response_obj])
-    config = DummyValidatedConfig(task_queue="queue1")
+        # Create a mock queue (just use an object for black box testing)
+        new_queue = object()
 
-    gen = fetch_and_process_messages(client, config)
-    result = next(gen)
-    gen.close()
-    assert result == "processed"
-    mock_process_message.assert_called_once()
+        # Test swap_queues method
+        swap_result = ray.get(stage_ref.swap_queues.remote(new_queue))
+        assert swap_result is True, "swap_queues should return True on success"
 
+        # Cleanup
+        ray.kill(stage_ref)
 
-@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
-def test_fetch_and_process_messages_skip_on_nonzero_response_code(mock_process_message):
-    """
-    Test that when the client returns a BaseModel job with a nonzero response_code,
-    the job is skipped and not processed.
-    Then a subsequent valid dictionary job is processed.
-    """
-    response_bad = DummyResponse(response_code=1, response="{}")
-    job = {
-        "job_id": "job_valid",
-        "job_payload": [{"z": 100}],
-        "tasks": [],
-        "tracing_options": {},
-    }
-    client = DummyClient([response_bad, job])
-    config = DummyValidatedConfig(task_queue="queue1")
+    def test_get_stats_structure(self):
+        """
+        Test the structure of stats returned by get_stats method.
 
-    gen = fetch_and_process_messages(client, config)
-    result = next(gen)
-    gen.close()
-    assert result == "processed"
-    assert mock_process_message.call_count == 1
+        This test verifies that the get_stats method returns a dictionary
+        with the expected keys and value types.
+        """
+        # Create a valid configuration
+        config = MessageBrokerTaskSourceConfig(
+            broker_client=SimpleClientConfig(client_type="simple", host="localhost", port=7671), task_queue="test_queue"
+        )
 
+        # Create the stage
+        stage_ref = MessageBrokerTaskSourceStage.remote(config)
 
-def test_fetch_and_process_messages_timeout_error():
-    """
-    Test that if client.fetch_message raises a TimeoutError,
-    fetch_and_process_messages catches it and continues to the next message.
-    """
-    call = [0]
+        # Start the stage to initialize stats
+        ray.get(stage_ref.start.remote())
 
-    class TimeoutThenValidClient:
-        def fetch_message(self, task_queue, count, override_fetch_mode=None):
-            if call[0] == 0:
-                call[0] += 1
-                raise TimeoutError("Timeout")
-            else:
-                return DummyResponse(
-                    response_code=0,
-                    response=json.dumps(
-                        {
-                            "job_id": "job_after_timeout",
-                            "job_payload": [{"a": "b"}],
-                            "tasks": [],
-                            "tracing_options": {},
-                        }
-                    ),
-                )
+        # Get stats
+        stats = ray.get(stage_ref.get_stats.remote())
 
-    config = DummyValidatedConfig(task_queue="queue1")
+        # Check that stats has all expected keys
+        expected_keys = [
+            "active_processing",
+            "delta_processed",
+            "elapsed",
+            "errors",
+            "failed",
+            "processed",
+            "processing_rate_cps",
+            "successful_queue_reads",
+            "successful_queue_writes",
+            "queue_full",
+        ]
 
-    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message:
-        gen = fetch_and_process_messages(TimeoutThenValidClient(), config)
-        result = next(gen)
-        gen.close()
-        assert result == "processed"
-        mock_process_message.assert_called_once()
+        for key in expected_keys:
+            assert key in stats, f"Stats should contain key '{key}'"
 
+        # Check value types
+        assert isinstance(stats["active_processing"], int)
+        assert isinstance(stats["delta_processed"], int)
+        assert isinstance(stats["elapsed"], (int, float))
+        assert isinstance(stats["errors"], int)
+        assert isinstance(stats["failed"], int)
+        assert isinstance(stats["processed"], int)
+        assert isinstance(stats["processing_rate_cps"], (int, float))
+        assert isinstance(stats["successful_queue_reads"], int)
+        assert isinstance(stats["successful_queue_writes"], int)
+        assert isinstance(stats["queue_full"], int)
 
-def test_fetch_and_process_messages_exception_handling():
-    """
-    Test that if client.fetch_message raises a generic Exception,
-    fetch_and_process_messages logs the error and continues fetching.
-    """
-    call = [0]
+        # Stop the stage
+        ray.get(stage_ref.stop.remote())
 
-    class ExceptionThenValidClient:
-        def fetch_message(self, task_queue, count, override_fetch_mode=None):
-            if call[0] == 0:
-                call[0] += 1
-                raise Exception("Generic error")
-            else:
-                return DummyResponse(
-                    response_code=0,
-                    response=json.dumps(
-                        {
-                            "job_id": "job_after_exception",
-                            "job_payload": [{"c": "d"}],
-                            "tasks": [],
-                            "tracing_options": {},
-                        }
-                    ),
-                )
+        # Cleanup
+        ray.kill(stage_ref)
 
-    config = DummyValidatedConfig(task_queue="queue1")
+    @ray.method(num_returns=1)
+    def set_output_queue(self, queue_handle: any) -> bool:
+        self.output_queue = queue_handle
+        self._logger.info("Output queue set: %s", queue_handle)
+        return True
 
-    # Patch process_message and the logger so we can assert they're called appropriately.
-    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message, patch(
-        f"{MODULE_UNDER_TEST}.logger"
-    ) as mock_logger:
-        # Create the generator.
-        gen = fetch_and_process_messages(ExceptionThenValidClient(), config)
+    @ray.method(num_returns=1)
+    def pause(self) -> bool:
+        """
+        Pause the stage. This clears the pause event, causing the processing loop
+        to block before writing to the output queue.
 
-        # The generator should swallow the Exception, log it, then yield the processed message.
-        result = next(gen)
-        gen.close()
+        Returns
+        -------
+        bool
+            True after the stage is paused.
+        """
+        self._pause_event.clear()
+        self._logger.info("Stage paused.")
 
-        # Assert that the processed result is returned.
-        assert result == "processed"
+        return True
 
-        # Assert that the process_message function was called once.
-        mock_process_message.assert_called_once()
+    @ray.method(num_returns=1)
+    def resume(self) -> bool:
+        """
+        Resume the stage. This sets the pause event, allowing the processing loop
+        to proceed with writing to the output queue.
 
-        # Assert that an exception was logged. Adjust the number as needed.
-        assert mock_logger.exception.call_count > 0
+        Returns
+        -------
+        bool
+            True after the stage is resumed.
+        """
+        self._pause_event.set()
+        self._logger.info("Stage resumed.")
+        return True
+
+    @ray.method(num_returns=1)
+    def swap_queues(self, new_queue: any) -> bool:
+        """
+        Swap in a new output queue for this stage.
+        This method pauses the stage, waits for any current processing to finish,
+        replaces the output queue, and then resumes the stage.
+        """
+        self._logger.info("Swapping output queue: pausing stage first.")
+        self.pause()
+        self.set_output_queue(new_queue)
+        self._logger.info("Output queue swapped. Resuming stage.")
+        self.resume()
+        return True

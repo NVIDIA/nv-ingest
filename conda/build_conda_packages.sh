@@ -64,7 +64,7 @@ if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
 
     echo "NV_INGEST_API_VERSION: $NV_INGEST_API_VERSION"
     NV_INGEST_API_VERSION="${NV_INGEST_API_VERSION}" GIT_ROOT="${GIT_ROOT}/api" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_api build."
@@ -72,18 +72,19 @@ fi
 
 if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
+    SCRIPT_PATH="$GIT_ROOT/src/nv_ingest/version.py"
+    echo "SCRIPT_PATH: $SCRIPT_PATH"
 
     # Generate the version if not specified
     if [ -z "$RELEASE_VERSION" ]; then
-        # Setting to Unknown will cause the version to be pulled from the nv-ingest setup.py file at conda build time
-        NV_INGEST_RELEASE_VERSION="Unknown"
+        NV_INGEST_SERVICE_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
     else
-        NV_INGEST_RELEASE_VERSION=$RELEASE_VERSION
+        NV_INGEST_SERVICE_VERSION=$RELEASE_VERSION
     fi
 
-    echo "NV_INGEST_VERSION: $NV_INGEST_RELEASE_VERSION"
-    NV_INGEST_RELEASE_VERSION="${NV_INGEST_RELEASE_VERSION}" GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+    echo "NV_INGEST_SERVICE_VERSION: $NV_INGEST_SERVICE_VERSION"
+    NV_INGEST_SERVICE_VERSION="${NV_INGEST_SERVICE_VERSION}" GIT_ROOT="${GIT_ROOT}/src" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest build."
@@ -103,7 +104,7 @@ if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
 
     echo "NV_INGEST_CLIENT_VERSION: $NV_INGEST_CLIENT_VERSION"
     NV_INGEST_CLIENT_VERSION="${NV_INGEST_CLIENT_VERSION}" GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
-        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_client build."

@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import base64
-import os
 from io import BytesIO
 
 import pandas as pd
@@ -31,21 +30,6 @@ DOCUMENT_TO_CONTENT_MAPPING = {
     DocumentTypeEnum.WAV: ContentTypeEnum.AUDIO,
     DocumentTypeEnum.UNKNOWN: ContentTypeEnum.UNKNOWN,
 }
-
-
-# ------------------------------------------------------------------------------
-# Helper function to get the document type from a file extension.
-# ------------------------------------------------------------------------------
-def get_document_type_from_extension(file_path: str) -> str:
-    ext = os.path.splitext(file_path)[1].lower()
-    mapping = {
-        ".png": DocumentTypeEnum.PNG,
-        ".jpg": DocumentTypeEnum.JPEG,
-        ".jpeg": DocumentTypeEnum.JPEG,
-        ".tiff": DocumentTypeEnum.TIFF,
-        ".svg": DocumentTypeEnum.SVG,
-    }
-    return mapping.get(ext, DocumentTypeEnum.UNKNOWN)
 
 
 # ------------------------------------------------------------------------------
@@ -99,6 +83,7 @@ def create_source_metadata(source_name: str, source_id: str, document_type: str)
         "summary": "",
         "partition_id": -1,
         "access_level": "unknown",  # You may wish to adjust this if needed.
+        "custom_content": {},
     }
 
 
@@ -130,6 +115,7 @@ def create_content_metadata(document_type: str) -> dict:
             },
         },
         "subtype": "",
+        "custom_content": {},
     }
 
 

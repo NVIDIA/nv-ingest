@@ -14,6 +14,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
+from .v1.metrics import router as MetricsApiRouter
+from .v2.ingest import router as IngestApiRouterV2
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="NV-Ingest Microservice",
     description="Service for ingesting heterogenous datatypes",
-    version="25.3.0",
+    version="25.4.2",
     contact={
         "name": "NVIDIA Corporation",
         "url": "https://nvidia.com",
@@ -31,6 +33,8 @@ app = FastAPI(
 
 app.include_router(IngestApiRouter, prefix="/v1")
 app.include_router(HealthApiRouter, prefix="/v1/health")
+app.include_router(MetricsApiRouter, prefix="/v1")
+app.include_router(IngestApiRouterV2, prefix="/v2")
 
 # Set up the tracer provider and add a processor for exporting traces
 resource = Resource(attributes={"service.name": "nv-ingest"})

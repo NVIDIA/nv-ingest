@@ -13,42 +13,42 @@ def test_valid_config_with_grpc_only():
     config = TableExtractorConfigSchema(
         auth_token="valid_token",
         yolox_endpoints=("grpc://yolox_service", None),
-        paddle_endpoints=("grpc://paddle_service", None),
+        ocr_endpoints=("grpc://ocr_service", None),
     )
     assert config.auth_token == "valid_token"
     assert config.yolox_endpoints == ("grpc://yolox_service", None)
-    assert config.paddle_endpoints == ("grpc://paddle_service", None)
+    assert config.ocr_endpoints == ("grpc://ocr_service", None)
 
 
 def test_valid_config_with_http_only():
     config = TableExtractorConfigSchema(
         auth_token="valid_token",
         yolox_endpoints=(None, "http://yolox_service"),
-        paddle_endpoints=(None, "http://paddle_service"),
+        ocr_endpoints=(None, "http://ocr_service"),
     )
     assert config.auth_token == "valid_token"
     assert config.yolox_endpoints == (None, "http://yolox_service")
-    assert config.paddle_endpoints == (None, "http://paddle_service")
+    assert config.ocr_endpoints == (None, "http://ocr_service")
 
 
 def test_valid_config_with_both_services():
     config = TableExtractorConfigSchema(
         auth_token="valid_token",
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-        paddle_endpoints=("grpc://paddle_service", "http://paddle_service"),
+        ocr_endpoints=("grpc://ocr_service", "http://ocr_service"),
     )
     assert config.auth_token == "valid_token"
     assert config.yolox_endpoints == ("grpc://yolox_service", "http://yolox_service")
-    assert config.paddle_endpoints == ("grpc://paddle_service", "http://paddle_service")
+    assert config.ocr_endpoints == ("grpc://ocr_service", "http://ocr_service")
 
 
 def test_invalid_config_empty_endpoints():
     with pytest.raises(ValidationError) as exc_info:
         TableExtractorConfigSchema(
             yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-            paddle_endpoints=(None, None),
+            ocr_endpoints=(None, None),
         )
-    assert "Both gRPC and HTTP services cannot be empty for paddle_endpoints" in str(exc_info.value)
+    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints" in str(exc_info.value)
 
 
 def test_invalid_extra_fields():
@@ -56,7 +56,7 @@ def test_invalid_extra_fields():
         TableExtractorConfigSchema(
             auth_token="valid_token",
             yolox_endpoints=("grpc://yolox_service", None),
-            paddle_endpoints=("grpc://paddle_service", None),
+            ocr_endpoints=("grpc://ocr_service", None),
             extra_field="invalid",
         )
     assert "Extra inputs are not permitted" in str(exc_info.value)
@@ -65,23 +65,23 @@ def test_invalid_extra_fields():
 def test_cleaning_empty_strings_in_endpoints():
     config = TableExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", " "),
-        paddle_endpoints=("   ", "http://paddle_service"),
+        ocr_endpoints=("   ", "http://ocr_service"),
     )
     assert config.yolox_endpoints == ("grpc://yolox_service", None)
-    assert config.paddle_endpoints == (None, "http://paddle_service")
+    assert config.ocr_endpoints == (None, "http://ocr_service")
 
     config = TableExtractorConfigSchema(
         yolox_endpoints=("", "http://yolox_service"),
-        paddle_endpoints=("grpc://paddle_service", ""),
+        ocr_endpoints=("grpc://ocr_service", ""),
     )
     assert config.yolox_endpoints == (None, "http://yolox_service")
-    assert config.paddle_endpoints == ("grpc://paddle_service", None)
+    assert config.ocr_endpoints == ("grpc://ocr_service", None)
 
 
 def test_auth_token_is_none_by_default():
     config = TableExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-        paddle_endpoints=("grpc://paddle_service", "http://paddle_service"),
+        ocr_endpoints=("grpc://ocr_service", "http://ocr_service"),
     )
     assert config.auth_token is None
 
@@ -98,7 +98,7 @@ def test_table_extractor_schema_defaults():
 def test_table_extractor_schema_with_custom_values():
     endpoint_config = TableExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-        paddle_endpoints=("grpc://paddle_service", "http://paddle_service"),
+        ocr_endpoints=("grpc://ocr_service", "http://ocr_service"),
     )
     config = TableExtractorSchema(
         max_queue_size=15, n_workers=12, raise_on_failure=True, endpoint_config=endpoint_config

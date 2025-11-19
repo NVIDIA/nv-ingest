@@ -10,6 +10,12 @@ There are two ways that NV Ingest chunks text:
 - Token-based splitting by using the `split` task.
 
 
+!!! warning
+
+    NeMo Retriever extraction is designed to process language and language-length strings. If you submit a document that contains extremely long, or non-language text strings, such as a DNA sequence, errors or unexpected results occur.
+
+
+
 ## Extraction Text Depth
 
 You can use the `text_depth` parameter to specify how extracted text is chunked together by the extractor. 
@@ -65,7 +71,8 @@ To use a different tokenizer, such as `intfloat/e5-large-unsupervised`, you can 
 ingestor = ingestor.split(
     tokenizer="intfloat/e5-large-unsupervised",
     chunk_size=1024,
-    chunk_overlap=150
+    chunk_overlap=150,
+    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"}
 )
 ```
 
@@ -77,7 +84,7 @@ The following table contains the `split` parameters.
 | ------ | ----------- | -------- |
 | `tokenizer` | HuggingFace Tokenizer identifier or path. | `meta-llama/Llama-3.2-1B`|
 | `chunk_size` | Maximum number of tokens per chunk.  | `1024` |
-| `chunk_size` | Number of tokens to overlap between chunks.  | `150` |
+| `chunk_overlap` | Number of tokens to overlap between chunks.  | `150` |
 | `params` | A sub-dictionary that can contain `split_source_types` and `hf_access_token` | `{}` |
 | `hf_access_token` | Your Hugging Face access token. | — |
 | `split_source_types` | The source types to split on (only splits on text by default). | — |

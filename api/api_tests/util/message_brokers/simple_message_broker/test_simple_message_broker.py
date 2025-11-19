@@ -275,8 +275,8 @@ def test_queue_not_exist():
     request_data = {"command": "POP", "queue_name": queue_name, "timeout": 1}
     sock, response = send_request(request_data)
 
-    assert response["response_code"] == 1
-    assert response["response_reason"] == "Queue is empty"
+    assert response["response_code"] == 2
+    assert response["response_reason"] == "Job not ready"
     sock.close()
 
 
@@ -393,8 +393,8 @@ def test_pop_from_empty_queue():
     request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
     sock, response = send_request(request_data)
 
-    assert response["response_code"] == 1
-    assert response["response_reason"] == "Queue is empty"
+    assert response["response_code"] == 2
+    assert response["response_reason"] == "Job not ready"
     sock.close()
 
 

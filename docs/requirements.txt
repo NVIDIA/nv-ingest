@@ -15,3 +15,5 @@ sphinx
 sphinx-markdown-builder
 sphinx-rtd-theme
 swagger-plugin-for-sphinx
+mike
+autodoc_pydantic

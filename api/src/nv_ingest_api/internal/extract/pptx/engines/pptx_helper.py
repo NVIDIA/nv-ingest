@@ -27,9 +27,9 @@ from typing import Optional
 import pandas as pd
 from pptx import Presentation
 from pptx.enum.dml import MSO_COLOR_TYPE
-from pptx.enum.dml import MSO_THEME_COLOR
+from pptx.enum.dml import MSO_THEME_COLOR  # noqa
 from pptx.enum.shapes import MSO_SHAPE_TYPE
-from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.enum.shapes import PP_PLACEHOLDER  # noqa
 from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
 
@@ -105,7 +105,7 @@ def _finalize_images(
             logger.warning(f"Unable to process shape image: {e}")
 
     # If you want table/chart detection for these images, do it now
-    # (similar to docx approach). This might use your YOLO or other method:
+    # (similar to docx approach). This might use your YOLO or another method:
     detection_map = defaultdict(list)  # image_idx -> list of CroppedImageWithContent
     if extract_tables or extract_charts:
         try:
@@ -220,20 +220,13 @@ def python_pptx(
     extraction_config: dict,
     execution_trace_log: Optional[List] = None,
 ):
-    """
-    Uses python-pptx to extract text from a PPTX bytestream, while deferring image
-    classification into tables/charts if requested.
-    """
-
-    _ = extract_infographics  # Placeholder for future use
-    _ = execution_trace_log  # Placeholder for future use
+    _ = extract_infographics
+    _ = execution_trace_log
 
     row_data = extraction_config.get("row_data")
     source_id = row_data["source_id"]
 
-    text_depth = extraction_config.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
-
+    text_depth = TextTypeEnum[extraction_config.get("text_depth", "page").upper()]
     paragraph_format = extraction_config.get("paragraph_format", "markdown")
     identify_nearby_objects = extraction_config.get("identify_nearby_objects", True)
 
@@ -241,16 +234,19 @@ def python_pptx(
     pptx_extractor_config = extraction_config.get("pptx_extraction_config", {})
     trace_info = extraction_config.get("trace_info", {})
 
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    base_unified_metadata = row_data.get(metadata_col, {})
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-    presentation = Presentation(pptx_stream)
+    try:
+        presentation = Presentation(pptx_stream)
+    except Exception as e:
+        logger.error("Failed to open PPTX presentation: %s", e)
+        return []
 
-    # Collect source metadata from the core properties of the document.
     last_modified = (
         presentation.core_properties.modified.isoformat()
         if presentation.core_properties.modified
@@ -262,12 +258,11 @@ def python_pptx(
         else datetime.now().isoformat()
     )
     keywords = presentation.core_properties.keywords
-    source_type = DocumentTypeEnum.PPTX
     source_metadata = {
-        "source_name": source_id,  # python-pptx doesn't maintain filename; re-use source_id
+        "source_name": source_id,
         "source_id": source_id,
         "source_location": source_location,
-        "source_type": source_type,
+        "source_type": DocumentTypeEnum.PPTX,
         "collection_id": collection_id,
         "date_created": date_created,
         "last_modified": last_modified,
@@ -277,18 +272,16 @@ def python_pptx(
     }
 
     slide_count = len(presentation.slides)
-
     accumulated_text = []
     extracted_data = []
-
-    # Hold images here for final classification.
-    # Each item is (shape, shape_idx, slide_idx, slide_count, page_nearby_blocks, source_metadata,
-    #   base_unified_metadata)
     pending_images = []
 
     for slide_idx, slide in enumerate(presentation.slides):
-        # Obtain a flat list of shapes (ungrouped) sorted by top then left.
-        shapes = sorted(ungroup_shapes(slide.shapes), key=_safe_position)
+        try:
+            shapes = sorted(ungroup_shapes(slide.shapes), key=_safe_position)
+        except Exception as e:
+            logger.error("Slide %d: Failed to ungroup or sort shapes: %s", slide_idx, e)
+            continue
 
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
@@ -297,152 +290,179 @@ def python_pptx(
         }
 
         for shape_idx, shape in enumerate(shapes):
-            block_text = []
-            added_title = added_subtitle = False
+            try:
+                block_text = []
+                added_title = added_subtitle = False
 
-            # ---------------------------------------------
-            # 1) Text Extraction
-            # ---------------------------------------------
-            if extract_text and shape.has_text_frame:
-                for paragraph_idx, paragraph in enumerate(shape.text_frame.paragraphs):
-                    if not paragraph.text.strip():
-                        continue
-
-                    for run_idx, run in enumerate(paragraph.runs):
-                        text = run.text
-                        if not text:
+                # Text extraction
+                if extract_text and shape.has_text_frame:
+                    for paragraph_idx, paragraph in enumerate(shape.text_frame.paragraphs):
+                        if not paragraph.text.strip():
                             continue
 
-                        text = escape_text(text)
-
-                        if paragraph_format == "markdown":
-                            if is_title(shape):
-                                if not added_title:
-                                    text = process_title(shape)
-                                    added_title = True
-                                else:
+                        for run_idx, run in enumerate(paragraph.runs):
+                            try:
+                                text = run.text
+                                if not text:
                                     continue
-                            elif is_subtitle(shape):
-                                if not added_subtitle:
-                                    text = process_subtitle(shape)
-                                    added_subtitle = True
-                                else:
-                                    continue
-                            else:
-                                if run.hyperlink.address:
-                                    text = get_hyperlink(text, run.hyperlink.address)
-                                if is_accent(paragraph.font) or is_accent(run.font):
-                                    text = format_text(text, italic=True)
-                                elif is_strong(paragraph.font) or is_strong(run.font):
-                                    text = format_text(text, bold=True)
-                                elif is_underlined(paragraph.font) or is_underlined(run.font):
-                                    text = format_text(text, underline=True)
-                                if is_list_block(shape):
-                                    text = "  " * paragraph.level + "* " + text
 
-                        accumulated_text.append(text)
+                                text = escape_text(text)
 
-                        # For "nearby objects", store block text.
-                        if extract_images and identify_nearby_objects:
-                            block_text.append(text)
+                                if paragraph_format == "markdown":
+                                    if is_title(shape) and not added_title:
+                                        text = process_title(shape)
+                                        added_title = True
+                                    elif is_subtitle(shape) and not added_subtitle:
+                                        text = process_subtitle(shape)
+                                        added_subtitle = True
+                                    elif is_title(shape) or is_subtitle(shape):
+                                        continue  # already added
 
-                        # If we only want text at SPAN level, flush after each run.
-                        if text_depth == TextTypeEnum.SPAN:
-                            text_extraction = _construct_text_metadata(
+                                    if run.hyperlink and run.hyperlink.address:
+                                        text = get_hyperlink(text, run.hyperlink.address)
+                                    if is_accent(paragraph.font) or is_accent(run.font):
+                                        text = format_text(text, italic=True)
+                                    elif is_strong(paragraph.font) or is_strong(run.font):
+                                        text = format_text(text, bold=True)
+                                    elif is_underlined(paragraph.font) or is_underlined(run.font):
+                                        text = format_text(text, underline=True)
+                                    if is_list_block(shape):
+                                        text = "  " * paragraph.level + "* " + text
+
+                                accumulated_text.append(text)
+                                if extract_images and identify_nearby_objects:
+                                    block_text.append(text)
+
+                                if text_depth == TextTypeEnum.SPAN:
+                                    extracted_data.append(
+                                        _construct_text_metadata(
+                                            presentation,
+                                            shape,
+                                            accumulated_text,
+                                            keywords,
+                                            slide_idx,
+                                            shape_idx,
+                                            paragraph_idx,
+                                            run_idx,
+                                            slide_count,
+                                            text_depth,
+                                            source_metadata,
+                                            base_unified_metadata,
+                                        )
+                                    )
+                                    accumulated_text = []
+
+                            except Exception as e:
+                                logger.warning(
+                                    "Slide %d Shape %d Run %d: Failed to process run: %s",
+                                    slide_idx,
+                                    shape_idx,
+                                    run_idx,
+                                    e,
+                                )
+
+                        if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
+                            accumulated_text.append("\n\n")
+
+                        if text_depth == TextTypeEnum.LINE:
+                            extracted_data.append(
+                                _construct_text_metadata(
+                                    presentation,
+                                    shape,
+                                    accumulated_text,
+                                    keywords,
+                                    slide_idx,
+                                    shape_idx,
+                                    paragraph_idx,
+                                    -1,
+                                    slide_count,
+                                    text_depth,
+                                    source_metadata,
+                                    base_unified_metadata,
+                                )
+                            )
+                            accumulated_text = []
+
+                    if text_depth == TextTypeEnum.BLOCK:
+                        extracted_data.append(
+                            _construct_text_metadata(
                                 presentation,
                                 shape,
                                 accumulated_text,
                                 keywords,
                                 slide_idx,
                                 shape_idx,
-                                paragraph_idx,
-                                run_idx,
+                                -1,
+                                -1,
                                 slide_count,
                                 text_depth,
                                 source_metadata,
                                 base_unified_metadata,
                             )
-                            if len(text_extraction) > 0:
-                                extracted_data.append(text_extraction)
-                            accumulated_text = []
+                        )
+                        accumulated_text = []
 
-                    # Add newlines for separation at line/paragraph level.
-                    if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
-                        accumulated_text.append("\n\n")
+                if extract_images and identify_nearby_objects and block_text:
+                    page_nearby_blocks["text"]["content"].append("".join(block_text))
+                    page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
 
-                    if text_depth == TextTypeEnum.LINE:
-                        text_extraction = _construct_text_metadata(
-                            presentation,
+                # Image processing (deferred)
+                if extract_images or extract_tables or extract_charts:
+                    try:
+                        process_shape(
                             shape,
-                            accumulated_text,
-                            keywords,
-                            slide_idx,
                             shape_idx,
-                            paragraph_idx,
-                            -1,
+                            slide_idx,
                             slide_count,
-                            text_depth,
+                            pending_images,
+                            page_nearby_blocks,
                             source_metadata,
                             base_unified_metadata,
                         )
-                        if len(text_extraction) > 0:
-                            extracted_data.append(text_extraction)
-                        accumulated_text = []
+                    except Exception as e:
+                        logger.warning("Slide %d Shape %d: Failed to process image shape: %s", slide_idx, shape_idx, e)
 
-                if text_depth == TextTypeEnum.BLOCK:
-                    text_extraction = _construct_text_metadata(
-                        presentation,
-                        shape,
-                        accumulated_text,
-                        keywords,
-                        slide_idx,
-                        shape_idx,
-                        -1,
-                        -1,
-                        slide_count,
-                        text_depth,
-                        source_metadata,
-                        base_unified_metadata,
-                    )
-                    if len(text_extraction) > 0:
-                        extracted_data.append(text_extraction)
-                    accumulated_text = []
+                # Table extraction
+                if extract_tables and shape.has_table:
+                    try:
+                        extracted_data.append(
+                            _construct_table_metadata(
+                                shape, slide_idx, slide_count, source_metadata, base_unified_metadata
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning("Slide %d Shape %d: Failed to extract table: %s", slide_idx, shape_idx, e)
 
-            if extract_images and identify_nearby_objects and block_text:
-                page_nearby_blocks["text"]["content"].append("".join(block_text))
-                page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
+            except Exception as e:
+                logger.warning("Slide %d Shape %d: Top-level failure: %s", slide_idx, shape_idx, e)
 
-            # ---------------------------------------------
-            # 2) Image Handling (DEFERRED) with nested/group shapes
-            # ---------------------------------------------
-            if extract_images:
-                process_shape(
-                    shape,
-                    shape_idx,
+        if extract_text and text_depth == TextTypeEnum.PAGE and accumulated_text:
+            extracted_data.append(
+                _construct_text_metadata(
+                    presentation,
+                    None,
+                    accumulated_text,
+                    keywords,
                     slide_idx,
+                    -1,
+                    -1,
+                    -1,
                     slide_count,
-                    pending_images,
-                    page_nearby_blocks,
+                    text_depth,
                     source_metadata,
                     base_unified_metadata,
                 )
+            )
+            accumulated_text = []
 
-            # ---------------------------------------------
-            # 3) Table Handling
-            # ---------------------------------------------
-            if extract_tables and shape.has_table:
-                table_extraction = _construct_table_metadata(
-                    shape, slide_idx, slide_count, source_metadata, base_unified_metadata
-                )
-                extracted_data.append(table_extraction)
-
-        if extract_text and (text_depth == TextTypeEnum.PAGE) and (len(accumulated_text) > 0):
-            text_extraction = _construct_text_metadata(
+    if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
+        extracted_data.append(
+            _construct_text_metadata(
                 presentation,
-                shape,  # may pass None if preferred
+                None,
                 accumulated_text,
                 keywords,
-                slide_idx,
+                -1,
                 -1,
                 -1,
                 -1,
@@ -451,41 +471,20 @@ def python_pptx(
                 source_metadata,
                 base_unified_metadata,
             )
-            if len(text_extraction) > 0:
-                extracted_data.append(text_extraction)
-            accumulated_text = []
-
-    if extract_text and (text_depth == TextTypeEnum.DOCUMENT) and (len(accumulated_text) > 0):
-        text_extraction = _construct_text_metadata(
-            presentation,
-            shape,  # may pass None
-            accumulated_text,
-            keywords,
-            -1,
-            -1,
-            -1,
-            -1,
-            slide_count,
-            text_depth,
-            source_metadata,
-            base_unified_metadata,
         )
-        if len(text_extraction) > 0:
-            extracted_data.append(text_extraction)
-        accumulated_text = []
 
-    # ---------------------------------------------
-    # FINAL STEP: Finalize images (and tables/charts)
-    # ---------------------------------------------
     if extract_images or extract_tables or extract_charts:
-        _finalize_images(
-            pending_images,
-            extracted_data,
-            pptx_extractor_config,
-            extract_tables=extract_tables,
-            extract_charts=extract_charts,
-            trace_info=trace_info,
-        )
+        try:
+            _finalize_images(
+                pending_images,
+                extracted_data,
+                pptx_extractor_config,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                trace_info=trace_info,
+            )
+        except Exception as e:
+            logger.error("Finalization of images failed: %s", e)
 
     return extracted_data
 

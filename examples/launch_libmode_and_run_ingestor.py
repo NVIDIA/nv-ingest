@@ -1,15 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 import os
 import time
+import sys
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
-
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -38,38 +40,38 @@ def run_ingestor():
             extract_tables=True,
             extract_charts=True,
             extract_images=True,
-            paddle_output_format="markdown",
-            extract_infographics=True,
+            table_output_format="markdown",
+            extract_infographics=False,
             text_depth="page",
         )
-        # .split()
-        # .embed()
+        .split(chunk_size=1024, chunk_overlap=150)
+        .embed()
     )
 
     try:
-        results = ingestor.ingest()
+        results, _ = ingestor.ingest(show_progress=False, return_failures=True)
         logger.info("Ingestion completed successfully.")
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")
         raise
 
     print("\nIngest done.")
-    print(ingest_json_results_to_blob(results[0]))
+    print(f"Got {len(results)} results.")
 
 
 def main():
-    # Possibly override config parameters
-    config_data = {}
-
-    # Filter out None values to let the schema defaults handle them
-    config_data = {key: value for key, value in config_data.items() if value is not None}
-
-    # Construct the pipeline configuration
-    ingest_config = PipelineCreationSchema(**config_data)
-
-    pipeline = None
+    """
+    Launch the libmode pipeline service and run the ingestor against it.
+    Uses the embedded default libmode pipeline configuration.
+    """
     try:
-        pipeline = run_pipeline(ingest_config, block=False)
+        pipeline = run_pipeline(
+            block=False,
+            disable_dynamic_scaling=True,
+            run_in_subprocess=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
         time.sleep(10)
         run_ingestor()
         # Run other code...
@@ -78,9 +80,8 @@ def main():
     except Exception as e:
         logger.error(f"Error running pipeline: {e}")
     finally:
+        pipeline.stop()
         logger.info("Shutting down pipeline...")
-        if pipeline:
-            pipeline.stop()
 
 
 if __name__ == "__main__":

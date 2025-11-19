@@ -14,7 +14,7 @@ import logging
 from typing import Optional, Tuple, Union
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
-from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase, FetchMode
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class SimpleClient(MessageBrokerClientBase):
         connection_timeout: int = 300,
         max_pool_size: int = 128,
         use_ssl: bool = False,
+        api_version: str = "v1",
     ):
         """
         Initialize the SimpleClient with configuration parameters.
@@ -108,29 +109,23 @@ class SimpleClient(MessageBrokerClientBase):
         return self._handle_push(queue_name, message, timeout, for_nv_ingest)
 
     def fetch_message(
-        self,
-        queue_name: str,
-        timeout: Optional[Tuple[int, Union[float]]] = (100, None),
-        override_fetch_mode: FetchMode = None,
+        self, queue_name: str, timeout: Optional[Tuple[int, Union[float, None]]] = (1200, None)
     ) -> ResponseSchema:
         """
-        Fetch a message from the specified queue.
+        Fetch a message from a specified queue.
 
         Parameters
         ----------
         queue_name : str
             The name of the queue.
-        timeout : float, optional
-            Timeout in seconds for the operation.
+        timeout : tuple, optional
+            A tuple containing the timeout value and an unused second element.
 
         Returns
         -------
         ResponseSchema
-            The response containing the fetched message.
+            The response from the broker.
         """
-        if isinstance(timeout, int):
-            timeout = (timeout, None)
-
         return self._handle_pop(queue_name, timeout)
 
     def ping(self) -> ResponseSchema:
@@ -208,6 +203,7 @@ class SimpleClient(MessageBrokerClientBase):
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
+                    sock.settimeout(self._connection_timeout)
                     self._send(sock, json.dumps(command).encode("utf-8"))
                     # Receive initial response with transaction ID
                     response_data = self._recv(sock)
@@ -241,8 +237,9 @@ class SimpleClient(MessageBrokerClientBase):
 
                     return ResponseSchema(**final_response)
 
-            except (ConnectionError, socket.error, BrokenPipeError):
-                pass
+            except (ConnectionError, socket.error, BrokenPipeError, socket.timeout) as e:
+                logger.debug(f"Connection error during PUSH: {e}")
+                pass  # Will be retried
             except json.JSONDecodeError:
                 return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
             except Exception as e:
@@ -272,61 +269,67 @@ class SimpleClient(MessageBrokerClientBase):
 
         command = {"command": "POP", "queue_name": queue_name}
 
-        timeout = int(timeout[0])
+        timeout_val = timeout[0] if isinstance(timeout, tuple) else timeout
 
-        if timeout is not None:
-            command["timeout"] = timeout
+        if timeout_val is not None:
+            command["timeout"] = timeout_val
 
         start_time = time.time()
+        backoff_delay = 1  # Start with a 1-second backoff
+
         while True:
             elapsed = time.time() - start_time
-            remaining_timeout = timeout - elapsed if timeout else None
-            if remaining_timeout is not None and remaining_timeout <= 0:
-                return ResponseSchema(response_code=1, response_reason="POP operation timed out.")
+            if timeout_val is not None and elapsed >= timeout_val:
+                return ResponseSchema(response_code=2, response_reason="Job not ready.")
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
+                    sock.settimeout(self._connection_timeout)
                     self._send(sock, json.dumps(command).encode("utf-8"))
                     # Receive initial response with transaction ID and message
                     response_data = self._recv(sock)
                     response = json.loads(response_data)
 
-                    if response.get("response_code") != 0:
-                        if response.get("response_reason") == "Queue is empty":
-                            time.sleep(0.1)
-                            continue
-                        else:
-                            return ResponseSchema(**response)
-
-                    if "transaction_id" not in response:
-                        error_msg = "No transaction_id in response."
-
-                        return ResponseSchema(response_code=1, response_reason=error_msg)
-
-                    transaction_id = response["transaction_id"]
-                    message = response.get("response")
-
-                    # Send ACK
-                    ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode("utf-8")
-                    self._send(sock, ack_data)
-
-                    # Receive final response
-                    final_response_data = self._recv(sock)
-                    final_response = json.loads(final_response_data)
-
-                    if final_response.get("response_code") == 0:
-                        return ResponseSchema(response_code=0, response=message, transaction_id=transaction_id)
+                    # The broker now returns a response_code of 2 for a timeout, which the high-level
+                    # client should handle as a retryable event.
+                    if response.get("response_code") == 2:
+                        # Queue is empty or job not ready, continue to backoff and retry
+                        pass
+                    elif response.get("response_code") != 0:
+                        return ResponseSchema(**response)
                     else:
-                        return ResponseSchema(**final_response)
+                        # Success case: we received a message.
+                        if "transaction_id" not in response:
+                            return ResponseSchema(response_code=1, response_reason="No transaction_id in response.")
 
-            except (ConnectionError, socket.error, BrokenPipeError):
-                pass
+                        transaction_id = response["transaction_id"]
+                        message = response.get("response")
+
+                        # Send ACK
+                        ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode("utf-8")
+                        self._send(sock, ack_data)
+
+                        # Receive final response
+                        final_response_data = self._recv(sock)
+                        final_response = json.loads(final_response_data)
+
+                        if final_response.get("response_code") == 0:
+                            return ResponseSchema(response_code=0, response=message, transaction_id=transaction_id)
+                        else:
+                            return ResponseSchema(**final_response)
+
+            except (ConnectionError, socket.error, BrokenPipeError, socket.timeout) as e:
+                # Let the high-level client handle connection errors as retryable.
+                logger.debug(f"Connection error during POP: {e}, will retry after backoff.")
+                pass  # Fall through to backoff and retry
             except json.JSONDecodeError:
                 return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
             except Exception as e:
                 return ResponseSchema(response_code=1, response_reason=str(e))
 
-            time.sleep(0.1)  # Backoff delay before retry
+            # Exponential backoff
+            time.sleep(backoff_delay)
+            backoff_delay = min(backoff_delay * 2, self._max_backoff)
 
     def _execute_simple_command(self, command: dict) -> ResponseSchema:
         """
@@ -350,12 +353,13 @@ class SimpleClient(MessageBrokerClientBase):
 
         try:
             with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
+                sock.settimeout(self._connection_timeout)
                 self._send(sock, data)
                 response_data = self._recv(sock)
                 response = json.loads(response_data)
                 return ResponseSchema(**response)
-        except (ConnectionError, socket.error, BrokenPipeError) as e:
-            return ResponseSchema(response_code=1, response_reason=f"Connection error: {e}")
+        except (ConnectionError, socket.error, BrokenPipeError, socket.timeout) as e:
+            return ResponseSchema(response_code=2, response_reason=f"Connection error: {e}")
         except json.JSONDecodeError:
             return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
         except Exception as e:

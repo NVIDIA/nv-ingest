@@ -1,0 +1,2 @@
+# Ensure user local scripts are not included in resulting docker images that are built
+scripts/private_local

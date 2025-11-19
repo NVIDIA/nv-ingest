@@ -8,20 +8,14 @@ import logging
 import os
 import time
 import typing
-from io import BytesIO
+import math
+import heapq
 from typing import Dict
 from typing import List
 
-import pypdfium2 as pdfium
-from docx import Document as DocxDocument
-
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
-from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
 from nv_ingest_client.util.file_processing.extract import extract_file_content
-from nv_ingest_client.util.file_processing.extract import get_or_infer_file_type
-from pptx import Presentation
 
 logger = logging.getLogger(__name__)
 
@@ -35,79 +29,13 @@ class ClientConfigSchema:
     def __init__(self):
         self.embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
         self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
-        self.nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
+        self.nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
         self.nv_ranker_nim_endpoint: str = os.getenv(
             "RERANKER_NIM_ENDPOINT",
             "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking",
         )
         self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
-
-
-def estimate_page_count(file_path: str) -> int:
-    document_type = get_or_infer_file_type(file_path)
-
-    if document_type in [
-        DocumentTypeEnum.PDF,
-        DocumentTypeEnum.DOCX,
-        DocumentTypeEnum.PPTX,
-    ]:
-        return count_pages_for_documents(file_path, document_type)
-    elif document_type in [
-        DocumentTypeEnum.TXT,
-        DocumentTypeEnum.MD,
-        DocumentTypeEnum.HTML,
-    ]:
-        return count_pages_for_text(file_path)
-    elif document_type in [
-        DocumentTypeEnum.JPEG,
-        DocumentTypeEnum.BMP,
-        DocumentTypeEnum.PNG,
-        DocumentTypeEnum.SVG,
-    ]:
-        return 1  # Image types assumed to be 1 page
-    else:
-        return 0
-
-
-def count_pages_for_documents(file_path: str, document_type: DocumentTypeEnum) -> int:
-    try:
-        if document_type == DocumentTypeEnum.PDF:
-            doc = pdfium.PdfDocument(file_path)
-            return len(doc)
-        elif document_type == DocumentTypeEnum.DOCX:
-            doc = DocxDocument(file_path)
-            # Approximation, as word documents do not have a direct 'page count' attribute
-            return len(doc.paragraphs) // 15
-        elif document_type == DocumentTypeEnum.PPTX:
-            ppt = Presentation(file_path)
-            return len(ppt.slides)
-    except FileNotFoundError:
-        print(f"The file {file_path} was not found.")
-        return 0
-    except Exception as e:
-        print(f"An error occurred while processing {file_path}: {e}")
-        return 0
-
-
-def count_pages_for_text(file_path: str) -> int:
-    """
-    Estimates the page count for text files based on word count,
-    using the detect_encoding_and_read_text_file function for reading.
-    """
-    try:
-        with open(file_path, "rb") as file:  # Open file in binary mode
-            file_stream = BytesIO(file.read())  # Create BytesIO object from file content
-
-        content = detect_encoding_and_read_text_file(file_stream)  # Read and decode content
-        word_count = len(content.split())
-        pages_estimated = word_count / 300
-        return round(pages_estimated)
-    except FileNotFoundError:
-        logger.error(f"The file {file_path} was not found.")
-        return 0
-    except Exception as e:
-        logger.error(f"An error occurred while processing {file_path}: {e}")
-        return 0
+        self.minio_bucket_name: str = os.getenv("MINIO_BUCKET", "nv-ingest")
 
 
 @unified_exception_handler
@@ -317,6 +245,43 @@ def generate_matching_files(file_sources):
                 yield file_path
 
 
+def balanced_groups_flat_order(
+    file_paths,
+    group_size=16,
+    weight_fn=os.path.getsize,
+):
+    # 1) sizes, sorted big -> small
+    # Sort by weight (descending), then by filename (ascending) for ties
+    def sort_key(weight_path_tuple):
+        weight, path = weight_path_tuple
+        return (-weight, path)
+
+    files = sorted(((weight_fn(p), p) for p in file_paths), key=sort_key)
+    n = len(files)
+    num_bins = math.ceil(n / group_size)
+
+    # 2) bins + heap over current loads (only for bins that are not full yet)
+    bins = [[] for _ in range(num_bins)]
+    loads = [0] * num_bins
+    counts = [0] * num_bins
+    heap = [(0, i) for i in range(num_bins)]
+    heapq.heapify(heap)
+
+    # 3) place biggest first into the currently lightest bin
+    for size, path in files:
+        total, i = heapq.heappop(heap)
+        bins[i].append(path)
+        loads[i] += size
+        counts[i] += 1
+        if counts[i] < group_size:  # still has capacity
+            heapq.heappush(heap, (loads[i], i))
+
+    # 4) sort bins by cumulative size (largest first), then flatten
+    sorted_bins = [bins[i] for _, i in sorted(zip(loads, range(num_bins)), reverse=True)]
+    balanced_ls = [p for b in sorted_bins for p in b]
+    return balanced_ls
+
+
 def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
     """
     Create and job specifications (JobSpecs) for a batch of files.
@@ -383,6 +348,32 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
         job_specs.append(job_spec)
 
     return job_specs
+
+
+def apply_pdf_split_config_to_job_specs(job_specs: List[JobSpec], pages_per_chunk: int) -> None:
+    """
+    Apply PDF split configuration to a list of JobSpec objects.
+
+    Modifies job specs in-place by adding pdf_config to extended_options for PDF files only.
+
+    Parameters
+    ----------
+    job_specs : List[JobSpec]
+        List of job specifications to potentially modify
+    pages_per_chunk : int
+        Number of pages per PDF chunk (will be stored as-is; server performs clamping)
+
+    Notes
+    -----
+    - Only modifies job specs with document_type == "pdf" (case-insensitive)
+    - Modifies job specs in-place
+    - Safe to call on mixed document types (only PDFs are affected)
+    """
+    for job_spec in job_specs:
+        if job_spec.document_type.lower() == "pdf":
+            if "pdf_config" not in job_spec._extended_options:
+                job_spec._extended_options["pdf_config"] = {}
+            job_spec._extended_options["pdf_config"]["split_page_count"] = pages_per_chunk
 
 
 def filter_function_kwargs(func, **kwargs):

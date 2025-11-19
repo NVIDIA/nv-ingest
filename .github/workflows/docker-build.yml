@@ -14,7 +14,6 @@ on:
 jobs:
   build:
     runs-on: linux-large-disk
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,9 +26,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # Build the Docker image using the Dockerfile
+      # Github does not allowing access secrets on pull requests. Therefore for this action we use the open source ubuntu
+      # base image and not the one hosted in nvcr.io
       - name: Build Docker image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t nv-ingest:latest .
+          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
 
       - name: Run Pytest inside Docker container
         run: |

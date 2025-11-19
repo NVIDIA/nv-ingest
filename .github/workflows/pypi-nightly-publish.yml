@@ -51,8 +51,8 @@ jobs:
             echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
           else
 
-            echo "Setting VERSION to $(date +'%y.%m.%d'). DEFAULT"
-            echo "VERSION=$(date +'%y.%m.%d')" >> $GITHUB_ENV
+            echo "Setting VERSION to $(date +'%Y.%m.%d'). DEFAULT"
+            echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
           fi
 
       - name: Checkout code
@@ -72,6 +72,10 @@ jobs:
         run: |
           cd client && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
+      - name: Build nv-ingest service wheel
+        run: |
+          cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
+
       - name: Publish wheels to Artifactory
         env:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
@@ -79,4 +83,5 @@ jobs:
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
         run: |
           twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
-          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/*
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/* \
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/*

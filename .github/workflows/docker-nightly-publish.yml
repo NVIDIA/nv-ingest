@@ -24,19 +24,20 @@ jobs:
       - name: Get current date (yyyy.mm.dd)
         run: echo "CURRENT_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
 
+      # Set up QEMU emulation for arm64
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       # Set up Docker Buildx, useful for building multi-platform images
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      # Build the Docker image using the Dockerfile
-      - name: Build Docker image
-        run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
 
       # Login to NGC
       - name: Log in to NGC Registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
-      # Push the container to NGC
-      - name: Upload nv-ingest container
-        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }}
+      # Build the Docker image using the Dockerfile
+      - name: Build Docker image
+        run: |
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .

@@ -3,153 +3,98 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import os
-import time
-from datetime import datetime
-from typing import Union, Tuple
+from typing import Union, Optional, TextIO
 
-import ray
-from pydantic import BaseModel, ConfigDict
 
-from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline, ScalingConfig
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
+from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
+    RayPipelineSubprocessInterface,
+    RayPipelineInterface,
+)
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+
+from nv_ingest.pipeline.config.loaders import resolve_pipeline_config, apply_runtime_overrides
+from nv_ingest.framework.orchestration.process.lifecycle import PipelineLifecycleManager
+from nv_ingest.framework.orchestration.execution.helpers import (
+    create_runtime_overrides,
+    create_execution_options,
+    select_execution_strategy,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def str_to_bool(value: str) -> bool:
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-DISABLE_DYNAMIC_SCALING = str_to_bool(os.environ.get("INGEST_DISABLE_DYNAMIC_SCALING", "false"))
-DYNAMIC_MEMORY_THRESHOLD = float(os.environ.get("INGEST_DYNAMIC_MEMORY_THRESHOLD", 0.75))
-
-
-class PipelineCreationSchema(BaseModel):
+def run_pipeline(
+    pipeline_config: Optional[PipelineConfigSchema] = None,
+    block: bool = True,
+    disable_dynamic_scaling: Optional[bool] = None,
+    dynamic_memory_threshold: Optional[float] = None,
+    run_in_subprocess: bool = False,
+    stdout: Optional[TextIO] = None,
+    stderr: Optional[TextIO] = None,
+    libmode: bool = True,
+) -> Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]:
     """
-    Schema for pipeline creation configuration.
+    Launch and manage a pipeline using configuration.
 
-    Contains all parameters required to set up and execute the pipeline,
-    including endpoints, API keys, and processing options.
+    This function is the primary entry point for executing a Ray pipeline,
+    either within the current process or in a separate Python subprocess.
+    It supports synchronous blocking execution or non-blocking lifecycle management,
+    and allows redirection of output to specified file-like objects.
+
+    Parameters
+    ----------
+    pipeline_config : Optional[PipelineConfigSchema], default=None
+        The validated configuration object used to construct and launch the pipeline.
+        If None and libmode is True, loads the default libmode pipeline.
+    block : bool, default=True
+        If True, blocks until the pipeline completes.
+        If False, returns an interface to control the pipeline externally.
+    disable_dynamic_scaling : Optional[bool], default=None
+        If provided, overrides the `disable_dynamic_scaling` setting from the pipeline config.
+    dynamic_memory_threshold : Optional[float], default=None
+        If provided, overrides the `dynamic_memory_threshold` setting from the pipeline config.
+    run_in_subprocess : bool, default=False
+        If True, launches the pipeline in a separate Python subprocess using `multiprocessing.Process`.
+        If False, runs the pipeline in the current process.
+    stdout : Optional[TextIO], default=None
+        Optional file-like stream to which subprocess stdout should be redirected.
+        If None, stdout is redirected to /dev/null.
+    stderr : Optional[TextIO], default=None
+        Optional file-like stream to which subprocess stderr should be redirected.
+        If None, stderr is redirected to /dev/null.
+    libmode : bool, default=True
+        If True and pipeline_config is None, loads the default libmode pipeline configuration.
+        If False, requires pipeline_config to be provided.
+
+    Returns
+    -------
+    Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]
+        - If run in-process with `block=True`: returns elapsed time in seconds (float).
+        - If run in-process with `block=False`: returns a `RayPipelineInterface`.
+        - If run in subprocess with `block=False`: returns a `RayPipelineSubprocessInterface`.
+        - If run in subprocess with `block=True`: returns 0.0.
+
+    Raises
+    ------
+    ValueError
+        If pipeline_config is None and libmode is False.
+    RuntimeError
+        If the subprocess fails to start or exits with an error.
+    Exception
+        Any other exceptions raised during pipeline launch or configuration.
     """
+    # Resolve configuration
+    config = resolve_pipeline_config(pipeline_config, libmode)
+    overrides = create_runtime_overrides(disable_dynamic_scaling, dynamic_memory_threshold)
+    final_config = apply_runtime_overrides(config, overrides)
 
-    # Audio processing settings
-    audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
-    audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
-    audio_infer_protocol: str = os.getenv("AUDIO_INFER_PROTOCOL", "grpc")
+    # Select execution strategy
+    strategy = select_execution_strategy(run_in_subprocess)
+    options = create_execution_options(block, stdout, stderr)
 
-    # Embedding model settings
-    embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
+    # Execute using lifecycle manager
+    lifecycle_manager = PipelineLifecycleManager(strategy)
+    result = lifecycle_manager.start(final_config, options)
 
-    # General pipeline settings
-    ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
-    max_ingest_process_workers: str = os.getenv("MAX_INGEST_PROCESS_WORKERS", "16")
-
-    # Messaging configuration
-    message_client_host: str = os.getenv("MESSAGE_CLIENT_HOST", "localhost")
-    message_client_port: str = os.getenv("MESSAGE_CLIENT_PORT", "7671")
-    message_client_type: str = os.getenv("MESSAGE_CLIENT_TYPE", "simple")
-
-    # NeMo Retriever settings
-    nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
-    )
-    nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
-    nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
-
-    # API keys
-    ngc_api_key: str = os.getenv("NGC_API_KEY", "")
-    nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
-
-    # Observability settings
-    otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
-
-    # OCR settings
-    paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
-    paddle_infer_protocol: str = os.getenv("PADDLE_INFER_PROTOCOL", "http")
-
-    # Task queue settings
-    REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
-
-    # Vision language model settings
-    vlm_caption_endpoint: str = os.getenv(
-        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
-    )
-    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
-
-    # YOLOX image processing settings
-    yolox_graphic_elements_http_endpoint: str = os.getenv(
-        "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
-    )
-    yolox_graphic_elements_infer_protocol: str = os.getenv("YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL", "http")
-
-    # YOLOX page elements settings
-    yolox_http_endpoint: str = os.getenv(
-        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
-    )
-    yolox_infer_protocol: str = os.getenv("YOLOX_INFER_PROTOCOL", "http")
-
-    # YOLOX table structure settings
-    yolox_table_structure_http_endpoint: str = os.getenv(
-        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
-    )
-    yolox_table_structure_infer_protocol: str = os.getenv("YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL", "http")
-
-    model_config = ConfigDict(extra="forbid")
-
-
-def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tuple[Union[RayPipeline, None], float]:
-    logger.info("Starting pipeline setup")
-
-    dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
-    scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=DYNAMIC_MEMORY_THRESHOLD
-    )
-
-    pipeline = RayPipeline(scaling_config=scaling_config)
-    start_abs = datetime.now()
-
-    # Set up the ingestion pipeline
-    setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
-
-    # Record setup time
-    end_setup = start_run = datetime.now()
-    setup_elapsed = (end_setup - start_abs).total_seconds()
-    logger.info(f"Pipeline setup completed in {setup_elapsed:.2f} seconds")
-
-    # Run the pipeline
-    logger.debug("Running pipeline")
-    pipeline.start()
-
-    if block:
-        try:
-            while True:
-                time.sleep(5)
-        except KeyboardInterrupt:
-            logger.info("Interrupt received, shutting down pipeline.")
-            pipeline.stop()
-            ray.shutdown()
-            logger.info("Ray shutdown complete.")
-
-        # Record execution times
-        end_run = datetime.now()
-        run_elapsed = (end_run - start_run).total_seconds()
-        total_elapsed = (end_run - start_abs).total_seconds()
-
-        logger.info(f"Pipeline run completed in {run_elapsed:.2f} seconds")
-        logger.info(f"Total time elapsed: {total_elapsed:.2f} seconds")
-
-        return None, total_elapsed
-    else:
-        return pipeline, 0.0
-
-
-def run_pipeline(ingest_config: PipelineCreationSchema, block: bool = True) -> Union[RayPipeline, float]:
-    pipeline, total_elapsed = _launch_pipeline(ingest_config, block)
-
-    if block:
-        logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
-
-    return pipeline
+    # Return in expected format
+    return result.get_return_value()

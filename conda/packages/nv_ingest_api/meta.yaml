@@ -24,8 +24,8 @@ build:
 requirements:
   build:
     - pip
-    - python=3.12
-    - setuptools>=58.2.0
+    - python=3.12.11
+    - setuptools>=78.1.1
   run:
     - azure-core>=1.32.0
     - fastparquet>=2024.11.0
@@ -33,22 +33,19 @@ requirements:
     - httpx>=0.28.1
     - isodate>=0.7.2
     - langdetect>=1.0.9
-    - openai>=1.57.1
+    - protobuf=5.28.3
     - pydantic>=2.0.0
     - pypdfium2>=4.30.0
     - pytest>=8.0.2
     - pytest-mock>=3.14.0
-    - python>=3.12
+    - python>=3.12.11
     - python-docx>=1.1.2
     - python-dotenv>=1.0.1
     - python-magic>=0.4.27
     - python-pptx>=1.0.2
-    - pytorch==2.4.1  # https://github.com/pytorch/pytorch/issues/111469
     - requests>=2.28.2
-    - setuptools>=58.2.0
+    - setuptools>=78.1.1
     - tabulate>=0.9.0
-    - torchaudio
-    - torchvision
     - transformers>=4.47.0
     # - unstructured-client>=0.25.9
 
@@ -70,4 +67,3 @@ channels:
   - rapidsai
   - nvidia
   - conda-forge
-  - pytorch

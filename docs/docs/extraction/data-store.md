@@ -1,4 +1,4 @@
-## Data Upload for NeMo Retriever Extraction
+# Data Upload for NeMo Retriever Extraction
 
 Use this documentation to learn how [NeMo Retriever extraction](overview.md) handles and uploads data.
 
@@ -6,20 +6,21 @@ Use this documentation to learn how [NeMo Retriever extraction](overview.md) han
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+
 ## Overview
 
 NeMo Retriever extraction supports extracting text representations of various forms of content, 
 and ingesting to the [Milvus vector database](https://milvus.io/). 
 NeMo Retriever extraction does not store data on disk directly, except through Milvus. 
 The data upload task pulls extraction results to the Python client, 
-and then pushes them to Milvus by using its underlying Minio object store service.
+and then pushes them to Milvus by using its underlying MinIO object store service.
 
 The vector database stores only the extracted text representations of ingested data. 
 It does not store the embeddings for images.
 
 NeMo Retriever extraction supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md). 
 Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
- 
+
 
 
 ## Upload to Milvus
@@ -35,7 +36,15 @@ If you set `recreate=True`, nv-ingest drops and recreates the collection given a
 The Milvus service persists data to disk by using a Docker volume defined in docker-compose.yaml. 
 You can delete all collections by deleting that volume, and then restarting the nv-ingest service.
 
-To upload to Milvus, use code similar to the following.
+!!! warning
+
+    When you use the `vdb_upload` task with Milvus, you must expose the ports for the Milvus and MinIO containers to the nv-ingest client. This ensures that the nv-ingest client can connect to both services and perform the `vdb_upload` action.
+
+!!! tip
+
+    When you use the `vdb_upload` method, the behavior of the upload depends on the `return_failures` parameter of the `ingest` method. For details, refer to [Capture Job Failures](nv-ingest-python-api.md#capture-job-failures).
+
+To upload to Milvus, use code similar to the following to define your `Ingestor`.
 
 ```python
 Ingestor(client=client)
@@ -58,7 +67,19 @@ Ingestor(client=client)
 
 ## Upload to a Custom Data Store
 
-
 You can ingest to other data stores by using the `Ingestor.vdb_upload` method; 
 however, you must configure other data stores and connections yourself. 
 NeMo Retriever extraction does not provide connections to other data sources. 
+
+!!! important
+
+    NVIDIA makes no claim about accuracy, performance, or functionality of any vector database except Milvus. If you use a different vector database, it's your responsibility to test and maintain it.
+
+For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
+
+
+
+## Related Topics
+
+- [Use the NeMo Retriever Extraction Python API](nv-ingest-python-api.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)

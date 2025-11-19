@@ -1,4 +1,4 @@
-## Use NeMo Retriever Extraction with Riva
+# Use NeMo Retriever Extraction with Riva for Audio Processing
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
@@ -64,10 +64,9 @@ Again, replace <your-ngc-key> with your actual NGC key.
 3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
 
     - The `--profile audio` flag ensures that audio-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
-    - The `--build` flag ensures that any changes to the container images are applied before starting.
 
     ```shell
-    docker compose --profile retrieval --profile audio up --build
+    docker compose --profile retrieval --profile audio up
     ```
 
 4. After the services are running, you can interact with nv-ingest by using Python.
@@ -127,3 +126,11 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
     !!! tip
 
         For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
+
+
+## Related Topics
+
+- [Support Matrix](support-matrix.md)
+- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
