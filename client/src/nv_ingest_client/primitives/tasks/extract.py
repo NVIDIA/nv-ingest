@@ -61,6 +61,16 @@ _Type_Extract_Method_PDF = Literal[
     "ocr",
 ]
 
+_Type_Extract_Method_DOCX = Literal[
+    "python_docx",
+    "render_as_pdf",
+]
+
+_Type_Extract_Method_PPTX = Literal[
+    "python_pptx",
+    "render_as_pdf",
+]
+
 _Type_Extract_Images_Method = Literal["group", "yolox"]
 
 _Type_Extract_Tables_Method_PDF = Literal["yolox", "paddle"]
@@ -74,7 +84,7 @@ class ExtractTask(Task):
     def __init__(
         self,
         document_type,
-        extract_method: _Type_Extract_Method_PDF = None,
+        extract_method: Optional[str] = None,
         extract_text: bool = False,
         extract_images: bool = False,
         extract_tables: bool = False,
