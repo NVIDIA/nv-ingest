@@ -24,6 +24,43 @@ def _resolve_storage_root(storage_uri: str, storage_options: Dict[str, Any]) -> 
     return storage_root, protocol
 
 
+def _extract_image_type(doc_type: Any, metadata: Dict[str, Any]) -> str:
+    """
+    Determine the image type to use when writing the decoded content based on the document type.
+    """
+
+    def _normalize(raw_value: Any, default: str = "png") -> str:
+        if raw_value is None:
+            return default
+        if hasattr(raw_value, "value"):
+            return str(raw_value.value).lower()
+        string_value = str(raw_value).strip()
+        return string_value.lower() if string_value else default
+
+    if doc_type == ContentTypeEnum.IMAGE:
+        image_metadata = metadata.get("image_metadata", {})
+        return _normalize(image_metadata.get("image_type"))
+
+    if doc_type == ContentTypeEnum.STRUCTURED:
+        table_metadata = metadata.get("table_metadata", {})
+        return _normalize(table_metadata.get("image_type"))
+
+    return "png"
+
+
+def _build_destination_path(storage_root: UPath, source_id: str, row_index: int, image_type: str) -> Tuple[UPath, str]:
+    """
+    Build the destination UPath for the decoded content and return both the destination and relative key.
+    """
+    safe_source_name = os.path.basename(source_id.rstrip("/")) or "source"
+    clean_source_name = safe_source_name.replace("/", "_")
+
+    destination: UPath = storage_root / clean_source_name / f"{row_index}.{image_type}"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    relative_key = destination.relative_to(storage_root).as_posix()
+    return destination, relative_key
+
+
 def _upload_images_via_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     """
     Identifies content within a DataFrame and persists it using an fsspec-compatible filesystem, updating
@@ -102,37 +139,18 @@ def _upload_images_via_fsspec(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Da
             content = base64.b64decode(metadata["content"].encode())
             source_id = source_metadata["source_id"]
 
-            # Determine image type (default to 'png')
-            image_type = "png"
-            if doc_type == ContentTypeEnum.IMAGE:
-                image_metadata = metadata.get("image_metadata", {})
-                raw_image_type = image_metadata.get("image_type", "png")
-                # Handle both enum and string values
-                if hasattr(raw_image_type, "value"):
-                    # It's an enum, get the string value
-                    image_type = raw_image_type.value.lower()
-                else:
-                    image_type = str(raw_image_type).lower()
-            elif doc_type == ContentTypeEnum.STRUCTURED:
-                # Structured content (tables/charts) may also have image_type
-                table_metadata = metadata.get("table_metadata", {})
-                raw_image_type = table_metadata.get("image_type", "png")
-                # Handle both enum and string values
-                if hasattr(raw_image_type, "value"):
-                    image_type = raw_image_type.value.lower()
-                else:
-                    image_type = str(raw_image_type).lower()
+            image_type = _extract_image_type(doc_type, metadata)
 
             # Construct destination file path
-            # Extract just the filename from source_id for cleaner organization
-            clean_source_name = os.path.basename(source_id).replace("/", "_")
-
-            destination: UPath = storage_root / clean_source_name / f"{idx}.{image_type}"
-            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination, relative_key = _build_destination_path(
+                storage_root=storage_root,
+                source_id=source_id,
+                row_index=idx,
+                image_type=image_type,
+            )
             with destination.open("wb") as target_file:
                 target_file.write(content)
 
-            relative_key = destination.relative_to(storage_root).as_posix()
             destination_uri = destination.as_uri()
             public_url: Optional[str] = None
             if public_base_url:
