@@ -886,9 +886,9 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
    - `results.json` → includes `trace_summary` with per-stage resident seconds
    - `traces/*.json` → raw payloads identical to `scripts/private_local/trace.json`
    - Use descriptive folder names (e.g., copy artifacts to `artifacts/baseline_bo20/`) to keep baseline vs RC side-by-side.
-5. **Visualize stage timings**
+5. **Visualize stage + wall timings**
    ```bash
-   # Generates results.stage_time.png + textual summary
+   # Generates results.stage_time.png (per-stage resident) and results.wall_time.png (doc wall vs resident)
    python scripts/tests/tools/plot_stage_totals.py \
      scripts/tests/artifacts/<run>/results.json \
      --sort total \
@@ -897,6 +897,8 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
    ```
    - `--keep-nested` preserves nested entries such as chart/table OCR workloads
    - `--exclude-network` hides broker/Redis wait time so the chart focuses on Ray stages
+   - `--doc-top-n` controls how many slowest documents appear on the wall-time plot (set `0` for all)
+   - `--skip-wall-plot` emits only the resident-time chart if you want the legacy behavior
 
 ### Future Trace Visualization Case (roadmap)
 

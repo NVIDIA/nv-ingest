@@ -14,7 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
+
+import math
 
 import matplotlib.pyplot as plt
 import yaml
@@ -97,7 +99,8 @@ def should_keep_stage(stage: str, keep_nested: bool, exclude_network: bool) -> b
     return "::" not in stage
 
 
-def build_plot(
+def build_stage_plot(
+    data: Dict[str, Any],
     results_path: Path,
     pipeline_yaml: Path,
     top_n: int | None,
@@ -108,8 +111,12 @@ def build_plot(
     summary_rows: int,
     exclude_network: bool,
 ):
-    data = json.loads(results_path.read_text())
-    stage_totals = data["trace_summary"]["stage_totals"]
+    trace_summary = data.get("trace_summary")
+    if not trace_summary or "stage_totals" not in trace_summary:
+        print("No stage_totals found in trace_summary; skipping stage plot.")
+        return
+
+    stage_totals = trace_summary["stage_totals"]
 
     stage_order = load_stage_order(pipeline_yaml)
     order_map = {stage: idx for idx, stage in enumerate(stage_order)}
@@ -190,6 +197,141 @@ def build_plot(
             print(f"{stage:<40} {total:>12.2f} {avg:>10.2f} {doc_cnt:>6}")
 
 
+def build_wall_plot(
+    data: Dict[str, Any],
+    results_path: Path,
+    doc_top_n: int | None,
+    width: int,
+    summary_rows: int,
+    title_suffix: str | None = None,
+):
+    trace_summary = data.get("trace_summary")
+    if not trace_summary:
+        print("No trace_summary present; skipping wall-time plot.")
+        return
+    document_totals = trace_summary.get("document_totals")
+    if not document_totals:
+        print("No document_totals present; skipping wall-time plot.")
+        return
+
+    run_results = data.get("results", {})
+    ingestion_time = run_results.get("ingestion_time_s")
+    result_count = run_results.get("result_count") or len(document_totals)
+
+    documents = sorted(
+        document_totals,
+        key=lambda item: item.get("total_wall_s", 0.0),
+        reverse=True,
+    )
+    if doc_top_n:
+        documents = documents[:doc_top_n]
+
+    if not documents:
+        print("No document entries available after filtering; skipping wall-time plot.")
+        return
+
+    labels = []
+    wall_vals = []
+    resident_vals = []
+    ratios = []
+    for doc in documents:
+        source = doc.get("source_id") or f"doc_{doc.get('document_index', '?')}"
+        source_name = Path(source).name
+        doc_idx = doc.get("document_index")
+        label = f"{doc_idx}: {source_name}" if doc_idx is not None else source_name
+        labels.append(label)
+        wall = float(doc.get("total_wall_s", 0.0))
+        resident = float(doc.get("total_resident_s", 0.0))
+        wall_vals.append(wall)
+        resident_vals.append(resident)
+        ratios.append(resident / wall if wall > 0 else math.inf)
+
+    labels = labels[::-1]
+    wall_vals = wall_vals[::-1]
+    resident_vals = resident_vals[::-1]
+    ratios = ratios[::-1]
+
+    base_positions = list(range(len(labels)))
+    wall_positions = [pos + 0.2 for pos in base_positions]
+    resident_positions = [pos - 0.2 for pos in base_positions]
+
+    fig_height = max(6, len(labels) * 0.35)
+    fig, ax = plt.subplots(figsize=(width, fig_height))
+
+    ax.barh(
+        wall_positions,
+        wall_vals,
+        height=0.35,
+        color="#55A868",
+        label="Wall seconds",
+    )
+    ax.barh(
+        resident_positions,
+        resident_vals,
+        height=0.35,
+        color="#C44E52",
+        label="Resident seconds",
+    )
+
+    ax.set_yticks(base_positions)
+    ax.set_yticklabels(labels)
+    ax.invert_yaxis()
+    ax.set_xlabel("Seconds per document")
+    title = "Document wall vs resident time"
+    if title_suffix:
+        title = f"{title} – {title_suffix}"
+    ax.set_title(title)
+    ax.legend(loc="upper right")
+
+    max_val = max(wall_vals + resident_vals)
+    text_x = max_val * 1.02 if max_val > 0 else 0.5
+
+    for pos, wall, resident, ratio in zip(base_positions, wall_vals, resident_vals, ratios):
+        if wall <= 0 and resident <= 0:
+            continue
+        ratio_str = "∞" if math.isinf(ratio) else f"{ratio:.1f}×"
+        ax.text(
+            text_x,
+            pos,
+            f"resident/wall {ratio_str}",
+            va="center",
+            fontsize=8,
+            color="#333333",
+        )
+
+    info_lines = []
+    if ingestion_time is not None:
+        info_lines.append(f"Run wall time: {ingestion_time:.1f}s")
+    if result_count:
+        info_lines.append(f"Documents: {result_count}")
+    if info_lines:
+        ax.text(
+            0.01,
+            1.02,
+            " • ".join(info_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=9,
+            color="#333333",
+        )
+
+    plt.tight_layout()
+    out_path = results_path.with_suffix(".wall_time.png")
+    plt.savefig(out_path, dpi=200)
+    print(f"Wrote {out_path}")
+
+    if summary_rows > 0:
+        print("\nTop documents by wall time")
+        print("-" * 90)
+        print(f"{'Document':<40} {'Wall (s)':>12} {'Resident (s)':>14} {'Ratio':>8}")
+        print("-" * 90)
+        truncated = list(zip(labels[::-1], wall_vals[::-1], resident_vals[::-1], ratios[::-1]))[:summary_rows]
+        for label, wall, resident, ratio in truncated:
+            ratio_str = "∞" if math.isinf(ratio) else f"{ratio:.2f}"
+            print(f"{label:<40} {wall:>12.2f} {resident:>14.2f} {ratio_str:>8}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plot stage resident times from results.json")
     parser.add_argument("results", type=Path, help="Path to results.json artifact")
@@ -224,12 +366,31 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exclude broker/network-in stages from the visualization",
     )
+    parser.add_argument(
+        "--doc-top-n",
+        type=int,
+        default=30,
+        help="Limit wall-time plot to top N documents by wall seconds (0 disables limit)",
+    )
+    parser.add_argument(
+        "--doc-summary-rows",
+        type=int,
+        default=10,
+        help="Print textual summary for document wall times (0 disables)",
+    )
+    parser.add_argument(
+        "--skip-wall-plot",
+        action="store_true",
+        help="Only emit the stage resident-time plot",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    build_plot(
+    data = json.loads(args.results.read_text())
+    build_stage_plot(
+        data=data,
         results_path=args.results,
         pipeline_yaml=args.pipeline,
         top_n=args.top_n,
@@ -240,6 +401,16 @@ def main():
         summary_rows=args.summary_rows,
         exclude_network=args.exclude_network,
     )
+    if not args.skip_wall_plot:
+        test_name = data.get("test_config", {}).get("test_name")
+        build_wall_plot(
+            data=data,
+            results_path=args.results,
+            doc_top_n=args.doc_top_n or None,
+            width=args.width,
+            summary_rows=args.doc_summary_rows,
+            title_suffix=test_name,
+        )
 
 
 if __name__ == "__main__":

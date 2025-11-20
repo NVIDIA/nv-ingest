@@ -86,8 +86,8 @@ def _summarize_traces(traces_list, results, trace_dir: str | None):
 
         stage_breakdown = {}
         total_resident = 0.0
-        total_wall = 0.0
-        wall_seen = False
+        doc_first_entry_ns = None
+        doc_last_exit_ns = None
 
         for key, value in trace_payload.items():
             if not key.startswith("trace::resident_time::"):
@@ -99,25 +99,27 @@ def _summarize_traces(traces_list, results, trace_dir: str | None):
             wall_s = None
             if entry is not None and exit_value is not None:
                 wall_s = _ns_to_seconds(exit_value - entry)
+                if doc_first_entry_ns is None or entry < doc_first_entry_ns:
+                    doc_first_entry_ns = entry
+                if doc_last_exit_ns is None or exit_value > doc_last_exit_ns:
+                    doc_last_exit_ns = exit_value
 
             stage_entry = {"resident_s": round(resident_s, 6)}
             if wall_s is not None:
                 stage_entry["wall_s"] = round(wall_s, 6)
-                wall_seen = True
-                total_wall += wall_s
 
             stage_breakdown[stage] = stage_entry
             total_resident += resident_s
             stage_totals[stage].append(resident_s)
 
-        document_totals.append(
-            {
-                "document_index": doc_index,
-                "source_id": source_id,
-                "total_resident_s": round(total_resident, 6),
-                **({"total_wall_s": round(total_wall, 6)} if wall_seen else {}),
-            }
-        )
+        doc_record = {
+            "document_index": doc_index,
+            "source_id": source_id,
+            "total_resident_s": round(total_resident, 6),
+        }
+        if doc_first_entry_ns is not None and doc_last_exit_ns is not None and doc_last_exit_ns >= doc_first_entry_ns:
+            doc_record["total_wall_s"] = round(_ns_to_seconds(doc_last_exit_ns - doc_first_entry_ns), 6)
+        document_totals.append(doc_record)
 
         if trace_dir:
             trace_payload_path = os.path.join(trace_dir, f"{_safe_trace_filename(source_id, doc_index)}.json")
