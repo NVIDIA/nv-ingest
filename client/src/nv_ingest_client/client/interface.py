@@ -724,8 +724,6 @@ class Ingestor:
             def _processor_done_callback(proc_future: Future):
                 """Callback to handle completion, VDB upload, and final result setting."""
                 try:
-                    processed_job_ids = set()
-
                     if proc_future.cancelled():
                         if not final_future.done():
                             final_future.cancel()
@@ -737,28 +735,21 @@ class Ingestor:
 
                     results, failures, traces_list = proc_future.result()
 
+                    failed_job_ids = set()
                     for job_id_with_source, error_msg in failures:
-                        # The failure format is "job_index:source_id"
                         job_id = job_id_with_source.split(":", 1)[0]
                         if job_id in self._job_states:
-                            job_state = self._job_states[job_id]
-                            if job_state.state != JobStateEnum.FAILED:
-                                job_state.state = JobStateEnum.FAILED
+                            if self._job_states[job_id].state != JobStateEnum.FAILED:
+                                self._job_states[job_id].state = JobStateEnum.FAILED
+                            failed_job_ids.add(job_id)
 
-                    for result_item in results:
-                        job_id = None
-                        if isinstance(result_item, str):  # Case: stream_to_callback_only=True
-                            job_id = result_item
-                        elif isinstance(result_item, dict):
-                            # Try to find jobIndex, which might be in the 'data' or top-level
-                            if "data" in result_item and isinstance(result_item["data"], dict):
-                                job_id = result_item["data"].get("jobIndex")
-                            if not job_id:
-                                job_id = result_item.get("jobIndex")
+                    all_submitted_job_ids = set(self._job_ids)
+                    successful_job_ids = all_submitted_job_ids - failed_job_ids
 
-                        if job_id and job_id in self._job_states:
-                            self._job_states[job_id].state = JobStateEnum.COMPLETED
-                            processed_job_ids.add(job_id)
+                    for job_id in successful_job_ids:
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.COMPLETED:
+                                self._job_states[job_id].state = JobStateEnum.COMPLETED
 
                     if self._vdb_bulk_upload and results:
                         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
@@ -788,6 +779,14 @@ class Ingestor:
                     logger.exception("Error in ingest_async processor callback")
                     if not final_future.done():
                         final_future.set_exception(e)
+                finally:
+                    final_state = JobStateEnum.CANCELLED if proc_future.cancelled() else JobStateEnum.FAILED
+                    for job_state in self._job_states.values():
+                        if (
+                            job_state.state not in [JobStateEnum.COMPLETED, JobStateEnum.FAILED]
+                            and job_state.state != final_state
+                        ):
+                            job_state.state = final_state
 
             processor_future.add_done_callback(_processor_done_callback)
             return final_future
