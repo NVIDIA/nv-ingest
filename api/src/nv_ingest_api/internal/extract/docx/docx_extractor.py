@@ -135,6 +135,8 @@ def _decode_and_extract_from_docx(
         pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
         pdf_extractor_config = extract_params.copy()
         pdf_extractor_config["extract_method"] = pdf_extract_method
+        if getattr(extraction_config, "pdfium_config", None) is not None:
+            pdf_extractor_config["pdfium_config"] = extraction_config.pdfium_config
 
         extracted_data: Any = pdfium_extractor(
             pdf_stream=pdf_stream,
