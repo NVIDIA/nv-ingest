@@ -8,7 +8,6 @@ import io
 import json
 import logging
 import os
-import sys
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import ANY

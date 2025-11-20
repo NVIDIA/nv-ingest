@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import random
-from collections import defaultdict
 from concurrent.futures import Future
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -13,7 +12,6 @@ import pytest
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.client.client import _ConcurrentProcessor
 from nv_ingest_client.primitives.jobs import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
