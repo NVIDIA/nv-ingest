@@ -253,7 +253,7 @@ class _ConcurrentProcessor:
         # Attempt to mark state as FAILED locally in the client (best effort)
         try:
             # Use a method assumed to safely get the state object
-            job_state = self.client._get_job_state_object(job_index)
+            job_state = self.client._get_and_check_job_state(job_index)
             # Check state exists and is not already terminal before updating
             if (
                 job_state and hasattr(job_state, "state") and job_state.state not in ["FAILED", "COMPLETED"]
