@@ -39,7 +39,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStor
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.util.introspection.function_inspect import infer_udf_function_name
 from nv_ingest_client.client.client import NvIngestClient
-from nv_ingest_client.client.client import _ConcurrentProcessor
 from nv_ingest_client.client.util.processing import get_valid_filename
 from nv_ingest_client.client.util.processing import save_document_results_to_jsonl
 from nv_ingest_client.primitives import BatchJobSpec
@@ -709,52 +708,24 @@ class Ingestor:
             self._job_ids = self._client.add_job(self._job_specs)
             self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
-            if not self._job_ids:
-                logger.warning("No job IDs to process for ingest_async.")
-                empty_returns = [[]]
-                if return_failures:
-                    empty_returns.append([])
-                if return_traces:
-                    empty_returns.append([])
-                final_empty_result = tuple(empty_returns) if len(empty_returns) > 1 else empty_returns[0]
+            proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently_async, **kwargs)
 
-                immediate_future: Future = Future()
-                immediate_future.set_result(final_empty_result)
-                return immediate_future
+            final_future: Future = Future()
 
-            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
-
-            # Establish default values for the processor, mirroring NvIngestClient.process_jobs_concurrently
-            # since we are calling the processor directly.
-            processor_args = {
-                "batch_size": kwargs.get("batch_size", None),  # Let the client validate None to its default
-                "timeout": kwargs.get("timeout", 100),
-                "max_job_retries": kwargs.get("max_job_retries", None),
-                "retry_delay": kwargs.get("retry_delay", 0.5),
-                "initial_fetch_delay": kwargs.get("initial_fetch_delay", 0.3),
-                "fail_on_submit_error": kwargs.get("fail_on_submit_error", False),
-                "verbose": kwargs.get("verbose", False),
-                "return_traces": return_traces,
-                # Arguments specific to async in-memory processing:
-                "completion_callback": None,
-                "stream_to_callback_only": False,
-                "return_full_response": kwargs.get("return_full_response", False),
-            }
-
-            processor_args["batch_size"] = self._client._validate_batch_size(processor_args["batch_size"])
-            processor_args["timeout"] = (int(processor_args["timeout"]), None)
-
-            processor = _ConcurrentProcessor(
-                client=self._client, job_indices=self._job_ids, job_queue_id=self._job_queue_id, **processor_args
+            processor_future = self._client.process_jobs_concurrently_async(
+                job_indices=self._job_ids,
+                job_queue_id=self._job_queue_id,
+                return_traces=return_traces,
+                **proc_kwargs,
             )
 
-            final_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = Future()
-
-            processor_future = processor.run_async()
+            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
 
             def _processor_done_callback(proc_future: Future):
                 """Callback to handle completion, VDB upload, and final result setting."""
                 try:
+                    processed_job_ids = set()
+
                     if proc_future.cancelled():
                         if not final_future.done():
                             final_future.cancel()
@@ -765,6 +736,29 @@ class Ingestor:
                         return
 
                     results, failures, traces_list = proc_future.result()
+
+                    for job_id_with_source, error_msg in failures:
+                        # The failure format is "job_index:source_id"
+                        job_id = job_id_with_source.split(":", 1)[0]
+                        if job_id in self._job_states:
+                            job_state = self._job_states[job_id]
+                            if job_state.state != JobStateEnum.FAILED:
+                                job_state.state = JobStateEnum.FAILED
+
+                    for result_item in results:
+                        job_id = None
+                        if isinstance(result_item, str):  # Case: stream_to_callback_only=True
+                            job_id = result_item
+                        elif isinstance(result_item, dict):
+                            # Try to find jobIndex, which might be in the 'data' or top-level
+                            if "data" in result_item and isinstance(result_item["data"], dict):
+                                job_id = result_item["data"].get("jobIndex")
+                            if not job_id:
+                                job_id = result_item.get("jobIndex")
+
+                        if job_id and job_id in self._job_states:
+                            self._job_states[job_id].state = JobStateEnum.COMPLETED
+                            processed_job_ids.add(job_id)
 
                     if self._vdb_bulk_upload and results:
                         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:

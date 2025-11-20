@@ -1425,6 +1425,68 @@ class NvIngestClient:
             logger.warning(f"{len(failures)} job(s) failed during concurrent processing." " Check logs for details.")
         return results
 
+    def process_jobs_concurrently_async(
+        self,
+        job_indices: Union[str, List[str]],
+        job_queue_id: Optional[str] = None,
+        batch_size: Optional[int] = None,
+        timeout: int = 100,
+        max_job_retries: Optional[int] = None,
+        retry_delay: float = 0.5,
+        initial_fetch_delay: float = 0.3,
+        fail_on_submit_error: bool = False,
+        completion_callback: Optional[Callable[[Any, str], None]] = None,
+        stream_to_callback_only: bool = False,
+        return_full_response: bool = False,
+        verbose: bool = False,
+        return_traces: bool = False,
+    ) -> Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]:
+        """
+        Submit and fetch multiple jobs concurrently and asynchronously.
+
+        This method initializes the processing and returns a Future immediately. The Future
+        will resolve with a fixed 3-part tuple `(results, failures, traces)` once all
+        jobs have completed.
+
+        Parameters are identical to `process_jobs_concurrently`.
+
+        Returns
+        -------
+        Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]
+            A future that completes when all jobs are done. Its result is a tuple
+            containing (successful_results, failures, traces).
+        """
+        if isinstance(job_indices, str):
+            job_indices = [job_indices]
+
+        if not job_indices:
+            immediate_future: Future = Future()
+            immediate_future.set_result(([], [], []))
+            return immediate_future
+
+        validated_batch_size = self._validate_batch_size(batch_size)
+        effective_timeout: Tuple[int, Optional[float]] = (int(timeout), None)
+
+        processor = _ConcurrentProcessor(
+            client=self,
+            batch_size=validated_batch_size,
+            job_indices=job_indices,
+            job_queue_id=job_queue_id,
+            timeout=effective_timeout,
+            max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
+            initial_fetch_delay=initial_fetch_delay,
+            completion_callback=completion_callback,
+            fail_on_submit_error=fail_on_submit_error,
+            stream_to_callback_only=stream_to_callback_only,
+            return_full_response=return_full_response,
+            verbose=verbose,
+            return_traces=return_traces,
+        )
+
+        # Asynchronous call
+        return processor.run_async()
+
     def _ensure_submitted(self, job_ids: Union[str, List[str]]) -> None:
         """
         Block until all specified jobs have been marked submitted.
