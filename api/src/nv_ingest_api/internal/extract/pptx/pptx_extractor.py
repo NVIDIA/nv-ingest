@@ -113,9 +113,9 @@ def _decode_and_extract_from_pptx(
     if trace_info is not None:
         extract_params["trace_info"] = trace_info
 
-    extract_method = extract_params.get("extract_method", "render_as_pdf")
+    extract_method = extract_params.get("extract_method", "python_pptx")
     if extract_method == "render_as_pdf":
-        pdf_stream = convert_stream_with_libreoffice(pptx_stream, "pptx", "pdf")
+        pdf_stream = convert_stream_with_libreoffice(pptx_stream, "pptx")
 
         pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
         pdf_extractor_config = extract_params.copy()

@@ -128,9 +128,9 @@ def _decode_and_extract_from_docx(
     if execution_trace_log is not None:
         extract_params["trace_info"] = execution_trace_log
 
-    extract_method = extract_params.get("extract_method", "render_as_pdf")
+    extract_method = extract_params.get("extract_method", "python_docx")
     if extract_method == "render_as_pdf":
-        pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx", "pdf")
+        pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx")
 
         pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
         pdf_extractor_config = extract_params.copy()

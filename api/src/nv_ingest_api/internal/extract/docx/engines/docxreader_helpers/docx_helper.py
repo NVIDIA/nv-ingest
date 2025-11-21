@@ -17,7 +17,6 @@
 
 # pylint: disable=too-many-locals
 
-import glob
 import io
 import logging
 import os
@@ -127,19 +126,17 @@ def python_docx(
 
 
 def convert_stream_with_libreoffice(
-    file_stream: io.BytesIO, input_extension: str, output_format: str
+    file_stream: io.BytesIO, input_extension: str
 ) -> Union[io.BytesIO, List[io.BytesIO]]:
     """
-    Converts a file stream (DOCX or PPTX) to PDF or a series of PNGs using a temporary directory.
+    Converts a file stream (DOCX or PPTX) to PDF using a temporary directory.
 
     Args:
         file_stream: A BytesIO stream of the input file.
         input_extension: The file extension of the input (e.g., 'docx' or 'pptx').
-        output_format: The desired output format ('pdf' or 'png').
 
     Returns:
-        - If output_format is 'pdf', returns a single BytesIO stream of the PDF.
-        - If output_format is 'png', returns a list of BytesIO streams, one for each page.
+        A single BytesIO stream of the PDF.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         input_path = os.path.join(temp_dir, f"input.{input_extension}")
@@ -150,7 +147,7 @@ def convert_stream_with_libreoffice(
             "libreoffice",
             "--headless",
             "--convert-to",
-            output_format,
+            "pdf",
             input_path,
             "--outdir",
             temp_dir,
@@ -164,27 +161,15 @@ def convert_stream_with_libreoffice(
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"LibreOffice conversion to {output_format} failed: {e.stderr}") from e
+            raise RuntimeError(f"LibreOffice conversion to PDF failed: {e.stderr}") from e
         except FileNotFoundError:
             raise RuntimeError("LibreOffice command not found. Is it installed and in the system's PATH?") from None
 
-        if output_format == "pdf":
-            pdf_path = os.path.join(temp_dir, "input.pdf")
-            if not os.path.exists(pdf_path):
-                raise RuntimeError("LibreOffice PDF conversion failed to produce an output file.")
-            with open(pdf_path, "rb") as f:
-                return io.BytesIO(f.read())
+        pdf_path = os.path.join(temp_dir, "input.pdf")
+        if not os.path.exists(pdf_path):
+            raise RuntimeError("LibreOffice PDF conversion failed to produce an output file.")
 
-        elif output_format == "png":
-            image_files = sorted(glob.glob(os.path.join(temp_dir, "input*.png")))
-            if not image_files:
-                raise RuntimeError("LibreOffice PNG conversion failed to produce any image files.")
+        with open(pdf_path, "rb") as f:
+            output = io.BytesIO(f.read())
 
-            image_streams = []
-            for image_path in image_files:
-                with open(image_path, "rb") as f:
-                    image_streams.append(io.BytesIO(f.read()))
-            return image_streams
-
-        else:
-            raise ValueError(f"Unsupported output format for LibreOffice conversion: {output_format}")
+        return output
