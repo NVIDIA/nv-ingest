@@ -523,3 +523,14 @@ class TestVDBUpload(unittest.TestCase):
         # Try to add an invalid VDB operator
         with self.assertRaises(ValueError):
             ingestor.vdb_upload(vdb_op="not_a_vdb_op")
+
+
+def test_milvus_bucket_name_validation():
+    """Test that providing a bucket_name different from the environment variable raises a ValueError."""
+    from nv_ingest_client.util.vdb.milvus import Milvus
+
+    # Attempt to create a Milvus instance with a different bucket_name
+    with pytest.raises(ValueError) as excinfo:
+        Milvus(bucket_name="different-bucket")
+
+    assert "You must use the environment variable MINIO_BUCKET to specify bucket_name" in str(excinfo.value)
