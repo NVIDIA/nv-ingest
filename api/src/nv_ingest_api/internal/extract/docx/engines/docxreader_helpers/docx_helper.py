@@ -17,12 +17,8 @@
 
 # pylint: disable=too-many-locals
 
-import io
 import logging
-import os
-import subprocess
-import tempfile
-from typing import IO, Optional, List, Union
+from typing import IO, Optional, List
 
 from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import TextTypeEnum
@@ -123,53 +119,3 @@ def python_docx(
     )
 
     return extracted_data
-
-
-def convert_stream_with_libreoffice(
-    file_stream: io.BytesIO, input_extension: str
-) -> Union[io.BytesIO, List[io.BytesIO]]:
-    """
-    Converts a file stream (DOCX or PPTX) to PDF using a temporary directory.
-
-    Args:
-        file_stream: A BytesIO stream of the input file.
-        input_extension: The file extension of the input (e.g., 'docx' or 'pptx').
-
-    Returns:
-        A single BytesIO stream of the PDF.
-    """
-    with tempfile.TemporaryDirectory() as temp_dir:
-        input_path = os.path.join(temp_dir, f"input.{input_extension}")
-        with open(input_path, "wb") as f:
-            f.write(file_stream.read())
-
-        command = [
-            "libreoffice",
-            "--headless",
-            "--convert-to",
-            "pdf",
-            input_path,
-            "--outdir",
-            temp_dir,
-        ]
-
-        try:
-            subprocess.run(
-                command,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"LibreOffice conversion to PDF failed: {e.stderr}") from e
-        except FileNotFoundError:
-            raise RuntimeError("LibreOffice command not found. Is it installed and in the system's PATH?") from None
-
-        pdf_path = os.path.join(temp_dir, "input.pdf")
-        if not os.path.exists(pdf_path):
-            raise RuntimeError("LibreOffice PDF conversion failed to produce an output file.")
-
-        with open(pdf_path, "rb") as f:
-            output = io.BytesIO(f.read())
-
-        return output

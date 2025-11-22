@@ -11,8 +11,8 @@ from typing import Any, Optional, Dict, Union, Tuple
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import convert_stream_with_libreoffice
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import pdfium_extractor
+from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import convert_stream_with_libreoffice
 from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import python_pptx
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
@@ -115,7 +115,7 @@ def _decode_and_extract_from_pptx(
         extract_params["trace_info"] = trace_info
 
     if extract_method == "render_as_pdf":
-        pdf_stream = convert_stream_with_libreoffice(pptx_stream, "pptx")
+        pdf_stream = convert_stream_with_libreoffice(pptx_stream, "pptx", "pdf")
 
         pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
         pdf_extractor_config = extract_params.copy()

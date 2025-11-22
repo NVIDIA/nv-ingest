@@ -12,9 +12,9 @@ from typing import Optional, Dict, Any, Union, Tuple
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import convert_stream_with_libreoffice
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import python_docx
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import pdfium_extractor
+from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import convert_stream_with_libreoffice
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
@@ -130,7 +130,7 @@ def _decode_and_extract_from_docx(
         extract_params["trace_info"] = execution_trace_log
 
     if extract_method == "render_as_pdf":
-        pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx")
+        pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx", "pdf")
 
         pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
         pdf_extractor_config = extract_params.copy()
