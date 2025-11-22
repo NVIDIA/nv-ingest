@@ -297,11 +297,12 @@ def test_store_task_no_args(ingestor):
 
 
 def test_store_task_some_args(ingestor):
-    ingestor.store(store_method="s3")
+    ingestor.store(storage_uri="s3://bucket/assets", public_base_url="http://public")
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, StoreTask)
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket/assets"
+    assert task._public_base_url == "http://public"
 
 
 def test_store_embed_task_no_args(ingestor):

@@ -335,6 +335,9 @@ stages:
     type: "stage"
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
+    config:
+      storage_uri: $IMAGE_STORAGE_URI|"s3://nv-ingest/artifacts/store/images"
+      public_base_url: $IMAGE_STORAGE_PUBLIC_BASE_URL|""
     replicas:
       min_replicas: 0
       max_replicas:

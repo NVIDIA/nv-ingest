@@ -12,16 +12,18 @@ def test_store_task_initialization():
     task = StoreTask(
         structured=True,
         images=True,
+        storage_uri="s3://bucket",
+        storage_options={"key": "foo"},
         params={
             "access_key": "foo",
             "secret_key": "bar",
             "endpoint": "minio:9000",
         },
-        store_method="s3",
     )
     assert task._structured
     assert task._images
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket"
+    assert task._storage_options == {"key": "foo"}
     assert task._params["endpoint"] == "minio:9000"
     assert task._params["access_key"] == "foo"
     assert task._params["secret_key"] == "bar"
@@ -31,12 +33,19 @@ def test_store_task_initialization():
 
 
 def test_store_task_str_representation():
-    task = StoreTask(structured=True, images=True, store_method="minio", params={"endpoint": "minio:9000"})
+    task = StoreTask(
+        structured=True,
+        images=True,
+        storage_uri="file:///tmp",
+        public_base_url="http://public",
+        params={"endpoint": "minio:9000"},
+    )
     expected_str = (
         "Store Task:\n"
         "  store structured types: True\n"
         "  store image types: True\n"
-        "  store method: minio\n"
+        "  storage uri: file:///tmp\n"
+        "  public base url: http://public\n"
         "  endpoint: minio:9000\n"
     )
     assert str(task) == expected_str
@@ -46,26 +55,25 @@ def test_store_task_str_representation():
 
 
 @pytest.mark.parametrize(
-    "structured, images, store_method, extra_param_1, extra_param_2",
+    "structured, images, storage_uri, extra_param_1, extra_param_2",
     [
-        (True, True, "minio", "foo", "bar"),
-        (False, True, "minio", "foo", "bar"),
-        (False, False, "minio", "foo", "bar"),
-        (False, True, "s3", "foo", "bar"),
-        (True, False, "s3", "foo", "bar"),
+        (True, True, "file:///tmp", "foo", "bar"),
+        (False, True, "s3://bucket", "foo", "bar"),
+        (False, False, None, "foo", "bar"),
     ],
 )
 def test_store_task_to_dict(
     structured,
     images,
-    store_method,
+    storage_uri,
     extra_param_1,
     extra_param_2,
 ):
     task = StoreTask(
         structured=structured,
         images=images,
-        store_method=store_method,
+        storage_uri=storage_uri,
+        storage_options={"region_name": "us-west-2"} if storage_uri else None,
         params={
             "extra_param_1": extra_param_1,
             "extra_param_2": extra_param_2,
@@ -77,7 +85,9 @@ def test_store_task_to_dict(
         "task_properties": {
             "structured": structured,
             "images": images,
-            "method": store_method or "minio",
+            "storage_uri": storage_uri,
+            "storage_options": {"region_name": "us-west-2"} if storage_uri else {},
+            "public_base_url": None,
             "params": {
                 "extra_param_1": extra_param_1,
                 "extra_param_2": extra_param_2,
@@ -96,7 +106,8 @@ def test_store_task_default_params():
     expected_str_contains = [
         "store structured types: True",
         "store image types: False",
-        "store method: minio",
+        "storage uri: None",
+        "public base url: None",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
@@ -106,7 +117,9 @@ def test_store_task_default_params():
         "task_properties": {
             "structured": True,
             "images": False,
-            "method": "minio",
+            "storage_uri": None,
+            "storage_options": {},
+            "public_base_url": None,
             "params": {},
         },
     }
@@ -122,12 +135,12 @@ def test_store_task_schema_consolidation():
     task = StoreTask(
         structured=False,
         images=True,
-        store_method="s3",
+        storage_uri="s3://bucket",
         params={"bucket": "test-bucket"},
     )
     assert task._structured is False
     assert task._images is True
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket"
     assert task._params["bucket"] == "test-bucket"
 
 
@@ -136,7 +149,7 @@ def test_store_task_extra_params_handling():
     task = StoreTask(
         structured=True,
         images=False,
-        store_method="minio",
+        storage_uri="file:///tmp",
         params={"endpoint": "localhost:9000"},
         access_key="test_key",
         secret_key="test_secret",
@@ -160,7 +173,6 @@ def test_store_task_edge_cases():
     task = StoreTask(
         structured=True,
         images=True,
-        store_method="minio",
         params={},
     )
     assert task._params == {}
@@ -173,7 +185,6 @@ def test_store_task_edge_cases():
     task = StoreTask(
         structured=False,
         images=False,
-        store_method="s3",
         params=None,
     )
     assert task._params == {}

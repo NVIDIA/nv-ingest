@@ -113,7 +113,10 @@ def test_validate_task_with_valid_extract():
 
 def test_validate_task_with_valid_store_task():
     """Test with valid store task options."""
-    value = ['store:{"structured": true, "images": false, "method": "minio", "params": {"endpoint": "localhost:9000"}}']
+    value = [
+        'store:{"structured": true, "images": false, "storage_uri": "file:///tmp", '
+        '"params": {"endpoint": "localhost:9000"}}'
+    ]
     result = click_validate_task(None, None, value)
 
     assert "store" in result
