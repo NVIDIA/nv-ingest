@@ -109,6 +109,7 @@ def _decode_and_extract_from_docx(
     doc_bytes: bytes = base64.b64decode(base64_content)
     doc_stream: io.BytesIO = io.BytesIO(doc_bytes)
 
+    extract_method = task_config.get("method", "python_docx")
     extract_params: Dict[str, Any] = task_config.get("params", {})
 
     # Extract required boolean flags from params.
@@ -128,7 +129,6 @@ def _decode_and_extract_from_docx(
     if execution_trace_log is not None:
         extract_params["trace_info"] = execution_trace_log
 
-    extract_method = extract_params.get("extract_method", "python_docx")
     if extract_method == "render_as_pdf":
         pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx")
 

@@ -100,6 +100,7 @@ def _decode_and_extract_from_pptx(
     pptx_stream: io.BytesIO = io.BytesIO(pptx_bytes)
 
     # Retrieve extraction parameters (and remove boolean flags as they are consumed).
+    extract_method = prepared_task_props.get("method", "python_pptx")
     extract_params: Dict[str, Any] = prepared_task_props.get("params", {})
     extract_text: bool = extract_params.pop("extract_text", False)
     extract_images: bool = extract_params.pop("extract_images", False)
@@ -113,7 +114,6 @@ def _decode_and_extract_from_pptx(
     if trace_info is not None:
         extract_params["trace_info"] = trace_info
 
-    extract_method = extract_params.get("extract_method", "python_pptx")
     if extract_method == "render_as_pdf":
         pdf_stream = convert_stream_with_libreoffice(pptx_stream, "pptx")
 

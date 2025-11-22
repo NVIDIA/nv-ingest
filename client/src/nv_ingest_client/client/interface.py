@@ -52,6 +52,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
+from nv_ingest_client.util.file_processing.extract import EXTENSION_TO_DOCUMENT_TYPE
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
@@ -863,11 +864,18 @@ class Ingestor:
                 **kwargs,
             )
 
+            api_document_type = EXTENSION_TO_DOCUMENT_TYPE.get(document_type.lower(), document_type)
+
             # Extract method from task_options for API schema
             method = task_options.pop("extract_method", None)
             if method is None:
                 # Let ExtractTask constructor handle default method selection
-                method = "pdfium"  # Default fallback
+                if api_document_type == "docx":
+                    method = "python_docx"
+                elif api_document_type == "pptx":
+                    method = "python_pptx"
+                else:
+                    method = "pdfium"  # Default fallback
 
             # Build params dict for API schema
             params = {k: v for k, v in task_options.items() if k != "document_type"}
