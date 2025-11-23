@@ -8,6 +8,8 @@
 
 import logging
 import os
+import warnings
+from typing import get_args
 from typing import Any
 from typing import Dict
 from typing import Literal
@@ -58,7 +60,18 @@ _Type_Extract_Method_PDF = Literal[
     "pdfium",
     "tika",
     "unstructured_io",
+    "unstructured_local",
     "ocr",
+]
+
+_Type_Extract_Method_DOCX = Literal[
+    "python_docx",
+    "render_as_pdf",
+]
+
+_Type_Extract_Method_PPTX = Literal[
+    "python_pptx",
+    "render_as_pdf",
 ]
 
 _Type_Extract_Images_Method = Literal["group", "yolox"]
@@ -74,7 +87,7 @@ class ExtractTask(Task):
     def __init__(
         self,
         document_type,
-        extract_method: _Type_Extract_Method_PDF = None,
+        extract_method: Optional[str] = None,
         extract_text: bool = False,
         extract_images: bool = False,
         extract_tables: bool = False,
@@ -108,6 +121,8 @@ class ExtractTask(Task):
                     f" Supported types are: {list(_DEFAULT_EXTRACTOR_MAP.keys())}"
                 )
             extract_method = _DEFAULT_EXTRACTOR_MAP[document_type_lower]
+
+        self._validate_extract_method(document_type, extract_method)
 
         # Set default extract_charts if None
         if extract_charts is None:
@@ -240,3 +255,31 @@ class ExtractTask(Task):
     @property
     def document_type(self):
         return self._document_type.value
+
+    def _validate_extract_method(self, document_type: str, extract_method: str):
+        doc_type = document_type.lower()
+
+        valid_docx = set(get_args(_Type_Extract_Method_DOCX))
+        valid_pptx = set(get_args(_Type_Extract_Method_PPTX))
+        valid_pdf = set(get_args(_Type_Extract_Method_PDF))
+
+        if doc_type == "docx" and extract_method not in valid_docx:
+            raise ValueError(f"'{extract_method}' is invalid for DOCX. Options: {valid_docx}")
+
+        elif doc_type == "pptx" and extract_method not in valid_pptx:
+            raise ValueError(f"'{extract_method}' is invalid for PPTX. Options: {valid_pptx}")
+
+        elif doc_type == "pdf" and extract_method not in valid_pdf:
+            raise ValueError(f"'{extract_method}' is invalid for PDF. Options: {valid_pdf}")
+
+        elif doc_type not in ["docx", "pptx", "pdf"]:
+            is_docx_method = extract_method in valid_docx
+            is_pptx_method = extract_method in valid_pptx
+            is_pdf_method = extract_method in valid_pdf
+
+            if (is_docx_method or is_pptx_method) and not is_pdf_method:
+                warnings.warn(
+                    f"extract_method '{extract_method}' is valid for Office documents but NOT for PDFs. "
+                    "If your batch includes PDFs, extraction may fail for those files. "
+                    "Consider leaving extract_method=None for mixed batches."
+                )
