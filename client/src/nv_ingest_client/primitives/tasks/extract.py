@@ -276,9 +276,6 @@ class ExtractTask(Task):
             is_pptx_method = extract_method in valid_pptx
             is_pdf_method = extract_method in valid_pdf
 
-            if not (is_docx_method or is_pptx_method or is_pdf_method):
-                raise ValueError(f"Unknown extract_method: '{extract_method}'")
-
             if (is_docx_method or is_pptx_method) and not is_pdf_method:
                 warnings.warn(
                     f"extract_method '{extract_method}' is valid for Office documents but NOT for PDFs. "

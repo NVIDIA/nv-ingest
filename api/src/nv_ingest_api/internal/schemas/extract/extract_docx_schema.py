@@ -124,6 +124,6 @@ class DocxExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     docx_extraction_config: Optional[DocxConfigSchema] = None
-    pdfium_config: Optional[PDFiumConfigSchema]
+    pdfium_config: Optional[PDFiumConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
