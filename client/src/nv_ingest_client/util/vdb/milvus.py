@@ -892,7 +892,7 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     logger.info(f"streamed {count} records")
 
 
-def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient):
+def wait_for_index(collection_name: str, expected_rows_dict: dict, client: MilvusClient):
     """
     This function waits for the index to be built. It checks
     the indexed_rows of the index and waits for it to be equal
@@ -901,32 +901,28 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
     client.flush(collection_name)
-    # index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
     # observe dense_index, all indexes get populated simultaneously
-    for index_name in [DENSE_INDEX_NAME]:
-        indexed_rows = 0
-        expected_rows = client.describe_index(collection_name, index_name)["indexed_rows"] + num_elements
-        while indexed_rows < expected_rows:
-            pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
+    for index_name, rows_expected in expected_rows_dict.items():
+        indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+        while indexed_rows < rows_expected:
+            # 0.5% of rows expected allowed without noticing an increase in indexed_rows
+            pos_movement = start_pos_movement = max((rows_expected - indexed_rows) * 0.005, 10)
             for i in range(20):
-                current_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                prev_indexed_rows = indexed_rows
+                indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
-                logger.info(
-                    f"Indexed rows, {collection_name}, {index_name} -  {current_indexed_rows} / {expected_rows}"
-                )
-                if current_indexed_rows == expected_rows:
-                    indexed_rows = current_indexed_rows
+                logger.info(f"Indexed rows, {collection_name}, {index_name} -  {indexed_rows} / {rows_expected}")
+                if indexed_rows == rows_expected:
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
-                if current_indexed_rows == indexed_rows:
+                if indexed_rows == prev_indexed_rows:
                     pos_movement -= 1
                 else:
-                    pos_movement = 10
+                    pos_movement = start_pos_movement
                 # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
                 if pos_movement == 0:
                     raise ValueError(f"Rows are not getting indexed as expected for: {index_name} - {collection_name}")
-                indexed_rows = current_indexed_rows
     return indexed_rows
 
 
@@ -1046,6 +1042,13 @@ def write_to_nvingest_collection(
     if num_elements < threshold:
         stream = True
     if stream:
+        # most be accessed/saved before adding new records
+        index_names = utility.list_indexes(collection_name)
+        expected_rows = {}
+        for index_name in index_names:
+            expected_rows[index_name] = (
+                int(client.describe_index(collection_name, index_name)["indexed_rows"]) + num_elements
+            )
         stream_insert_milvus(
             cleaned_records,
             client,
@@ -1054,7 +1057,7 @@ def write_to_nvingest_collection(
         if not local_index:
             # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
             # know how long this should take, it is num_elements dependent.
-            wait_for_index(collection_name, num_elements, client)
+            wait_for_index(collection_name, expected_rows, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         bucket_name = bucket_name if bucket_name else ClientConfigSchema().minio_bucket_name
