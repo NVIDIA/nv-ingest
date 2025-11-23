@@ -68,9 +68,9 @@ ARG FORCE_REMOVE_PKGS="\
 "
 RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
       dpkg-dev \
-      libreoffice \
+      libreoffice-nogui \
       $GPL_LIBS \
     && apt-get source $GPL_LIBS \
     && for pkg in $FORCE_REMOVE_PKGS; do \
