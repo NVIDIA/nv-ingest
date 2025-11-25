@@ -5,6 +5,7 @@ import re
 import shutil
 import time
 from collections import defaultdict
+from typing import Dict
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -89,6 +90,18 @@ def _summarize_traces(traces_list, results, trace_dir: str | None):
         doc_first_entry_ns = None
         doc_last_exit_ns = None
 
+        submission_ts_ns = trace_payload.get("submission_ts_ns")
+        doc_submission_ts_ns = None
+        if isinstance(submission_ts_ns, (int, float)):
+            doc_submission_ts_ns = int(submission_ts_ns)
+        elif isinstance(submission_ts_ns, str):
+            try:
+                doc_submission_ts_ns = int(submission_ts_ns)
+            except ValueError:
+                doc_submission_ts_ns = None
+
+        queue_wait_totals: Dict[str, float] = defaultdict(float)
+
         for key, value in trace_payload.items():
             if not key.startswith("trace::resident_time::"):
                 continue
@@ -111,14 +124,24 @@ def _summarize_traces(traces_list, results, trace_dir: str | None):
             stage_breakdown[stage] = stage_entry
             total_resident += resident_s
             stage_totals[stage].append(resident_s)
+            if stage.endswith("_channel_in"):
+                queue_wait_totals[stage] += resident_s
 
         doc_record = {
             "document_index": doc_index,
             "source_id": source_id,
             "total_resident_s": round(total_resident, 6),
         }
+        if queue_wait_totals:
+            doc_record["in_ray_queue_s"] = round(sum(queue_wait_totals.values()), 6)
+        if doc_submission_ts_ns is not None:
+            doc_record["submission_ts_s"] = round(_ns_to_seconds(doc_submission_ts_ns), 6)
         if doc_first_entry_ns is not None and doc_last_exit_ns is not None and doc_last_exit_ns >= doc_first_entry_ns:
+            doc_record["ray_start_ts_s"] = round(_ns_to_seconds(doc_first_entry_ns), 6)
+            doc_record["ray_end_ts_s"] = round(_ns_to_seconds(doc_last_exit_ns), 6)
             doc_record["total_wall_s"] = round(_ns_to_seconds(doc_last_exit_ns - doc_first_entry_ns), 6)
+            if doc_submission_ts_ns is not None and doc_first_entry_ns >= doc_submission_ts_ns:
+                doc_record["ray_wait_s"] = round(_ns_to_seconds(doc_first_entry_ns - doc_submission_ts_ns), 6)
         document_totals.append(doc_record)
 
         if trace_dir:

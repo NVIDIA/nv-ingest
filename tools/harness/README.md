@@ -222,8 +222,22 @@ When traces are enabled:
     }
   },
   "document_totals": [
-    {"document_index": 0, "source_id": "doc001.pdf", "total_resident_s": 1.58},
-    {"document_index": 1, "source_id": "doc002.pdf", "total_resident_s": 1.64}
+    {
+      "document_index": 0,
+      "source_id": "doc001.pdf",
+      "total_resident_s": 1.58,
+      "ray_start_ts_s": 1732194384.123456,
+      "ray_end_ts_s": 1732194399.901234,
+      "total_wall_s": 15.78
+    },
+    {
+      "document_index": 1,
+      "source_id": "doc002.pdf",
+      "total_resident_s": 1.64,
+      "ray_start_ts_s": 1732194385.012345,
+      "ray_end_ts_s": 1732194400.456789,
+      "total_wall_s": 15.44
+    }
     // ...
   ]
 }
@@ -899,6 +913,7 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
    - `--exclude-network` hides broker/Redis wait time so the chart focuses on Ray stages
    - `--doc-top-n` controls how many slowest documents appear on the wall-time plot (set `0` for all)
    - `--skip-wall-plot` emits only the resident-time chart if you want the legacy behavior
+- When traces include `ray_start_ts_s`/`ray_end_ts_s` (scripts/tests/cases/e2e.py now records them), the wall-time textual table shows the Ray window timestamps alongside wall/resident totals.
 
 ### Future Trace Visualization Case (roadmap)
 
