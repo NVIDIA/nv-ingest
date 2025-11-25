@@ -13,13 +13,28 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
-
 import math
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import yaml
+
+# Ensure repo root is importable so we can reuse shared trace helpers
+CURRENT_DIR = Path(__file__).resolve()
+try:
+    REPO_ROOT = CURRENT_DIR.parents[3]
+except IndexError:
+    REPO_ROOT = CURRENT_DIR
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from scripts.tests.utils.trace_summary import summarize_traces
+except ImportError as err:  # pragma: no cover - defensive fallback
+    summarize_traces = None  # type: ignore[assignment]
+    print(f"Warning: failed to import trace_summary helpers ({err}); trace rebuild disabled.")
 
 
 FRIENDLY_STAGE_NAMES: Dict[str, str] = {
@@ -62,6 +77,76 @@ FRIENDLY_STAGE_NAMES: Dict[str, str] = {
     "broker_source_network_in": "Broker Network",
     "message_broker_task_source": "Message Broker Source",
 }
+
+
+def _load_traces_from_dir(trace_dir: Path) -> Optional[Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]]:
+    trace_files = sorted(trace_dir.glob("*.json"))
+    if not trace_files:
+        return None
+    traces: List[Optional[Dict[str, Any]]] = []
+    results_stub: List[List[Dict[str, Any]]] = []
+
+    for trace_file in trace_files:
+        payload = json.loads(trace_file.read_text())
+        trace_payload = payload.get("trace") or payload
+        doc_index = payload.get("document_index")
+        if doc_index is None:
+            doc_index = len(traces)
+        while len(traces) <= doc_index:
+            traces.append(None)
+            results_stub.append([])
+        traces[doc_index] = trace_payload
+        source_id = payload.get("source_id")
+        results_stub[doc_index] = [
+            {
+                "metadata": {
+                    "source_metadata": {
+                        "source_id": source_id,
+                    }
+                }
+            }
+        ]
+
+    # Replace any remaining None entries with empty dict so summarize_traces can skip them
+    clean_traces: List[Dict[str, Any]] = [trace or {} for trace in traces]
+    return clean_traces, results_stub
+
+
+def _ensure_trace_summary(data: Dict[str, Any], results_path: Path, trace_dir_arg: Optional[Path]) -> None:
+    trace_summary = data.get("trace_summary")
+    if isinstance(trace_summary, dict) and trace_summary.get("document_totals"):
+        return
+    if summarize_traces is None:
+        print("trace_summary helpers unavailable; cannot rebuild trace summary.")
+        return
+
+    candidate_dirs: List[Path] = []
+    if trace_dir_arg:
+        candidate_dirs.append(trace_dir_arg)
+    output_dir = trace_summary.get("output_dir") if isinstance(trace_summary, dict) else None
+    if output_dir:
+        candidate_dirs.append(Path(output_dir))
+    candidate_dirs.append(results_path.parent / "traces")
+
+    visited = set()
+    for candidate in candidate_dirs:
+        if not candidate:
+            continue
+        candidate = candidate.expanduser().resolve()
+        if candidate in visited or not candidate.is_dir():
+            continue
+        visited.add(candidate)
+        loaded = _load_traces_from_dir(candidate)
+        if not loaded:
+            continue
+        traces_list, results_stub = loaded
+        summary = summarize_traces(traces_list, results_stub, trace_dir=None)
+        if summary:
+            summary.setdefault("output_dir", str(candidate))
+            data["trace_summary"] = summary
+            print(f"Rebuilt trace_summary from {candidate}")
+            return
+    print("Unable to locate trace_summary data; stage/wall plots may be skipped.")
 
 
 def load_stage_order(pipeline_yaml: Path) -> List[str]:
@@ -510,6 +595,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plot stage resident times from results.json")
     parser.add_argument("results", type=Path, help="Path to results.json artifact")
     parser.add_argument(
+        "--trace-dir",
+        type=Path,
+        help="Optional directory containing raw trace *.json files (auto-detected if omitted)",
+    )
+    parser.add_argument(
         "--pipeline",
         type=Path,
         default=Path("config/default_pipeline.yaml"),
@@ -569,6 +659,7 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
     data = json.loads(args.results.read_text())
+    _ensure_trace_summary(data, args.results, args.trace_dir)
     build_stage_plot(
         data=data,
         results_path=args.results,

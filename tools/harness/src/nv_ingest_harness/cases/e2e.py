@@ -1,17 +1,15 @@
 import json
 import logging
 import os
-import re
 import shutil
 import time
-from collections import defaultdict
-from typing import Dict
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from nv_ingest_harness.utils.trace_summary import summarize_traces
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
@@ -23,162 +21,6 @@ try:
     from pymilvus import MilvusClient
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
-
-
-NS_IN_SECOND = 1_000_000_000
-
-
-def _ns_to_seconds(value):
-    if value is None:
-        return None
-    return value / NS_IN_SECOND
-
-
-def _safe_trace_filename(source_id: str | None, index: int) -> str:
-    base = source_id or f"document_{index}"
-    base = os.path.basename(str(base))
-    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", base)[:80]
-    if not sanitized:
-        sanitized = f"document_{index}"
-    return f"{index:03d}_{sanitized}"
-
-
-def _extract_source_id(doc_results) -> str | None:
-    if doc_results is None:
-        return None
-    try:
-        first_entry = doc_results[0]
-    except (IndexError, KeyError, TypeError):
-        return None
-    except Exception:
-        try:
-            iterator = iter(doc_results)
-            first_entry = next(iterator)
-        except Exception:
-            return None
-    metadata = first_entry.get("metadata", {}) if isinstance(first_entry, dict) else {}
-    source_meta = metadata.get("source_metadata", {})
-    return source_meta.get("source_id")
-
-
-def _summarize_traces(traces_list, results, trace_dir: str | None):
-    if not traces_list:
-        return None
-
-    valid_traces = [(idx, trace) for idx, trace in enumerate(traces_list) if trace]
-    if not valid_traces:
-        return None
-
-    stage_totals = defaultdict(list)
-    document_totals = []
-
-    if trace_dir:
-        os.makedirs(trace_dir, exist_ok=True)
-
-    for doc_index, trace_payload in valid_traces:
-        if not isinstance(trace_payload, dict):
-            continue
-
-        source_id = None
-        if results and doc_index < len(results):
-            source_id = _extract_source_id(results[doc_index])
-        if not source_id:
-            source_id = f"document_{doc_index}"
-
-        stage_breakdown = {}
-        total_resident = 0.0
-        doc_first_entry_ns = None
-        doc_last_exit_ns = None
-
-        submission_ts_ns = trace_payload.get("submission_ts_ns")
-        doc_submission_ts_ns = None
-        if isinstance(submission_ts_ns, (int, float)):
-            doc_submission_ts_ns = int(submission_ts_ns)
-        elif isinstance(submission_ts_ns, str):
-            try:
-                doc_submission_ts_ns = int(submission_ts_ns)
-            except ValueError:
-                doc_submission_ts_ns = None
-
-        queue_wait_totals: Dict[str, float] = defaultdict(float)
-
-        for key, value in trace_payload.items():
-            if not key.startswith("trace::resident_time::"):
-                continue
-            stage = key.replace("trace::resident_time::", "")
-            resident_s = _ns_to_seconds(value) or 0.0
-            entry = trace_payload.get(f"trace::entry::{stage}")
-            exit_value = trace_payload.get(f"trace::exit::{stage}")
-            wall_s = None
-            if entry is not None and exit_value is not None:
-                wall_s = _ns_to_seconds(exit_value - entry)
-                if doc_first_entry_ns is None or entry < doc_first_entry_ns:
-                    doc_first_entry_ns = entry
-                if doc_last_exit_ns is None or exit_value > doc_last_exit_ns:
-                    doc_last_exit_ns = exit_value
-
-            stage_entry = {"resident_s": round(resident_s, 6)}
-            if wall_s is not None:
-                stage_entry["wall_s"] = round(wall_s, 6)
-
-            stage_breakdown[stage] = stage_entry
-            total_resident += resident_s
-            stage_totals[stage].append(resident_s)
-            if stage.endswith("_channel_in"):
-                queue_wait_totals[stage] += resident_s
-
-        doc_record = {
-            "document_index": doc_index,
-            "source_id": source_id,
-            "total_resident_s": round(total_resident, 6),
-        }
-        if queue_wait_totals:
-            doc_record["in_ray_queue_s"] = round(sum(queue_wait_totals.values()), 6)
-        if doc_submission_ts_ns is not None:
-            doc_record["submission_ts_s"] = round(_ns_to_seconds(doc_submission_ts_ns), 6)
-        if doc_first_entry_ns is not None and doc_last_exit_ns is not None and doc_last_exit_ns >= doc_first_entry_ns:
-            doc_record["ray_start_ts_s"] = round(_ns_to_seconds(doc_first_entry_ns), 6)
-            doc_record["ray_end_ts_s"] = round(_ns_to_seconds(doc_last_exit_ns), 6)
-            doc_record["total_wall_s"] = round(_ns_to_seconds(doc_last_exit_ns - doc_first_entry_ns), 6)
-            if doc_submission_ts_ns is not None and doc_first_entry_ns >= doc_submission_ts_ns:
-                doc_record["ray_wait_s"] = round(_ns_to_seconds(doc_first_entry_ns - doc_submission_ts_ns), 6)
-        document_totals.append(doc_record)
-
-        if trace_dir:
-            trace_payload_path = os.path.join(trace_dir, f"{_safe_trace_filename(source_id, doc_index)}.json")
-            trace_record = {
-                "document_index": doc_index,
-                "source_id": source_id,
-                "trace": trace_payload,
-                "stage_summary": stage_breakdown,
-            }
-            try:
-                with open(trace_payload_path, "w") as fp:
-                    json.dump(trace_record, fp, indent=2)
-            except OSError as err:
-                print(f"Failed to write trace file {trace_payload_path}: {err}")
-
-    if not stage_totals:
-        return None
-
-    stage_summary = {}
-    for stage, values in stage_totals.items():
-        total = sum(values)
-        count = len(values)
-        stage_summary[stage] = {
-            "documents": count,
-            "total_resident_s": round(total, 6),
-            "avg_resident_s": round(total / count, 6),
-            "max_resident_s": round(max(values), 6),
-            "min_resident_s": round(min(values), 6),
-        }
-
-    return {
-        "documents": len(document_totals),
-        "output_dir": trace_dir,
-        "stage_totals": stage_summary,
-        "document_totals": document_totals,
-    }
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -444,7 +286,7 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     trace_summary = None
     if enable_traces:
-        trace_summary = _summarize_traces(traces_list, results, trace_dir)
+        trace_summary = summarize_traces(traces_list, results, trace_dir)
         if trace_summary:
             kv_event_log("trace_documents", trace_summary["documents"], log_path)
 

@@ -206,7 +206,16 @@ EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dat
 When traces are enabled:
 
 1. Each processed document gets a raw payload written to `trace_output_dir/<index>_<source>.json` that contains the complete `"trace::"` dictionary plus a small stage summary. These files match the structure shown in `scripts/private_local/trace.json`.
-2. `results.json` gains a `trace_summary` block that aggregates resident-time seconds per stage and lists total compute seconds per document. Example:
+2. `results.json` automatically gains a `trace_summary` block every time `run.py` executes a traced case—no manual helper calls needed.
+3. The per-document section now includes the full timing context needed for wait-time analysis:
+   - `submission_ts_s`: FastAPI submission timestamp (wall-clock seconds)
+   - `ray_start_ts_s` / `ray_end_ts_s`: first stage entry and last stage exit inside Ray
+   - `ray_wait_s`: latency between submission and Ray start (pre-Ray wait)
+   - `in_ray_queue_s`: cumulative resident seconds spent in `*_channel_in` actors (Ray queue wait)
+   - `total_wall_s`: elapsed Ray processing window (`ray_end - ray_start`)
+   - `total_resident_s`: summed resident seconds across all compute stages
+
+Example:
 
 ```json
 "trace_summary": {
@@ -225,18 +234,24 @@ When traces are enabled:
     {
       "document_index": 0,
       "source_id": "doc001.pdf",
+      "submission_ts_s": 1732194383.812345,
       "total_resident_s": 1.58,
       "ray_start_ts_s": 1732194384.123456,
       "ray_end_ts_s": 1732194399.901234,
-      "total_wall_s": 15.78
+      "total_wall_s": 15.78,
+      "ray_wait_s": 0.311111,
+      "in_ray_queue_s": 0.042381
     },
     {
       "document_index": 1,
       "source_id": "doc002.pdf",
+      "submission_ts_s": 1732194384.034567,
       "total_resident_s": 1.64,
       "ray_start_ts_s": 1732194385.012345,
       "ray_end_ts_s": 1732194400.456789,
-      "total_wall_s": 15.44
+      "total_wall_s": 15.44,
+      "ray_wait_s": 0.977778,
+      "in_ray_queue_s": 0.063255
     }
     // ...
   ]
@@ -792,6 +807,8 @@ All test cases receive a validated `TestConfig` object with typed fields, elimin
    CASES = ["e2e", "e2e_with_llm_summary", "your_new_case"]
    ```
 
+> ℹ️ Import hygiene: `run.py` now prepends the `cases/`, `tests/`, `scripts/`, and repo-root directories to `sys.path` before loading a case, so new modules can directly import shared helpers (`from scripts.interact import ...`, `from scripts.tests.utils import ...`) without mutating `sys.path` locally.
+
 ### Extending Configuration
 
 To add new configurable parameters:
@@ -900,20 +917,27 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
    - `results.json` → includes `trace_summary` with per-stage resident seconds
    - `traces/*.json` → raw payloads identical to `scripts/private_local/trace.json`
    - Use descriptive folder names (e.g., copy artifacts to `artifacts/baseline_bo20/`) to keep baseline vs RC side-by-side.
-5. **Visualize stage + wall timings**
+5. **Visualize stage + wall/wait timings**
    ```bash
-   # Generates results.stage_time.png (per-stage resident) and results.wall_time.png (doc wall vs resident)
+   # Positional argument = results.json path; emits stage + wall PNGs
    python scripts/tests/tools/plot_stage_totals.py \
      scripts/tests/artifacts/<run>/results.json \
+     --doc-top-n 25 \
+     --doc-sort wait \
      --sort total \
      --keep-nested \
      --exclude-network
    ```
    - `--keep-nested` preserves nested entries such as chart/table OCR workloads
    - `--exclude-network` hides broker/Redis wait time so the chart focuses on Ray stages
-   - `--doc-top-n` controls how many slowest documents appear on the wall-time plot (set `0` for all)
+   - `--doc-top-n` controls how many documents appear on the wall-time plot (set `0` for all)
+   - `--doc-sort wait` sorts documents by Ray wait time instead of wall time (useful for large jobs)
    - `--skip-wall-plot` emits only the resident-time chart if you want the legacy behavior
-- When traces include `ray_start_ts_s`/`ray_end_ts_s` (scripts/tests/cases/e2e.py now records them), the wall-time textual table shows the Ray window timestamps alongside wall/resident totals.
+   - Wall-time output now includes:
+     - Pre-Ray wait (submission → Ray start)
+     - In-Ray queue totals (sum of `*_channel_in` resident time)
+     - Execution window (Ray start/stop timestamps + wall vs resident bars)
+   - Percentile summaries for wait and queue time are printed in the CLI output for the entire dataset.
 
 ### Future Trace Visualization Case (roadmap)
 
