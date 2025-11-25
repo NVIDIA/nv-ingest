@@ -197,6 +197,71 @@ def build_stage_plot(
             print(f"{stage:<40} {total:>12.2f} {avg:>10.2f} {doc_cnt:>6}")
 
 
+def _doc_wait_seconds(doc: Dict[str, Any]) -> float | None:
+    wait = doc.get("ray_wait_s")
+    if wait is not None:
+        try:
+            return float(wait)
+        except (TypeError, ValueError):
+            return None
+    start = doc.get("ray_start_ts_s")
+    submitted = doc.get("submission_ts_s")
+    if start is None or submitted is None:
+        return None
+    try:
+        wait_val = float(start) - float(submitted)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, wait_val)
+
+
+def _percentile(values: List[float], pct: float) -> float | None:
+    if not values:
+        return None
+    if pct <= 0:
+        return values[0]
+    if pct >= 100:
+        return values[-1]
+    k = (len(values) - 1) * (pct / 100.0)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return values[int(k)]
+    return values[f] + (values[c] - values[f]) * (k - f)
+
+
+def _print_wait_summary(wait_values: List[float], wall_values: List[float]):
+    if not wait_values or not wall_values:
+        return
+    sorted_waits = sorted(wait_values)
+    p50 = _percentile(sorted_waits, 50)
+    p90 = _percentile(sorted_waits, 90)
+    p99 = _percentile(sorted_waits, 99)
+    max_wait = sorted_waits[-1]
+    ratio_samples = [w / w_tot for w, w_tot in zip(wait_values, wall_values) if w_tot > 0]
+    avg_ratio = sum(ratio_samples) / len(ratio_samples) if ratio_samples else 0.0
+    print("\nWait time summary (all documents)")
+    print("-" * 90)
+    print(f"Median wait: {p50:.2f}s | p90: {p90:.2f}s | p99: {p99:.2f}s | max: {max_wait:.2f}s")
+    print(f"Average wait / wall fraction: {avg_ratio * 100:.2f}%")
+
+
+def _print_queue_summary(queue_values: List[float], wall_values: List[float]):
+    if not queue_values or not wall_values:
+        return
+    sorted_queues = sorted(queue_values)
+    p50 = _percentile(sorted_queues, 50)
+    p90 = _percentile(sorted_queues, 90)
+    p99 = _percentile(sorted_queues, 99)
+    max_queue = sorted_queues[-1]
+    ratios = [queue / wall for queue, wall in zip(queue_values, wall_values) if wall > 0]
+    avg_ratio = sum(ratios) / len(ratios) if ratios else 0.0
+    print("\nIn-Ray queue time summary (all documents)")
+    print("-" * 90)
+    print(f"Median queue: {p50:.2f}s | p90: {p90:.2f}s | p99: {p99:.2f}s | max: {max_queue:.2f}s")
+    print(f"Average queue / wall fraction: {avg_ratio * 100:.2f}%")
+
+
 def build_wall_plot(
     data: Dict[str, Any],
     results_path: Path,
@@ -204,6 +269,7 @@ def build_wall_plot(
     width: int,
     summary_rows: int,
     title_suffix: str | None = None,
+    doc_sort: str = "wall",
 ):
     trace_summary = data.get("trace_summary")
     if not trace_summary:
@@ -218,11 +284,18 @@ def build_wall_plot(
     ingestion_time = run_results.get("ingestion_time_s")
     result_count = run_results.get("result_count") or len(document_totals)
 
-    documents = sorted(
-        document_totals,
-        key=lambda item: item.get("total_wall_s", 0.0),
-        reverse=True,
-    )
+    def wait_sort_key(doc: Dict[str, Any]) -> float:
+        wait_val = _doc_wait_seconds(doc)
+        return wait_val if wait_val is not None else 0.0
+
+    if doc_sort == "wait":
+        documents = sorted(document_totals, key=wait_sort_key, reverse=True)
+    else:
+        documents = sorted(
+            document_totals,
+            key=lambda item: item.get("total_wall_s", 0.0),
+            reverse=True,
+        )
     if doc_top_n:
         documents = documents[:doc_top_n]
 
@@ -230,10 +303,16 @@ def build_wall_plot(
         print("No document entries available after filtering; skipping wall-time plot.")
         return
 
-    labels = []
-    wall_vals = []
-    resident_vals = []
-    ratios = []
+    labels: List[str] = []
+    wall_vals: List[float] = []
+    resident_vals: List[float] = []
+    ratios: List[float] = []
+    ray_start_vals: List[float | None] = []
+    ray_end_vals: List[float | None] = []
+    submission_vals: List[float | None] = []
+    wait_vals: List[float | None] = []
+    queue_vals: List[float | None] = []
+
     for doc in documents:
         source = doc.get("source_id") or f"doc_{doc.get('document_index', '?')}"
         source_name = Path(source).name
@@ -245,15 +324,33 @@ def build_wall_plot(
         wall_vals.append(wall)
         resident_vals.append(resident)
         ratios.append(resident / wall if wall > 0 else math.inf)
+        ray_start_vals.append(doc.get("ray_start_ts_s"))
+        ray_end_vals.append(doc.get("ray_end_ts_s"))
+        submission_vals.append(doc.get("submission_ts_s"))
+        wait_vals.append(_doc_wait_seconds(doc))
+        queue_val = doc.get("in_ray_queue_s")
+        if queue_val is None:
+            queue_vals.append(None)
+        else:
+            try:
+                queue_vals.append(float(queue_val))
+            except (TypeError, ValueError):
+                queue_vals.append(None)
 
     labels = labels[::-1]
     wall_vals = wall_vals[::-1]
     resident_vals = resident_vals[::-1]
     ratios = ratios[::-1]
+    wait_vals = wait_vals[::-1]
+    ray_start_vals = ray_start_vals[::-1]
+    ray_end_vals = ray_end_vals[::-1]
+    submission_vals = submission_vals[::-1]
+    queue_vals = queue_vals[::-1]
 
     base_positions = list(range(len(labels)))
     wall_positions = [pos + 0.2 for pos in base_positions]
     resident_positions = [pos - 0.2 for pos in base_positions]
+    queue_positions = [pos + 0.05 for pos in base_positions]
 
     fig_height = max(6, len(labels) * 0.35)
     fig, ax = plt.subplots(figsize=(width, fig_height))
@@ -271,6 +368,22 @@ def build_wall_plot(
         height=0.35,
         color="#C44E52",
         label="Resident seconds",
+    )
+    wait_display_vals = [val if val is not None else 0.0 for val in wait_vals]
+    ax.barh(
+        base_positions,
+        wait_display_vals,
+        height=0.15,
+        color="#FFA600",
+        label="Wait before Ray",
+    )
+    queue_display_vals = [val if val is not None else 0.0 for val in queue_vals]
+    ax.barh(
+        queue_positions,
+        queue_display_vals,
+        height=0.12,
+        color="#AA65D2",
+        label="In-Ray queue",
     )
 
     ax.set_yticks(base_positions)
@@ -321,15 +434,76 @@ def build_wall_plot(
     plt.savefig(out_path, dpi=200)
     print(f"Wrote {out_path}")
 
+    all_wait_values: List[float] = []
+    all_queue_values: List[float] = []
+    all_walls: List[float] = []
+    for doc in document_totals:
+        wait_value = _doc_wait_seconds(doc)
+        if wait_value is None:
+            continue
+        all_wait_values.append(wait_value)
+        wall_value = doc.get("total_wall_s")
+        if wall_value is None:
+            all_walls.append(wait_value)  # Dummy placeholder to keep lengths equal
+        else:
+            try:
+                all_walls.append(float(wall_value))
+            except (TypeError, ValueError):
+                all_walls.append(wait_value)
+        queue_val = doc.get("in_ray_queue_s")
+        if queue_val is not None:
+            try:
+                all_queue_values.append(float(queue_val))
+            except (TypeError, ValueError):
+                pass
+    _print_wait_summary(all_wait_values, all_walls)
+    _print_queue_summary(all_queue_values, all_walls)
+
+    has_ray = any(value is not None for value in ray_start_vals)
+    has_submission = any(value is not None for value in submission_vals)
+    has_wait = any(value is not None for value in wait_vals)
+    has_queue = any(value is not None for value in queue_vals)
+
     if summary_rows > 0:
         print("\nTop documents by wall time")
         print("-" * 90)
-        print(f"{'Document':<40} {'Wall (s)':>12} {'Resident (s)':>14} {'Ratio':>8}")
+        header = f"{'Document':<40} {'Wall (s)':>12} {'Resident (s)':>14} {'Ratio':>8}"
+        if has_wait:
+            header += f" {'Wait (s)':>10}"
+        if has_queue:
+            header += f" {'Ray queue (s)':>14}"
+        if has_submission:
+            header += f" {'Submitted (s)':>15}"
+        if has_ray:
+            header += f" {'Ray start (s)':>15} {'Ray end (s)':>15}"
+        print(header)
         print("-" * 90)
-        truncated = list(zip(labels[::-1], wall_vals[::-1], resident_vals[::-1], ratios[::-1]))[:summary_rows]
-        for label, wall, resident, ratio in truncated:
+        truncated = list(
+            zip(
+                labels[::-1],
+                wall_vals[::-1],
+                resident_vals[::-1],
+                ratios[::-1],
+                wait_vals[::-1],
+                queue_vals[::-1],
+                submission_vals[::-1],
+                ray_start_vals[::-1],
+                ray_end_vals[::-1],
+            )
+        )[:summary_rows]
+        for label, wall, resident, ratio, wait, queue, submitted, ray_start, ray_end in truncated:
             ratio_str = "∞" if math.isinf(ratio) else f"{ratio:.2f}"
-            print(f"{label:<40} {wall:>12.2f} {resident:>14.2f} {ratio_str:>8}")
+            row = f"{label:<40} {wall:>12.2f} {resident:>14.2f} {ratio_str:>8}"
+            if has_wait:
+                row += f" {wait if wait is not None else '-':>10}"
+            if has_queue:
+                row += f" {queue if queue is not None else '-':>10}"
+            if has_submission:
+                row += f" {submitted if submitted is not None else '-':>15}"
+            if has_ray:
+                row += f" {ray_start if ray_start is not None else '-':>15}"
+                row += f" {ray_end if ray_end is not None else '-':>15}"
+            print(row)
 
 
 def parse_args() -> argparse.Namespace:
@@ -379,6 +553,12 @@ def parse_args() -> argparse.Namespace:
         help="Print textual summary for document wall times (0 disables)",
     )
     parser.add_argument(
+        "--doc-sort",
+        choices=["wall", "wait"],
+        default="wall",
+        help="Sort document chart by wall time or wait time",
+    )
+    parser.add_argument(
         "--skip-wall-plot",
         action="store_true",
         help="Only emit the stage resident-time plot",
@@ -410,6 +590,7 @@ def main():
             width=args.width,
             summary_rows=args.doc_summary_rows,
             title_suffix=test_name,
+            doc_sort=args.doc_sort,
         )
 
 

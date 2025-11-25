@@ -722,6 +722,10 @@ def _build_aggregated_response(
             end_page = descriptor.get("end_page")
 
             if trace_data:
+                submission_ts_ns = metadata.get("submission_ts_ns")
+                if submission_ts_ns is not None:
+                    trace_data = dict(trace_data)
+                    trace_data["submission_ts_ns"] = submission_ts_ns
                 # Add to trace_segments (detailed, per-chunk view)
                 aggregated_result["metadata"]["trace_segments"].append(
                     {
@@ -752,6 +756,11 @@ def _build_aggregated_response(
             logger.warning(f"Page {page_num} failed or missing")
 
     # Compute parent-level trace aggregations from trace_segments
+    submission_ts_ns = metadata.get("submission_ts_ns")
+    if submission_ts_ns is not None:
+        aggregated_result["metadata"]["submission_ts_ns"] = submission_ts_ns
+        aggregated_result["trace"]["submission_ts_ns"] = submission_ts_ns
+
     trace_segments = aggregated_result["metadata"]["trace_segments"]
     if trace_segments:
         # Build a temporary chunk trace dict for aggregation
@@ -765,6 +774,8 @@ def _build_aggregated_response(
 
         # Aggregate and set as top-level trace (only parent traces, no chunk traces)
         parent_level_traces = _aggregate_parent_traces(temp_chunk_traces)
+        if submission_ts_ns is not None:
+            parent_level_traces["submission_ts_ns"] = submission_ts_ns
         aggregated_result["trace"] = parent_level_traces
 
     return aggregated_result
@@ -836,6 +847,7 @@ async def submit_job_v2(
     document_type = None
     try:
         span.add_event("Submitting file for processing (V2)")
+        submission_ts_ns = time.time_ns()
 
         current_trace_id = span.get_span_context().trace_id
         parent_job_id = trace_id_to_uuid(current_trace_id)
@@ -863,7 +875,7 @@ async def submit_job_v2(
         submission_items: List[Tuple[str, MessageWrapper]] = []
         subjob_ids: List[str] = []
         subjob_descriptors: List[Dict[str, Any]] = []
-        parent_metadata: Dict[str, Any] = {}
+        parent_metadata: Dict[str, Any] = {"submission_ts_ns": submission_ts_ns}
         submission_items: List[Tuple[str, MessageWrapper]] = []
         try:
             parent_uuid = uuid.UUID(parent_job_id)
@@ -1072,6 +1084,7 @@ async def submit_job_v2(
                     "original_source_name": original_source_name,
                     "document_type": document_types[0],
                     "subjob_order": [],  # No subjobs for non-split PDFs
+                    "submission_ts_ns": submission_ts_ns,
                 }
 
                 # Store as parent job metadata with empty subjob list for consistency
