@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import threading
+from io import BytesIO
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -225,6 +226,7 @@ class Ingestor:
         **kwargs,
     ):
         self._documents = documents or []
+        self._buffers = []
         self._client = client
         self._job_queue_id = job_queue_id
         self._vdb_bulk_upload = None
@@ -350,6 +352,28 @@ class Ingestor:
         if self._check_files_local():
             self._job_specs = BatchJobSpec(self._documents)
             self._all_local = True
+
+        return self
+
+    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "Ingestor":
+        """
+        Add buffers for processing.
+
+        Parameters
+        ----------
+        buffers : List[Tuple[str, BytesIO]]
+            List of tuples containing the name of the buffer and the BytesIO object.
+        """
+        if (
+            isinstance(buffers, tuple)
+            and len(buffers) == 2
+            and isinstance(buffers[0], str)
+            and isinstance(buffers[1], BytesIO)
+        ):
+            buffers = [buffers]
+        self._buffers.extend(buffers)
+        self._job_specs = BatchJobSpec(self._buffers)
+        self._all_local = True
 
         return self
 
@@ -670,57 +694,133 @@ class Ingestor:
 
         return tuple(returns) if len(returns) > 1 else results
 
-    def ingest_async(self, **kwargs: Any) -> Future:
+    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **kwargs: Any) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
+        The return type of the future's result is dynamic and mirrors the behavior of the synchronous
+        `ingest()` method, controlled by the `return_failures` and `return_traces` flags. If a VDB
+        upload is configured, the future will complete *after* the VDB upload finishes.
+
         Parameters
         ----------
+        return_failures : bool, optional
+            If True, return a tuple containing failures; otherwise, only return results. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
         kwargs : dict
-            Additional parameters for the `submit_job_async` method.
+            Additional parameters passed to the concurrent processor.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        Future
-            A future that completes when all submitted jobs have reached a terminal state.
+        Future[Union[List[Any], Tuple[Any, ...]]]
+            A future that completes when all jobs and any subsequent VDB upload
+            have finished. Its result will be one of the following:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+
         """
-        self._prepare_ingest_run()
+        try:
+            self._prepare_ingest_run()
 
-        self._job_ids = self._client.add_job(self._job_specs)
+            # Add jobs locally first
+            if self._job_specs is None:
+                raise RuntimeError("Job specs missing for ingest_async.")
+            self._job_ids = self._client.add_job(self._job_specs)
+            self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
-        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
-        self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
+            proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently_async, **kwargs)
 
-        combined_future = Future()
-        submitted_futures = set(future_to_job_id.keys())
-        completed_futures = set()
-        future_results = []
-        vdb_future = None
+            final_future: Future = Future()
 
-        def _done_callback(future):
-            job_id = future_to_job_id[future]
-            job_state = self._job_states[job_id]
-            try:
-                result = self._client.fetch_job_result(job_id)
-                if job_state.state != JobStateEnum.COMPLETED:
-                    job_state.state = JobStateEnum.COMPLETED
-            except Exception:
-                result = None
-                if job_state.state != JobStateEnum.FAILED:
-                    job_state.state = JobStateEnum.FAILED
-            completed_futures.add(future)
-            future_results.extend(result)
-            if completed_futures == submitted_futures:
-                combined_future.set_result(future_results)
+            processor_future = self._client.process_jobs_concurrently_async(
+                job_indices=self._job_ids,
+                job_queue_id=self._job_queue_id,
+                return_traces=return_traces,
+                **proc_kwargs,
+            )
 
-        for future in future_to_job_id:
-            future.add_done_callback(_done_callback)
+            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
 
-        if self._vdb_bulk_upload:
-            executor = ThreadPoolExecutor(max_workers=1)
-            vdb_future = executor.submit(self._vdb_bulk_upload.run_async, combined_future)
+            def _processor_done_callback(proc_future: Future):
+                """Callback to handle completion, VDB upload, and final result setting."""
+                try:
+                    if proc_future.cancelled():
+                        if not final_future.done():
+                            final_future.cancel()
+                        return
+                    if proc_future.exception():
+                        if not final_future.done():
+                            final_future.set_exception(proc_future.exception())
+                        return
 
-        return combined_future if not vdb_future else vdb_future
+                    results, failures, traces_list = proc_future.result()
+
+                    failed_job_ids = set()
+                    for job_id_with_source, error_msg in failures:
+                        job_id = job_id_with_source.split(":", 1)[0]
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.FAILED:
+                                self._job_states[job_id].state = JobStateEnum.FAILED
+                            failed_job_ids.add(job_id)
+
+                    all_submitted_job_ids = set(self._job_ids)
+                    successful_job_ids = all_submitted_job_ids - failed_job_ids
+
+                    for job_id in successful_job_ids:
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.COMPLETED:
+                                self._job_states[job_id].state = JobStateEnum.COMPLETED
+
+                    if self._vdb_bulk_upload and results:
+                        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
+                            results_future = Future()
+                            results_future.set_result(results)
+                            vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
+                            vdb_future.result()
+
+                    parent_trace_ids = (
+                        self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+                    )
+
+                    returns = [results]
+                    if return_failures:
+                        returns.append(failures)
+                    if return_traces:
+                        returns.append(traces_list)
+                    if include_parent_trace_ids:
+                        returns.append(parent_trace_ids)
+
+                    final_result = tuple(returns) if len(returns) > 1 else results
+
+                    if not final_future.done():
+                        final_future.set_result(final_result)
+
+                except Exception as e:
+                    logger.exception("Error in ingest_async processor callback")
+                    if not final_future.done():
+                        final_future.set_exception(e)
+                finally:
+                    final_state = JobStateEnum.CANCELLED if proc_future.cancelled() else JobStateEnum.FAILED
+                    for job_state in self._job_states.values():
+                        if (
+                            job_state.state not in [JobStateEnum.COMPLETED, JobStateEnum.FAILED]
+                            and job_state.state != final_state
+                        ):
+                            job_state.state = final_state
+
+            processor_future.add_done_callback(_processor_done_callback)
+            return final_future
+
+        except Exception as setup_err:
+            logger.exception("Failed during synchronous setup of ingest_async")
+            error_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = Future()
+            error_future.set_exception(setup_err)
+            return error_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):
