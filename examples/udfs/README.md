@@ -144,8 +144,10 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 
 ## LLM Content Summarizer (Production Example)
 
-**Purpose**: Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline payload,
+**Purpose**: Generates document summaries using an LLM. This production UDF demonstrates how to extract the pipeline payload,
 run custom code (summarization), and inject results into the metadata for downstream usecases (such as retrieval).
+
+By default, this uses NVIDIA BUILD-hosted Nemotron-mini-4b-instruct as an example, but you can customize it to use **any OpenAI-compatible endpoint** - other NVIDIA BUILD models, local LLMs (Ollama, vLLM), self-hosted NIM deployments, or other cloud providers.
 
 ### Custom Pipeline Configuration (Optional)
 
@@ -205,15 +207,16 @@ This approach is useful for production deployments requiring specific pipeline c
 Before running the nv-ingest pipeline with the LLM Content Summarizer, set the following environment variables in your shell:
 
 ```bash
-export NVIDIA_API_KEY="your-nvidia-api-key"                                # (required) API key for NVIDIA NIM endpoints
-export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"    # (optional) LLM model for summarization
-export LLM_BASE_URL="https://integrate.api.nvidia.com/v1"                  # (optional) Base URL for NVIDIA API
-export TIMEOUT=60                         # (optional) API timeout in seconds
-export MIN_CONTENT_LENGTH=50              # (optional) Minimum content length to trigger summarization
-export MAX_CONTENT_LENGTH=12000           # (optional) Maximum content length sent to the API
+export NVIDIA_API_KEY="your-nvidia-api-key"                                      # (required) API key for NVIDIA NIM endpoints
+export LLM_SUMMARIZATION_MODEL="nvidia/nemotron-mini-4b-instruct"                # (optional) Model to use
+export LLM_SUMMARIZATION_BASE_URL="https://integrate.api.nvidia.com/v1"          # (optional) OpenAI-compatible API endpoint
+export LLM_SUMMARIZATION_TIMEOUT=60                                              # (optional) API timeout in seconds
+export LLM_MIN_CONTENT_LENGTH=50                                                 # (optional) Minimum content length to summarize
+export LLM_MAX_CONTENT_LENGTH=12000                                              # (optional) Maximum content length to API
 ```
 
-- `NVIDIA_API_KEY` is required for calling NVIDIA LLM APIs.
+- `NVIDIA_API_KEY` is required for NVIDIA-hosted endpoints (can use `NGC_API_KEY` as fallback).
+- To use a **local LLM** or other provider, change `LLM_SUMMARIZATION_BASE_URL` and `LLM_SUMMARIZATION_MODEL`.
 - Other settings are optional and will fall back to their defaults if unset.
 
 ### Usage
@@ -263,7 +266,7 @@ After processing, summaries are stored in the output metadata files. Look for th
     "custom_content": {
       "llm_summarizer_udf": {
         "summary": "Your AI-generated summary appears here...",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct"
+        "model": "nvidia/nemotron-mini-4b-instruct"
       }
     }
   }

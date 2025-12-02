@@ -5,15 +5,18 @@ LLM Content Summarizer UDF for NV-Ingest Pipeline
 This UDF uses an LLM to generate concise summaries of text content chunks. These summaries are added to the metadata
 for enhanced downstream processing and search capabilities.
 
-These variables can be set in the environment before running the pipeline. These can be treated as kwargs.
-- NVIDIA_API_KEY: API key for NVIDIA NIM endpoints (required)
+By default, this uses NVIDIA BUILD-hosted Nemotron-mini-4b-instruct as an example, but you can customize it to use any
+OpenAI-compatible endpoint (other NVIDIA BUILD models, local LLMs via Ollama/vLLM, self-hosted NIM, etc.) by setting
+LLM_SUMMARIZATION_BASE_URL and LLM_SUMMARIZATION_MODEL.
+
+Environment variables (can be treated as kwargs):
+- NVIDIA_API_KEY: API key for NVIDIA NIM endpoints (required for hosted endpoints)
 - LLM_SUMMARIZATION_MODEL: Model to use (default: nvidia/nemotron-mini-4b-instruct)
-- LLM_SUMMARIZATION_BASE_URL: base URL (default: https://integrate.api.nvidia.com/v1)
+- LLM_SUMMARIZATION_BASE_URL: Base URL for OpenAI-compatible API (default: https://integrate.api.nvidia.com/v1)
 - LLM_SUMMARIZATION_TIMEOUT: API timeout in seconds (default: 60)
 - LLM_MIN_CONTENT_LENGTH: Minimum content length to summarize (default: 50)
 - LLM_MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
-TODO: Implement this
-- NUM_CHUNKS: (Optional) Number of first and last pages to summarize. default=1
+
 More info can be found in `examples/udfs/README.md`
 """
 
