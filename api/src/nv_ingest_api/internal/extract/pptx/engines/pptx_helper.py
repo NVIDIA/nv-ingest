@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import io
-import glob
 import logging
 import os
 import re
@@ -36,6 +35,7 @@ from pptx.enum.dml import MSO_THEME_COLOR  # noqa
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.shapes import PP_PLACEHOLDER  # noqa
 from pptx.slide import Slide
+import pypdfium2 as pdfium
 
 from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
@@ -230,12 +230,11 @@ def process_shape(
 
             png_streams = convert_stream_with_libreoffice(io.BytesIO(ole_blob), ext, "png")
 
-            for i, png_stream in enumerate(png_streams):
-                ole_idx = f"{shape_idx}.ole_page_{i}"
+            for png_stream in png_streams:
                 pending_images.append(
                     (
                         png_stream.getvalue(),
-                        ole_idx,
+                        shape_idx,
                         slide_idx,
                         slide_count,
                         page_nearby_blocks,
@@ -891,6 +890,9 @@ def convert_stream_with_libreoffice(
     """
     Converts a file stream (DOCX or PPTX) to PDF or a series of PNGs using a temporary directory.
     """
+    if output_format not in {"pdf", "png"}:
+        raise ValueError(f"Unsupported output format for LibreOffice conversion: {output_format}")
+
     with tempfile.TemporaryDirectory() as temp_dir:
         input_path = os.path.join(temp_dir, f"input.{input_extension}")
         with open(input_path, "wb") as f:
@@ -900,44 +902,38 @@ def convert_stream_with_libreoffice(
             "libreoffice",
             "--headless",
             "--convert-to",
-            output_format,
+            "pdf",
             input_path,
             "--outdir",
             temp_dir,
         ]
 
-        try:
-            subprocess.run(
-                command,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"LibreOffice conversion to {output_format} failed: {e.stderr}") from e
-        except FileNotFoundError:
-            raise RuntimeError("LibreOffice command not found. Is it installed and in the system's PATH?") from None
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        pdf_path = os.path.join(temp_dir, "input.pdf")
+        if not os.path.exists(pdf_path):
+            raise RuntimeError("LibreOffice conversion failed.")
 
         if output_format == "pdf":
-            pdf_path = os.path.join(temp_dir, "input.pdf")
-            if not os.path.exists(pdf_path):
-                raise RuntimeError("LibreOffice PDF conversion failed to produce an output file.")
             with open(pdf_path, "rb") as f:
                 return io.BytesIO(f.read())
 
-        elif output_format == "png":
-            image_files = sorted(glob.glob(os.path.join(temp_dir, "input*.png")))
-            if not image_files:
-                raise RuntimeError("LibreOffice PNG conversion failed to produce any image files.")
-
+        elif output_format in {"png"}:
             image_streams = []
-            for image_path in image_files:
-                with open(image_path, "rb") as f:
-                    image_streams.append(io.BytesIO(f.read()))
+            pdf_document = pdfium.PdfDocument(pdf_path)
+            for i in range(len(pdf_document)):
+                page = pdf_document[i]
+                bitmap = page.render(scale=1)
+                pil_image = bitmap.to_pil()
+                buffered = io.BytesIO()
+                pil_image.save(buffered, format=output_format)
+                image_streams.append(buffered)
             return image_streams
-
-        else:
-            raise ValueError(f"Unsupported output format for LibreOffice conversion: {output_format}")
 
 
 def _get_ole_extension(prog_id: str) -> str:

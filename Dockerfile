@@ -70,7 +70,7 @@ RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
       dpkg-dev \
-      libreoffice-nogui \
+      libreoffice \
       $GPL_LIBS \
     && apt-get source $GPL_LIBS \
     && for pkg in $FORCE_REMOVE_PKGS; do \
