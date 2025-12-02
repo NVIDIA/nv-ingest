@@ -898,6 +898,10 @@ def convert_stream_with_libreoffice(
         with open(input_path, "wb") as f:
             f.write(file_stream.read())
 
+        # We always convert to PDF first using LibreOffice.
+        # Direct conversion to image formats (e.g. --convert-to png) in LibreOffice
+        # often only exports the first page/slide or lacks control over resolution.
+        # Converting to PDF preserves multi-page structure and layout fidelity.
         command = [
             "libreoffice",
             "--headless",
@@ -924,6 +928,10 @@ def convert_stream_with_libreoffice(
                 return io.BytesIO(f.read())
 
         elif output_format in {"png"}:
+            # We use pdfium to rasterize the PDF into images.
+            # This provides:
+            # 1. Support for multi-page documents (LibreOffice image export is often single-page).
+            # 2. Consistent rendering appearance matching the PDF output.
             image_streams = []
             pdf_document = pdfium.PdfDocument(pdf_path)
             for i in range(len(pdf_document)):

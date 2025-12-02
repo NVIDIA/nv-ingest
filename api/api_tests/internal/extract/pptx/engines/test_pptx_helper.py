@@ -12,8 +12,6 @@ class TestConvertStreamWithLibreOffice(unittest.TestCase):
     def setUp(self):
         self.input_content = b"fake docx content"
         self.expected_pdf_content = b"fake pdf content"
-        self.expected_png_content_1 = b"fake png page 1"
-        self.expected_png_content_2 = b"fake png page 2"
         self.stream = io.BytesIO(self.input_content)
 
     @patch("subprocess.run")
@@ -26,19 +24,15 @@ class TestConvertStreamWithLibreOffice(unittest.TestCase):
             try:
                 outdir_index = command.index("--outdir")
                 temp_dir = command[outdir_index + 1]
-
-                # Create the expected output file
                 output_path = os.path.join(temp_dir, "input.pdf")
                 with open(output_path, "wb") as f:
                     f.write(self.expected_pdf_content)
             except ValueError:
                 raise RuntimeError("Test setup error: --outdir not found in command")
-
             return MagicMock(returncode=0)
 
         mock_run.side_effect = side_effect
 
-        # Pass "pdf" as output_format
         result = convert_stream_with_libreoffice(self.stream, "docx", "pdf")
 
         self.assertIsInstance(result, io.BytesIO)
@@ -50,100 +44,92 @@ class TestConvertStreamWithLibreOffice(unittest.TestCase):
         self.assertIn("--convert-to", command)
         self.assertIn("pdf", command)
 
+    @patch("nv_ingest_api.internal.extract.pptx.engines.pptx_helper.pdfium")
     @patch("subprocess.run")
-    def test_conversion_success_png(self, mock_run):
+    def test_conversion_success_png(self, mock_run, mock_pdfium):
         """
-        Test the happy path where LibreOffice runs successfully and produces PNGs.
+        Test the happy path where LibreOffice makes a PDF, then pdfium converts it to PNGs.
         """
 
         def side_effect(command, **kwargs):
             try:
                 outdir_index = command.index("--outdir")
                 temp_dir = command[outdir_index + 1]
-
-                # Simulate LibreOffice creating multiple PNG files (one per page)
-                # LibreOffice typically names them input_0.png, input_1.png, etc.
-                p1_path = os.path.join(temp_dir, "input_0.png")
-                p2_path = os.path.join(temp_dir, "input_1.png")
-
-                with open(p1_path, "wb") as f:
-                    f.write(self.expected_png_content_1)
-                with open(p2_path, "wb") as f:
-                    f.write(self.expected_png_content_2)
-
+                output_path = os.path.join(temp_dir, "input.pdf")
+                with open(output_path, "wb") as f:
+                    f.write(self.expected_pdf_content)
             except ValueError:
                 raise RuntimeError("Test setup error: --outdir not found in command")
-
             return MagicMock(returncode=0)
 
         mock_run.side_effect = side_effect
 
-        # Pass "png" as output_format
+        mock_doc = MagicMock()
+        mock_pdfium.PdfDocument.return_value = mock_doc
+        mock_doc.__len__.return_value = 2
+
+        mock_page = MagicMock()
+        mock_doc.__getitem__.return_value = mock_page
+        mock_bitmap = MagicMock()
+        mock_page.render.return_value = mock_bitmap
+        mock_pil_image = MagicMock()
+        mock_bitmap.to_pil.return_value = mock_pil_image
+
+        def save_side_effect(buffer, format):
+            buffer.write(b"fake_png_data")
+
+        mock_pil_image.save.side_effect = save_side_effect
+
         result = convert_stream_with_libreoffice(self.stream, "docx", "png")
-
-        # Verify result is a list
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 2)
-        self.assertIsInstance(result[0], io.BytesIO)
-
-        # Verify content
-        self.assertEqual(result[0].getvalue(), self.expected_png_content_1)
-        self.assertEqual(result[1].getvalue(), self.expected_png_content_2)
 
         args, _ = mock_run.call_args
         command = args[0]
-        self.assertIn("png", command)
+        self.assertIn("--convert-to", command)
+        self.assertIn("pdf", command)
+
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].getvalue(), b"fake_png_data")
+        self.assertEqual(result[1].getvalue(), b"fake_png_data")
+
+        mock_pdfium.PdfDocument.assert_called_once()
+        mock_pil_image.save.assert_called_with(unittest.mock.ANY, format="png")
 
     @patch("subprocess.run")
     def test_libreoffice_command_error(self, mock_run):
         """
-        Test handling of subprocess.CalledProcessError (LibreOffice returns non-zero exit code).
+        Test handling of subprocess.CalledProcessError.
+        Note: The new code allows CalledProcessError to bubble up directly.
         """
         mock_run.side_effect = subprocess.CalledProcessError(
             returncode=1, cmd="libreoffice", stderr="Conversion failed"
         )
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(subprocess.CalledProcessError):
             convert_stream_with_libreoffice(self.stream, "docx", "pdf")
-
-        self.assertIn("LibreOffice conversion to pdf failed", str(cm.exception))
-        self.assertIn("Conversion failed", str(cm.exception))
 
     @patch("subprocess.run")
     def test_libreoffice_not_found(self, mock_run):
         """
-        Test handling of FileNotFoundError (LibreOffice binary not found).
+        Test handling of FileNotFoundError.
+        Note: The new code allows FileNotFoundError to bubble up directly.
         """
         mock_run.side_effect = FileNotFoundError("No such file or directory")
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FileNotFoundError):
             convert_stream_with_libreoffice(self.stream, "docx", "pdf")
 
-        self.assertIn("LibreOffice command not found", str(cm.exception))
-
     @patch("subprocess.run")
-    def test_no_output_file_generated_pdf(self, mock_run):
+    def test_no_output_file_generated(self, mock_run):
         """
-        Test the case where LibreOffice runs successfully but fails to generate PDF.
+        Test the case where LibreOffice runs successfully but fails to generate the PDF.
         """
         mock_run.return_value = MagicMock(returncode=0)
 
         with self.assertRaises(RuntimeError) as cm:
             convert_stream_with_libreoffice(self.stream, "docx", "pdf")
 
-        self.assertIn("LibreOffice PDF conversion failed to produce an output file", str(cm.exception))
-
-    @patch("subprocess.run")
-    def test_no_output_file_generated_png(self, mock_run):
-        """
-        Test the case where LibreOffice runs successfully but fails to generate PNGs.
-        """
-        mock_run.return_value = MagicMock(returncode=0)
-
-        with self.assertRaises(RuntimeError) as cm:
-            convert_stream_with_libreoffice(self.stream, "docx", "png")
-
-        self.assertIn("LibreOffice PNG conversion failed to produce any image files", str(cm.exception))
+        self.assertEqual(str(cm.exception), "LibreOffice conversion failed.")
 
     def test_invalid_output_format(self):
         """
