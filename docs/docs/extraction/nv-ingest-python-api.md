@@ -169,6 +169,31 @@ ingestor = ingestor.extract(document_type="pdf")
 
 
 
+### PDF Extraction Strategies
+
+NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
+You can select the strategy using the `extract_method` parameter.
+
+- `pdfium` (Default): Uses PDFium to extract native text.
+  This is the fastest method but does not capture text from scanned images/pages.
+- `pdfium_hybrid`: A hybrid approach that uses PDFium for pages with native text and automatically switches to OCR for scanned pages.
+  This offers a robust balance of speed and coverage for mixed documents.
+- `ocr`: Bypasses native text extraction and processes every page using the full OCR pipeline.
+  Use this for fully scanned documents or when native text is corrupt.
+
+```python
+ingestor = Ingestor().files("mixed_content.pdf")
+
+# Use hybrid mode for mixed digital/scanned PDFs
+ingestor = ingestor.extract(
+    document_type="pdf",
+    extract_method="pdfium_hybrid",
+)
+results = ingestor.ingest()
+```
+
+
+
 ## Work with Large Datasets: Save to Disk
 
 By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
