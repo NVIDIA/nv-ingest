@@ -97,8 +97,6 @@ services:
               device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
-    profiles:
-      - table-structure
 
   ocr:
     image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
@@ -200,7 +198,7 @@ services:
       - nemoretriever-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1}:${VLM_TAG:-latest}
+    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
     ports:
       - "8018:8000"
     user: root
@@ -342,7 +340,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
-      - VLM_CAPTION_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+      - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
@@ -495,10 +493,10 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-attu
-    image: zilliz/attu:v2.3.5
+    image: zilliz/attu:v2.5.3
     hostname: attu
     environment:
-      MILVUS_URL: http://milvus:19530
+      MILVUS_URL: milvus:19530
     ports:
       - "3001:3000"
     depends_on:

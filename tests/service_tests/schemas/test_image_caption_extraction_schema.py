@@ -15,7 +15,7 @@ def test_valid_schema():
     assert schema.api_key == "your-api-key-here"
     assert schema.endpoint_url == "https://integrate.api.nvidia.com/v1/chat/completions"
     assert schema.prompt == "Caption the content of this image:"
-    assert schema.model_name == "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    assert schema.model_name == "nvidia/nemotron-nano-12b-v2-vl"
     assert schema.raise_on_failure is False
 
 

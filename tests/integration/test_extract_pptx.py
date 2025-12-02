@@ -13,7 +13,7 @@ from tests.integration.utilities_for_test import canonicalize_markdown_table
 def test_pptx_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
-    multimodal_first_chart_xaxis,
+    multimodal_first_chart_xaxis_variants,
     multimodal_first_chart_yaxis,
     multimodal_second_chart_xaxis,
     multimodal_second_chart_yaxis,
@@ -54,7 +54,7 @@ def test_pptx_extract_only(
     assert any(canonicalize_markdown_table(x) == multimodal_first_table_markdown for x in table_contents)
 
     chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
-    assert multimodal_first_chart_xaxis in chart_contents
+    assert any(v in chart_contents for v in multimodal_first_chart_xaxis_variants)
     assert multimodal_first_chart_yaxis in chart_contents
     assert multimodal_second_chart_xaxis in chart_contents
     assert multimodal_second_chart_yaxis.replace("1 - ", "") in chart_contents

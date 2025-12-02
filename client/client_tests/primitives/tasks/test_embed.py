@@ -84,6 +84,7 @@ def test_embed_task_str_representation():
         model_name="nvidia/llama-3.2-nv-embedqa-1b-v2",
         api_key="api-key",
         filter_errors=False,
+        dimensions=2048,
     )
     expected_str = (
         "Embed Task:\n"
@@ -91,6 +92,7 @@ def test_embed_task_str_representation():
         "  model_name: nvidia/llama-3.2-nv-embedqa-1b-v2\n"
         "  api_key: [redacted]\n"
         "  filter_errors: False\n"
+        "  dimensions: 2048\n"
     )
     assert str(task) == expected_str
 
@@ -99,12 +101,12 @@ def test_embed_task_str_representation():
 
 
 @pytest.mark.parametrize(
-    "endpoint_url, model_name, api_key, filter_errors",
+    "endpoint_url, model_name, api_key, filter_errors, dimensions",
     [
-        ("https://integrate.api.nvidia.com/v1", "nvidia/embedding-model", "", True),
-        ("http://embedding-ms:8000/v1", "nvidia/llama-3.2-nv-embedqa-1b-v2", "test-key", False),
-        ("", "nvidia/nv-embedqa-e5-v5", "42", True),
-        (None, None, None, False),
+        ("https://integrate.api.nvidia.com/v1", "nvidia/embedding-model", "", True, 2048),
+        ("http://embedding-ms:8000/v1", "nvidia/llama-3.2-nv-embedqa-1b-v2", "test-key", False, 1024),
+        ("", "nvidia/nv-embedqa-e5-v5", "42", True, None),
+        (None, None, None, False, 512),
     ],
 )
 def test_embed_task_to_dict(
@@ -112,9 +114,16 @@ def test_embed_task_to_dict(
     model_name,
     api_key,
     filter_errors,
+    dimensions,
 ):
 
-    task = EmbedTask(endpoint_url=endpoint_url, model_name=model_name, api_key=api_key, filter_errors=filter_errors)
+    task = EmbedTask(
+        endpoint_url=endpoint_url,
+        model_name=model_name,
+        api_key=api_key,
+        filter_errors=filter_errors,
+        dimensions=dimensions,
+    )
 
     expected_dict = {"type": "embed", "task_properties": {"filter_errors": filter_errors}}
 
@@ -125,6 +134,8 @@ def test_embed_task_to_dict(
         expected_dict["task_properties"]["model_name"] = model_name
     if api_key:
         expected_dict["task_properties"]["api_key"] = api_key
+    if dimensions:
+        expected_dict["task_properties"]["dimensions"] = dimensions
 
     print(expected_dict)
     print(task.to_dict())
@@ -167,6 +178,7 @@ def test_embed_task_schema_consolidation():
         image_elements_modality="image",
         structured_elements_modality="text_image",
         audio_elements_modality="text",
+        dimensions=2048,
     )
 
     assert task._endpoint_url == "http://embedding-ms:8000/v1"
@@ -177,6 +189,7 @@ def test_embed_task_schema_consolidation():
     assert task._image_elements_modality == "image"
     assert task._structured_elements_modality == "text_image"
     assert task._audio_elements_modality == "text"
+    assert task._dimensions == 2048
 
 
 def test_embed_task_api_schema_validation():
@@ -192,6 +205,7 @@ def test_embed_task_api_schema_validation():
     assert task._image_elements_modality is None
     assert task._structured_elements_modality is None
     assert task._audio_elements_modality is None
+    assert task._dimensions is None
 
 
 def test_embed_task_serialization_with_api_schema():
@@ -202,6 +216,7 @@ def test_embed_task_serialization_with_api_schema():
         api_key="api-key",
         filter_errors=True,
         text_elements_modality="text",
+        dimensions=2048,
     )
 
     task_dict = task.to_dict()
@@ -212,3 +227,4 @@ def test_embed_task_serialization_with_api_schema():
     assert task_dict["task_properties"]["api_key"] == "api-key"
     assert task_dict["task_properties"]["filter_errors"] is True
     assert task_dict["task_properties"]["text_elements_modality"] == "text"
+    assert task_dict["task_properties"]["dimensions"] == 2048

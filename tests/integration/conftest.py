@@ -104,11 +104,6 @@ def multimodal_second_table_markdown():
 
 
 @pytest.fixture
-def multimodal_first_chart_xaxis():
-    return "Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan"
-
-
-@pytest.fixture
 def multimodal_first_chart_yaxis():
     return "$- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00"
 
@@ -155,7 +150,7 @@ def multimodal_first_table_location_variants_images():
 
 # Image-specific chart x-axis variants observed across formats
 @pytest.fixture
-def multimodal_first_chart_xaxis_variants_images():
+def multimodal_first_chart_xaxis_variants():
     return [
         "Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan",
         "Hammer - Powerdrill - Bluetoothspeaker - Minifridge - Premium desk fan",

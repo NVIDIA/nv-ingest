@@ -6,18 +6,19 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
+from urllib.parse import urlparse
 
 import glom
 import pandas as pd
-from openai import OpenAI
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.util.nim import infer_microservice
+
 
 logger = logging.getLogger(__name__)
 
 # Reduce SDK HTTP logging verbosity so request/response logs are not emitted
-logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
@@ -40,6 +41,7 @@ def _make_async_request(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> list:
     """
     Interacts directly with the NIM embedding service to calculate embeddings for a batch of prompts.
@@ -79,26 +81,22 @@ def _make_async_request(
         # Normalize API key to avoid sending an empty bearer token via SDK internals
         _token = (api_key or "").strip()
         _api_key = _token if _token else "<no key provided>"
-        client = OpenAI(
-            api_key=_api_key,
-            base_url=embedding_nim_endpoint,
+
+        resp = infer_microservice(
+            prompts,
+            embedding_model,
+            embedding_endpoint=embedding_nim_endpoint,
+            nvidia_api_key=_api_key,
+            input_type=input_type,
+            truncate=truncate,
+            batch_size=8191,
+            grpc="http" not in urlparse(embedding_nim_endpoint).scheme,
+            input_names=["text"],
+            output_names=["embeddings"],
+            dtypes=["BYTES"],
         )
 
-        extra_body = {
-            "input_type": input_type,
-            "truncate": truncate,
-        }
-        if modalities:
-            extra_body["modality"] = modalities
-
-        resp = client.embeddings.create(
-            input=prompts,
-            model=embedding_model,
-            encoding_format=encoding_format,
-            extra_body=extra_body,
-        )
-
-        response["embedding"] = resp.data
+        response["embedding"] = resp
         response["info_msg"] = None
 
     except Exception as err:
@@ -124,6 +122,7 @@ def _async_request_handler(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> List[dict]:
     """
     Gathers calculated embedding results from the NIM embedding service concurrently.
@@ -168,6 +167,7 @@ def _async_request_handler(
                 truncate=truncate,
                 filter_errors=filter_errors,
                 modalities=modality_batch,
+                dimensions=dimensions,
             )
             for prompt_batch, modality_batch in zip(prompts, modalities)
         ]
@@ -186,6 +186,7 @@ def _async_runner(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> dict:
     """
     Concurrently launches all NIM embedding requests and flattens the results.
@@ -224,6 +225,7 @@ def _async_runner(
         truncate,
         filter_errors,
         modalities=modalities,
+        dimensions=dimensions,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -562,6 +564,7 @@ def transform_create_text_embeddings_internal(
     endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
     model_name = task_config.get("model_name") or transform_config.embedding_model
     custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
+    dimensions = task_config.get("dimensions") or transform_config.dimensions
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -636,6 +639,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.truncate,
                 False,
                 modalities=modality_batches,
+                dimensions=dimensions,
             )
             # Build a simple row index -> embedding map
             embeddings_dict = dict(
@@ -680,6 +684,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.input_type,
                 transform_config.truncate,
                 False,
+                dimensions=dimensions,
             )
             custom_embeddings_dict = dict(
                 zip(
