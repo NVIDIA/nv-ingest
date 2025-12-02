@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class UDFParallelStage(RayActorStage):
     """
     A no-op pass-through stage designed for parallel UDF execution.
-    
+
     This stage simply returns the input message unchanged, but when configured
     with multiple replicas, it provides a high-concurrency pool for UDFs to
     achieve parallel execution without blocking.
@@ -46,7 +46,7 @@ class UDFParallelStage(RayActorStage):
     def on_data(self, message: Any) -> Any:
         """
         Pass-through processing that simply returns the message unchanged.
-        
+
         The @udf_intercept_hook decorator allows UDFs to target this stage,
         and multiple replicas provide parallel execution capacity.
 

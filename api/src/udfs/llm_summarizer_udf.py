@@ -24,7 +24,8 @@ import time
 logger = logging.getLogger(__name__)
 
 PROMPT = """
-Based on the contents from the first and last page of a document below, provide a single sentence summary that captures the main purpose and key topics. Do not add special characters for formatting.
+Based on the contents from the first and last page of a document below, provide a single sentence summary that \
+captures the main purpose and key topics. Do not add special characters for formatting.
 
 [CONTENT]
 {content}
@@ -50,9 +51,9 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
         The modified control message with LLM summaries added to metadata
     """
     udf_start_time = time.time()
-    
-    # Load configuration 
-    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NGC_API_KEY") # Using NGC_API_KEY if NVIDIA_API_KEY is not set
+
+    # Load configuration
+    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("NGC_API_KEY")  # Using NGC_API_KEY if NVIDIA_API_KEY is not set
     model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/nemotron-mini-4b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
@@ -68,7 +69,9 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     }
 
     logger.info(f"Configuration: model={model_name}, base_url={base_url}")
-    logger.info(f"Configuration: timeout={timeout}s, min_content={min_content_length}, max_content={max_content_length}")
+    logger.info(
+        f"Configuration: timeout={timeout}s, min_content={min_content_length}, max_content={max_content_length}"
+    )
 
     if not api_key:
         logger.error("NVIDIA_API_KEY not set - skipping LLM summarization")
@@ -82,10 +85,10 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Extract document name
     doc_name = _extract_document_name(df)
     logger.info(f"LLM summarization starting: {doc_name} ({len(df)} chunks, model={model_name})")
-    
+
     # Save original dataframe to preserve all chunks
     original_df = df.copy()
-    
+
     extraction_start = time.time()
     if len(df) > 1:
         # Select first and last chunk for summarization
@@ -113,24 +116,34 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     )
     stats["tokens"] = _estimate_tokens(content)
     extraction_time = time.time() - extraction_start
-    logger.info(f"Content extraction completed: {len(content)} characters, ~{stats['tokens']} tokens (took {extraction_time:.2f}s)")
+    logger.info(
+        f"Content extraction completed: {len(content)} characters, "
+        f"~{stats['tokens']} tokens (took {extraction_time:.2f}s)"
+    )
 
     logger.info(f"Calling LLM API ({model_name}) for summarization...")
     summary, llm_duration = _generate_llm_summary(content, model_name, base_url, api_key, timeout)
 
     if summary:
-        tokens_per_sec = stats['tokens'] / llm_duration if llm_duration > 0 else 0
-        logger.info(f"✓ LLM API call completed: duration={llm_duration:.2f}s, tokens={stats['tokens']}, throughput={tokens_per_sec:.1f} tokens/s")
-        logger.info(f"Generated summary ({len(summary)} chars): {summary[:100]}..." if len(summary) > 100 else f"Generated summary: {summary}")
+        tokens_per_sec = stats["tokens"] / llm_duration if llm_duration > 0 else 0
+        logger.info(
+            f"LLM API call completed: duration={llm_duration:.2f}s, "
+            f"tokens={stats['tokens']}, throughput={tokens_per_sec:.1f} tokens/s"
+        )
+        logger.info(
+            f"Generated summary ({len(summary)} chars): {summary[:100]}..."
+            if len(summary) > 100
+            else f"Generated summary: {summary}"
+        )
     else:
-        logger.error(f"✗ LLM API call failed (took {llm_duration:.2f}s)")
-    
+        logger.error(f"LLM API call failed (took {llm_duration:.2f}s)")
+
     # Store summary in chunk 0 of the original dataframe (preserves all chunks)
     _store_summary(original_df, summary, model_name)
 
     # Calculate total UDF time
     udf_total_time = time.time() - udf_start_time
-    
+
     # Log summary
     logger.info("=" * 80)
     logger.info(f"LLM Summarization Complete - Document: {doc_name}")
@@ -179,32 +192,32 @@ def _generate_llm_summary(
 ) -> tuple[str | None, float]:
     """
     Generate summary using LLM API.
-    
+
     Returns
     -------
     tuple[str | None, float]
         Summary text (or None if failed) and duration in seconds
     """
     start_time = time.time()
-    
+
     try:
         from openai import OpenAI
 
         client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
-        
+
         completion = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": PROMPT.format(content=content)}],
             max_tokens=400,
             temperature=0.7,
         )
-        
+
         duration = time.time() - start_time
-        
+
         if completion.choices:
             summary = completion.choices[0].message.content.strip()
             return summary, duration
-        
+
         logger.warning("LLM returned no completion choices")
         return None, duration
 
