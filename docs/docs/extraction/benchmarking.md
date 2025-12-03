@@ -822,6 +822,5 @@ EXTRACT_IMAGES=true python run.py --case=e2e --dataset=bo767
 - **Test utilities**: See `interact.py` for shared helper functions  
 - **Docker setup**: See project root README for service management commands
 - **API documentation**: See `docs/` for API version differences
-- **MIG Benchmarking**: See [Benchmarking with MIG on Helm](mig-benchmarking.md) for GPU partitioning and multi-tenant deployment benchmarking
 
 The framework prioritizes clarity, type safety, and validation to support reliable testing of nv-ingest pipelines.

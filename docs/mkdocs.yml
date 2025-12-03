@@ -84,7 +84,6 @@ nav:
         - Add User-defined Stages: extraction/user-defined-stages.md
       - Benchmarking:
         - Overview: extraction/benchmarking.md
-        - Benchmarking with MIG on Helm: extraction/mig-benchmarking.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Content Metadata: extraction/content-metadata.md
