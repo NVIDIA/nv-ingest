@@ -1055,7 +1055,7 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
-        if not local_index or not no_wait_index:
+        if not local_index and not no_wait_index:
             # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
             # know how long this should take, it is num_elements dependent.
             wait_for_index(collection_name, expected_rows, client)
