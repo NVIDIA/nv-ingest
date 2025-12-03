@@ -49,8 +49,8 @@ def test_generate_url(rest_client):
 class TestApiVersionConfiguration:
     """Test suite for API version configuration and validation"""
 
-    def test_default_api_version_is_v1(self):
-        """Test that RestClient defaults to v1 when no api_version is provided"""
+    def test_default_api_version_is_v2(self):
+        """Test that RestClient defaults to v2 when no api_version is provided"""
         client = RestClient(host="localhost", port=7670)
 
         assert client._api_version == "v2"
