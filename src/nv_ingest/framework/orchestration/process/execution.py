@@ -162,6 +162,11 @@ def build_logging_config_from_env() -> LoggingConfig:
         if key not in os.environ:
             os.environ[key] = default_value
 
+    # For PRODUCTION mode, also suppress nv-ingest module INFO logs
+    if preset_level == "PRODUCTION":
+        logging.getLogger("nv_ingest").setLevel(logging.WARNING)
+        logging.getLogger("nv_ingest_api").setLevel(logging.WARNING)
+
     logger.info(f"Applied Ray logging preset: {preset_level}")
 
     # Get log level from environment, default to INFO
@@ -318,14 +323,15 @@ def launch_pipeline(
     if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:
         # Directly modify the pipeline config to disable dynamic scaling
         pipeline_config.pipeline.disable_dynamic_scaling = True
-        logger.info("Dynamic scaling disabled via function parameter override")
+        logger.debug("Dynamic scaling disabled via function parameter override")
 
     # Resolve static replicas
     pipeline_config = resolve_static_replicas(pipeline_config)
 
     # Pretty print the final pipeline configuration (after replica resolution)
+    # Use DEBUG level to avoid verbose output during normal startup
     pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
-    logger.info("\n" + pretty_output)
+    logger.debug("\n" + pretty_output)
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()
@@ -448,13 +454,6 @@ def run_pipeline_process(
         signal.signal(signal.SIGTERM, _handle_signal)
     except Exception as e:
         logger.debug(f"Signal handlers not set: {e}")
-
-    # Test output redirection
-    print("DEBUG: Direct print to stdout - should appear in parent process")
-    sys.stderr.write("DEBUG: Direct write to stderr - should appear in parent process\n")
-
-    # Test logging output
-    logger.info("DEBUG: Logger info - may not appear if logging handlers not redirected")
 
     # If requested, start the simple broker inside this subprocess so it shares the process group
     broker_proc = None
