@@ -81,40 +81,40 @@ tmpDirSize: 50Gi
 
 ## @section NIM Configuration
 ## @descriptionStart
-## Define additional values to the dependent NIM helm charts by updating the "nemoretriever-page-elements-v2", "nemoretriever-graphic-elements-v1",
+## Define additional values to the dependent NIM helm charts by updating the "nemoretriever-page-elements-v3", "nemoretriever-graphic-elements-v1",
 ## "nemoretriever-table-structure-v1", "nemoretriever-parse", and "paddle" values. A sane set of configurations are already included in this value
 ## file and only the "image.repository" and "image.tag" fields are explicitly called out here.
 ## @descriptionEnd
 
 ## @section NIM Components
-## @param nemoretriever-page-elements-v2.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
-## @param nemoretriever-page-elements-v2.image.repository The repository to override the location of the YOLOX
-## @param nemoretriever-page-elements-v2.image.tag The tag override for YOLOX
-## @param nemoretriever-page-elements-v2.image.pullPolicy [default: IfNotPresent] The pull policy for the YOLOX image
-## @param nemoretriever-page-elements-v2.podSecurityContext.runAsUser [default: 1000] The user ID to run the YOLOX container as
-## @param nemoretriever-page-elements-v2.podSecurityContext.runAsGroup [default: 1000] The group ID to run the YOLOX container as
-## @param nemoretriever-page-elements-v2.podSecurityContext.fsGroup [default: 1000] The filesystem group ID for YOLOX volumes
-## @param nemoretriever-page-elements-v2.replicaCount [default: 1] Number of YOLOX replicas when autoscaling is disabled
-## @param nemoretriever-page-elements-v2.serviceAccount.create [default: false] Whether to create a service account for YOLOX
-## @param nemoretriever-page-elements-v2.serviceAccount.name [default: ""] The name of the service account to use
-## @param nemoretriever-page-elements-v2.statefuleSet.enabled [default: false] Whether to deploy YOLOX as a statefulset
-## @param nemoretriever-page-elements-v2.autoscaling.enabled [default: false] Enable autoscaling for YOLOX
-## @param nemoretriever-page-elements-v2.autoscaling.minReplicas [default: 1] Minimum number of YOLOX replicas
-## @param nemoretriever-page-elements-v2.autoscaling.maxReplicas [default: 10] Maximum number of YOLOX replicas
-## @param nemoretriever-page-elements-v2.autoscaling.metrics [default: []] Metrics to use for autoscaling
-## @param nemoretriever-page-elements-v2.service.type [default: "ClusterIP"] The type of Kubernetes service to create
-## @param nemoretriever-page-elements-v2.service.name [default: "nemoretriever-page-elements-v2"] The name of the service
-## @param nemoretriever-page-elements-v2.service.httpPort [default: 8000] The HTTP port for the service
-## @param nemoretriever-page-elements-v2.service.grpcPort [default: 8001] The gRPC port for the service
-## @param nemoretriever-page-elements-v2.service.metricsPort [default: 0] The metrics port for the service
-## @param nemoretriever-page-elements-v2.nim.grpcPort [default: 8001] The gRPC port for NIM communication
-## @param nemoretriever-page-elements-v2.nim.logLevel [default: "INFO"] The log level for NIM
-## @param nemoretriever-page-elements-v2.env Environment variables for the YOLOX container
-nemoretriever-page-elements-v2:
+## @param nemoretriever-page-elements-v3.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
+## @param nemoretriever-page-elements-v3.image.repository The repository to override the location of the YOLOX
+## @param nemoretriever-page-elements-v3.image.tag The tag override for YOLOX
+## @param nemoretriever-page-elements-v3.image.pullPolicy [default: IfNotPresent] The pull policy for the YOLOX image
+## @param nemoretriever-page-elements-v3.podSecurityContext.runAsUser [default: 1000] The user ID to run the YOLOX container as
+## @param nemoretriever-page-elements-v3.podSecurityContext.runAsGroup [default: 1000] The group ID to run the YOLOX container as
+## @param nemoretriever-page-elements-v3.podSecurityContext.fsGroup [default: 1000] The filesystem group ID for YOLOX volumes
+## @param nemoretriever-page-elements-v3.replicaCount [default: 1] Number of YOLOX replicas when autoscaling is disabled
+## @param nemoretriever-page-elements-v3.serviceAccount.create [default: false] Whether to create a service account for YOLOX
+## @param nemoretriever-page-elements-v3.serviceAccount.name [default: ""] The name of the service account to use
+## @param nemoretriever-page-elements-v3.statefuleSet.enabled [default: false] Whether to deploy YOLOX as a statefulset
+## @param nemoretriever-page-elements-v3.autoscaling.enabled [default: false] Enable autoscaling for YOLOX
+## @param nemoretriever-page-elements-v3.autoscaling.minReplicas [default: 1] Minimum number of YOLOX replicas
+## @param nemoretriever-page-elements-v3.autoscaling.maxReplicas [default: 10] Maximum number of YOLOX replicas
+## @param nemoretriever-page-elements-v3.autoscaling.metrics [default: []] Metrics to use for autoscaling
+## @param nemoretriever-page-elements-v3.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param nemoretriever-page-elements-v3.service.name [default: "nemoretriever-page-elements-v3"] The name of the service
+## @param nemoretriever-page-elements-v3.service.httpPort [default: 8000] The HTTP port for the service
+## @param nemoretriever-page-elements-v3.service.grpcPort [default: 8001] The gRPC port for the service
+## @param nemoretriever-page-elements-v3.service.metricsPort [default: 0] The metrics port for the service
+## @param nemoretriever-page-elements-v3.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param nemoretriever-page-elements-v3.nim.logLevel [default: "INFO"] The log level for NIM
+## @param nemoretriever-page-elements-v3.env Environment variables for the YOLOX container
+nemoretriever-page-elements-v3:
   deployed: true
   image:
-    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.4.0"
+    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
+    tag: "1.7.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -133,7 +133,7 @@ nemoretriever-page-elements-v2:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nemoretriever-page-elements-v2
+    name: nemoretriever-page-elements-v3
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -996,8 +996,8 @@ prometheus:
 ## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"] HTTP endpoint for NeMo Retriever Parse service
 ## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"] Protocol for NeMo Retriever Parse service
 ## @param envVars.NEMORETRIEVER_PARSE_MODEL_NAME [default: "nvidia/nemoretriever-parse"] Model name for NeMo Retriever Parse
-## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"] gRPC endpoint for YOLOX page elements
-## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"] HTTP endpoint for YOLOX page elements
+## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
+## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v3:8000/v1/infer"] HTTP endpoint for YOLOX page elements
 ## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements
 ## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"] gRPC endpoint for YOLOX graphic elements
 ## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"] HTTP endpoint for YOLOX graphic elements
@@ -1038,8 +1038,8 @@ envVars:
   NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
   NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
   NEMORETRIEVER_PARSE_MODEL_NAME: nvidia/nemoretriever-parse
-  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
-  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
+  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v3:8001
+  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v3:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
   YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
   YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer

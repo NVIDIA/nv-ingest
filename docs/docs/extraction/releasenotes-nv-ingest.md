@@ -132,7 +132,7 @@ The NeMo Retriever extraction 25.03 release includes accuracy improvements, feat
 <!-- - Integrated with new NVIDIA NIMs -->
 <!--   - Nemoretriever-table-structure-v1 -->
 <!--   - Nemoretriever-graphic-elements-v1 -->
-<!--   - Nemoretriever-page-elements-v2 -->
+<!--   - Nemoretriever-page-elements-v3 -->
 
 
 
