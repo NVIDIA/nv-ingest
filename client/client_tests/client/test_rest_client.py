@@ -53,9 +53,9 @@ class TestApiVersionConfiguration:
         """Test that RestClient defaults to v1 when no api_version is provided"""
         client = RestClient(host="localhost", port=7670)
 
-        assert client._api_version == "v1"
-        assert client._submit_endpoint == "/v1/submit_job"
-        assert client._fetch_endpoint == "/v1/fetch_job"
+        assert client._api_version == "v2"
+        assert client._submit_endpoint == "/v2/submit_job"
+        assert client._fetch_endpoint == "/v2/fetch_job"
 
     def test_explicit_v2_configuration(self):
         """Test that RestClient accepts explicit v2 configuration"""
