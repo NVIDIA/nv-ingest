@@ -216,9 +216,17 @@ class YoloxModelInterfaceBase(ModelInterface):
             formatted_batch_data = []
             for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
                 input_array = np.array(b64_chunk, dtype=np.object_)
-                current_batch_size = input_array.shape[0]
-                single_threshold_pair = [self.conf_threshold, self.iou_threshold]
-                thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+
+                if getattr(self, "_grpc_uses_bls", False):
+                    # For BLS with dynamic batching (max_batch_size > 0), we need to add explicit batch dimension
+                    # Shape [N] becomes [1, N] to indicate: batch of 1, containing N images
+                    input_array = input_array.reshape(1, -1)
+                    thresholds = np.array([[self.conf_threshold, self.iou_threshold]], dtype=np.float32)
+                else:
+                    current_batch_size = input_array.shape[0]
+                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+
                 batched_inputs.append([input_array, thresholds])
                 formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
 
@@ -381,10 +389,14 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if version.endswith("-v3"):
+        self.version = version
+
+        if self.version.endswith("-v3"):
             class_labels = YOLOX_PAGE_V3_CLASS_LABELS
+            self._grpc_uses_bls = True
         else:
             class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+            self._grpc_uses_bls = False
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
@@ -1630,7 +1642,9 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
-        if "yolox_ensemble" in model_names:
+        if "pipeline" in model_names:
+            yolox_model_name = "pipeline"
+        elif "yolox_ensemble" in model_names:
             yolox_model_name = "yolox_ensemble"
         else:
             yolox_model_name = default_model_name
