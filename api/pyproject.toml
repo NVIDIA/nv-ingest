@@ -26,7 +26,7 @@ dependencies = [
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "fsspec>=2025.5.1",
-    "universal_pathlib>=0.2.6",
+    "upath>=1.0",
     "ffmpeg-python==0.2.0",
     "tritonclient",
     "glom",
