@@ -94,7 +94,7 @@ jobs:
           # Install other dependencies
           conda install -y -c conda-forge librosa
           # Install pip dependencies
-          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' 'nvidia-riva-client==2.20.0' unstructured-client tritonclient markitdown glom upath
+          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' 'nvidia-riva-client==2.20.0' unstructured-client tritonclient markitdown glom
 
       - name: Run integration test
         env:
