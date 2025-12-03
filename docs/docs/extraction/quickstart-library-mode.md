@@ -255,6 +255,35 @@ Please keep in mind that this response is purely humorous and interpretative, as
 ```
 
 
+## Logging Configuration
+
+By default, library mode runs in **quiet mode** to minimize startup noise. This automatically configures the following environment variables:
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `INGEST_RAY_LOG_LEVEL` | `PRODUCTION` | Sets Ray logging to ERROR level |
+| `RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO` | `0` | Silences Ray accelerator warnings |
+| `OTEL_SDK_DISABLED` | `true` | Disables OpenTelemetry trace export errors |
+
+### Enable Verbose Logging
+
+To see detailed startup logs for debugging, you have two options:
+
+**Option 1: Use the `quiet` parameter**
+
+```python
+run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True, quiet=False)
+```
+
+**Option 2: Set environment variables before running**
+
+```bash
+export INGEST_RAY_LOG_LEVEL=DEVELOPMENT  # or DEBUG for maximum verbosity
+```
+
+For more information on logging configuration, refer to [Ray Logging Configuration](ray-logging.md).
+
+
 ## Library Mode Communication and Advanced Examples
 
 Communication in library mode is handled through a simplified, 3-way handshake message broker called `SimpleBroker`.
@@ -380,6 +409,8 @@ The `run_pipeline` function accepts the following parameters.
 | dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
 | stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
 | stderr                   | TextIO                 | None    | No        | Redirect subprocess `stderr` to a file or stream. If `None`, defaults to `/dev/null`. |
+| libmode                  | bool                   | True    | No        | `True` to load the default library mode pipeline configuration when `ingest_config` is `None`. |
+| quiet                    | bool                   | None    | No        | `True` to suppress verbose startup logs (PRODUCTION preset). `None` defaults to `True` when `libmode=True`. Set to `False` for verbose output. |
 
 
 The `run_pipeline` function returns the following values, depending on the parameters that you set:

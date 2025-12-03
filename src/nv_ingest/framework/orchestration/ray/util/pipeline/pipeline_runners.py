@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Union, Optional, TextIO
 
 
@@ -23,6 +24,34 @@ from nv_ingest.framework.orchestration.execution.helpers import (
 logger = logging.getLogger(__name__)
 
 
+def _configure_quiet_mode():
+    """
+    Configure environment for quiet/production logging in library mode.
+
+    Sets INGEST_RAY_LOG_LEVEL=PRODUCTION if not already set by user, which:
+    - Sets Ray logging to ERROR level (suppresses INFO/WARNING)
+    - Disables Ray usage stats collection
+    - Disables Ray import warnings
+
+    Also silences other common warnings that are noisy in library mode.
+    """
+    # Only set if user hasn't explicitly configured
+    if "INGEST_RAY_LOG_LEVEL" not in os.environ:
+        os.environ["INGEST_RAY_LOG_LEVEL"] = "PRODUCTION"
+
+    # Silence Ray accelerator env var warning
+    if "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO" not in os.environ:
+        os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+
+    # Disable OTEL tracing export errors (no collector expected in library mode)
+    if "OTEL_SDK_DISABLED" not in os.environ:
+        os.environ["OTEL_SDK_DISABLED"] = "true"
+
+    # Set nv-ingest module loggers to WARNING to suppress INFO level startup messages
+    logging.getLogger("nv_ingest").setLevel(logging.WARNING)
+    logging.getLogger("nv_ingest_api").setLevel(logging.WARNING)
+
+
 def run_pipeline(
     pipeline_config: Optional[PipelineConfigSchema] = None,
     block: bool = True,
@@ -32,6 +61,7 @@ def run_pipeline(
     stdout: Optional[TextIO] = None,
     stderr: Optional[TextIO] = None,
     libmode: bool = True,
+    quiet: Optional[bool] = None,
 ) -> Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]:
     """
     Launch and manage a pipeline using configuration.
@@ -65,6 +95,10 @@ def run_pipeline(
     libmode : bool, default=True
         If True and pipeline_config is None, loads the default libmode pipeline configuration.
         If False, requires pipeline_config to be provided.
+    quiet : Optional[bool], default=None
+        If True, configures logging for minimal output (PRODUCTION preset, suppresses
+        INFO-level startup messages). If None, defaults to True when libmode=True.
+        Set to False to see verbose startup logs even in library mode.
 
     Returns
     -------
@@ -83,6 +117,12 @@ def run_pipeline(
     Exception
         Any other exceptions raised during pipeline launch or configuration.
     """
+    # Configure quiet mode for library mode by default (unless explicitly disabled)
+    if quiet is None:
+        quiet = libmode
+    if quiet:
+        _configure_quiet_mode()
+
     # Resolve configuration
     config = resolve_pipeline_config(pipeline_config, libmode)
     overrides = create_runtime_overrides(disable_dynamic_scaling, dynamic_memory_threshold)
