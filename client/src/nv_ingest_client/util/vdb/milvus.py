@@ -949,6 +949,7 @@ def write_to_nvingest_collection(
     stream: bool = False,
     username: str = None,
     password: str = None,
+    no_wait_index: bool = False,
     **kwargs,
 ):
     """
@@ -1054,7 +1055,7 @@ def write_to_nvingest_collection(
             client,
             collection_name,
         )
-        if not local_index:
+        if not local_index and not no_wait_index:
             # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
             # know how long this should take, it is num_elements dependent.
             wait_for_index(collection_name, expected_rows, client)
@@ -1971,6 +1972,7 @@ class Milvus(VDB):
         threshold: int = 1000,
         username: str = None,
         password: str = None,
+        no_wait_index: bool = False,
         **kwargs,
     ):
         """
