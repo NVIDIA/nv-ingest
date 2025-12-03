@@ -301,33 +301,38 @@ and keeps it running until it is interrupted (for example, by pressing `Ctrl+C`)
 It listens for ingestion requests on port `7671` from an external client.
 
 ```python
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+
 def main():
-
-    config_data = {}
-    config_data = {key: value for key, value in config_data.items() if value is not None}
-    ingest_config = PipelineCreationSchema(**config_data)
-
     try:
-        _ = run_pipeline(
-            ingest_config,
+        # Start pipeline and block until interrupted
+        # No config needed - uses default libmode configuration
+        run_pipeline(
             block=True,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,
         )
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received. Shutting down...")
+        print("Keyboard interrupt received. Shutting down...")
     except Exception as e:
-        logger.error(f"Error running pipeline: {e}")
+        print(f"Error running pipeline: {e}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 ### Example `launch_libmode_and_run_ingestor.py`
 
-This example starts the pipeline service in-process, 
+This example starts the pipeline service in a subprocess, 
 and immediately runs an ingestion client against it in the same parent process.
 
 ```python
-def run_ingestor():
+import time
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest_client.client import Ingestor, NvIngestClient
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 
+def run_ingestor():
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -342,50 +347,47 @@ def run_ingestor():
             extract_tables=True,
             extract_charts=True,
             extract_images=True,
-            paddle_output_format="markdown",
+            table_output_format="markdown",
             extract_infographics=False,
             text_depth="page",
         )
         .split(chunk_size=1024, chunk_overlap=150)
     )
 
-    try:
-        results, failures = ingestor.ingest(show_progress=False, return_failures=True)
-        logger.info("Ingestion completed successfully.")
-        if failures:
-            logger.warning(f"Ingestion completed with {len(failures)} failures:")
-            for i, failure in enumerate(failures):
-                logger.warning(f"  [{i}] {failure}")
-    except Exception as e:
-        logger.error(f"Ingestion failed: {e}")
-        raise
-
-    print("\nIngest done.")
-    print(f"Got {len(results)} results.")
+    results, failures = ingestor.ingest(show_progress=False, return_failures=True)
+    
+    if failures:
+        print(f"Ingestion completed with {len(failures)} failures")
+    
+    print(f"\nIngest done. Got {len(results)} results.")
+    return results
 
 
 def main():
-
-    config_data = {}
-    config_data = {key: value for key, value in config_data.items() if value is not None}
-    ingest_config = PipelineCreationSchema(**config_data)
-
+    pipeline = None
     try:
+        # Start pipeline in subprocess (non-blocking)
+        # No config needed - uses default libmode configuration
         pipeline = run_pipeline(
-            ingest_config,
             block=False,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,
         )
-        time.sleep(10)
+        
+        # Wait for pipeline to initialize
+        time.sleep(5)
+        
+        # Run ingestion
         run_ingestor()
+        
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received. Shutting down...")
+        print("Keyboard interrupt received. Shutting down...")
     except Exception as e:
-        logger.error(f"Error running pipeline: {e}")
+        print(f"Error running pipeline: {e}")
     finally:
-        pipeline.stop()
-        logger.info("Shutting down pipeline...")
+        if pipeline:
+            pipeline.stop()
+            print("Pipeline stopped.")
 
 if __name__ == "__main__":
     main()
@@ -402,9 +404,9 @@ The `run_pipeline` function accepts the following parameters.
 
 | Parameter                | Type                   | Default | Required? | Description                                     |
 |--------------------------|------------------------|---------|-----------|-------------------------------------------------|
-| ingest_config            | PipelineCreationSchema | —       | Yes       | A configuration object that specifies how the pipeline should be constructed. |
-| run_in_subprocess        | bool                   | False   | Yes       | `True` to launch the pipeline in a separate Python subprocess. `False` to run in the current process. |
-| block                    | bool                   | True    | Yes       | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
+| pipeline_config          | PipelineConfigSchema   | None    | No        | A configuration object that specifies how the pipeline should be constructed. If `None`, uses the default library mode configuration. |
+| run_in_subprocess        | bool                   | False   | No        | `True` to launch the pipeline in a separate Python subprocess. `False` to run in the current process. |
+| block                    | bool                   | True    | No        | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
 | disable_dynamic_scaling  | bool                   | None    | No        | `True` to disable autoscaling regardless of global settings. `None` to use the global default behavior. |
 | dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
 | stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
