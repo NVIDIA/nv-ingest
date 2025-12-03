@@ -514,7 +514,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-page-elements-v3.env[2].value | string | `"768"` |  |
 | nemoretriever-page-elements-v3.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nemoretriever-page-elements-v3.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v3"` |  |
-| nemoretriever-page-elements-v3.image.tag | string | `"1.4.0"` |  |
+| nemoretriever-page-elements-v3.image.tag | string | `"1.7.0"` |  |
 | nemoretriever-page-elements-v3.nim.grpcPort | int | `8001` |  |
 | nemoretriever-page-elements-v3.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-page-elements-v3.podSecurityContext.fsGroup | int | `1000` |  |
