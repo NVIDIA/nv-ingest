@@ -54,3 +54,4 @@ dependencies:
       - nvidia-riva-client==2.20.0
       - unstructured-client
       - markitdown
+      - upath
