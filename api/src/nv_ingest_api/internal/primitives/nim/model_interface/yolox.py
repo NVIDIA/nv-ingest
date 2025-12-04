@@ -26,7 +26,7 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
-YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v2"
+YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v3"
 
 # yolox-page-elements-v2 and v3 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01

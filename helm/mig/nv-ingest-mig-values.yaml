@@ -9,7 +9,7 @@ resources:
     nvidia.com/mig-1g.10gb: 1      # Use MIG instance
 
 # Configure NIM components to use MIG
-nemoretriever-page-elements-v2:
+nemoretriever-page-elements-v3:
   resources:
     limits:
       nvidia.com/gpu: 0
