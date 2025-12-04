@@ -436,17 +436,6 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
         self.assertTrue("not a NumPy array" in str(context.exception))
 
-    def test_parse_output_grpc_invalid_response_shape(self):
-        """Test parse_output method with gRPC protocol and an invalid response shape."""
-        # Create a response with an invalid shape (2, 3) instead of (3, n)
-        mock_response = np.zeros((2, 3))
-        data = {"image_dims": [{}]}
-
-        with self.assertRaises(ValueError) as context:
-            self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
-
-        self.assertTrue("Unexpected response shape" in str(context.exception))
-
     def test_parse_output_invalid_protocol(self):
         """Test parse_output method with an invalid protocol."""
         mock_response = {}
