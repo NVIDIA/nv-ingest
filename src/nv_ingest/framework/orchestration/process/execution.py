@@ -329,9 +329,9 @@ def launch_pipeline(
     pipeline_config = resolve_static_replicas(pipeline_config)
 
     # Pretty print the final pipeline configuration (after replica resolution)
-    # Use DEBUG level to avoid verbose output during normal startup
+    # INFO level so it shows in docker/helm deployments; quiet mode suppresses in library mode
     pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
-    logger.debug("\n" + pretty_output)
+    logger.info("\n" + pretty_output)
 
     # Set up the ingestion pipeline
     start_abs = datetime.now()
