@@ -91,7 +91,7 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
 
                 total_memory_demand_mb += stage_memory_demand
 
-                logger.info(
+                logger.debug(
                     f"Stage '{stage.name}': {baseline_replicas} replicas × "
                     f"{memory_per_replica_mb}MB = {stage_memory_demand}MB"
                 )
@@ -130,7 +130,7 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
         stage.replicas.static_replicas = scaled_replicas
 
         logger.info(
-            f"Stage '{stage.name}': {baseline_replicas} -> {scaled_replicas} replicas " f"({actual_memory_mb}MB)"
+            f"Stage '{stage.name}': {baseline_replicas} → {scaled_replicas} replicas " f"({actual_memory_mb}MB)"
         )
 
     logger.info(

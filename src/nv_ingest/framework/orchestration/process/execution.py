@@ -455,6 +455,13 @@ def run_pipeline_process(
     except Exception as e:
         logger.debug(f"Signal handlers not set: {e}")
 
+    # Test output redirection
+    print("DEBUG: Direct print to stdout - should appear in parent process")
+    sys.stderr.write("DEBUG: Direct write to stderr - should appear in parent process\n")
+
+    # Test logging output
+    logger.info("DEBUG: Logger info - may not appear if logging handlers not redirected")
+
     # If requested, start the simple broker inside this subprocess so it shares the process group
     broker_proc = None
     try:
