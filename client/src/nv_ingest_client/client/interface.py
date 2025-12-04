@@ -1088,13 +1088,9 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        # Handle parameter name mapping: store_method -> method for API schema
-        if "store_method" in kwargs:
-            kwargs["method"] = kwargs.pop("store_method")
-
-        # Provide default method if not specified (matching client StoreTask behavior)
-        if "method" not in kwargs:
-            kwargs["method"] = "minio"
+        deprecated_method = kwargs.pop("store_method", None)
+        if deprecated_method is not None:
+            logger.warning("`store_method` is deprecated and no longer used. Configure storage_uri instead.")
 
         task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
 
@@ -1102,7 +1098,9 @@ class Ingestor:
         store_params = {
             "structured": task_options.structured,
             "images": task_options.images,
-            "store_method": task_options.method,  # Map method back to store_method
+            "storage_uri": task_options.storage_uri,
+            "storage_options": task_options.storage_options,
+            "public_base_url": task_options.public_base_url,
             "params": task_options.params,
         }
         store_task = StoreTask(**store_params)

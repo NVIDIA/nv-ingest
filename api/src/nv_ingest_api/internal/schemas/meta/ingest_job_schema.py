@@ -100,7 +100,9 @@ class IngestTaskStoreEmbedSchema(BaseModelNoExt):
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
-    method: str
+    storage_uri: Optional[str] = None
+    storage_options: dict = Field(default_factory=dict)
+    public_base_url: Optional[str] = None
     params: dict = Field(default_factory=dict)
 
 
