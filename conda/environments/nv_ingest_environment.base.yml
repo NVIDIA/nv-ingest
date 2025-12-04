@@ -42,6 +42,7 @@ dependencies:
   - transformers>=4.47.0
   - tqdm>=4.67.1
   - uvicorn
+  - universal_pathlib
   - pip
   - pip:
       - llama-index-embeddings-nvidia
@@ -54,4 +55,3 @@ dependencies:
       - nvidia-riva-client==2.20.0
       - unstructured-client
       - markitdown
-      - upath
