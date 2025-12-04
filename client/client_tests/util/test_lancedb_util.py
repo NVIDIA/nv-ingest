@@ -1,9 +1,5 @@
-import sys
 import types
 from unittest.mock import Mock
-
-# Ensure the client src path is importable
-sys.path.insert(0, "/raid/jperez/nv-ingest/client/src")
 
 from nv_ingest_client.util.vdb import lancedb as lancedb_mod
 
