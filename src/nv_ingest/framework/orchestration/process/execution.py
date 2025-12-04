@@ -323,7 +323,7 @@ def launch_pipeline(
     if disable_dynamic_scaling and not pipeline_config.pipeline.disable_dynamic_scaling:
         # Directly modify the pipeline config to disable dynamic scaling
         pipeline_config.pipeline.disable_dynamic_scaling = True
-        logger.debug("Dynamic scaling disabled via function parameter override")
+        logger.info("Dynamic scaling disabled via function parameter override")
 
     # Resolve static replicas
     pipeline_config = resolve_static_replicas(pipeline_config)

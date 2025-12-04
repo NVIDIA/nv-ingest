@@ -49,7 +49,7 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
         logger.debug("Dynamic scaling enabled, skipping static replica resolution")
         return pipeline_config
 
-    logger.debug("Resolving static replica counts for disabled dynamic scaling mode")
+    logger.info("Resolving static replica counts for disabled dynamic scaling mode")
 
     # Create a deep copy to avoid modifying the original config
     resolved_config = deepcopy(pipeline_config)
@@ -59,7 +59,7 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
     total_memory_mb = system_probe.total_memory_mb
     available_memory_mb = int(total_memory_mb * resolved_config.pipeline.static_memory_threshold)
 
-    logger.debug(
+    logger.info(
         f"System memory: {total_memory_mb}MB, available for static replicas: {available_memory_mb}MB "
         f"(threshold: {resolved_config.pipeline.static_memory_threshold:.1%})"
     )
@@ -91,20 +91,20 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
 
                 total_memory_demand_mb += stage_memory_demand
 
-                logger.debug(
+                logger.info(
                     f"Stage '{stage.name}': {baseline_replicas} replicas × "
                     f"{memory_per_replica_mb}MB = {stage_memory_demand}MB"
                 )
 
     if not non_static_stages:
-        logger.debug("No stages with non-static strategies found")
+        logger.info("No stages with non-static strategies found")
         return resolved_config
 
-    logger.debug(f"Total baseline memory demand: {total_memory_demand_mb}MB from {len(non_static_stages)} stages")
+    logger.info(f"Total baseline memory demand: {total_memory_demand_mb}MB from {len(non_static_stages)} stages")
 
     # Check if we need to scale down
     if total_memory_demand_mb <= available_memory_mb:
-        logger.debug("Memory demand within threshold, applying baseline replica counts")
+        logger.info("Memory demand within threshold, applying baseline replica counts")
         scaling_factor = 1.0
     else:
         # Calculate scaling factor to fit within memory threshold
@@ -129,11 +129,11 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
         # Replace the strategy config with a static replica count
         stage.replicas.static_replicas = scaled_replicas
 
-        logger.debug(
+        logger.info(
             f"Stage '{stage.name}': {baseline_replicas} -> {scaled_replicas} replicas " f"({actual_memory_mb}MB)"
         )
 
-    logger.debug(
+    logger.info(
         f"Total actual memory allocation: {total_actual_memory_mb}MB "
         f"({(total_actual_memory_mb / total_memory_mb) * 100:.1f}% of system memory)"
     )

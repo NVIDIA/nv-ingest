@@ -25,7 +25,7 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import
 def main():
     # Start the pipeline subprocess for library mode
     # quiet=True is the default when libmode=True, suppressing verbose startup logs
-    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
+    pipeline = run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
@@ -76,6 +76,10 @@ def main():
 
     if failures:
         print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+
+    # Clean up
+    if pipeline:
+        pipeline.stop()
 
 
 # Required for multiprocessing on macOS (spawn start method)
