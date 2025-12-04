@@ -382,11 +382,11 @@ nim-vlm-text-extraction:
 ## Configuration for the NemoRetriever OCR NIM service.
 ## This service provides OCR (Optical Character Recognition) capabilities using NemoRetriever OCR.
 ## @descriptionEnd
-## @param nemoretriever-ocr.deployed [default: false] Whether to deploy the PaddleOCR NIM service
+## @param nemoretriever-ocr.deployed [default: true] Whether to deploy the NemoRetriever OCR NIM service
 ## @param nemoretriever-ocr.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
 ## @param nemoretriever-ocr.customCommand [default: []] Custom command to run in the container
 ## @param nemoretriever-ocr.customArgs [default: []] Custom arguments to pass to the container command
-## @param nemoretriever-ocr.image.repository [default: "nvcr.io/nim/baidu/paddleocr"] The container image repository
+## @param nemoretriever-ocr.image.repository [default: "nvcr.io/nim/nvidia/nemoretriever-ocr-v1"] The container image repository
 ## @param nemoretriever-ocr.image.tag [default: "1.2.0"] The container image tag
 ## @param nemoretriever-ocr.podSecurityContext [default: {}] Pod security context configuration
 ## @param nemoretriever-ocr.replicaCount [default: 1] Number of replicas to deploy
@@ -402,12 +402,12 @@ nim-vlm-text-extraction:
 ## @param nemoretriever-ocr.nim.logLevel [default: "INFO"] The log level for NIM
 ## @param nemoretriever-ocr.env [default: []] Environment variables for the container
 nemoretriever-ocr:
-  deployed: false
+  deployed: true
   fullnameOverride: nv-ingest-ocr
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
     tag: "1.0.0"
   podSecurityContext:
     runAsUser: 1000
@@ -436,19 +436,19 @@ nemoretriever-ocr:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    # - name: NIM_TRITON_MAX_BATCH_SIZE
-    #   value: "32"
-    - name: NIM_TRITON_OPTIMIZATION_MODE
-      value: vram_opt
+    - name: OMP_NUM_THREADS
+      value: "8"
+    - name: NIM_TRITON_MAX_BATCH_SIZE
+      value: "32"
     - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "768"
+      value: "8192"
 
 ## @section PaddleOCR NIM Configuration
 ## @descriptionStart
 ## Configuration for the PaddleOCR NIM service.
 ## This service provides OCR (Optical Character Recognition) capabilities using PaddleOCR.
 ## @descriptionEnd
-## @param paddleocr-nim.deployed [default: true] Whether to deploy the PaddleOCR NIM service
+## @param paddleocr-nim.deployed [default: false] Whether to deploy the PaddleOCR NIM service
 ## @param paddleocr-nim.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
 ## @param paddleocr-nim.customCommand [default: []] Custom command to run in the container
 ## @param paddleocr-nim.customArgs [default: []] Custom arguments to pass to the container command
@@ -468,7 +468,7 @@ nemoretriever-ocr:
 ## @param paddleocr-nim.nim.logLevel [default: "INFO"] The log level for NIM
 ## @param paddleocr-nim.env [default: []] Environment variables for the container
 paddleocr-nim:
-  deployed: true
+  deployed: false
   fullnameOverride: nv-ingest-ocr
   customCommand: []
   customArgs: []
@@ -1050,7 +1050,7 @@ envVars:
   OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
   OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
-  OCR_MODEL_NAME: paddle
+  OCR_MODEL_NAME: scene_text_ensemble
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"

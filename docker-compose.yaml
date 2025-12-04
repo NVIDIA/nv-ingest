@@ -99,7 +99,7 @@ services:
     runtime: nvidia
 
   ocr:
-    image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
+    image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-latest}
     shm_size: 16gb
     ports:
       - "8009:8000"
@@ -315,9 +315,9 @@ services:
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
       - OCR_INFER_PROTOCOL=grpc
-      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-scene_text_ensemble}
       # build.nvidia.com hosted ocr endpoints.
-      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
+      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1
       #- OCR_INFER_PROTOCOL=http
       - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue

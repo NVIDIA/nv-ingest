@@ -45,6 +45,15 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
       nvidia.com/gpu: 0
       nvidia.com/mig-1g.10gb: 1
 
+nemoretriever-ocr:
+  resources:
+    limits:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+    requests:
+      nvidia.com/gpu: 0
+      nvidia.com/mig-1g.10gb: 1
+
 paddleocr-nim:
   resources:
     limits:
