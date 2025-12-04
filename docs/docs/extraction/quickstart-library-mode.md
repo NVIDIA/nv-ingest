@@ -358,7 +358,7 @@ def run_ingestor():
     
     if failures:
         print(f"Ingestion completed with {len(failures)} failures")
-    
+
     print(f"\nIngest done. Got {len(results)} results.")
     return results
 
@@ -409,8 +409,8 @@ The `run_pipeline` function accepts the following parameters.
 | block                    | bool                   | True    | No        | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
 | disable_dynamic_scaling  | bool                   | None    | No        | `True` to disable autoscaling regardless of global settings. `None` to use the global default behavior. |
 | dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
-| stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
-| stderr                   | TextIO                 | None    | No        | Redirect subprocess `stderr` to a file or stream. If `None`, defaults to `/dev/null`. |
+| stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, inherits from parent process (terminal). Note: Cannot pass `sys.stdout` when `run_in_subprocess=True` (not picklable). |
+| stderr                   | TextIO                 | None    | No        | Redirect subprocess `stderr` to a file or stream. If `None`, inherits from parent process (terminal). Note: Cannot pass `sys.stderr` when `run_in_subprocess=True` (not picklable). |
 | libmode                  | bool                   | True    | No        | `True` to load the default library mode pipeline configuration when `ingest_config` is `None`. |
 | quiet                    | bool                   | None    | No        | `True` to suppress verbose startup logs (PRODUCTION preset). `None` defaults to `True` when `libmode=True`. Set to `False` for verbose output. |
 
