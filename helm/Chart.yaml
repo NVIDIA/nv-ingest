@@ -8,11 +8,11 @@ maintainers:
     url: https://www.nvidia.com/
 dependencies:
   # Yolox based architecture variant NIM for extracting Page Elements
-  - name: nvidia-nim-nemoretriever-page-elements-v2
+  - name: nvidia-nim-nemoretriever-page-elements-v3
     repository: "alias:nvidia-nim"
-    version: 1.4.0
-    alias: nemoretriever-page-elements-v2
-    condition: nemoretriever-page-elements-v2.deployed
+    version: 1.7.0
+    alias: nemoretriever-page-elements-v3
+    condition: nemoretriever-page-elements-v3.deployed
 
   # Yolox based architecture variant NIM for extracting Graphic Elements from images
   - name: nvidia-nim-nemoretriever-graphic-elements-v1
