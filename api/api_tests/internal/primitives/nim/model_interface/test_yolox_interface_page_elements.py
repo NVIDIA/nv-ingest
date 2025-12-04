@@ -64,7 +64,9 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         model = YoloxPageElementsModelInterface()
 
         # Check that v3 parameters are used by default
-        self.assertEqual(model.class_labels, ['table', 'chart', 'title', 'infographic', 'paragraph', 'header_footer', 'foo'])
+        self.assertEqual(
+            model.class_labels, ["table", "chart", "title", "infographic", "paragraph", "header_footer", "foo"]
+        )
 
     def test_inheritance(self):
         """Test that YoloxPageElementsModelInterface inherits from YoloxModelInterfaceBase."""
