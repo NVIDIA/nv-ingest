@@ -106,8 +106,6 @@ The “fast” dataset by data-size-over-time can be the “slow” one by pages
 - Separate warm-up from steady-state measurements.
 - Fix the pipeline configuration and model versions for a given comparison.
 - Keep concurrency and resource limits identical across runs.
-- Use percentiles (p50/p95) rather than averages only.
-- Report failures and retries; note any caching effects.
 - Provide dataset characterization alongside throughput numbers.
 
 ## When data-size-over-time Metrics Are Still Useful
