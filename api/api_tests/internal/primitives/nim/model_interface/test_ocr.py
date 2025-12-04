@@ -306,7 +306,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -367,7 +369,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 2)  # Should have 2 results (for 2 images)
@@ -408,7 +412,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
