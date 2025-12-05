@@ -111,6 +111,7 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     api_key: Optional[str] = Field(default=None, repr=False)
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
+    system_prompt: Optional[str] = None
     model_name: Optional[str] = None
 
 
