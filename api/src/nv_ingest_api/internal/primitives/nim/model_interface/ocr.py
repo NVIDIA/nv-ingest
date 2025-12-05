@@ -789,97 +789,144 @@ class NemotronParseModelInterface(OCRModelInterfaceBase):
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Prepare input data for NemotronParse inference. Accepts either a single base64 image or a list of images.
+        Decode one or more base64-encoded images into NumPy arrays, storing them
+        alongside their dimensions in `data`.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data containing either:
+             - 'base64_image': a single base64-encoded image, or
+             - 'base64_images': a list of base64-encoded images.
+
+        Returns
+        -------
+        dict of str -> Any
+            The updated data dictionary with the following keys added:
+            - "images": List of decoded NumPy arrays of shape (H, W, C).
+            - "image_dims": List of (height, width) tuples for each decoded image.
 
         Raises
         ------
         KeyError
-            If neither "base64_image" nor "base64_images" is provided.
+            If neither 'base64_image' nor 'base64_images' is found in `data`.
         ValueError
-            If "base64_images" exists but is not a list.
+            If 'base64_images' is present but is not a list.
         """
-        # Allow either a single image with "base64_image" or multiple images with "base64_images".
         if "base64_images" in data:
-            if not isinstance(data["base64_images"], list):
+            base64_list = data["base64_images"]
+            if not isinstance(base64_list, list):
                 raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
+
+            images: List[np.ndarray] = []
+            for b64 in base64_list:
+                img = base64_to_numpy(b64)
+                images.append(img)
+
+            data["images"] = images
+
         elif "base64_image" in data:
-            # Convert a single image into a list.
+            # Single-image fallback
+            img = base64_to_numpy(data["base64_image"])
             data["base64_images"] = [data["base64_image"]]
+            data["images"] = [img]
+
         else:
             raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
 
         return data
 
-    def format_input(
-        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
-    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
-        Format the input payload for the VLM endpoint. This method constructs one payload per batch,
-        where each payload includes one message per image in the batch.
-        Additionally, it returns batch data that preserves the original order of images by including
-        the list of base64 images for each batch.
+        Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
 
         Parameters
         ----------
-        data : dict
-            The input data containing "base64_images" (a list of base64-encoded images).
+        data : dict of str -> Any
+            The input data dictionary, expected to contain "images" (list of np.ndarray)
+            and "image_dims" (list of (height, width) tuples), as produced by prepare_data_for_inference.
         protocol : str
-            Only "http" is supported.
+            The inference protocol, either "grpc" or "http".
         max_batch_size : int
-            Maximum number of images per payload.
-        kwargs : dict
-            Additional parameters including model_name, max_tokens, temperature, top_p, and stream.
+            The maximum batch size for batching.
 
         Returns
         -------
         tuple
-            A tuple (payloads, batch_data_list) where:
-              - payloads is a list of JSON-serializable payload dictionaries.
-              - batch_data_list is a list of dictionaries containing the keys "base64_images" and "prompt"
-                corresponding to each batch.
+            A tuple (formatted_batches, formatted_batch_data) where:
+              - formatted_batches is a list of batches ready for inference.
+              - formatted_batch_data is a list of scratch-pad dictionaries corresponding to each batch,
+                containing the keys "images" and "image_dims" for later post-processing.
+
+        Raises
+        ------
+        KeyError
+            If either "images" or "image_dims" is not found in `data`.
+        ValueError
+            If an invalid protocol is specified.
         """
-        if protocol != "http":
-            raise ValueError("VLMModelInterface only supports HTTP protocol.")
 
-        images = data.get("base64_images", [])
-
-        # Helper function to chunk the list into batches.
+        # Helper function to split a list into chunks of size up to chunk_size.
         def chunk_list(lst, chunk_size):
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
-        batches = chunk_list(images, max_batch_size)
-        payloads = []
-        batch_data_list = []
-        for batch in batches:
-            # Create one message per image in the batch.
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
-                    ],
-                }
-                for img in batch
-            ]
-            payload = {
-                "model": kwargs.get("model_name"),
-                "messages": messages,
-                "max_tokens": kwargs.get("max_tokens", 1024),
-                "temperature": kwargs.get("temperature", 1.0),
-                "tools": [
-                    {
-                        "type": "function",
-                        "function":
-                        {
-                            "name": "markdown_bbox"
-                        }
-                    }
-                ]
-            }
-            payloads.append(payload)
-            batch_data_list.append({"base64_images": batch})
-        return payloads, batch_data_list
+        if "images" not in data:
+            raise KeyError("Expected 'images' in data. Call prepare_data_for_inference first.")
 
+        images = data["base64_images"]
+        dims = [img.shape[:2] for img in data["images"]]
+
+        if protocol == "grpc":
+            raise ValueError("gRPC protocol is not supported for NemotronParse.")
+        elif protocol == "http":
+            logger.debug("Formatting input for HTTP NemotronParse model (batched).")
+            formatted_batches = []
+            formatted_batch_data = []
+
+            image_chunks = chunk_list(images, max_batch_size)
+            dims_chunks = chunk_list(dims, max_batch_size)
+            for image_chunk, dims_chunk in zip(image_chunks, dims_chunks):
+                final_batch, batch_data = self._format_single_batch(image_chunk, dims_chunk, protocol, **kwargs)
+                formatted_batches.append(final_batch)
+                formatted_batch_data.append(batch_data)
+
+            all_dims = [item for d in formatted_batch_data for item in d.get("image_dims", [])]
+            data["image_dims"] = all_dims
+
+            return formatted_batches, formatted_batch_data
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def _format_single_batch(
+        self, batch_images: List[str], batch_dims: List[Tuple[int, int]], protocol: str, **kwargs
+    ) -> Tuple[Any, Dict[str, Any]]:
+        """
+        Format a single batch of images for NemotronParse inference.
+        """
+        dims: List[Dict[str, Any]] = []
+        messages: List[Dict[str, Any]] = []
+
+        for b64, shape in zip(batch_images, batch_dims):
+            message = {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ],
+            }
+            messages.append(message)
+            _dims = {"new_width": shape[1], "new_height": shape[0]}
+            dims.append(_dims)
+
+        payload = {
+            "model": kwargs.get("model_name", "nvidia/nemotron-parse"),
+            "messages": messages,
+            "max_tokens": kwargs.get("max_tokens", 1024),
+            "temperature": kwargs.get("temperature", 1.0),
+            "tools": [{"type": "function", "function": {"name": "markdown_bbox"}}],
+        }
+
+        batch_data = {"image_dims": dims}
+        return payload, batch_data
 
     def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
@@ -904,12 +951,14 @@ class NemotronParseModelInterface(OCRModelInterfaceBase):
         ValueError
             If an invalid protocol is specified.
         """
+        # Retrieve image dimensions if available
+        dims: Optional[List[Tuple[int, int]]] = data.get("image_dims") if data else None
 
         if protocol == "grpc":
             raise ValueError("gRPC protocol is not supported for NemotronParse.")
         elif protocol == "http":
             logger.debug("Parsing output from HTTP NemotronParse model")
-            return self._extract_content_from_nemotron_parse_response(response)
+            return self._extract_content_from_nemotron_parse_response(response, dims)
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -925,7 +974,9 @@ class NemotronParseModelInterface(OCRModelInterfaceBase):
         """
         return output
 
-    def _extract_content_from_nemotron_parse_response(self, json_response: Dict[str, Any]) -> Any:
+    def _extract_content_from_nemotron_parse_response(
+        self, json_response: Dict[str, Any], dimensions: List[Dict[str, Any]]
+    ) -> Any:
         """
         Extract content from the JSON response of a NemotronParse HTTP API request.
 
@@ -949,23 +1000,24 @@ class NemotronParseModelInterface(OCRModelInterfaceBase):
             raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
 
         tool_call = json_response["choices"][0]["message"]["tool_calls"][0]
-        logger.error(f"Results: {results}")
         results = []
         for item_idx, item in enumerate(json.loads(tool_call["function"]["arguments"])):
-            for bbox in item["bbox"]:
-                results.append
-
-
-        results: List[str] = []
-        for item_idx, item in enumerate(json_response["data"]):
-            text_detections = item.get("text_detections", [])
             text_predictions = []
             bounding_boxes = []
             conf_scores = []
-            for td in text_detections:
-                text_predictions.append(td["text_prediction"]["text"])
-                bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
-                conf_scores.append(td["text_prediction"]["confidence"])
+            for text_detection in item:
+                text_predictions.append(text_detection["text"])
+                bounding_boxes.append(
+                    [
+                        [
+                            text_detection["bbox"]["xmin"],
+                            text_detection["bbox"]["ymin"],
+                            text_detection["bbox"]["xmax"],
+                            text_detection["bbox"]["ymax"],
+                        ]
+                    ]
+                )
+                conf_scores.append(1)
 
             bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,

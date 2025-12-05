@@ -15,6 +15,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemotronParseModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_ocr_schema import OCRExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -115,6 +116,10 @@ def _update_text_metadata(
             dtypes=["BYTES", "BYTES"],
             merge_level="paragraph",
         )
+    elif ocr_model_name == "nvidia/nemotron-parse":
+        infer_kwargs.update(
+            model_name=ocr_model_name,
+        )
     else:
         raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
 
@@ -141,11 +146,12 @@ def _create_ocr_client(
     ocr_model_name: str,
     auth_token: str,
 ) -> NimClient:
-    ocr_model_interface = (
-        NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
-        else PaddleOCRModelInterface()
-    )
+    if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+        ocr_model_interface = NemoRetrieverOCRModelInterface()
+    elif ocr_model_name == "nvidia/nemotron-parse":
+        ocr_model_interface = NemotronParseModelInterface()
+    else:
+        ocr_model_interface = PaddleOCRModelInterface()
 
     ocr_client = create_inference_client(
         endpoints=ocr_endpoints,
