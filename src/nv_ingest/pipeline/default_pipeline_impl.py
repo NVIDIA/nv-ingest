@@ -123,7 +123,14 @@ stages:
       docx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -142,6 +149,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",

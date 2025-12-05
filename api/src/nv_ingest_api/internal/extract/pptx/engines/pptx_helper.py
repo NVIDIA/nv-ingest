@@ -15,14 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import io
+import logging
+import os
 import re
+import subprocess
+import tempfile
 import uuid
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Tuple, IO
 from typing import Optional
+from typing import Union
 
 import pandas as pd
 from pptx import Presentation
@@ -30,8 +34,8 @@ from pptx.enum.dml import MSO_COLOR_TYPE
 from pptx.enum.dml import MSO_THEME_COLOR  # noqa
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.shapes import PP_PLACEHOLDER  # noqa
-from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
+import pypdfium2 as pdfium
 
 from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
@@ -53,11 +57,12 @@ logger = logging.getLogger(__name__)
 
 
 def _finalize_images(
-    pending_images: List[Tuple[Shape, int, int, int, dict, dict, dict]],
+    pending_images: List[Tuple[bytes, int, int, int, dict, dict, dict]],
     extracted_data: List,
     pptx_extraction_config: PPTXConfigSchema,
     extract_tables: bool = False,
     extract_charts: bool = False,
+    extract_infographics: bool = False,
     trace_info: Optional[Dict] = None,
 ):
     """
@@ -76,7 +81,7 @@ def _finalize_images(
     image_arrays = []
     image_contexts = []
     for (
-        shape,
+        image_bytes,
         shape_idx,
         slide_idx,
         slide_count,
@@ -85,7 +90,6 @@ def _finalize_images(
         base_unified_metadata,
     ) in pending_images:
         try:
-            image_bytes = shape.image.blob
             image_array = load_and_preprocess_image(io.BytesIO(image_bytes))
             base64_img = bytetools.base64frombytes(image_bytes)
 
@@ -107,7 +111,7 @@ def _finalize_images(
     # If you want table/chart detection for these images, do it now
     # (similar to docx approach). This might use your YOLO or another method:
     detection_map = defaultdict(list)  # image_idx -> list of CroppedImageWithContent
-    if extract_tables or extract_charts:
+    if extract_tables or extract_charts or extract_infographics:
         try:
             # For example, a call to your function that checks for tables/charts
             detection_results = extract_page_elements_from_images(
@@ -117,6 +121,16 @@ def _finalize_images(
             )
             # detection_results is something like [(image_idx, CroppedImageWithContent), ...]
             for img_idx, cropped_obj in detection_results:
+
+                # Skip elements that shouldn't be extracted based on flags
+                element_type = cropped_obj.type_string
+                if (not extract_tables) and (element_type == "table"):
+                    continue
+                if (not extract_charts) and (element_type == "chart"):
+                    continue
+                if (not extract_infographics) and (element_type == "infographic"):
+                    continue
+
                 detection_map[img_idx].append(cropped_obj)
         except Exception as e:
             logger.error(f"Error while running table/chart detection on PPTX images: {e}")
@@ -170,6 +184,7 @@ def process_shape(
     Recursively process a shape:
       - If the shape is a group, iterate over its child shapes.
       - If it is a picture or a placeholder with an embedded image, append it to pending_images.
+      - OLE Objects: Convert with LibreOffice, then extract blobs.
     """
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         for sub_idx, sub_shape in enumerate(shape.shapes):
@@ -185,14 +200,40 @@ def process_shape(
                 source_metadata,
                 base_unified_metadata,
             )
-    else:
-        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE or (
-            shape.is_placeholder and shape.placeholder_format.type == PP_PLACEHOLDER.OBJECT and hasattr(shape, "image")
-        ):
-            try:
+    elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE or (
+        shape.is_placeholder and shape.placeholder_format.type == PP_PLACEHOLDER.OBJECT and hasattr(shape, "image")
+    ):
+        try:
+            pending_images.append(
+                (
+                    shape.image.blob,
+                    shape_idx,
+                    slide_idx,
+                    slide_count,
+                    page_nearby_blocks,
+                    source_metadata,
+                    base_unified_metadata,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Error processing shape {shape_idx} on slide {slide_idx}: {e}")
+            raise
+
+    elif shape.shape_type == MSO_SHAPE_TYPE.EMBEDDED_OLE_OBJECT:
+        try:
+            ole_blob = shape.ole_format.blob
+            if not ole_blob:
+                return
+
+            prog_id = getattr(shape.ole_format, "prog_id", "")
+            ext = _get_ole_extension(prog_id)
+
+            png_streams = convert_stream_with_libreoffice(io.BytesIO(ole_blob), ext, "png")
+
+            for png_stream in png_streams:
                 pending_images.append(
                     (
-                        shape,  # so we can later pull shape.image.blob
+                        png_stream.getvalue(),
                         shape_idx,
                         slide_idx,
                         slide_count,
@@ -201,9 +242,24 @@ def process_shape(
                         base_unified_metadata,
                     )
                 )
-            except Exception as e:
-                logger.warning(f"Error processing shape {shape_idx} on slide {slide_idx}: {e}")
-                raise
+        except Exception as e:
+            logger.warning(f"Failed to convert OLE object (shape {shape_idx}, slide {slide_idx}) via LibreOffice: {e}")
+            # Fallback: Try to use the standard image representation if it exists (the preview image)
+            if hasattr(shape, "image"):
+                try:
+                    pending_images.append(
+                        (
+                            shape.image.blob,
+                            shape_idx,
+                            slide_idx,
+                            slide_count,
+                            page_nearby_blocks,
+                            source_metadata,
+                            base_unified_metadata,
+                        )
+                    )
+                except Exception as fallback_err:
+                    logger.warning(f"Fallback to OLE preview image failed: {fallback_err}")
 
 
 # -----------------------------------------------------------------------------
@@ -407,7 +463,7 @@ def python_pptx(
                     page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
 
                 # Image processing (deferred)
-                if extract_images or extract_tables or extract_charts:
+                if extract_images or extract_tables or extract_charts or extract_infographics:
                     try:
                         process_shape(
                             shape,
@@ -473,7 +529,7 @@ def python_pptx(
             )
         )
 
-    if extract_images or extract_tables or extract_charts:
+    if extract_images or extract_tables or extract_charts or extract_infographics:
         try:
             _finalize_images(
                 pending_images,
@@ -481,6 +537,7 @@ def python_pptx(
                 pptx_extractor_config,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
                 trace_info=trace_info,
             )
         except Exception as e:
@@ -823,3 +880,83 @@ def is_strong(font):
         return True
     else:
         return False
+
+
+def convert_stream_with_libreoffice(
+    file_stream: io.BytesIO,
+    input_extension: str,
+    output_format: str,
+) -> Union[io.BytesIO, List[io.BytesIO]]:
+    """
+    Converts a file stream (DOCX or PPTX) to PDF or a series of PNGs using a temporary directory.
+    """
+    if output_format not in {"pdf", "png"}:
+        raise ValueError(f"Unsupported output format for LibreOffice conversion: {output_format}")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_path = os.path.join(temp_dir, f"input.{input_extension}")
+        with open(input_path, "wb") as f:
+            f.write(file_stream.read())
+
+        # We always convert to PDF first using LibreOffice.
+        # Direct conversion to image formats (e.g. --convert-to png) in LibreOffice
+        # often only exports the first page/slide or lacks control over resolution.
+        # Converting to PDF preserves multi-page structure and layout fidelity.
+        command = [
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            input_path,
+            "--outdir",
+            temp_dir,
+        ]
+
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        pdf_path = os.path.join(temp_dir, "input.pdf")
+        if not os.path.exists(pdf_path):
+            raise RuntimeError("LibreOffice conversion failed.")
+
+        if output_format == "pdf":
+            with open(pdf_path, "rb") as f:
+                return io.BytesIO(f.read())
+
+        elif output_format in {"png"}:
+            # We use pdfium to rasterize the PDF into images.
+            # This provides:
+            # 1. Support for multi-page documents (LibreOffice image export is often single-page).
+            # 2. Consistent rendering appearance matching the PDF output.
+            image_streams = []
+            pdf_document = pdfium.PdfDocument(pdf_path)
+            for i in range(len(pdf_document)):
+                page = pdf_document[i]
+                bitmap = page.render(scale=1)
+                pil_image = bitmap.to_pil()
+                buffered = io.BytesIO()
+                pil_image.save(buffered, format=output_format)
+                image_streams.append(buffered)
+            return image_streams
+
+
+def _get_ole_extension(prog_id: str) -> str:
+    """
+    Map OLE prog_id to a likely file extension for LibreOffice conversion.
+    """
+    if not prog_id:
+        return "bin"
+
+    pid = prog_id.lower()
+    if "excel" in pid or "sheet" in pid:
+        return "xlsx"
+    if "word" in pid or "document" in pid:
+        return "docx"
+    if "powerpoint" in pid or "show" in pid or "presentation" in pid:
+        return "pptx"
+    if "acrobat" in pid or "pdf" in pid:
+        return "pdf"
