@@ -774,3 +774,207 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MO
         ocr_model_name = default_model_name
 
     return ocr_model_name
+
+
+class NemotronParseModelInterface(OCRModelInterfaceBase):
+    """
+    An interface for handling inference with a NemotronParse model.
+    """
+
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+        """
+        return "NemotronParse"
+
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare input data for NemotronParse inference. Accepts either a single base64 image or a list of images.
+
+        Raises
+        ------
+        KeyError
+            If neither "base64_image" nor "base64_images" is provided.
+        ValueError
+            If "base64_images" exists but is not a list.
+        """
+        # Allow either a single image with "base64_image" or multiple images with "base64_images".
+        if "base64_images" in data:
+            if not isinstance(data["base64_images"], list):
+                raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
+        elif "base64_image" in data:
+            # Convert a single image into a list.
+            data["base64_images"] = [data["base64_image"]]
+        else:
+            raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
+
+        return data
+
+    def format_input(
+        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
+        """
+        Format the input payload for the VLM endpoint. This method constructs one payload per batch,
+        where each payload includes one message per image in the batch.
+        Additionally, it returns batch data that preserves the original order of images by including
+        the list of base64 images for each batch.
+
+        Parameters
+        ----------
+        data : dict
+            The input data containing "base64_images" (a list of base64-encoded images).
+        protocol : str
+            Only "http" is supported.
+        max_batch_size : int
+            Maximum number of images per payload.
+        kwargs : dict
+            Additional parameters including model_name, max_tokens, temperature, top_p, and stream.
+
+        Returns
+        -------
+        tuple
+            A tuple (payloads, batch_data_list) where:
+              - payloads is a list of JSON-serializable payload dictionaries.
+              - batch_data_list is a list of dictionaries containing the keys "base64_images" and "prompt"
+                corresponding to each batch.
+        """
+        if protocol != "http":
+            raise ValueError("VLMModelInterface only supports HTTP protocol.")
+
+        images = data.get("base64_images", [])
+
+        # Helper function to chunk the list into batches.
+        def chunk_list(lst, chunk_size):
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+        batches = chunk_list(images, max_batch_size)
+        payloads = []
+        batch_data_list = []
+        for batch in batches:
+            # Create one message per image in the batch.
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
+                    ],
+                }
+                for img in batch
+            ]
+            payload = {
+                "model": kwargs.get("model_name"),
+                "messages": messages,
+                "max_tokens": kwargs.get("max_tokens", 1024),
+                "temperature": kwargs.get("temperature", 1.0),
+                "tools": [
+                    {
+                        "type": "function",
+                        "function":
+                        {
+                            "name": "markdown_bbox"
+                        }
+                    }
+                ]
+            }
+            payloads.append(payload)
+            batch_data_list.append({"base64_images": batch})
+        return payloads, batch_data_list
+
+
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+        """
+        Parse the output from the model's inference response.
+
+        Parameters
+        ----------
+        response : Any
+            The response from the model inference.
+        protocol : str
+            The protocol used ("grpc" or "http").
+        data : dict, optional
+            Additional input data passed to the function.
+
+        Returns
+        -------
+        Any
+            The parsed output data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
+
+        if protocol == "grpc":
+            raise ValueError("gRPC protocol is not supported for NemotronParse.")
+        elif protocol == "http":
+            logger.debug("Parsing output from HTTP NemotronParse model")
+            return self._extract_content_from_nemotron_parse_response(response)
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def process_inference_results(self, output: Any, protocol: str, **kwargs) -> Any:
+        """
+        Process inference results for the NemotronParse model.
+        For this implementation, the output is expected to be a list of text and bboxes.
+
+        Returns
+        -------
+        list
+            The processed list of captions.
+        """
+        return output
+
+    def _extract_content_from_nemotron_parse_response(self, json_response: Dict[str, Any]) -> Any:
+        """
+        Extract content from the JSON response of a NemotronParse HTTP API request.
+
+        Parameters
+        ----------
+        json_response : dict
+            The JSON response from the NemotronParse API.
+
+        Returns
+        -------
+        Any
+            The extracted content from the response.
+
+        Raises
+        ------
+        RuntimeError
+            If the response does not contain the expected "choices" key or if it is empty.
+        """
+
+        if "choices" not in json_response or not json_response["choices"]:
+            raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+        tool_call = json_response["choices"][0]["message"]["tool_calls"][0]
+        logger.error(f"Results: {results}")
+        results = []
+        for item_idx, item in enumerate(json.loads(tool_call["function"]["arguments"])):
+            for bbox in item["bbox"]:
+                results.append
+
+
+        results: List[str] = []
+        for item_idx, item in enumerate(json_response["data"]):
+            text_detections = item.get("text_detections", [])
+            text_predictions = []
+            bounding_boxes = []
+            conf_scores = []
+            for td in text_detections:
+                text_predictions.append(td["text_prediction"]["text"])
+                bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
+                conf_scores.append(td["text_prediction"]["confidence"])
+
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
+                bounding_boxes,
+                text_predictions,
+                conf_scores,
+                dimensions,
+                img_index=item_idx,
+            )
+
+            results.append([bounding_boxes, text_predictions, conf_scores])
+
+        return results
