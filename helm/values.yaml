@@ -81,40 +81,40 @@ tmpDirSize: 50Gi
 
 ## @section NIM Configuration
 ## @descriptionStart
-## Define additional values to the dependent NIM helm charts by updating the "nemoretriever-page-elements-v2", "nemoretriever-graphic-elements-v1",
+## Define additional values to the dependent NIM helm charts by updating the "nemoretriever-page-elements-v3", "nemoretriever-graphic-elements-v1",
 ## "nemoretriever-table-structure-v1", "nemoretriever-parse", and "paddle" values. A sane set of configurations are already included in this value
 ## file and only the "image.repository" and "image.tag" fields are explicitly called out here.
 ## @descriptionEnd
 
 ## @section NIM Components
-## @param nemoretriever-page-elements-v2.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
-## @param nemoretriever-page-elements-v2.image.repository The repository to override the location of the YOLOX
-## @param nemoretriever-page-elements-v2.image.tag The tag override for YOLOX
-## @param nemoretriever-page-elements-v2.image.pullPolicy [default: IfNotPresent] The pull policy for the YOLOX image
-## @param nemoretriever-page-elements-v2.podSecurityContext.runAsUser [default: 1000] The user ID to run the YOLOX container as
-## @param nemoretriever-page-elements-v2.podSecurityContext.runAsGroup [default: 1000] The group ID to run the YOLOX container as
-## @param nemoretriever-page-elements-v2.podSecurityContext.fsGroup [default: 1000] The filesystem group ID for YOLOX volumes
-## @param nemoretriever-page-elements-v2.replicaCount [default: 1] Number of YOLOX replicas when autoscaling is disabled
-## @param nemoretriever-page-elements-v2.serviceAccount.create [default: false] Whether to create a service account for YOLOX
-## @param nemoretriever-page-elements-v2.serviceAccount.name [default: ""] The name of the service account to use
-## @param nemoretriever-page-elements-v2.statefuleSet.enabled [default: false] Whether to deploy YOLOX as a statefulset
-## @param nemoretriever-page-elements-v2.autoscaling.enabled [default: false] Enable autoscaling for YOLOX
-## @param nemoretriever-page-elements-v2.autoscaling.minReplicas [default: 1] Minimum number of YOLOX replicas
-## @param nemoretriever-page-elements-v2.autoscaling.maxReplicas [default: 10] Maximum number of YOLOX replicas
-## @param nemoretriever-page-elements-v2.autoscaling.metrics [default: []] Metrics to use for autoscaling
-## @param nemoretriever-page-elements-v2.service.type [default: "ClusterIP"] The type of Kubernetes service to create
-## @param nemoretriever-page-elements-v2.service.name [default: "nemoretriever-page-elements-v2"] The name of the service
-## @param nemoretriever-page-elements-v2.service.httpPort [default: 8000] The HTTP port for the service
-## @param nemoretriever-page-elements-v2.service.grpcPort [default: 8001] The gRPC port for the service
-## @param nemoretriever-page-elements-v2.service.metricsPort [default: 0] The metrics port for the service
-## @param nemoretriever-page-elements-v2.nim.grpcPort [default: 8001] The gRPC port for NIM communication
-## @param nemoretriever-page-elements-v2.nim.logLevel [default: "INFO"] The log level for NIM
-## @param nemoretriever-page-elements-v2.env Environment variables for the YOLOX container
-nemoretriever-page-elements-v2:
+## @param nemoretriever-page-elements-v3.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
+## @param nemoretriever-page-elements-v3.image.repository The repository to override the location of the YOLOX
+## @param nemoretriever-page-elements-v3.image.tag The tag override for YOLOX
+## @param nemoretriever-page-elements-v3.image.pullPolicy [default: IfNotPresent] The pull policy for the YOLOX image
+## @param nemoretriever-page-elements-v3.podSecurityContext.runAsUser [default: 1000] The user ID to run the YOLOX container as
+## @param nemoretriever-page-elements-v3.podSecurityContext.runAsGroup [default: 1000] The group ID to run the YOLOX container as
+## @param nemoretriever-page-elements-v3.podSecurityContext.fsGroup [default: 1000] The filesystem group ID for YOLOX volumes
+## @param nemoretriever-page-elements-v3.replicaCount [default: 1] Number of YOLOX replicas when autoscaling is disabled
+## @param nemoretriever-page-elements-v3.serviceAccount.create [default: false] Whether to create a service account for YOLOX
+## @param nemoretriever-page-elements-v3.serviceAccount.name [default: ""] The name of the service account to use
+## @param nemoretriever-page-elements-v3.statefuleSet.enabled [default: false] Whether to deploy YOLOX as a statefulset
+## @param nemoretriever-page-elements-v3.autoscaling.enabled [default: false] Enable autoscaling for YOLOX
+## @param nemoretriever-page-elements-v3.autoscaling.minReplicas [default: 1] Minimum number of YOLOX replicas
+## @param nemoretriever-page-elements-v3.autoscaling.maxReplicas [default: 10] Maximum number of YOLOX replicas
+## @param nemoretriever-page-elements-v3.autoscaling.metrics [default: []] Metrics to use for autoscaling
+## @param nemoretriever-page-elements-v3.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param nemoretriever-page-elements-v3.service.name [default: "nemoretriever-page-elements-v3"] The name of the service
+## @param nemoretriever-page-elements-v3.service.httpPort [default: 8000] The HTTP port for the service
+## @param nemoretriever-page-elements-v3.service.grpcPort [default: 8001] The gRPC port for the service
+## @param nemoretriever-page-elements-v3.service.metricsPort [default: 0] The metrics port for the service
+## @param nemoretriever-page-elements-v3.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param nemoretriever-page-elements-v3.nim.logLevel [default: "INFO"] The log level for NIM
+## @param nemoretriever-page-elements-v3.env Environment variables for the YOLOX container
+nemoretriever-page-elements-v3:
   deployed: true
   image:
-    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.4.0"
+    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
+    tag: "1.7.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -133,7 +133,7 @@ nemoretriever-page-elements-v2:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nemoretriever-page-elements-v2
+    name: nemoretriever-page-elements-v3
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -382,11 +382,11 @@ nim-vlm-text-extraction:
 ## Configuration for the NemoRetriever OCR NIM service.
 ## This service provides OCR (Optical Character Recognition) capabilities using NemoRetriever OCR.
 ## @descriptionEnd
-## @param nemoretriever-ocr.deployed [default: false] Whether to deploy the PaddleOCR NIM service
+## @param nemoretriever-ocr.deployed [default: true] Whether to deploy the NemoRetriever OCR NIM service
 ## @param nemoretriever-ocr.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
 ## @param nemoretriever-ocr.customCommand [default: []] Custom command to run in the container
 ## @param nemoretriever-ocr.customArgs [default: []] Custom arguments to pass to the container command
-## @param nemoretriever-ocr.image.repository [default: "nvcr.io/nim/baidu/paddleocr"] The container image repository
+## @param nemoretriever-ocr.image.repository [default: "nvcr.io/nim/nvidia/nemoretriever-ocr-v1"] The container image repository
 ## @param nemoretriever-ocr.image.tag [default: "1.2.0"] The container image tag
 ## @param nemoretriever-ocr.podSecurityContext [default: {}] Pod security context configuration
 ## @param nemoretriever-ocr.replicaCount [default: 1] Number of replicas to deploy
@@ -402,12 +402,12 @@ nim-vlm-text-extraction:
 ## @param nemoretriever-ocr.nim.logLevel [default: "INFO"] The log level for NIM
 ## @param nemoretriever-ocr.env [default: []] Environment variables for the container
 nemoretriever-ocr:
-  deployed: false
+  deployed: true
   fullnameOverride: nv-ingest-ocr
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+    repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
     tag: "1.0.0"
   podSecurityContext:
     runAsUser: 1000
@@ -436,19 +436,19 @@ nemoretriever-ocr:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    # - name: NIM_TRITON_MAX_BATCH_SIZE
-    #   value: "32"
-    - name: NIM_TRITON_OPTIMIZATION_MODE
-      value: vram_opt
+    - name: OMP_NUM_THREADS
+      value: "8"
+    - name: NIM_TRITON_MAX_BATCH_SIZE
+      value: "32"
     - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-      value: "768"
+      value: "8192"
 
 ## @section PaddleOCR NIM Configuration
 ## @descriptionStart
 ## Configuration for the PaddleOCR NIM service.
 ## This service provides OCR (Optical Character Recognition) capabilities using PaddleOCR.
 ## @descriptionEnd
-## @param paddleocr-nim.deployed [default: true] Whether to deploy the PaddleOCR NIM service
+## @param paddleocr-nim.deployed [default: false] Whether to deploy the PaddleOCR NIM service
 ## @param paddleocr-nim.fullnameOverride [default: "nv-ingest-ocr"] Override the full name of the deployment
 ## @param paddleocr-nim.customCommand [default: []] Custom command to run in the container
 ## @param paddleocr-nim.customArgs [default: []] Custom arguments to pass to the container command
@@ -468,7 +468,7 @@ nemoretriever-ocr:
 ## @param paddleocr-nim.nim.logLevel [default: "INFO"] The log level for NIM
 ## @param paddleocr-nim.env [default: []] Environment variables for the container
 paddleocr-nim:
-  deployed: true
+  deployed: false
   fullnameOverride: nv-ingest-ocr
   customCommand: []
   customArgs: []
@@ -990,14 +990,18 @@ prometheus:
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
+## @param envVars.MINIO_ACCESS_KEY [default: "minioadmin"] MinIO access key for authentication
+## @param envVars.MINIO_SECRET_KEY [default: "minioadmin"] MinIO secret key for authentication
+## @param envVars.IMAGE_STORAGE_URI [default: "s3://nv-ingest/artifacts/store/images"] fsspec-compatible destination for stored images
+## @param envVars.IMAGE_STORAGE_PUBLIC_BASE_URL [default: ""] Optional HTTP base URL for serving stored images when using object storage
 ## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
 ## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
 ## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
 ## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"] HTTP endpoint for NeMo Retriever Parse service
 ## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"] Protocol for NeMo Retriever Parse service
 ## @param envVars.NEMORETRIEVER_PARSE_MODEL_NAME [default: "nvidia/nemoretriever-parse"] Model name for NeMo Retriever Parse
-## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"] gRPC endpoint for YOLOX page elements
-## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"] HTTP endpoint for YOLOX page elements
+## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
+## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v3:8000/v1/infer"] HTTP endpoint for YOLOX page elements
 ## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements
 ## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"] gRPC endpoint for YOLOX graphic elements
 ## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"] HTTP endpoint for YOLOX graphic elements
@@ -1031,6 +1035,15 @@ envVars:
   MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+
+  # Image Storage Configuration
+  # Provide a single fsspec-compatible URI (file://, s3://, etc.)
+  # Uses existing volume mounts for file:// paths i.e. file:///workspace/data/artifacts/store/images
+  IMAGE_STORAGE_URI: "s3://nv-ingest/artifacts/store/images"
+  # Optional public base URL for rendering object storage assets
+  IMAGE_STORAGE_PUBLIC_BASE_URL: ""
 
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
@@ -1038,8 +1051,8 @@ envVars:
   NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
   NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
   NEMORETRIEVER_PARSE_MODEL_NAME: nvidia/nemoretriever-parse
-  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
-  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
+  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v3:8001
+  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v3:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
   YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
   YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
@@ -1050,7 +1063,7 @@ envVars:
   OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
   OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
-  OCR_MODEL_NAME: paddle
+  OCR_MODEL_NAME: scene_text_ensemble
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"

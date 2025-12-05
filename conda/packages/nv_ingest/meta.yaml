@@ -59,6 +59,7 @@ requirements:
     - transformers>=4.47.0
     # - unstructured-client>=0.25.9
     - uvicorn
+    - universal_pathlib
   pip:
     - nvidia-riva-client==2.20.0
     - markitdown

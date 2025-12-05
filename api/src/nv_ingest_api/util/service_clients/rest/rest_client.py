@@ -156,7 +156,7 @@ class RestClient(MessageBrokerClientBase):
         # Validate and normalize API version to prevent misconfiguration
         # Default to v1 for backwards compatibility if not explicitly provided
         VALID_API_VERSIONS = {"v1", "v2"}
-        raw_api_version = kwargs.get("api_version", "v1")
+        raw_api_version = kwargs.get("api_version", "v2")
         api_version = str(raw_api_version).strip().lower()
 
         if api_version not in VALID_API_VERSIONS:
