@@ -287,6 +287,10 @@ def create_nvingest_index_params(
     gpu_index: bool = True,
     gpu_search: bool = False,
     local_index: bool = True,
+    intermediate_graph_degree: int = 128,
+    graph_degree: int = 100,
+    m: int = 64,
+    ef_construction: int = 512,
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -326,8 +330,8 @@ def create_nvingest_index_params(
                 index_type="GPU_CAGRA",
                 metric_type="L2",
                 params={
-                    "intermediate_graph_degree": 128,
-                    "graph_degree": 100,
+                    "intermediate_graph_degree": intermediate_graph_degree,
+                    "graph_degree": graph_degree,
                     "build_algo": "NN_DESCENT",
                     "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
@@ -339,7 +343,7 @@ def create_nvingest_index_params(
                 index_name=DENSE_INDEX_NAME,
                 index_type="HNSW",
                 metric_type="L2",
-                params={"M": 64, "efConstruction": 512},
+                params={"M": m, "efConstruction": ef_construction},
             )
     if sparse and local_index:
         index_params.add_index(
@@ -407,6 +411,10 @@ def create_nvingest_collection(
     recreate_meta: bool = False,
     username: str = None,
     password: str = None,
+    intermediate_graph_degree: int = 128,
+    graph_degree: int = 100,
+    m: int = 64,
+    ef_construction: int = 512,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -457,6 +465,10 @@ def create_nvingest_collection(
         gpu_index=gpu_index,
         gpu_search=gpu_search,
         local_index=local_index,
+        intermediate_graph_degree=intermediate_graph_degree,
+        graph_degree=graph_degree,
+        m=m,
+        ef_construction=ef_construction,
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
     d_idx, s_idx = _get_index_types(index_params, sparse=sparse)

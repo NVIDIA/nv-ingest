@@ -5,10 +5,10 @@
 active:
   # Dataset configuration
   dataset_dir: /path/to/dataset
-  test_name: null  # Auto-generated if null
+  test_name: multimodal_test  # Auto-generated if null
 
   # API configuration
-  api_version: v1 # v1 or v2
+  api_version: v1  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
@@ -37,6 +37,7 @@ active:
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
   split_chunk_overlap: 150  # Overlap for text splitting
+  enable_image_storage: false  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
   # Storage configuration
   spill_dir: /tmp/spill
@@ -83,7 +84,7 @@ datasets:
     extract_tables: true
     extract_charts: true
     extract_images: true
-    extract_infographics: false
+    extract_infographics: true
     recall_dataset: null  # bo20 does not have recall
 
   financebench:
@@ -98,6 +99,16 @@ datasets:
   # Single file example
   single:
     path: data/multimodal_test.pdf
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: true
+    extract_infographics: true
+    recall_dataset: null  # No recall evaluator for single file
+
+# Example of a custom dataset configuration
+  jensen_single:
+    path: /path/to/jensen.pdf
     extract_text: true
     extract_tables: true
     extract_charts: true

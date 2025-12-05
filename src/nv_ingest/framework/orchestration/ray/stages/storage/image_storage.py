@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Dict, Any, Optional
+from urllib.parse import urlparse
 
 import pandas as pd
 import ray
@@ -26,7 +28,8 @@ logger = logging.getLogger(__name__)
 @ray.remote
 class ImageStorageStage(RayActorStage):
     """
-    A Ray actor stage that stores images or structured content in MinIO and updates metadata with storage URLs.
+    A Ray actor stage that stores images or structured content using an fsspec-compatible backend and updates
+    metadata with storage URLs.
 
     This stage uses the validated configuration (ImageStorageModuleSchema) to process and store the DataFrame
     payload and updates the control message accordingly.
@@ -69,8 +72,16 @@ class ImageStorageStage(RayActorStage):
         task_config = remove_task_by_type(control_message, "store")
         # logger.debug("ImageStorageStage: Task configuration extracted: %s", pprint.pformat(task_config))
 
-        store_structured: bool = task_config.get("structured", True)
-        store_unstructured: bool = task_config.get("images", False)
+        stage_defaults = {
+            "structured": self.validated_config.structured,
+            "images": self.validated_config.images,
+            "storage_uri": self.validated_config.storage_uri,
+            "storage_options": self.validated_config.storage_options,
+            "public_base_url": self.validated_config.public_base_url,
+        }
+
+        store_structured: bool = task_config.get("structured", stage_defaults["structured"])
+        store_unstructured: bool = task_config.get("images", stage_defaults["images"])
 
         content_types: Dict[Any, Any] = {}
         if store_structured:
@@ -80,14 +91,34 @@ class ImageStorageStage(RayActorStage):
             content_types[ContentTypeEnum.IMAGE] = store_unstructured
 
         params: Dict[str, Any] = task_config.get("params", {})
-        params["content_types"] = content_types
 
-        logger.debug(f"Processing storage task with parameters: {params}")
+        storage_uri = task_config.get("storage_uri") or params.get("storage_uri") or stage_defaults["storage_uri"]
+        storage_options = {
+            **(stage_defaults["storage_options"] or {}),
+            **(task_config.get("storage_options") or {}),
+            **params.get("storage_options", {}),
+        }
+        if "public_base_url" in task_config:
+            public_base_url = task_config["public_base_url"]
+        else:
+            public_base_url = params.get("public_base_url", stage_defaults["public_base_url"])
+
+        storage_options = self._inject_storage_defaults(storage_uri, storage_options)
+
+        storage_params: Dict[str, Any] = {
+            "content_types": content_types,
+            "storage_uri": storage_uri,
+            "storage_options": storage_options,
+        }
+        if public_base_url:
+            storage_params["public_base_url"] = public_base_url
+
+        logger.debug("Processing storage task with parameters: %s", storage_params)
 
         # Store images or structured content.
         df_storage_ledger: pd.DataFrame = store_images_to_minio_internal(
             df_storage_ledger=df_payload,
-            task_config=params,
+            task_config=storage_params,
             storage_config={},
             execution_trace_log=None,
         )
@@ -98,3 +129,38 @@ class ImageStorageStage(RayActorStage):
         control_message.payload(df_storage_ledger)
 
         return control_message
+
+    @staticmethod
+    def _inject_storage_defaults(storage_uri: str, storage_options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Populate storage options for common backends (e.g., MinIO/S3) using environment defaults.
+        """
+        parsed_scheme = urlparse(storage_uri).scheme.lower()
+        merged_options: Dict[str, Any] = {k: v for k, v in storage_options.items() if v is not None}
+
+        if parsed_scheme not in {"s3", "s3a", "s3n"}:
+            return merged_options
+
+        def _set_if_absent(key: str, env_var: str) -> None:
+            if key not in merged_options and env_var in os.environ:
+                merged_options[key] = os.environ[env_var]
+
+        _set_if_absent("key", "MINIO_ACCESS_KEY")
+        _set_if_absent("secret", "MINIO_SECRET_KEY")
+        if "token" not in merged_options and os.environ.get("MINIO_SESSION_TOKEN"):
+            merged_options["token"] = os.environ["MINIO_SESSION_TOKEN"]
+
+        client_kwargs = dict(merged_options.get("client_kwargs", {}))
+        endpoint = os.environ.get("MINIO_INTERNAL_ADDRESS")
+        if not endpoint:
+            endpoint = "http://minio:9000"
+        if endpoint and not endpoint.startswith(("http://", "https://")):
+            endpoint = f"http://{endpoint}"
+        client_kwargs.setdefault("endpoint_url", endpoint)
+        region = os.environ.get("MINIO_REGION")
+        if region:
+            client_kwargs.setdefault("region_name", region)
+        if client_kwargs:
+            merged_options["client_kwargs"] = client_kwargs
+
+        return merged_options

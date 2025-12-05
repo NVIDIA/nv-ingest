@@ -99,7 +99,7 @@ services:
     runtime: nvidia
 
   ocr:
-    image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
+    image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-latest}
     shm_size: 16gb
     ports:
       - "8009:8000"
@@ -302,6 +302,8 @@ services:
       - MESSAGE_CLIENT_PORT=6379
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       # build.nvidia.com hosted nemoretriever-parse
       # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
       - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
@@ -315,9 +317,9 @@ services:
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
       - OCR_INFER_PROTOCOL=grpc
-      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-scene_text_ensemble}
       # build.nvidia.com hosted ocr endpoints.
-      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
+      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1
       #- OCR_INFER_PROTOCOL=http
       - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
@@ -338,6 +340,12 @@ services:
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
+      # Image Storage Configuration
+      # Provide a single fsspec-compatible URI (defaults to bundled MinIO)
+      # Uses existing volume mounts for file:// paths i.e. file:///workspace/data/artifacts/store/images
+      - IMAGE_STORAGE_URI=${IMAGE_STORAGE_URI:-s3://nv-ingest/artifacts/store/images}
+      # Optional public HTTP base for serving images persisted via object storage (set for download links)
+      - IMAGE_STORAGE_PUBLIC_BASE_URL=${IMAGE_STORAGE_PUBLIC_BASE_URL:-}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
