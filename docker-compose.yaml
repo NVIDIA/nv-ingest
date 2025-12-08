@@ -369,7 +369,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
-    user: "${UID}:${GID}"
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
