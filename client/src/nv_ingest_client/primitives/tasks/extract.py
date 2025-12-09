@@ -54,7 +54,7 @@ _DEFAULT_EXTRACTOR_MAP = {
 
 _Type_Extract_Method_PDF = Literal[
     "adobe",
-    "nemoretriever_parse",
+    "nemotron_parse",
     "haystack",
     "llama_parse",
     "pdfium",

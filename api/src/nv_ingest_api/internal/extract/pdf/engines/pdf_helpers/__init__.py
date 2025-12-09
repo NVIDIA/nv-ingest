@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 EXTRACTOR_LOOKUP = {
     "adobe": adobe_extractor,
     "llama": llama_parse_extractor,
-    "nemoretriever_parse": nemoretriever_parse_extractor,
+    "nemotron_parse": nemoretriever_parse_extractor,
     "pdfium": pdfium_extractor,
     "pdfium_hybrid": pdfium_extractor,  # Uses pdfium for native text and switches to OCR pipeline only for scanned pages.  # noqa: E501
     "tika": tika_extractor,
@@ -41,6 +41,7 @@ EXTRACTOR_LOOKUP = {
 METHOD_TO_CONFIG_KEY_MAP = {
     "pdfium_hybrid": "pdfium_config",
     "ocr": "pdfium_config",
+    "nemotron_parse": "nemoretriever_parse_config",
 }
 
 

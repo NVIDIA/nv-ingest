@@ -102,7 +102,7 @@ def extract_primitives_from_pdf(
         - "pdfium" : PDFium-based extraction (default)
         - "adobe" : Adobe PDF Services API
         - "llama" : LlamaParse extraction
-        - "nemoretriever_parse" : NVIDIA NemoRetriever Parse
+        - "nemotron_parse" : NVIDIA Nemotron Parse
         - "unstructured_io" : Unstructured.io extraction
         - "tika" : Apache Tika extraction
 
@@ -461,7 +461,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     """
     return extract_primitives_from_pdf(
         df_extraction_ledger=df_extraction_ledger,
-        extract_method="nemoretriever_parse",
+        extract_method="nemotron_parse",
         extract_text=extract_text,
         extract_images=extract_images,
         extract_tables=extract_tables,

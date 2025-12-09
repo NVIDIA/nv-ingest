@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
     "extract_method",
     [
         "pdfium",
-        "nemoretriever_parse",
+        "nemotron",
         pytest.param("adobe", marks=pytest.mark.xfail(reason="Adobe extraction not configured in test environment")),
         pytest.param("llama", marks=pytest.mark.xfail(reason="Llama extraction not configured in test environment")),
         pytest.param(
@@ -161,7 +161,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
                 "yolox_auth_token": _AUTH_TOKEN,
             }
         )
-    elif extract_method == "nemoretriever_parse":
+    elif extract_method == "nemotron_parse":
         extraction_params.update(
             {
                 # NemoRetriever Parse specific parameters
