@@ -189,7 +189,7 @@ ingestor = Ingestor().files(["report.docx", "presentation.pptx"]).extract()
 #### Render as PDF
 
 The `render_as_pdf` method uses [LibreOffice](https://www.libreoffice.org/) to convert the document to a PDF before extraction.
-This approach is recommended when visual layout preservation is critical, or when you need to extract visual elements (tables, charts) that are better detected via computer vision on a rendered page.
+We recommend this approach when preserving the visual layout is critical, or when you need to extract visual elements, such as tables and charts, that are better detected by using computer vision on a rendered page.
 
 ```python
 ingestor = Ingestor().files(["report.docx", "presentation.pptx"])
