@@ -76,6 +76,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Optional pipeline steps
     enable_caption = config.enable_caption
     enable_split = config.enable_split
+    enable_image_storage = config.enable_image_storage
 
     # Text splitting configuration
     split_chunk_size = config.split_chunk_size
@@ -118,6 +119,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         pipeline_opts.append("caption")
     if enable_split:
         pipeline_opts.append(f"text split: {split_chunk_size}/{split_chunk_overlap}")
+    if enable_image_storage:
+        pipeline_opts.append("image storage")
 
     if pipeline_opts:
         print(f"Pipeline: {', '.join(pipeline_opts)}")
@@ -165,19 +168,28 @@ def main(config=None, log_path: str = "test_results") -> int:
             chunk_overlap=split_chunk_overlap,
         )
 
-    # Embed and upload (core pipeline)
-    ingestor = (
-        ingestor.embed(model_name=model_name)
-        .vdb_upload(
-            collection_name=collection_name,
-            dense_dim=dense_dim,
-            sparse=sparse,
-            gpu_search=gpu_search,
-            model_name=model_name,
-            purge_results_after_upload=False,
+    # Embed (must come before storage per pipeline ordering)
+    ingestor = ingestor.embed(model_name=model_name)
+
+    # Store images to disk (server-side image storage) - optional
+    # Note: All storage config comes from docker-compose/helm environment variables:
+    # - IMAGE_STORAGE_URI (default: s3://nv-ingest/artifacts/store/images; set to file://... to opt into disk)
+    # - IMAGE_STORAGE_PUBLIC_BASE_URL (optional HTTP gateway for object URLs)
+    if enable_image_storage:
+        ingestor = ingestor.store(
+            structured=True,
+            images=True,
         )
-        .save_to_disk(output_directory=spill_dir)
-    )
+
+    # VDB upload and save results
+    ingestor = ingestor.vdb_upload(
+        collection_name=collection_name,
+        dense_dim=dense_dim,
+        sparse=sparse,
+        gpu_search=gpu_search,
+        model_name=model_name,
+        purge_results_after_upload=False,
+    ).save_to_disk(output_directory=spill_dir)
 
     results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
     ingestion_time = time.time() - ingestion_start
@@ -261,6 +273,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "table_output_format": table_output_format,
             "enable_caption": enable_caption,
             "enable_split": enable_split,
+            "enable_image_storage": enable_image_storage,
         },
         "results": {
             "result_count": len(results),

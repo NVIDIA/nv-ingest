@@ -26,6 +26,7 @@ The following table describes methods of the `Ingestor` class.
 | `ingest`       | Submit jobs and retrieve results synchronously. |
 | `load`         | Ensure files are locally accessible (downloads if needed). |
 | `save_to_disk` | Save ingestion results to disk instead of memory. |
+| `store`        | Persist extracted images/structured renderings to an fsspec-compatible backend. |
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
@@ -202,6 +203,27 @@ ingestor = ingestor.extract(
 
 
 
+### PDF Extraction Strategies
+
+NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
+You can select the strategy by using the following values for the `extract_method` parameter.
+
+- **pdfium** – Uses PDFium to extract native text. This is the default. This is the fastest method but does not capture text from scanned images/pages.
+- **pdfium_hybrid** – A hybrid approach that uses PDFium for pages with native text and automatically switches to OCR for scanned pages. This offers a robust balance of speed and coverage for mixed documents.
+- **ocr** – Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt.
+
+```python
+ingestor = Ingestor().files("mixed_content.pdf")
+
+# Use hybrid mode for mixed digital/scanned PDFs
+ingestor = ingestor.extract(
+    document_type="pdf",
+    extract_method="pdfium_hybrid",
+)
+results = ingestor.ingest()
+```
+
+
 
 ## Work with Large Datasets: Save to Disk
 
@@ -337,6 +359,24 @@ ingestor = ingestor.embed(
 )
 ```
 
+## Store Extracted Images
+
+The `store` method exports decoded images (unstructured images as well as structured renderings such as tables and charts) to any fsspec-compatible URI so you can inspect or serve the generated visuals.
+
+```python
+ingestor = ingestor.store(
+    structured=True,   # persist table/chart renderings
+    images=True,       # persist unstructured images
+    storage_uri="file:///workspace/data/artifacts/store/images",  # Supports file://, s3://, etc.
+    public_base_url="https://assets.example.com/images"  # Optional CDN/base URL for download links
+)
+```
+
+!!! tip
+
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the nv-ingest runtime so the container picks up the new value.
+
+When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
 
 
 ## Extract Audio
