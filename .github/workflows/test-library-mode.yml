@@ -25,6 +25,7 @@ jobs:
         if:
           ${{
             github.event_name == 'pull_request_target' &&
+            github.event.pull_request.author_association != 'MEMBER' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
             !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
@@ -50,6 +51,7 @@ jobs:
           name: test_artifacts
           path: |
             ./conda/output_conda_channel
+            ./config
             ./data
             ./examples
             ./tests/integration
@@ -64,6 +66,7 @@ jobs:
         if:
           ${{
             github.event_name == 'pull_request_target' &&
+            github.event.pull_request.author_association != 'MEMBER' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
             !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
@@ -91,20 +94,27 @@ jobs:
           # Install other dependencies
           conda install -y -c conda-forge librosa
           # Install pip dependencies
-          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' 'nvidia-riva-client==2.20.0' unstructured-client tritonclient markitdown
+          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' 'nvidia-riva-client==2.20.0' unstructured-client tritonclient markitdown glom
 
       - name: Run integration test
         env:
           AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
+          AUDIO_INFER_PROTOCOL: http
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
           NEMORETRIEVER_PARSE_MODEL_NAME: ${{ secrets.NEMORETRIEVER_PARSE_MODEL_NAME }}
+          NGC_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          PADDLE_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+          OCR_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+          OCR_INFER_PROTOCOL: http
           VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
           VLM_CAPTION_MODEL_NAME: ${{ secrets.VLM_CAPTION_MODEL_NAME }}
           YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
+          YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: http
           YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
+          YOLOX_INFER_PROTOCOL: http
           YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
+          YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
+          NV_INGEST_PIPELINE_CONFIG_PATH: ./config/default_pipeline.yaml
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
