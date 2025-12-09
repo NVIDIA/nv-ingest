@@ -172,12 +172,15 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Extract Office Documents (DOCX and PPTX)
 
-For Microsoft Office documents (.docx and .pptx), NeMo Retriever extraction offers two extraction methods to balance performance and layout fidelity.
+NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+
+- Native extraction
+- Render as PDF
 
 #### Native Extraction (Default)
 
 The default methods (`python_docx` and `python_pptx`) extract content directly from the file structure.
-This is generally faster but may lose some visual layout information.
+This is generally faster, but you might lose some visual layout information.
 
 ```python
 # Uses default native extraction
@@ -186,8 +189,8 @@ ingestor = Ingestor().files(["report.docx", "presentation.pptx"]).extract()
 
 #### Render as PDF
 
-The `render_as_pdf` method uses LibreOffice to convert the document to a PDF before extraction.
-This approach is recommended when visual layout preservation is critical, or when you need to extract visual elements (tables, charts) that are better detected via computer vision on a rendered page.
+The `render_as_pdf` method uses [LibreOffice](https://www.libreoffice.org/) to convert the document to a PDF before extraction.
+We recommend this approach when preserving the visual layout is critical, or when you need to extract visual elements, such as tables and charts, that are better detected by using computer vision on a rendered page.
 
 ```python
 ingestor = Ingestor().files(["report.docx", "presentation.pptx"])
