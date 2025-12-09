@@ -175,7 +175,7 @@ services:
       - reranker
 
   nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -308,7 +308,7 @@ services:
       # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
       - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
-      #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
+      - NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemotron-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
