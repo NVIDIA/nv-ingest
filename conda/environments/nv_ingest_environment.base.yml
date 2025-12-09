@@ -11,6 +11,7 @@ dependencies:
   - fastapi>=0.115.6
   - fastparquet>=2024.11.0
   - fsspec>=2024.10.0
+  - s3fs>=2024.10.0
   - gunicorn
   - h11>=0.16.0 # Must pin at or above 0.16.0 for CVE mitigation
   - httpx>=0.28.1
@@ -41,6 +42,7 @@ dependencies:
   - transformers>=4.47.0
   - tqdm>=4.67.1
   - uvicorn
+  - universal_pathlib
   - pip
   - pip:
       - llama-index-embeddings-nvidia
