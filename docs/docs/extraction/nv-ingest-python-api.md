@@ -179,7 +179,7 @@ NeMo Retriever extraction offers the following two extraction methods for Micros
 #### Native Extraction (Default)
 
 The default methods (`python_docx` and `python_pptx`) extract content directly from the file structure.
-This is generally faster but may lose some visual layout information.
+This is generally faster, but you might lose some visual layout information.
 
 ```python
 # Uses default native extraction
