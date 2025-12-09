@@ -115,7 +115,6 @@ def _generate_captions(
             infer_protocol="http",
         )
 
-        logger.debug(f"Calling VLM endpoint: {endpoint_url} with model: {model_name}")
         # Perform inference to generate captions.
         captions: List[str] = nim_client.infer(data, model_name=model_name)
         return captions
