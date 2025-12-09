@@ -173,7 +173,7 @@ ingestor = ingestor.extract(document_type="pdf")
 ### PDF Extraction Strategies
 
 NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
-You can select the strategy using the `extract_method` parameter.
+You can select the strategy by using the following values for the `extract_method` parameter.
 
 - `pdfium` (Default): Uses PDFium to extract native text.
   This is the fastest method but does not capture text from scanned images/pages.
