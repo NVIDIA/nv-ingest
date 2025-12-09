@@ -171,7 +171,10 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Extract Office Documents (DOCX and PPTX)
 
-For Microsoft Office documents (.docx and .pptx), NeMo Retriever extraction offers two extraction methods to balance performance and layout fidelity.
+NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+
+- Native extraction
+- Render as PDF
 
 #### Native Extraction (Default)
 
