@@ -7,4 +7,4 @@ channels:
 dependencies:
   - pip:
       - pypdfium2>=4.30.0
-      - ray[all]>=2.49.0
+      - ray[all]>=2.52.0

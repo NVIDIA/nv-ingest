@@ -53,6 +53,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
+from nv_ingest_client.util.file_processing.extract import EXTENSION_TO_DOCUMENT_TYPE
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
@@ -963,11 +964,18 @@ class Ingestor:
                 **kwargs,
             )
 
+            api_document_type = EXTENSION_TO_DOCUMENT_TYPE.get(document_type.lower(), document_type)
+
             # Extract method from task_options for API schema
             method = task_options.pop("extract_method", None)
             if method is None:
                 # Let ExtractTask constructor handle default method selection
-                method = "pdfium"  # Default fallback
+                if api_document_type == "docx":
+                    method = "python_docx"
+                elif api_document_type == "pptx":
+                    method = "python_pptx"
+                else:
+                    method = "pdfium"  # Default fallback
 
             # Build params dict for API schema
             params = {k: v for k, v in task_options.items() if k != "document_type"}
@@ -1088,13 +1096,9 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        # Handle parameter name mapping: store_method -> method for API schema
-        if "store_method" in kwargs:
-            kwargs["method"] = kwargs.pop("store_method")
-
-        # Provide default method if not specified (matching client StoreTask behavior)
-        if "method" not in kwargs:
-            kwargs["method"] = "minio"
+        deprecated_method = kwargs.pop("store_method", None)
+        if deprecated_method is not None:
+            logger.warning("`store_method` is deprecated and no longer used. Configure storage_uri instead.")
 
         task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
 
@@ -1102,7 +1106,9 @@ class Ingestor:
         store_params = {
             "structured": task_options.structured,
             "images": task_options.images,
-            "store_method": task_options.method,  # Map method back to store_method
+            "storage_uri": task_options.storage_uri,
+            "storage_options": task_options.storage_options,
+            "public_base_url": task_options.public_base_url,
             "params": task_options.params,
         }
         store_task = StoreTask(**store_params)
