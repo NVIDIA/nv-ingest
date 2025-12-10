@@ -1,0 +1,45 @@
+{{- if .Values.nimOperator.graphic_elements.enabled }}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nemoretriever-graphic-elements-v1
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ .Values.nimOperator.graphic_elements.image.repository }}:{{ .Values.nimOperator.graphic_elements.image.tag }}"
+      pullSecret: "{{ index .Values.nimOperator.graphic_elements.image.pullSecrets 0 }}"
+      authSecret: {{ .Values.nimOperator.graphic_elements.authSecret }}
+  storage:
+    pvc:
+      create: {{ .Values.nimOperator.graphic_elements.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.graphic_elements.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.graphic_elements.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.graphic_elements.storage.pvc.volumeAccessMode }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nemoretriever-graphic-elements-v1
+spec:
+  image:
+    repository: {{ .Values.nimOperator.graphic_elements.image.repository }}
+    tag: {{ .Values.nimOperator.graphic_elements.image.tag }}
+    pullPolicy: {{ .Values.nimOperator.graphic_elements.image.pullPolicy }}
+    pullSecrets:
+{{ toYaml .Values.nimOperator.graphic_elements.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.graphic_elements.authSecret }}
+  storage:
+    nimCache:
+      name: nemoretriever-graphic-elements-v1
+  replicas: {{ .Values.nimOperator.graphic_elements.replicas }}
+  nodeSelector:
+{{ toYaml .Values.nimOperator.graphic_elements.nodeSelector | nindent 4 }}
+  resources:
+{{ toYaml .Values.nimOperator.graphic_elements.resources | nindent 4 }}
+  tolerations:
+{{ toYaml .Values.nimOperator.graphic_elements.tolerations | nindent 4 }}
+  expose:
+{{ toYaml .Values.nimOperator.graphic_elements.expose | nindent 4 }}
+  env:
+{{ toYaml .Values.nimOperator.graphic_elements.env | nindent 4 }}
+{{- end }}
