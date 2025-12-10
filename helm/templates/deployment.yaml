@@ -39,18 +39,6 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
 
-      initContainers:
-        - name: verify-tmpdir-permissions
-          image: busybox
-          command:
-            - "sh"
-            - "-c"
-            - "mkdir -p /scratch/.cache /scratch/tmp && chown -R {{ .Values.nemo.userID }}:{{ .Values.nemo.groupID }} /scratch"
-          volumeMounts:
-            - name: ephemeral
-              subPath: scratch
-              mountPath: /scratch
-
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

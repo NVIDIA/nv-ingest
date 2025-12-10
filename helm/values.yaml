@@ -228,13 +228,13 @@ milvus:
   image:
     all:
       repository: milvusdb/milvus
-      tag: v2.5.17-gpu
+      tag: v2.6.5-gpu
   cluster:
     enabled: false
   etcd:
     image:
       repository: "milvusdb/etcd"
-      tag: "3.5.22-r1"
+      tag: "3.5.23-r2"
     replicaCount: 1
     extraVolumes: []
     extraVolumeMounts: []
@@ -291,8 +291,8 @@ redisDeployed: true
 
 redis:
   image:
-    repository: bitnamilegacy/redis
-    tag: "8.2.1-debian-12-r0"
+    repository: redis
+    tag: "8.2.3"
   auth:
     enabled: false
   replica:
@@ -349,7 +349,7 @@ otelDeployed: true
 opentelemetry-collector:
   image:
     repository: "otel/opentelemetry-collector-contrib"
-    tag: "0.133.0"
+    tag: "0.140.0"
   mode: deployment
   config:
     receivers:
@@ -436,8 +436,8 @@ zipkinDeployed: true
 
 zipkin:
   image:
-    repository: "openzipkin/zipkin"
-    tag: "3.5.0"
+    repository: "ghcr.io/openzipkin/alpine"
+    tag: "3.21.3"
   zipkin:
     extraEnv:
       JAVA_OPTS: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
@@ -586,7 +586,7 @@ nimOperator:
     pvc:
       create: true
       # If specified, sets the storageClass for all NIMCache PVCS created by the Helm chart.
-      storageClass: "pdx02-cdot03-ainfs01-nfsv3"
+      storageClass: "default"
       size: "25Gi"
       volumeAccessMode: ReadWriteMany
 
@@ -603,32 +603,21 @@ nimOperator:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-      tag: 1.5.0
+      tag: 1.6.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       # Defaults to inherit from nimOperator.nimCache.pvc.storageClass, size, and volumeAccessMode
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -671,34 +660,23 @@ nimOperator:
         value: "1"
 
   graphic_elements:
-    enabled: false
+    enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-      tag: 1.5.0
+      tag: 1.6.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -719,34 +697,23 @@ nimOperator:
         value: "1"
 
   table_structure:
-    enabled: false
+    enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-      tag: 1.5.0
+      tag: 1.6.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -767,34 +734,23 @@ nimOperator:
         value: "8"
 
   embedqa:
-    enabled: false
+    enabled: true
     image:
       repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
       tag: 1.10.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "50Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -820,27 +776,16 @@ nimOperator:
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -863,34 +808,23 @@ nimOperator:
         value: "1"
 
   nemoretriever_ocr_v1:
-    enabled: false
+    enabled: true
     image:
-      repository: nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
-      tag: 1.2.0-rc2-latest-release-37831672
+      repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+      tag: 1.1.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "25Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -903,6 +837,10 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
+      - name: NIM_TRITON_RATE_LIMIT
+        value: "3"
+      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+        value: "8192"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
       - name: NIM_TRITON_ENABLE_MODEL_CONTROL
@@ -916,27 +854,16 @@ nimOperator:
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "50Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
@@ -952,27 +879,16 @@ nimOperator:
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
-    authSecret: ngc-api-secret
+    authSecret: ngc-api
     storage:
       pvc:
         create: true
-        storageClass: "pdx02-cdot03-ainfs01-nfsv3"
         size: "300Gi"
         volumeAccessMode: "ReadWriteMany"
     replicas: 1
-    nodeSelector:
-      nvidia.com/mig.config: all-1g.23gb
     resources:
       limits:
         nvidia.com/gpu: 1
-    tolerations:
-      - key: "nvidia.com/mig"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
     expose:
       service:
         type: ClusterIP
