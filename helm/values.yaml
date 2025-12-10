@@ -458,8 +458,8 @@ zipkinDeployed: true
 
 zipkin:
   image:
-    repository: "ghcr.io/openzipkin/alpine"
-    tag: "3.21.3"
+    repository: "openzipkin/zipkin"
+    tag: "3.5.0"
   zipkin:
     extraEnv:
       JAVA_OPTS: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
