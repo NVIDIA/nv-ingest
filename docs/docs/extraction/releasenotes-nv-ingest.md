@@ -31,7 +31,7 @@ The NeMo Retriever extraction 25.09 release adds new hardware and software suppo
 The following are the known issues for this release:
 
 - A10G and L40S are not supported. To use A10G or L40S hardware, use release 25.6.x.
-- `nemoretriever-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
+- `nemotron-parse` is not supported on RTX Pro 6000 or B200. For details, refer to [Support Matrix](support-matrix.md).
 - The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB.
 
 
@@ -128,7 +128,7 @@ The NeMo Retriever extraction 25.03 release includes accuracy improvements, feat
 - Added support for Llama-3.2 VLM for Image Captioning capability.
 - docX, pptx, jpg, png support for image detection & extraction.
 - Deprecated DePlot and CACHED NIMs.
-<!-- - Integrated with nemoretriever-parse NIM for state-of-the-art text extraction -->
+<!-- - Integrated with nemotron-parse NIM for state-of-the-art text extraction -->
 <!-- - Integrated with new NVIDIA NIMs -->
 <!--   - Nemoretriever-table-structure-v1 -->
 <!--   - Nemoretriever-graphic-elements-v1 -->

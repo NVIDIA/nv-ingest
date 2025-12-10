@@ -71,10 +71,10 @@ You can set the variable in your .env file or directly in your environment.
 
 
 
-## Extract method nemoretriever-parse doesn't support image files
+## Extract method nemotron-parse doesn't support image files
 
-Currently, extraction with nemoretriever-parse doesn't support image files, only scanned PDFs. 
-To work around this issue, convert image files to PDFs before you use `extract_method="nemoretriever_parse"`.
+Currently, extraction with nemotron-parse doesn't support image files, only scanned PDFs. 
+To work around this issue, convert image files to PDFs before you use `extract_method="nemotron_parse"`.
 
 
 
