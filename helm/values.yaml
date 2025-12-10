@@ -211,6 +211,7 @@ envVars:
   # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
+  
 
   # "ready" check configuration.
   # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
@@ -892,11 +893,11 @@ nimOperator:
         grpcPort: 8001
     env: []
 
-  llama_3_1_nemotron_nano_vl_8b_v1:
+  nemotron_nano_12b_v2_vl:
     enabled: false
     image:
-      repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
-      tag: latest
+      repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
+      tag: 1.5.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
