@@ -437,9 +437,8 @@ class SystemResourceProbe:
             cgroup_memory_detected = self._read_memory_cgroup_v1()
 
         # 4. Determine effective memory
-        if self.cgroup_memory_limit_bytes is not None and self.os_total_memory_bytes is not None:
-            # Use the smaller of cgroup limit and system memory
-            self.effective_memory_bytes = min(self.cgroup_memory_limit_bytes, self.os_total_memory_bytes)
+        if self.cgroup_memory_limit_bytes is not None:
+            self.effective_memory_bytes = self.cgroup_memory_limit_bytes
             self.memory_detection_method = "cgroup_limited"
             logger.debug(f"Effective memory: {self.effective_memory_bytes / (1024**3):.2f} GB (cgroup limited)")
         elif self.os_total_memory_bytes is not None:

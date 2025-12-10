@@ -24,8 +24,6 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-from utils import default_collection_name
-
 
 def main(config=None, log_path: str = "test_results") -> int:
     """
@@ -49,7 +47,15 @@ def main(config=None, log_path: str = "test_results") -> int:
     spill_dir = config.spill_dir
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = config.collection_name or default_collection_name()
+    # Use consistent collection naming with recall pattern
+    # If collection_name not set, generate from test_name or dataset basename
+    if config.collection_name:
+        collection_name = config.collection_name
+    else:
+        from recall_utils import get_recall_collection_name
+
+        test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+        collection_name = get_recall_collection_name(test_name)
     hostname = config.hostname
     sparse = config.sparse
     gpu_search = config.gpu_search
@@ -70,6 +76,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Optional pipeline steps
     enable_caption = config.enable_caption
     enable_split = config.enable_split
+    enable_image_storage = config.enable_image_storage
 
     # Text splitting configuration
     split_chunk_size = config.split_chunk_size
@@ -112,6 +119,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         pipeline_opts.append("caption")
     if enable_split:
         pipeline_opts.append(f"text split: {split_chunk_size}/{split_chunk_overlap}")
+    if enable_image_storage:
+        pipeline_opts.append("image storage")
 
     if pipeline_opts:
         print(f"Pipeline: {', '.join(pipeline_opts)}")
@@ -124,7 +133,15 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2":
         ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
 
-    ingestor = Ingestor(**ingestor_kwargs).files(data_dir)
+    # Convert directory to recursive glob pattern to handle nested directories
+    if os.path.isdir(data_dir):
+        # Use **/*.pdf to recursively match PDF files in subdirectories
+        file_pattern = os.path.join(data_dir, "**", "*.pdf")
+    else:
+        # Already a file or glob pattern
+        file_pattern = data_dir
+
+    ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
 
     # V2-only: Configure PDF splitting (server-side page splitting)
     if api_version == "v2" and pdf_split_page_count:
@@ -151,19 +168,28 @@ def main(config=None, log_path: str = "test_results") -> int:
             chunk_overlap=split_chunk_overlap,
         )
 
-    # Embed and upload (core pipeline)
-    ingestor = (
-        ingestor.embed(model_name=model_name)
-        .vdb_upload(
-            collection_name=collection_name,
-            dense_dim=dense_dim,
-            sparse=sparse,
-            gpu_search=gpu_search,
-            model_name=model_name,
-            purge_results_after_upload=False,
+    # Embed (must come before storage per pipeline ordering)
+    ingestor = ingestor.embed(model_name=model_name)
+
+    # Store images to disk (server-side image storage) - optional
+    # Note: All storage config comes from docker-compose/helm environment variables:
+    # - IMAGE_STORAGE_URI (default: s3://nv-ingest/artifacts/store/images; set to file://... to opt into disk)
+    # - IMAGE_STORAGE_PUBLIC_BASE_URL (optional HTTP gateway for object URLs)
+    if enable_image_storage:
+        ingestor = ingestor.store(
+            structured=True,
+            images=True,
         )
-        .save_to_disk(output_directory=spill_dir)
-    )
+
+    # VDB upload and save results
+    ingestor = ingestor.vdb_upload(
+        collection_name=collection_name,
+        dense_dim=dense_dim,
+        sparse=sparse,
+        gpu_search=gpu_search,
+        model_name=model_name,
+        purge_results_after_upload=False,
+    ).save_to_disk(output_directory=spill_dir)
 
     results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
     ingestion_time = time.time() - ingestion_start
@@ -247,6 +273,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "table_output_format": table_output_format,
             "enable_caption": enable_caption,
             "enable_split": enable_split,
+            "enable_image_storage": enable_image_storage,
         },
         "results": {
             "result_count": len(results),

@@ -29,7 +29,7 @@ For more information, refer to [Data Upload](data-store.md).
 
 ## How would I process unstructured images?
 
-For images that `nemoretriever-page-elements-v2` does not classify as tables, charts, or infographics, 
+For images that `nemoretriever-page-elements-v3` does not classify as tables, charts, or infographics,
 you can use our VLM caption task to create a dense caption of the detected image. 
 That caption is then be embedded along with the rest of your content. 
 For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).

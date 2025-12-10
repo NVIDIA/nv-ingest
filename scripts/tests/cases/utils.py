@@ -39,17 +39,36 @@ def get_repo_root() -> str:
     raise RuntimeError(f"Not inside a Git repository starting from {start}")
 
 
-def default_collection_name() -> str:
-    """Derive test name from dataset directory or use explicit TEST_NAME"""
+def default_collection_name(config=None) -> str:
+    """
+    Derive collection name from config or fallback to ENV vars.
 
-    dataset_dir = os.getenv("DATASET_DIR", "")
-    if dataset_dir:
-        dataset_name = os.path.basename(dataset_dir.rstrip("/"))
+    Returns deterministic collection name (no timestamp) to enable:
+    - Reusing collections across test runs
+    - Running recall evaluation after e2e ingestion
+    - Consistent collection naming with recall patterns
+
+    Args:
+        config: TestConfig object (preferred). If None, falls back to ENV vars.
+
+    Returns:
+        Collection name string (e.g., 'bo767', 'earnings_consulting')
+    """
+    if config:
+        # Use config object (preferred)
+        dataset_name = os.path.basename(config.dataset_dir.rstrip("/"))
+        test_name = config.test_name or dataset_name
     else:
-        dataset_name = "e2e"
+        # Fallback to ENV vars for backward compatibility
+        dataset_dir = os.getenv("DATASET_DIR", "")
+        if dataset_dir:
+            dataset_name = os.path.basename(dataset_dir.rstrip("/"))
+        else:
+            dataset_name = "e2e"
+        test_name = os.getenv("TEST_NAME", dataset_name)
 
-    test_name = os.getenv("TEST_NAME", dataset_name)
-    return f"{test_name}_{now_timestr()}"
+    # Return deterministic name (no timestamp) for consistency with recall patterns
+    return test_name
 
 
 def last_commit() -> str:

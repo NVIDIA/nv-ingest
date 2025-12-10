@@ -31,9 +31,8 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
             YOLOX_PAGE_CONF_THRESHOLD=0.5,
             YOLOX_PAGE_IOU_THRESHOLD=0.45,
             YOLOX_PAGE_MIN_SCORE=0.3,
-            YOLOX_PAGE_V2_NUM_CLASSES=4,
-            YOLOX_PAGE_V2_FINAL_SCORE={"table": 0.5, "chart": 0.5, "infographic": 0.5},
             YOLOX_PAGE_V2_CLASS_LABELS=["table", "chart", "infographic", "title"],
+            YOLOX_PAGE_V3_CLASS_LABELS=["table", "chart", "title", "infographic", "paragraph", "header_footer", "foo"],
         )
         self.mocked_constants = self.constants_patcher.start()
 
@@ -64,10 +63,10 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         """Test default initialization (should use v2 parameters)."""
         model = YoloxPageElementsModelInterface()
 
-        # Check that v2 parameters are used by default
-        self.assertEqual(model.num_classes, 4)
-        self.assertEqual(model.final_score, {"table": 0.5, "chart": 0.5, "infographic": 0.5})
-        self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
+        # Check that v3 parameters are used by default
+        self.assertEqual(
+            model.class_labels, ["table", "chart", "title", "infographic", "paragraph", "header_footer", "foo"]
+        )
 
     def test_inheritance(self):
         """Test that YoloxPageElementsModelInterface inherits from YoloxModelInterfaceBase."""
@@ -256,32 +255,144 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_invalid_final_score(self):
         """Test postprocess_annotations with invalid final_score."""
         # Create an instance with an invalid final_score (not a dictionary)
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", 0.5):
-            model = YoloxPageElementsModelInterface()
+        model = YoloxPageElementsModelInterface()
 
-            # Create mock annotations
-            annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
+        # Create mock annotations
+        annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
 
-            # Should raise ValueError due to invalid final_score
-            with self.assertRaises(ValueError) as context:
-                model.postprocess_annotations(annotations)
+        # Should raise ValueError due to invalid final_score
+        with self.assertRaises(ValueError) as context:
+            model.postprocess_annotations(annotations, final_score=0.5)
 
-            self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
+        self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
 
     def test_postprocess_annotations_missing_class_in_final_score(self):
         """Test postprocess_annotations with final_score missing a required class."""
         # Create an instance with final_score missing a required class
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", {"table": 0.5, "chart": 0.5}):
-            model = YoloxPageElementsModelInterface()
+        model = YoloxPageElementsModelInterface()
 
-            # Create mock annotations
-            annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
+        # Create mock annotations
+        annotations = [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}]
 
-            # Should raise ValueError due to missing class in final_score
-            with self.assertRaises(ValueError) as context:
-                model.postprocess_annotations(annotations)
+        # Should raise ValueError due to missing class in final_score
+        with self.assertRaises(ValueError) as context:
+            model.postprocess_annotations(annotations, final_score={"table": 0.5, "chart": 0.5})
 
-            self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
+        self.assertTrue("requires a dictionary of thresholds" in str(context.exception))
+
+
+class TestYoloxPageElementsV3Interface(unittest.TestCase):
+    """
+    Tests specifically for the page-elements-v3 logic path.
+    """
+
+    def setUp(self):
+        self.constants_patcher = patch.multiple(
+            MODULE_UNDER_TEST,
+            YOLOX_PAGE_CLASS_LABELS=["table", "chart", "title", "infographic", "paragraph", "header_footer"],
+            YOLOX_PAGE_V3_FINAL_SCORE={
+                "table": 0.4,
+                "chart": 0.4,
+                "infographic": 0.4,
+                "paragraph": 0.4,
+                "header_footer": 0.4,
+                "title": 0.4,
+            },
+            YOLOX_PAGE_V2_FINAL_SCORE={"table": 0.4, "chart": 0.4, "infographic": 0.4},
+        )
+        self.mocked_constants = self.constants_patcher.start()
+
+        # Mock the new v3 post-processing function to isolate testing
+        self.postprocess_v3_patcher = patch(f"{MODULE_UNDER_TEST}.postprocess_page_elements_v3")
+        self.mock_postprocess_v3 = self.postprocess_v3_patcher.start()
+        # Make it an identity function by default
+        self.mock_postprocess_v3.side_effect = lambda x, labels: x
+
+        # Mock the old v2 expansion functions to ensure they are NOT called for v3
+        self.expand_table_patcher = patch(f"{MODULE_UNDER_TEST}.expand_table_bboxes")
+        self.mock_expand_table = self.expand_table_patcher.start()
+        self.expand_chart_patcher = patch(f"{MODULE_UNDER_TEST}.expand_chart_bboxes")
+        self.mock_expand_chart = self.expand_chart_patcher.start()
+
+        self.model_interface = YoloxPageElementsModelInterface()
+        # Mock the coordinate transformation to simplify testing
+        self.model_interface.transform_normalized_coordinates_to_original = MagicMock(side_effect=lambda x, y: x)
+
+    def tearDown(self):
+        self.constants_patcher.stop()
+        self.postprocess_v3_patcher.stop()
+        self.expand_table_patcher.stop()
+        self.expand_chart_patcher.stop()
+
+    def test_postprocess_annotations_v3_path_is_taken(self):
+        v3_annotations = [
+            {
+                "table": [],
+                "chart": [],
+                "title": [],
+                "infographic": [],
+                "paragraph": [[0.1, 0.1, 0.2, 0.2, 0.9]],
+                "header_footer": [],
+            }
+        ]
+
+        self.model_interface.postprocess_annotations(v3_annotations)
+
+        self.mock_postprocess_v3.assert_called_once()
+        self.mock_expand_table.assert_not_called()
+        self.mock_expand_chart.assert_not_called()
+
+    def test_postprocess_annotations_v2_fallback_path_is_taken(self):
+        v2_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
+
+        self.model_interface.postprocess_annotations(v2_annotations)
+
+        self.mock_postprocess_v3.assert_not_called()
+        self.mock_expand_table.assert_called_once()
+        self.mock_expand_chart.assert_called_once()
+
+    def test_v3_text_class_filtering(self):
+        v3_annotations = [
+            {
+                "table": [],
+                "chart": [],
+                "infographic": [],
+                "title": [[0.1, 0.1, 0.2, 0.2, 0.9], [0.2, 0.2, 0.3, 0.3, 0.05]],
+                "paragraph": [[0.3, 0.3, 0.4, 0.4, 0.8], [0.4, 0.4, 0.5, 0.5, 0.2]],
+                "header_footer": [[0.6, 0.6, 0.7, 0.7, 0.7], [0.7, 0.7, 0.8, 0.8, 0.3]],
+            }
+        ]
+
+        # We need to mock the internal helpers of postprocess_page_elements_v3
+        # to prevent them from modifying the data in unexpected ways for this specific test.
+        # We just want them to pass the data through.
+        with patch(
+            f"{MODULE_UNDER_TEST}.remove_overlapping_boxes_using_wbf", side_effect=lambda b, c, l: (b, c, l)
+        ), patch(
+            f"{MODULE_UNDER_TEST}.match_structured_boxes_with_title", side_effect=lambda b, c, l, cl: (b, c, l, [])
+        ), patch(
+            f"{MODULE_UNDER_TEST}.expand_tables_and_charts", side_effect=lambda b, c, l, cl, ft: (b, c, l)
+        ), patch(
+            f"{MODULE_UNDER_TEST}.postprocess_included_texts", side_effect=lambda b, c, l, cl: (b, c, l)
+        ):
+
+            results = self.model_interface.postprocess_annotations(v3_annotations)
+
+        self.assertEqual(len(results), 1)
+        result_dict = results[0]
+
+        self.assertIn("paragraph", result_dict)
+        self.assertIn("header_footer", result_dict)
+        self.assertIn("title", result_dict)
+
+        self.assertEqual(len(result_dict["paragraph"]), 1)
+        self.assertEqual(result_dict["paragraph"][0][4], 0.8)
+
+        self.assertEqual(len(result_dict["header_footer"]), 1)
+        self.assertEqual(result_dict["header_footer"][0][4], 0.7)
+
+        self.assertEqual(len(result_dict["title"]), 1)
+        self.assertEqual(result_dict["title"][0][4], 0.9)
 
 
 if __name__ == "__main__":

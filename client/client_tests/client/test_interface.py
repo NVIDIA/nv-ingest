@@ -10,6 +10,7 @@ import logging
 import os
 import tempfile
 from concurrent.futures import Future
+from io import BytesIO
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -17,7 +18,7 @@ from unittest.mock import patch
 import nv_ingest_client.client.interface as module_under_test
 import pytest
 
-from client.client_tests.utilities_for_test import (
+from client_tests.utilities_for_test import (
     cleanup_test_workspace,
     create_test_workspace,
     get_git_root,
@@ -127,6 +128,12 @@ def text_documents():
         "data/test.md",
         "data/test.sh",
     ]
+
+
+@pytest.fixture
+def buffers(documents, text_documents):
+    all_documents = documents + text_documents
+    return [(doc, BytesIO(open(doc, "rb").read())) for doc in all_documents]
 
 
 @pytest.fixture
@@ -241,6 +248,18 @@ def test_extract_task_text_filetypes(text_documents):
         )
 
 
+def test_extract_task_buffers(buffers):
+    for buffer in buffers:
+        Ingestor(client=mock_client).buffers([buffer]).extract(
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_images=False,
+            extract_infographics=False,
+            document_type=buffer[0].split(".")[1],
+        )
+
+
 def test_filter_task_no_args(ingestor):
     ingestor.filter()
 
@@ -278,11 +297,12 @@ def test_store_task_no_args(ingestor):
 
 
 def test_store_task_some_args(ingestor):
-    ingestor.store(store_method="s3")
+    ingestor.store(storage_uri="s3://bucket/assets", public_base_url="http://public")
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, StoreTask)
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket/assets"
+    assert task._public_base_url == "http://public"
 
 
 def test_store_embed_task_no_args(ingestor):
@@ -456,28 +476,101 @@ def test_ingest_return_failures(ingestor, mock_client):
         mock_client.fetch_job_result.assert_not_called()
 
 
-def test_ingest_async(ingestor, mock_client):
+def _make_mock_processor(desired_results, desired_failures=None, desired_traces=None):
+    if desired_failures is None:
+        desired_failures = []
+
+    if desired_traces is None:
+        desired_traces = []
+
+    proc_future = Future()
+    proc_future.set_result((desired_results, desired_failures, desired_traces))
+
+    mock_proc = MagicMock()
+    mock_proc.run_async.return_value = proc_future
+    return mock_proc
+
+
+def test_ingest_async_returns_success_list(monkeypatch, ingestor, mock_client):
     mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
 
-    future1 = Future()
-    future2 = Future()
-    future1.set_result("result_1")
-    future2.set_result("result_2")
-    mock_client.submit_job_async.return_value = {
-        future1: "job_id_1",
-        future2: "job_id_2",
-    }
+    proc_future = Future()
+    mock_results = ["result_1", "result_2"]
+    proc_future.set_result((mock_results, [], []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
 
-    ingestor._job_states = {}
-    ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
-    ingestor._job_states["job_id_2"] = MagicMock(state=JobStateEnum.FAILED)
+    future = ingestor.ingest_async()
+    result = future.result(timeout=1)
 
-    mock_client.fetch_job_result.side_effect = lambda job_id, *args, **kwargs: (
-        ["result_1"] if job_id == "job_id_1" else ["result_2"]
-    )
+    assert result == mock_results
+    mock_client.process_jobs_concurrently_async.assert_called_once()
 
-    combined_result = ingestor.ingest_async(timeout=15).result()
-    assert combined_result == ["result_1", "result_2"]
+
+def test_ingest_async_with_failures(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+
+    mock_successes = ["result_1"]
+    mock_failures = [("job_id_2", "boom")]
+
+    proc_future = Future()
+    proc_future.set_result((mock_successes, mock_failures, []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    future = ingestor.ingest_async(return_failures=True)
+    results, returned_failures = future.result(timeout=1)
+
+    assert results == mock_successes
+    assert returned_failures == mock_failures
+    mock_client.process_jobs_concurrently_async.assert_called_once()
+
+
+def test_ingest_async_with_vdb_upload(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+
+    mock_vdb_op = MagicMock(spec=Milvus)
+    ingestor.vdb_upload(vdb_op=mock_vdb_op)
+
+    proc_future = Future()
+    mock_results = ["result_1", "result_2"]
+    proc_future.set_result((mock_results, [], []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    future = ingestor.ingest_async()
+    result = future.result(timeout=2)
+
+    assert result == mock_results
+
+    mock_client.process_jobs_concurrently_async.assert_called_once()
+
+    mock_vdb_op.run_async.assert_called_once()
+    vdb_arg_future = mock_vdb_op.run_async.call_args[0][0]
+    assert isinstance(vdb_arg_future, Future)
+    assert vdb_arg_future.result() == mock_results
+
+
+def test_ingest_async_dynamic_return_values(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    mock_results = ["result_1", "result_2"]
+    mock_failures = [("error_1", "msg")]
+    mock_traces = [{"trace": "data"}]
+
+    # --- Test Case 1: return_failures=True ---
+    proc_future_1 = Future()
+    proc_future_1.set_result((mock_results, mock_failures, []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future_1
+
+    future_case_1 = ingestor.ingest_async(return_failures=True)
+    assert future_case_1.result(timeout=1) == (mock_results, mock_failures)
+
+    # --- Test Case 2: return_failures=True, return_traces=True ---
+    proc_future_2 = Future()
+    proc_future_2.set_result((mock_results, mock_failures, mock_traces))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future_2
+
+    future_case_2 = ingestor.ingest_async(return_failures=True, return_traces=True)
+    assert future_case_2.result(timeout=1) == (mock_results, mock_failures, mock_traces)
 
 
 def test_create_client(ingestor):
@@ -514,6 +607,39 @@ def test_job_state_counting(ingestor):
     assert ingestor.failed_jobs() == 1
     assert ingestor.cancelled_jobs() == 1
     assert ingestor.remaining_jobs() == 0  # All jobs are in terminal states
+
+
+def test_get_status(ingestor):
+    ingestor._job_states = {
+        "job_1": MagicMock(state=JobStateEnum.SUBMITTED),
+        "job_2": MagicMock(state=JobStateEnum.SUBMITTED_ASYNC),
+        "job_3": MagicMock(state=JobStateEnum.PENDING),
+        "job_4": MagicMock(state=JobStateEnum.PROCESSING),
+        "job_5": MagicMock(state=JobStateEnum.FAILED),
+        "job_6": MagicMock(state=JobStateEnum.CANCELLED),
+        "job_7": MagicMock(state=JobStateEnum.COMPLETED),
+    }
+
+    ingestor._client._job_index_to_job_spec = {
+        "job_1": MagicMock(source_name="job_1"),
+        "job_2": MagicMock(source_name="job_2"),
+        "job_3": MagicMock(source_name="job_3"),
+        "job_4": MagicMock(source_name="job_4"),
+        "job_5": MagicMock(source_name="job_5"),
+        "job_6": MagicMock(source_name="job_6"),
+        "job_7": MagicMock(source_name="job_7"),
+    }
+    print(ingestor.get_status())
+
+    assert ingestor.get_status() == {
+        "job_1": "submitted",
+        "job_2": "submitted",
+        "job_3": "pending",
+        "job_4": "processing",
+        "job_5": "failed",
+        "job_6": "cancelled",
+        "job_7": "completed",
+    }
 
 
 @patch("glob.glob")

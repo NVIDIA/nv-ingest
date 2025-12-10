@@ -29,8 +29,9 @@ The following diagram shows the Nemo Retriever extraction pipeline.
 1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#library-mode-quickstart)
-4. [GitHub Repository Structure](#nv-ingest-repository-structure)
-5. [Notices](#notices)
+4. [Benchmarking](#benchmarking)
+5. [GitHub Repository Structure](#nv-ingest-repository-structure)
+6. [Notices](#notices)
 
 
 ## What NeMo Retriever Extraction Is
@@ -295,6 +296,44 @@ Please keep in mind that this response is purely humorous and interpretative, as
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
+
+## Benchmarking
+
+nv-ingest includes a comprehensive testing framework for benchmarking performance and evaluating retrieval accuracy.
+
+### Quick Start
+
+```bash
+cd scripts/tests
+
+# Run end-to-end benchmark
+python run.py --case=e2e --dataset=bo767
+
+# Evaluate retrieval accuracy
+python run.py --case=e2e_recall --dataset=bo767
+```
+
+### Available Benchmarks
+
+- **End-to-End Performance** - Measure ingestion throughput, latency, and resource utilization
+- **Retrieval Accuracy** - Evaluate recall@k metrics against ground truth datasets
+- **MIG Benchmarking** - Test performance with NVIDIA Multi-Instance GPU (MIG) configurations
+
+### Documentation
+
+- **[Testing Framework Guide](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/)** - Complete guide to benchmarking and testing nv-ingest (same as `scripts/tests/README.md`)
+- **[MIG Benchmarking](https://docs.nvidia.com/nemo/retriever/extraction/mig-benchmarking/)** - GPU partitioning for multi-tenant deployments on Kubernetes/Helm
+
+### Benchmark Datasets
+
+- **bo767** - 767 PDF documents with ground truth for recall evaluation
+- **bo20** - 20 PDF documents for quick validation
+- **single** - singular multimodal pdf for quick validation
+- **earnings** - earnings reports ppt and pdf dataset
+-- **financebench** - financial data
+- **Custom datasets** - Use your own datasets with the testing framework
+
+For more information, see the [benchmarking documentation](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/).
 
 
 ## GitHub Repository Structure

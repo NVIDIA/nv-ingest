@@ -100,7 +100,9 @@ class IngestTaskStoreEmbedSchema(BaseModelNoExt):
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
-    method: str
+    storage_uri: Optional[str] = None
+    storage_options: dict = Field(default_factory=dict)
+    public_base_url: Optional[str] = None
     params: dict = Field(default_factory=dict)
 
 
@@ -146,6 +148,7 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
     audio_elements_modality: Optional[str] = None
     custom_content_field: Optional[str] = None
     result_target_field: Optional[str] = None
+    dimensions: Optional[int] = None
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
@@ -175,6 +178,10 @@ class IngestTaskChartExtraction(BaseModelNoExt):
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
+    params: dict = Field(default_factory=dict)
+
+
+class IngestTaskOCRExtraction(BaseModelNoExt):
     params: dict = Field(default_factory=dict)
 
 
@@ -228,6 +235,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
+        IngestTaskOCRExtraction,
         IngestTaskUDFSchema,
     ]
     raise_on_failure: bool = False
@@ -260,6 +268,7 @@ class IngestTaskSchema(BaseModelNoExt):
             TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
             TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
             TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            TaskTypeEnum.OCR_DATA_EXTRACT: IngestTaskOCRExtraction,
             TaskTypeEnum.UDF: IngestTaskUDFSchema,
         }
 

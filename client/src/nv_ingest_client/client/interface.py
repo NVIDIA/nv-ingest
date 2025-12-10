@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import threading
+from io import BytesIO
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -52,6 +53,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
+from nv_ingest_client.util.file_processing.extract import EXTENSION_TO_DOCUMENT_TYPE
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
@@ -224,6 +226,7 @@ class Ingestor:
         **kwargs,
     ):
         self._documents = documents or []
+        self._buffers = []
         self._client = client
         self._job_queue_id = job_queue_id
         self._vdb_bulk_upload = None
@@ -349,6 +352,28 @@ class Ingestor:
         if self._check_files_local():
             self._job_specs = BatchJobSpec(self._documents)
             self._all_local = True
+
+        return self
+
+    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "Ingestor":
+        """
+        Add buffers for processing.
+
+        Parameters
+        ----------
+        buffers : List[Tuple[str, BytesIO]]
+            List of tuples containing the name of the buffer and the BytesIO object.
+        """
+        if (
+            isinstance(buffers, tuple)
+            and len(buffers) == 2
+            and isinstance(buffers[0], str)
+            and isinstance(buffers[1], BytesIO)
+        ):
+            buffers = [buffers]
+        self._buffers.extend(buffers)
+        self._job_specs = BatchJobSpec(self._buffers)
+        self._all_local = True
 
         return self
 
@@ -669,55 +694,133 @@ class Ingestor:
 
         return tuple(returns) if len(returns) > 1 else results
 
-    def ingest_async(self, **kwargs: Any) -> Future:
+    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **kwargs: Any) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
+        The return type of the future's result is dynamic and mirrors the behavior of the synchronous
+        `ingest()` method, controlled by the `return_failures` and `return_traces` flags. If a VDB
+        upload is configured, the future will complete *after* the VDB upload finishes.
+
         Parameters
         ----------
+        return_failures : bool, optional
+            If True, return a tuple containing failures; otherwise, only return results. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
         kwargs : dict
-            Additional parameters for the `submit_job_async` method.
+            Additional parameters passed to the concurrent processor.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        Future
-            A future that completes when all submitted jobs have reached a terminal state.
+        Future[Union[List[Any], Tuple[Any, ...]]]
+            A future that completes when all jobs and any subsequent VDB upload
+            have finished. Its result will be one of the following:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+
         """
-        self._prepare_ingest_run()
+        try:
+            self._prepare_ingest_run()
 
-        self._job_ids = self._client.add_job(self._job_specs)
+            # Add jobs locally first
+            if self._job_specs is None:
+                raise RuntimeError("Job specs missing for ingest_async.")
+            self._job_ids = self._client.add_job(self._job_specs)
+            self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
-        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
-        self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
+            proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently_async, **kwargs)
 
-        combined_future = Future()
-        submitted_futures = set(future_to_job_id.keys())
-        completed_futures = set()
-        future_results = []
+            final_future: Future = Future()
 
-        def _done_callback(future):
-            job_id = future_to_job_id[future]
-            job_state = self._job_states[job_id]
-            try:
-                result = self._client.fetch_job_result(job_id)
-                if job_state.state != JobStateEnum.COMPLETED:
-                    job_state.state = JobStateEnum.COMPLETED
-            except Exception:
-                result = None
-                if job_state.state != JobStateEnum.FAILED:
-                    job_state.state = JobStateEnum.FAILED
-            completed_futures.add(future)
-            future_results.extend(result)
-            if completed_futures == submitted_futures:
-                combined_future.set_result(future_results)
+            processor_future = self._client.process_jobs_concurrently_async(
+                job_indices=self._job_ids,
+                job_queue_id=self._job_queue_id,
+                return_traces=return_traces,
+                **proc_kwargs,
+            )
 
-        for future in future_to_job_id:
-            future.add_done_callback(_done_callback)
+            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
 
-        if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future.result())
+            def _processor_done_callback(proc_future: Future):
+                """Callback to handle completion, VDB upload, and final result setting."""
+                try:
+                    if proc_future.cancelled():
+                        if not final_future.done():
+                            final_future.cancel()
+                        return
+                    if proc_future.exception():
+                        if not final_future.done():
+                            final_future.set_exception(proc_future.exception())
+                        return
 
-        return combined_future
+                    results, failures, traces_list = proc_future.result()
+
+                    failed_job_ids = set()
+                    for job_id_with_source, error_msg in failures:
+                        job_id = job_id_with_source.split(":", 1)[0]
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.FAILED:
+                                self._job_states[job_id].state = JobStateEnum.FAILED
+                            failed_job_ids.add(job_id)
+
+                    all_submitted_job_ids = set(self._job_ids)
+                    successful_job_ids = all_submitted_job_ids - failed_job_ids
+
+                    for job_id in successful_job_ids:
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.COMPLETED:
+                                self._job_states[job_id].state = JobStateEnum.COMPLETED
+
+                    if self._vdb_bulk_upload and results:
+                        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
+                            results_future = Future()
+                            results_future.set_result(results)
+                            vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
+                            vdb_future.result()
+
+                    parent_trace_ids = (
+                        self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+                    )
+
+                    returns = [results]
+                    if return_failures:
+                        returns.append(failures)
+                    if return_traces:
+                        returns.append(traces_list)
+                    if include_parent_trace_ids:
+                        returns.append(parent_trace_ids)
+
+                    final_result = tuple(returns) if len(returns) > 1 else results
+
+                    if not final_future.done():
+                        final_future.set_result(final_result)
+
+                except Exception as e:
+                    logger.exception("Error in ingest_async processor callback")
+                    if not final_future.done():
+                        final_future.set_exception(e)
+                finally:
+                    final_state = JobStateEnum.CANCELLED if proc_future.cancelled() else JobStateEnum.FAILED
+                    for job_state in self._job_states.values():
+                        if (
+                            job_state.state not in [JobStateEnum.COMPLETED, JobStateEnum.FAILED]
+                            and job_state.state != final_state
+                        ):
+                            job_state.state = final_state
+
+            processor_future.add_done_callback(_processor_done_callback)
+            return final_future
+
+        except Exception as setup_err:
+            logger.exception("Failed during synchronous setup of ingest_async")
+            error_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = Future()
+            error_future.set_exception(setup_err)
+            return error_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):
@@ -834,6 +937,7 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
+        table_output_format = kwargs.pop("table_output_format", "markdown")
 
         # Defaulting to False since enabling infographic extraction reduces throughput.
         # Users have to set to True if infographic extraction is required.
@@ -856,14 +960,22 @@ class Ingestor:
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
                 extract_page_as_image=extract_page_as_image,
+                table_output_format=table_output_format,
                 **kwargs,
             )
+
+            api_document_type = EXTENSION_TO_DOCUMENT_TYPE.get(document_type.lower(), document_type)
 
             # Extract method from task_options for API schema
             method = task_options.pop("extract_method", None)
             if method is None:
                 # Let ExtractTask constructor handle default method selection
-                method = "pdfium"  # Default fallback
+                if api_document_type == "docx":
+                    method = "python_docx"
+                elif api_document_type == "pptx":
+                    method = "python_pptx"
+                else:
+                    method = "pdfium"  # Default fallback
 
             # Build params dict for API schema
             params = {k: v for k, v in task_options.items() if k != "document_type"}
@@ -984,13 +1096,9 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        # Handle parameter name mapping: store_method -> method for API schema
-        if "store_method" in kwargs:
-            kwargs["method"] = kwargs.pop("store_method")
-
-        # Provide default method if not specified (matching client StoreTask behavior)
-        if "method" not in kwargs:
-            kwargs["method"] = "minio"
+        deprecated_method = kwargs.pop("store_method", None)
+        if deprecated_method is not None:
+            logger.warning("`store_method` is deprecated and no longer used. Configure storage_uri instead.")
 
         task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
 
@@ -998,7 +1106,9 @@ class Ingestor:
         store_params = {
             "structured": task_options.structured,
             "images": task_options.images,
-            "store_method": task_options.method,  # Map method back to store_method
+            "storage_uri": task_options.storage_uri,
+            "storage_options": task_options.storage_options,
+            "public_base_url": task_options.public_base_url,
             "params": task_options.params,
         }
         store_task = StoreTask(**store_params)
@@ -1359,3 +1469,85 @@ class Ingestor:
         terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
 
         return len(self._job_states) - terminal_jobs
+
+    def get_status(self) -> Dict[str, str]:
+        """
+        Returns a dictionary mapping document identifiers to their current status in the pipeline.
+
+        This method is designed for use with async ingestion to poll the status of submitted jobs.
+        For each document submitted to the ingestor, the method returns its current processing state.
+
+        Returns
+        -------
+        Dict[str, str]
+            A dictionary where:
+            - Keys are document identifiers (source names or source IDs)
+            - Values are status strings representing the current state:
+              * "pending": Job created but not yet submitted
+              * "submitted": Job submitted and waiting for processing
+              * "processing": Job is currently being processed
+              * "completed": Job finished successfully
+              * "failed": Job encountered an error
+              * "cancelled": Job was cancelled
+              * "unknown": Job state could not be determined (initial state)
+
+        Examples
+        --------
+        >>> ingestor = Ingestor(documents=["doc1.pdf", "doc2.pdf"], client=client)
+        >>> ingestor.extract().embed()
+        >>> future = ingestor.ingest_async()
+        >>>
+        >>> # Poll status while processing
+        >>> status = ingestor.get_status()
+        >>> print(status)
+        {'doc1.pdf': 'processing', 'doc2.pdf': 'submitted'}
+        >>>
+        >>> # Check again after some time
+        >>> status = ingestor.get_status()
+        >>> print(status)
+        {'doc1.pdf': 'completed', 'doc2.pdf': 'processing'}
+
+        Notes
+        -----
+        - This method is most useful when called after `ingest_async()` to track progress
+        - If called before any jobs are submitted, returns an empty dictionary or
+          documents with "unknown" status
+        - The method accesses internal job state from the client, so it reflects
+          the most current known state
+        """
+        status_dict = {}
+
+        if not self._job_states:
+            # If job states haven't been initialized yet (before ingest_async is called)
+            # Return unknown status for all documents
+            for doc in self._documents:
+                doc_name = os.path.basename(doc) if isinstance(doc, str) else str(doc)
+                status_dict[doc_name] = "unknown"
+            return status_dict
+
+        # Map job IDs to their states and source identifiers
+        for job_id, job_state in self._job_states.items():
+            # Get the job spec to find the source identifier
+            job_spec = self._client._job_index_to_job_spec.get(job_id)
+
+            if job_spec:
+                # Use source_name as the key (the document name)
+                source_identifier = job_spec.source_name
+            else:
+                # Fallback to job_id if we can't find the spec
+                source_identifier = f"job_{job_id}"
+
+            # Map the JobStateEnum to a user-friendly string
+            state_mapping = {
+                JobStateEnum.PENDING: "pending",
+                JobStateEnum.SUBMITTED_ASYNC: "submitted",
+                JobStateEnum.SUBMITTED: "submitted",
+                JobStateEnum.PROCESSING: "processing",
+                JobStateEnum.COMPLETED: "completed",
+                JobStateEnum.FAILED: "failed",
+                JobStateEnum.CANCELLED: "cancelled",
+            }
+
+            status_dict[source_identifier] = state_mapping.get(job_state.state, "unknown")
+
+        return status_dict

@@ -15,11 +15,13 @@ import os
 import pandas as pd
 import pytest
 from unittest.mock import Mock, patch
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.chat.chat_completion import Choice
 
 # Import the UDF functions from API udfs location
 from udfs.llm_summarizer_udf import content_summarizer, _extract_content, _store_summary
+
+pytest.importorskip("openai")
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice
 
 
 class MockIngestControlMessage:

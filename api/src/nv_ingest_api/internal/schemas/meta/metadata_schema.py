@@ -151,7 +151,7 @@ class TextMetadataSchema(BaseModelNoExt):
     keywords: Union[str, List[str], Dict] = ""
     """Keywords, named entities, or other phrases."""
 
-    language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
+    language: LanguageEnum = LanguageEnum.EN  # default to Unknown? Maybe do some kind of heuristic check
     """The language of the content."""
 
     text_location: tuple = (0, 0, 0, 0)
@@ -244,7 +244,7 @@ class TableMetadataSchema(BaseModelNoExt):
 
 class ChartMetadataSchema(BaseModelNoExt):
     """
-    The schema for extracted chart content.
+    The schema for table content extracted from charts.
     """
 
     caption: str = ""

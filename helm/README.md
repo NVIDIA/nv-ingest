@@ -61,11 +61,11 @@ helm upgrade \
 > The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
 >
 > ```bash
-> --set redis.image.repository=redis \
-> --set redis.image.tag=8.2.1 \
+> --set redis.image.repository=bitnamilegacy/redis \
+> --set redis.image.tag=8.2.1-debian-12-r0 \
 > ```
 >
-> This uses the Bitnami Redis 8.2.1 image. Adjust the tag as needed for your environment.
+> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
 
 > [!NOTE]
 > For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default paddleocr-nim.
@@ -301,7 +301,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.9.0 |
 | alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.7.0 |
 | alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.4.0 |
-| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.4.0 |
+| alias:nvidia-nim | nemoretriever-page-elements-v3(nvidia-nim-nemoretriever-page-elements-v3) | 1.7.0 |
 | alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.4.0 |
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
@@ -358,8 +358,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |
-| envVars.YOLOX_GRPC_ENDPOINT | string | `"nemoretriever-page-elements-v2:8001"` |  |
-| envVars.YOLOX_HTTP_ENDPOINT | string | `"http://nemoretriever-page-elements-v2:8000/v1/infer"` |  |
+| envVars.YOLOX_GRPC_ENDPOINT | string | `"nemoretriever-page-elements-v3:8001"` |  |
+| envVars.YOLOX_HTTP_ENDPOINT | string | `"http://nemoretriever-page-elements-v3:8000/v1/infer"` |  |
 | envVars.YOLOX_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT | string | `"nemoretriever-table-structure-v1:8001"` |  |
 | envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT | string | `"http://nemoretriever-table-structure-v1:8000/v1/infer"` |  |
@@ -371,7 +371,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.6.2"` |  |
+| image.tag | string | `"latest"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -501,34 +501,34 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-ocr.serviceAccount.create | bool | `false` |  |
 | nemoretriever-ocr.serviceAccount.name | string | `""` |  |
 | nemoretriever-ocr.statefuleSet.enabled | bool | `false` |  |
-| nemoretriever-page-elements-v2.autoscaling.enabled | bool | `false` |  |
-| nemoretriever-page-elements-v2.autoscaling.maxReplicas | int | `10` |  |
-| nemoretriever-page-elements-v2.autoscaling.metrics | list | `[]` |  |
-| nemoretriever-page-elements-v2.autoscaling.minReplicas | int | `1` |  |
-| nemoretriever-page-elements-v2.deployed | bool | `true` |  |
-| nemoretriever-page-elements-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
-| nemoretriever-page-elements-v2.env[0].value | string | `"8000"` |  |
-| nemoretriever-page-elements-v2.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
-| nemoretriever-page-elements-v2.env[1].value | string | `"vram_opt"` |  |
-| nemoretriever-page-elements-v2.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
-| nemoretriever-page-elements-v2.env[2].value | string | `"768"` |  |
-| nemoretriever-page-elements-v2.image.pullPolicy | string | `"IfNotPresent"` |  |
-| nemoretriever-page-elements-v2.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v2"` |  |
-| nemoretriever-page-elements-v2.image.tag | string | `"1.4.0"` |  |
-| nemoretriever-page-elements-v2.nim.grpcPort | int | `8001` |  |
-| nemoretriever-page-elements-v2.nim.logLevel | string | `"INFO"` |  |
-| nemoretriever-page-elements-v2.podSecurityContext.fsGroup | int | `1000` |  |
-| nemoretriever-page-elements-v2.podSecurityContext.runAsGroup | int | `1000` |  |
-| nemoretriever-page-elements-v2.podSecurityContext.runAsUser | int | `1000` |  |
-| nemoretriever-page-elements-v2.replicaCount | int | `1` |  |
-| nemoretriever-page-elements-v2.service.grpcPort | int | `8001` |  |
-| nemoretriever-page-elements-v2.service.httpPort | int | `8000` |  |
-| nemoretriever-page-elements-v2.service.metricsPort | int | `0` |  |
-| nemoretriever-page-elements-v2.service.name | string | `"nemoretriever-page-elements-v2"` |  |
-| nemoretriever-page-elements-v2.service.type | string | `"ClusterIP"` |  |
-| nemoretriever-page-elements-v2.serviceAccount.create | bool | `false` |  |
-| nemoretriever-page-elements-v2.serviceAccount.name | string | `""` |  |
-| nemoretriever-page-elements-v2.statefuleSet.enabled | bool | `false` |  |
+| nemoretriever-page-elements-v3.autoscaling.enabled | bool | `false` |  |
+| nemoretriever-page-elements-v3.autoscaling.maxReplicas | int | `10` |  |
+| nemoretriever-page-elements-v3.autoscaling.metrics | list | `[]` |  |
+| nemoretriever-page-elements-v3.autoscaling.minReplicas | int | `1` |  |
+| nemoretriever-page-elements-v3.deployed | bool | `true` |  |
+| nemoretriever-page-elements-v3.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nemoretriever-page-elements-v3.env[0].value | string | `"8000"` |  |
+| nemoretriever-page-elements-v3.env[1].name | string | `"NIM_TRITON_OPTIMIZATION_MODE"` |  |
+| nemoretriever-page-elements-v3.env[1].value | string | `"vram_opt"` |  |
+| nemoretriever-page-elements-v3.env[2].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
+| nemoretriever-page-elements-v3.env[2].value | string | `"768"` |  |
+| nemoretriever-page-elements-v3.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nemoretriever-page-elements-v3.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v3"` |  |
+| nemoretriever-page-elements-v3.image.tag | string | `"1.7.0"` |  |
+| nemoretriever-page-elements-v3.nim.grpcPort | int | `8001` |  |
+| nemoretriever-page-elements-v3.nim.logLevel | string | `"INFO"` |  |
+| nemoretriever-page-elements-v3.podSecurityContext.fsGroup | int | `1000` |  |
+| nemoretriever-page-elements-v3.podSecurityContext.runAsGroup | int | `1000` |  |
+| nemoretriever-page-elements-v3.podSecurityContext.runAsUser | int | `1000` |  |
+| nemoretriever-page-elements-v3.replicaCount | int | `1` |  |
+| nemoretriever-page-elements-v3.service.grpcPort | int | `8001` |  |
+| nemoretriever-page-elements-v3.service.httpPort | int | `8000` |  |
+| nemoretriever-page-elements-v3.service.metricsPort | int | `0` |  |
+| nemoretriever-page-elements-v3.service.name | string | `"nemoretriever-page-elements-v3"` |  |
+| nemoretriever-page-elements-v3.service.type | string | `"ClusterIP"` |  |
+| nemoretriever-page-elements-v3.serviceAccount.create | bool | `false` |  |
+| nemoretriever-page-elements-v3.serviceAccount.name | string | `""` |  |
+| nemoretriever-page-elements-v3.statefuleSet.enabled | bool | `false` |  |
 | nemoretriever-table-structure-v1.autoscaling.enabled | bool | `false` |  |
 | nemoretriever-table-structure-v1.autoscaling.maxReplicas | int | `10` |  |
 | nemoretriever-table-structure-v1.autoscaling.metrics | list | `[]` |  |
@@ -757,9 +757,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | riva-nim.env[0].value | string | `"9000"` |  |
 | riva-nim.env[1].name | string | `"NIM_TAGS_SELECTOR"` |  |
-| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"` |  |
+| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
 | riva-nim.fullnameOverride | string | `"nv-ingest-riva-nim"` |  |
-| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us"` |  |
 | riva-nim.image.tag | string | `"1.3.0"` |  |
 | riva-nim.nim.grpcPort | int | `50051` |  |
 | riva-nim.nim.logLevel | string | `"INFO"` |  |

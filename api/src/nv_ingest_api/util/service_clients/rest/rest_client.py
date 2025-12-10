@@ -10,7 +10,9 @@ from urllib.parse import urlparse
 
 import requests
 
-from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
+from nv_ingest_api.internal.schemas.message_brokers.response_schema import (
+    ResponseSchema,
+)
 from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
@@ -127,7 +129,10 @@ class RestClient(MessageBrokerClientBase):
         self._default_read_timeout: Optional[float] = default_read_timeout
         self._http_allocator: Optional[Callable[[], Any]] = http_allocator
 
-        self._timeout: Tuple[float, Optional[float]] = (self._default_connect_timeout, default_read_timeout)
+        self._timeout: Tuple[float, Optional[float]] = (
+            self._default_connect_timeout,
+            default_read_timeout,
+        )
 
         if self._http_allocator is None:
             self._client: Any = requests.Session()
@@ -151,7 +156,7 @@ class RestClient(MessageBrokerClientBase):
         # Validate and normalize API version to prevent misconfiguration
         # Default to v1 for backwards compatibility if not explicitly provided
         VALID_API_VERSIONS = {"v1", "v2"}
-        raw_api_version = kwargs.get("api_version", "v1")
+        raw_api_version = kwargs.get("api_version", "v2")
         api_version = str(raw_api_version).strip().lower()
 
         if api_version not in VALID_API_VERSIONS:
@@ -285,7 +290,10 @@ class RestClient(MessageBrokerClientBase):
             - response_code = 0 indicates success (HTTP status code < 400).
             - response_code = 1 indicates failure, with details in response_reason.
         """
-        ping_timeout: Tuple[float, float] = (min(self._default_connect_timeout, 5.0), 10.0)
+        ping_timeout: Tuple[float, float] = (
+            min(self._default_connect_timeout, 5.0),
+            10.0,
+        )
         logger.debug(f"Attempting to ping server at {self._base_url} with timeout {ping_timeout}")
         try:
             if isinstance(self._client, requests.Session):
@@ -357,7 +365,11 @@ class RestClient(MessageBrokerClientBase):
             try:
                 if isinstance(self._client, requests.Session):
                     with self._client.get(
-                        url, timeout=req_timeout, headers=headers, stream=True, auth=self._auth
+                        url,
+                        timeout=req_timeout,
+                        headers=headers,
+                        stream=True,
+                        auth=self._auth,
                     ) as result:
                         response_code = result.status_code
                         response_text = result.text
@@ -366,7 +378,10 @@ class RestClient(MessageBrokerClientBase):
                             error_reason: str = f"Terminal response code {response_code} fetching {job_id}."
                             logger.error(f"{error_reason} Response: {response_text[:200]}")
                             return ResponseSchema(
-                                response_code=1, response_reason=error_reason, response=response_text, trace_id=trace_id
+                                response_code=1,
+                                response_reason=error_reason,
+                                response=response_text,
+                                trace_id=trace_id,
                             )
                         elif response_code == 200:
                             try:
@@ -374,17 +389,24 @@ class RestClient(MessageBrokerClientBase):
                                     "utf-8"
                                 )
                                 return ResponseSchema(
-                                    response_code=0, response_reason="OK", response=full_response, trace_id=trace_id
+                                    response_code=0,
+                                    response_reason="OK",
+                                    response=full_response,
+                                    trace_id=trace_id,
                                 )
                             except Exception as e:
                                 logger.error(f"Stream processing error for {job_id}: {e}")
                                 return ResponseSchema(
-                                    response_code=1, response_reason=f"Stream processing error: {e}", trace_id=trace_id
+                                    response_code=1,
+                                    response_reason=f"Stream processing error: {e}",
+                                    trace_id=trace_id,
                                 )
                         elif response_code == 202:
                             logger.debug(f"Job {job_id} not ready (202)")
                             return ResponseSchema(
-                                response_code=2, response_reason="Job not ready yet. Retry later.", trace_id=trace_id
+                                response_code=2,
+                                response_reason="Job not ready yet. Retry later.",
+                                trace_id=trace_id,
                             )
                         else:
                             logger.warning(f"Unexpected status {response_code} for {job_id}. Retrying if possible.")
@@ -488,7 +510,10 @@ class RestClient(MessageBrokerClientBase):
                         error_reason: str = f"Terminal response code {response_code} submitting job."
                         logger.error(f"{error_reason} Response: {response_text[:200]}")
                         return ResponseSchema(
-                            response_code=1, response_reason=error_reason, response=response_text, trace_id=trace_id
+                            response_code=1,
+                            response_reason=error_reason,
+                            response=response_text,
+                            trace_id=trace_id,
                         )
                     elif response_code == 200:
                         server_job_id_raw: str = response_text

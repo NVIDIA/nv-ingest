@@ -30,6 +30,7 @@ class TextEmbeddingSchema(BaseModel):
     audio_elements_modality: str = Field(default="text")
     custom_content_field: Optional[str] = None
     result_target_field: Optional[str] = None
+    dimensions: Optional[int] = None
 
     model_config = ConfigDict(extra="forbid")
 
