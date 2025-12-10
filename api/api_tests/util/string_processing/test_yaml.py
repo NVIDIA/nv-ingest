@@ -316,8 +316,8 @@ stages:
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|""
         nemoretriever_parse_endpoints: [
-          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
+          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
+          $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
         ]
 """
         with patch.dict(os.environ, {"NGC_API_KEY": "secret-key", "YOLOX_GRPC_ENDPOINT": "prod-yolox:9001"}):

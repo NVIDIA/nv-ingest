@@ -101,7 +101,7 @@ jobs:
           AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
           AUDIO_INFER_PROTOCOL: http
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
-          NEMORETRIEVER_PARSE_MODEL_NAME: ${{ secrets.NEMORETRIEVER_PARSE_MODEL_NAME }}
+          NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
           NGC_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           OCR_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}

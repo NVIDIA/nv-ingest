@@ -59,10 +59,10 @@ from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)
 
-NEMORETRIEVER_PARSE_RENDER_DPI = 300
-NEMORETRIEVER_PARSE_MAX_WIDTH = 1024
-NEMORETRIEVER_PARSE_MAX_HEIGHT = 1280
-NEMORETRIEVER_PARSE_MAX_BATCH_SIZE = 8
+NEMOTRON_PARSE_RENDER_DPI = 300
+NEMOTRON_PARSE_MAX_WIDTH = 1024
+NEMOTRON_PARSE_MAX_HEIGHT = 1280
+NEMOTRON_PARSE_MAX_BATCH_SIZE = 8
 
 
 # Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
@@ -228,8 +228,8 @@ def nemoretriever_parse_extractor(
 
             page.close()
 
-            # Whenever pages_as_images hits NEMORETRIEVER_PARSE_MAX_BATCH_SIZE, submit a job
-            if (extract_text) and (len(pages_for_ocr) >= NEMORETRIEVER_PARSE_MAX_BATCH_SIZE):
+            # Whenever pages_as_images hits NEMOTRON_PARSE_MAX_BATCH_SIZE, submit a job
+            if (extract_text) and (len(pages_for_ocr) >= NEMOTRON_PARSE_MAX_BATCH_SIZE):
                 future_parser = executor.submit(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                     pages_for_ocr[:],  # pass a copy
@@ -325,10 +325,10 @@ def nemoretriever_parse_extractor(
             txt = bbox_dict["text"]
 
             transformed_bbox = [
-                math.floor(bbox["xmin"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
-                math.floor(bbox["ymin"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
-                math.ceil(bbox["xmax"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
-                math.ceil(bbox["ymax"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
+                math.floor(bbox["xmin"] * NEMOTRON_PARSE_MAX_WIDTH),
+                math.floor(bbox["ymin"] * NEMOTRON_PARSE_MAX_HEIGHT),
+                math.ceil(bbox["xmax"] * NEMOTRON_PARSE_MAX_WIDTH),
+                math.ceil(bbox["ymax"] * NEMOTRON_PARSE_MAX_HEIGHT),
             ]
 
             if cls not in nemoretriever_parse_utils.ACCEPTED_CLASSES:
@@ -344,8 +344,8 @@ def nemoretriever_parse_extractor(
                 table = LatexTable(
                     latex=txt,
                     bbox=transformed_bbox,
-                    max_width=NEMORETRIEVER_PARSE_MAX_WIDTH,
-                    max_height=NEMORETRIEVER_PARSE_MAX_HEIGHT,
+                    max_width=NEMOTRON_PARSE_MAX_WIDTH,
+                    max_height=NEMOTRON_PARSE_MAX_HEIGHT,
                 )
                 accumulated_tables.append(table)
 
@@ -364,8 +364,8 @@ def nemoretriever_parse_extractor(
                         bbox=transformed_bbox,
                         width=img_numpy.shape[1],
                         height=img_numpy.shape[0],
-                        max_width=NEMORETRIEVER_PARSE_MAX_WIDTH,
-                        max_height=NEMORETRIEVER_PARSE_MAX_HEIGHT,
+                        max_width=NEMOTRON_PARSE_MAX_WIDTH,
+                        max_height=NEMOTRON_PARSE_MAX_HEIGHT,
                     )
                     accumulated_images.append(image)
 
@@ -420,7 +420,7 @@ def nemoretriever_parse_extractor(
                     source_metadata,
                     base_unified_metadata,
                     delimiter="\n\n",
-                    bbox_max_dimensions=(NEMORETRIEVER_PARSE_MAX_WIDTH, NEMORETRIEVER_PARSE_MAX_HEIGHT),
+                    bbox_max_dimensions=(NEMOTRON_PARSE_MAX_WIDTH, NEMOTRON_PARSE_MAX_HEIGHT),
                     nearby_objects=page_nearby_blocks,
                 )
             )
@@ -470,7 +470,7 @@ def _extract_text_and_bounding_boxes(
         data=data,
         model_name="nemoretriever_parse",
         stage_name="pdf_extraction",
-        max_batch_size=NEMORETRIEVER_PARSE_MAX_BATCH_SIZE,
+        max_batch_size=NEMOTRON_PARSE_MAX_BATCH_SIZE,
         execution_trace_log=execution_trace_log,
     )
 
@@ -513,9 +513,9 @@ def _send_inference_request(
 
 def _convert_pdfium_page_to_numpy_for_parser(
     page: pdfium.PdfPage,
-    render_dpi: int = NEMORETRIEVER_PARSE_RENDER_DPI,
-    scale_tuple: Tuple[int, int] = (NEMORETRIEVER_PARSE_MAX_WIDTH, NEMORETRIEVER_PARSE_MAX_HEIGHT),
-    padding_tuple: Tuple[int, int] = (NEMORETRIEVER_PARSE_MAX_WIDTH, NEMORETRIEVER_PARSE_MAX_HEIGHT),
+    render_dpi: int = NEMOTRON_PARSE_RENDER_DPI,
+    scale_tuple: Tuple[int, int] = (NEMOTRON_PARSE_MAX_WIDTH, NEMOTRON_PARSE_MAX_HEIGHT),
+    padding_tuple: Tuple[int, int] = (NEMOTRON_PARSE_MAX_WIDTH, NEMOTRON_PARSE_MAX_HEIGHT),
 ) -> np.ndarray:
     page_images, padding_offsets = pdfium_pages_to_numpy(
         [page], render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple

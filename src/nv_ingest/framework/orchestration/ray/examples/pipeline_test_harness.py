@@ -150,7 +150,7 @@ if __name__ == "__main__":
     os.environ["OCR_GRPC_ENDPOINT"] = "localhost:8010"
     os.environ["OCR_INFER_PROTOCOL"] = "grpc"
     os.environ["OCR_MODEL_NAME"] = "paddle"
-    os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
+    os.environ["NEMOTRON_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/nemotron-nano-12b-v2-vl"
     logger.info("Environment variables set.")
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     )
     ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
-    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    model_name = os.environ.get("NEMOTRON_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
     pdf_extractor_config = {
         "pdfium_config": {
             "auth_token": yolox_auth,  # All auth tokens are the same for the moment

@@ -175,7 +175,7 @@ services:
       - reranker
 
   nemotron-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+    image: ${NEMOTRON_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMOTRON_PARSE_TAG:-latest}
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -305,10 +305,10 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       # build.nvidia.com hosted nemotron-parse
-      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemotron-parse:8000/v1/chat/completions
-      - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
-      - NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemotron-parse
+      # - NEMOTRON_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMOTRON_PARSE_HTTP_ENDPOINT=http://nemotron-parse:8000/v1/chat/completions
+      - NEMOTRON_PARSE_INFER_PROTOCOL=http
+      - NEMOTRON_PARSE_MODEL_NAME=nvidia/nemotron-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
