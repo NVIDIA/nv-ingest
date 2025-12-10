@@ -78,7 +78,7 @@ stages:
           $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
         ]
         nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
-        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
+        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
