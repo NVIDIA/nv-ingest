@@ -194,8 +194,8 @@ envVars:
   YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
 
-  OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
-  OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
+  OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
+  OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
   OCR_MODEL_NAME: scene_text_ensemble
 
@@ -211,6 +211,7 @@ envVars:
   # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
+
 
   # "ready" check configuration.
   # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
@@ -644,8 +645,8 @@ nimOperator:
   page_elements:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-      tag: 1.6.0
+      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
+      tag: 1.7.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -967,19 +968,26 @@ nimOperator:
         grpcPort: 8001
     env: []
 
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1 [object] Configuration for LLaMA-3.1 Nemotron Nano VL 8B v1 NIM
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.enabled [bool] Enable the LLaMA-3.1 Nemotron Nano VL NIM
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.image.* [various] Image repository/tag for LLaMA-3.1 Nemotron Nano VL
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.authSecret [string] Auth secret for this NIM
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.storage.* [object] PVC configuration
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.replicas [int] Number of replicas
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.resources [object] Limits/requests for resources
-  ## @param llama_3_1_nemotron_nano_vl_8b_v1.expose.* [object] Ports/services for NIM
-  llama_3_1_nemotron_nano_vl_8b_v1:
+  ## @param nemotron_nano_12b_v2_vl [object] Configuration for Nemotron Nano 12B v2 VL NIM
+  ## @param nemotron_nano_12b_v2_vl.enabled [bool] Enable this NIM
+  ## @param nemotron_nano_12b_v2_vl.image.repository [string] Image repository for this NIM
+  ## @param nemotron_nano_12b_v2_vl.image.tag [string] Image tag or version
+  ## @param nemotron_nano_12b_v2_vl.image.pullPolicy [string] Image pull policy
+  ## @param nemotron_nano_12b_v2_vl.image.pullSecrets [array] List of image pull secrets
+  ## @param nemotron_nano_12b_v2_vl.authSecret [string] Authentication secret for the NIM
+  ## @param nemotron_nano_12b_v2_vl.storage.pvc.create [bool] Whether to create a persistent volume claim
+  ## @param nemotron_nano_12b_v2_vl.storage.pvc.size [string] Size of the persistent volume claim (e.g., "300Gi")
+  ## @param nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode [string] Volume access mode for the PVC
+  ## @param nemotron_nano_12b_v2_vl.replicas [int] Number of replicas
+  ## @param nemotron_nano_12b_v2_vl.resources.limits.nvidia.com/gpu [int] Number of GPUs to allocate
+  ## @param nemotron_nano_12b_v2_vl.expose.service.type [string] Kubernetes service type (e.g., "ClusterIP")
+  ## @param nemotron_nano_12b_v2_vl.expose.service.port [int] HTTP service port
+  ## @param nemotron_nano_12b_v2_vl.expose.service.grpcPort [int] gRPC service port
+  nemotron_nano_12b_v2_vl:
     enabled: false
     image:
-      repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
-      tag: latest
+      repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
+      tag: 1.5.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
