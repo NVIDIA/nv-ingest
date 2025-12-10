@@ -2,7 +2,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: nemoretriever-page-elements-v2
+  name: nemoretriever-page-elements-v3
 spec:
   source:
     ngc:
@@ -20,7 +20,7 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: nemoretriever-page-elements-v2
+  name: nemoretriever-page-elements-v3
 spec:
   image:
     repository: {{ .Values.nimOperator.page_elements.image.repository }}
@@ -30,7 +30,7 @@ spec:
   authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
   storage:
     nimCache:
-      name: nemoretriever-page-elements-v2
+      name: nemoretriever-page-elements-v3
       profile: ''
   replicas: {{ .Values.nimOperator.page_elements.replicas }}
   nodeSelector: {{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}

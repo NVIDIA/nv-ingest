@@ -194,8 +194,8 @@ envVars:
   YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
 
-  OCR_GRPC_ENDPOINT: nv-ingest-ocr:8001
-  OCR_HTTP_ENDPOINT: http://nv-ingest-ocr:8000/v1/infer
+  OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
+  OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
   OCR_MODEL_NAME: scene_text_ensemble
 
@@ -623,8 +623,8 @@ nimOperator:
   page_elements:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-      tag: 1.6.0
+      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
+      tag: 1.7.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
