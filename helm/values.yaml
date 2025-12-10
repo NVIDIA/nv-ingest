@@ -619,7 +619,28 @@ nimOperator:
     namespaces: []
     resources: {}
 
-  # Define each NIM that is used by the nv-ingest service and its possible configurations
+  ## @section NIM Services Configuration
+  ##
+  ## Define each NIM service instance used by nv-ingest and its configuration.
+  ## You can enable/disable, set resource limits, storage, image, and environment variables for each NIM.
+  ##
+
+  ## @param page_elements [object] Configuration for Page Elements NIM
+  ## @param page_elements.enabled [bool] Enable the Page Elements NIM service
+  ## @param page_elements.image.repository [string] Image repository for the NIM
+  ## @param page_elements.image.tag [string] Image tag for the NIM
+  ## @param page_elements.image.pullPolicy [string] Kubernetes pull policy for the image
+  ## @param page_elements.image.pullSecrets [array] List of imagePullSecrets for NGC
+  ## @param page_elements.authSecret [string] Name of the secret to use for authentication
+  ## @param page_elements.storage.pvc.create [bool] Whether to create a new PVC for storage
+  ## @param page_elements.storage.pvc.size [string] Size of the persistent storage
+  ## @param page_elements.storage.pvc.volumeAccessMode [string] PVC access mode
+  ## @param page_elements.replicas [int] Number of replicas to deploy
+  ## @param page_elements.resources [object] Resource requests/limits for the deployment
+  ## @param page_elements.expose.service.type [string] Kubernetes Service type
+  ## @param page_elements.expose.service.port [int] HTTP port for the service
+  ## @param page_elements.expose.service.grpcPort [int] gRPC port for the service
+  ## @param page_elements.env [array] Additional environment variables for the container
   page_elements:
     enabled: true
     image:
@@ -680,6 +701,15 @@ nimOperator:
       - name: TRITON_OTEL_RATE
         value: "1"
 
+  ## @param graphic_elements [object] Configuration for Graphic Elements NIM
+  ## @param graphic_elements.enabled [bool] Enable the Graphic Elements NIM service
+  ## @param graphic_elements.image.* [various] Image configuration for the NIM
+  ## @param graphic_elements.authSecret [string] Authentication secret name
+  ## @param graphic_elements.storage.* [various] Storage/PVC configuration for the NIM
+  ## @param graphic_elements.replicas [int] Number of replicas to deploy
+  ## @param graphic_elements.resources [object] Resource requests/limits for the deployment
+  ## @param graphic_elements.expose.service.* [object] Service port configuration
+  ## @param graphic_elements.env [array] Additional environment variables for the container
   graphic_elements:
     enabled: true
     image:
@@ -717,6 +747,15 @@ nimOperator:
       - name: OMP_NUM_THREADS
         value: "1"
 
+  ## @param table_structure [object] Configuration for Table Structure NIM
+  ## @param table_structure.enabled [bool] Enable the Table Structure NIM service
+  ## @param table_structure.image.* [various] Image config for the Table Structure model
+  ## @param table_structure.authSecret [string] Authentication secret
+  ## @param table_structure.storage.* [various] PVC/storage config
+  ## @param table_structure.replicas [int] Number of replicas
+  ## @param table_structure.resources [object] Resource limits/requests
+  ## @param table_structure.expose.service.* [object] Ports to expose
+  ## @param table_structure.env [array] Additional environment variables
   table_structure:
     enabled: true
     image:
@@ -754,6 +793,15 @@ nimOperator:
       - name: OMP_NUM_THREADS
         value: "8"
 
+  ## @param embedqa [object] Configuration for EmbedQA NIM
+  ## @param embedqa.enabled [bool] Enable the EmbedQA service
+  ## @param embedqa.image.* [various] EmbedQA NIM image configuration
+  ## @param embedqa.authSecret [string] Authentication secret name
+  ## @param embedqa.storage.* [object] PVC configuration
+  ## @param embedqa.replicas [int] Number of replicas
+  ## @param embedqa.resources [object] Resource requests/limits
+  ## @param embedqa.expose.* [object] Service endpoint configuration
+  ## @param embedqa.env [array] Environment variables
   embedqa:
     enabled: true
     image:
@@ -789,6 +837,15 @@ nimOperator:
       - name: NIM_TRITON_PERFORMANCE_MODE
         value: "throughput"
 
+  ## @param paddleocr [object] Configuration for PaddleOCR NIM
+  ## @param paddleocr.enabled [bool] Enable the PaddleOCR service
+  ## @param paddleocr.image.* [various] PaddleOCR image config
+  ## @param paddleocr.authSecret [string] Authentication secret
+  ## @param paddleocr.storage.* [object] PVC configuration
+  ## @param paddleocr.replicas [int] Number of replicas
+  ## @param paddleocr.resources [object] Resource requests/limits
+  ## @param paddleocr.expose.* [object] Service endpoint configuration
+  ## @param paddleocr.env [array] Environment variables
   paddleocr:
     enabled: false
     image:
@@ -828,6 +885,15 @@ nimOperator:
       - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
         value: "1"
 
+  ## @param nemoretriever_ocr_v1 [object] Configuration for NemoRetriever OCR v1 NIM
+  ## @param nemoretriever_ocr_v1.enabled [bool] Enable the NEMORetriever OCR v1 service
+  ## @param nemoretriever_ocr_v1.image.* [various] Image settings for NEMORetriever OCR v1
+  ## @param nemoretriever_ocr_v1.authSecret [string] Secret for authentication
+  ## @param nemoretriever_ocr_v1.storage.* [object] Storage/PVC configuration
+  ## @param nemoretriever_ocr_v1.replicas [int] Number of service replicas
+  ## @param nemoretriever_ocr_v1.resources [object] Limits/requests for compute resources
+  ## @param nemoretriever_ocr_v1.expose.* [object] Ports and service config
+  ## @param nemoretriever_ocr_v1.env [array] Additional environment variables
   nemoretriever_ocr_v1:
     enabled: true
     image:
@@ -867,6 +933,15 @@ nimOperator:
       - name: NIM_TRITON_ENABLE_MODEL_CONTROL
         value: "1"
 
+  ## @param llama_3_2_nv_rerankqa_1b_v2 [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
+  ## @param llama_3_2_nv_rerankqa_1b_v2.enabled [bool] Enable this NIM
+  ## @param llama_3_2_nv_rerankqa_1b_v2.image.* [various] Image repository/tag for this NIM
+  ## @param llama_3_2_nv_rerankqa_1b_v2.authSecret [string] Authentication secret for the NIM
+  ## @param llama_3_2_nv_rerankqa_1b_v2.storage.* [various] Storage/PVC configuration
+  ## @param llama_3_2_nv_rerankqa_1b_v2.replicas [int] Number of replicas
+  ## @param llama_3_2_nv_rerankqa_1b_v2.resources [object] Limits/requests for resources
+  ## @param llama_3_2_nv_rerankqa_1b_v2.expose.* [object] Port/service configuration
+  ## @param llama_3_2_nv_rerankqa_1b_v2.env [array] Additional environment variables
   llama_3_2_nv_rerankqa_1b_v2:
     enabled: false
     image:
@@ -892,6 +967,14 @@ nimOperator:
         grpcPort: 8001
     env: []
 
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1 [object] Configuration for LLaMA-3.1 Nemotron Nano VL 8B v1 NIM
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.enabled [bool] Enable the LLaMA-3.1 Nemotron Nano VL NIM
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.image.* [various] Image repository/tag for LLaMA-3.1 Nemotron Nano VL
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.authSecret [string] Auth secret for this NIM
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.storage.* [object] PVC configuration
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.replicas [int] Number of replicas
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.resources [object] Limits/requests for resources
+  ## @param llama_3_1_nemotron_nano_vl_8b_v1.expose.* [object] Ports/services for NIM
   llama_3_1_nemotron_nano_vl_8b_v1:
     enabled: false
     image:
