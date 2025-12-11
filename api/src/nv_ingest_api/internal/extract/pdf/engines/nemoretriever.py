@@ -30,7 +30,7 @@ import numpy as np
 import pypdfium2 as pdfium
 
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements
-from nv_ingest_api.internal.primitives.nim.model_interface import nemoretriever_parse as nemoretriever_parse_utils
+from nv_ingest_api.internal.primitives.nim.model_interface import nemoretriever_parse as nemotron_parse_utils
 from nv_ingest_api.internal.enums.common import AccessLevelEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentDescriptionEnum
@@ -65,8 +65,8 @@ NEMOTRON_PARSE_MAX_HEIGHT = 1280
 NEMOTRON_PARSE_MAX_BATCH_SIZE = 8
 
 
-# Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
-def nemoretriever_parse_extractor(
+# Define a helper function to use nemotron_parse to extract text from a base64 encoded bytestram PDF
+def nemotron_parse_extractor(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
@@ -77,7 +77,7 @@ def nemoretriever_parse_extractor(
     execution_trace_log: Optional[List[Any]] = None,
 ) -> str:
     """
-    Helper function to use nemoretriever_parse to extract text from a bytestream PDF.
+    Helper function to use nemotron_parse to extract text from a bytestream PDF.
 
     Parameters
     ----------
@@ -119,7 +119,7 @@ def nemoretriever_parse_extractor(
         If required keys are missing in row_data.
     """
     logger = logging.getLogger(__name__)
-    logger.debug("Extracting PDF with nemoretriever_parse backend.")
+    logger.debug("Extracting PDF with nemotron_parse backend.")
 
     # Retrieve row_data from extractor_config.
     row_data = extractor_config.get("row_data")
@@ -156,7 +156,7 @@ def nemoretriever_parse_extractor(
             f"Invalid table_output_format value: {table_output_format_str}. Expected one of: {valid_options}"
         )
 
-    # Process nemoretriever_parse configuration.
+    # Process nemotron_parse configuration.
     nemotron_parse_config_raw = extractor_config.get("nemotron_parse_config", {})
     if isinstance(nemotron_parse_config_raw, dict):
         nemotron_parse_config = NemotronParseConfigSchema(**nemotron_parse_config_raw)
@@ -209,9 +209,9 @@ def nemoretriever_parse_extractor(
     pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
-    nemoretriever_parse_client = None
+    nemotron_parse_client = None
     if extract_text:
-        nemoretriever_parse_client = _create_clients(nemotron_parse_config)
+        nemotron_parse_client = _create_clients(nemotron_parse_config)
 
     max_workers = nemotron_parse_config.workers_per_progress_engine
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -231,7 +231,7 @@ def nemoretriever_parse_extractor(
                 future_parser = executor.submit(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                     pages_for_ocr[:],  # pass a copy
-                    nemoretriever_parse_client,
+                    nemotron_parse_client,
                     execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_parser)
@@ -267,7 +267,7 @@ def nemoretriever_parse_extractor(
             future_parser = executor.submit(
                 lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                 pages_for_ocr[:],  # pass a copy
-                nemoretriever_parse_client,
+                nemotron_parse_client,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future_parser)
@@ -329,7 +329,7 @@ def nemoretriever_parse_extractor(
                 math.ceil(bbox["ymax"] * NEMOTRON_PARSE_MAX_HEIGHT),
             ]
 
-            if cls not in nemoretriever_parse_utils.ACCEPTED_CLASSES:
+            if cls not in nemotron_parse_utils.ACCEPTED_CLASSES:
                 continue
 
             if identify_nearby_objects:
@@ -338,7 +338,7 @@ def nemoretriever_parse_extractor(
             if extract_text:
                 page_text.append(txt)
 
-            if (extract_tables_method == "nemoretriever_parse") and (extract_tables) and (cls == "Table"):
+            if (extract_tables_method == "nemotron_parse") and (extract_tables) and (cls == "Table"):
                 table = LatexTable(
                     latex=txt,
                     bbox=transformed_bbox,
@@ -443,8 +443,8 @@ def nemoretriever_parse_extractor(
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
 
-    if nemoretriever_parse_client:
-        nemoretriever_parse_client.close()
+    if nemotron_parse_client:
+        nemotron_parse_client.close()
     doc.close()
 
     return extracted_data
@@ -452,7 +452,7 @@ def nemoretriever_parse_extractor(
 
 def _extract_text_and_bounding_boxes(
     pages: list,
-    nemoretriever_parse_client,
+    nemotron_parse_client,
     execution_trace_log=None,
 ) -> list:
 
@@ -464,9 +464,9 @@ def _extract_text_and_bounding_boxes(
     data = {"images": original_images}
 
     # Perform inference using the NimClient.
-    inference_results = nemoretriever_parse_client.infer(
+    inference_results = nemotron_parse_client.infer(
         data=data,
-        model_name="nemoretriever_parse",
+        model_name="nemotron_parse",
         stage_name="pdf_extraction",
         max_batch_size=NEMOTRON_PARSE_MAX_BATCH_SIZE,
         execution_trace_log=execution_trace_log,
@@ -476,10 +476,10 @@ def _extract_text_and_bounding_boxes(
 
 
 def _create_clients(nemotron_parse_config):
-    model_interface = nemoretriever_parse_utils.NemotronParseModelInterface(
+    model_interface = nemotron_parse_utils.NemotronParseModelInterface(
         model_name=nemotron_parse_config.nemotron_parse_model_name,
     )
-    nemoretriever_parse_client = create_inference_client(
+    nemotron_parse_client = create_inference_client(
         nemotron_parse_config.nemotron_parse_endpoints,
         model_interface,
         nemotron_parse_config.auth_token,
@@ -487,20 +487,20 @@ def _create_clients(nemotron_parse_config):
         nemotron_parse_config.timeout,
     )
 
-    return nemoretriever_parse_client
+    return nemotron_parse_client
 
 
 def _send_inference_request(
-    nemoretriever_parse_client,
+    nemotron_parse_client,
     image_array: np.ndarray,
 ) -> Dict[str, Any]:
 
     try:
         # NIM only supports processing one page at a time (batch size = 1).
         data = {"image": image_array}
-        response = nemoretriever_parse_client.infer(
+        response = nemotron_parse_client.infer(
             data=data,
-            model_name="nemoretriever_parse",
+            model_name="nemotron_parse",
         )
     except Exception as e:
         logger.exception(f"Unhandled error during NemoRetrieverParse inference: {e}")
@@ -538,11 +538,11 @@ def _insert_page_nearby_blocks(
     txt: str,
     bbox: str,
 ):
-    if cls in nemoretriever_parse_utils.ACCEPTED_TEXT_CLASSES:
+    if cls in nemotron_parse_utils.ACCEPTED_TEXT_CLASSES:
         nearby_blocks_key = "text"
-    elif cls in nemoretriever_parse_utils.ACCEPTED_TABLE_CLASSES:
+    elif cls in nemotron_parse_utils.ACCEPTED_TABLE_CLASSES:
         nearby_blocks_key = "structured"
-    elif cls in nemoretriever_parse_utils.ACCEPTED_IMAGE_CLASSES:
+    elif cls in nemotron_parse_utils.ACCEPTED_IMAGE_CLASSES:
         nearby_blocks_key = "images"
 
     page_nearby_blocks[nearby_blocks_key]["content"].append(txt)
@@ -550,7 +550,7 @@ def _insert_page_nearby_blocks(
     page_nearby_blocks[nearby_blocks_key]["type"].append(cls)
 
 
-@pdfium_exception_handler(descriptor="nemoretriever_parse")
+@pdfium_exception_handler(descriptor="nemotron_parse")
 def _construct_table_metadata(
     table: LatexTable,
     page_idx: int,

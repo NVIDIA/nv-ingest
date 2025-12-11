@@ -106,7 +106,7 @@ class NemotronParseConfigSchema(LowercaseProtocolMixin):
         Authentication token required for secure services.
 
     nemotron_parse_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the nemoretriever_parse endpoint.
+        A tuple containing the gRPC and HTTP services for the nemotron_parse endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods

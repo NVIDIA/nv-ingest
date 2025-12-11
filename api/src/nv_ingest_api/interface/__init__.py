@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 CONFIG_SCHEMAS: Dict[str, Any] = {
     "adobe": PDFiumConfigSchema,
     "llama": PDFiumConfigSchema,
-    "nemoretriever_parse": NemotronParseConfigSchema,
+    "nemotron_parse": NemotronParseConfigSchema,
     "pdfium": PDFiumConfigSchema,
     "tika": PDFiumConfigSchema,
     "unstructured_io": PDFiumConfigSchema,
