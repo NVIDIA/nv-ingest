@@ -234,7 +234,7 @@ else:
             for to_remove in files_to_remove:
                 to_remove = Path(to_remove)
                 if to_remove.is_file():
-                    logger.error(f"Removing file {to_remove}")
+                    logger.debug(f"Removing file {to_remove}")
                     to_remove.unlink()
             return files
 

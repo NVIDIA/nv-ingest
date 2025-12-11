@@ -2,92 +2,11 @@ apiVersion: v2
 name: nv-ingest
 description: NV-Ingest Microservice
 type: application
-version: 25.4.2
+version: 25.9.0
 maintainers:
   - name: NVIDIA Corporation
     url: https://www.nvidia.com/
 dependencies:
-  # Yolox based architecture variant NIM for extracting Page Elements
-  - name: nvidia-nim-nemoretriever-page-elements-v3
-    repository: "alias:nvidia-nim"
-    version: 1.7.0
-    alias: nemoretriever-page-elements-v3
-    condition: nemoretriever-page-elements-v3.deployed
-
-  # Yolox based architecture variant NIM for extracting Graphic Elements from images
-  - name: nvidia-nim-nemoretriever-graphic-elements-v1
-    repository: "alias:nvidia-nim"
-    version: 1.4.0
-    alias: nemoretriever-graphic-elements-v1
-    condition: nemoretriever-graphic-elements-v1.deployed
-
-  # Yolox based architecture variant NIM for extracting Table Structures from images
-  - name: nvidia-nim-nemoretriever-table-structure-v1
-    repository: "alias:nvidia-nim"
-    version: 1.4.0
-    alias: nemoretriever-table-structure-v1
-    condition: nemoretriever-table-structure-v1.deployed
-
-  # VLM for image captioning.
-  # This same chart can power several different underlying VLM models. Configure in values.yaml
-  - name: nim-vlm
-    repository: "alias:nim"
-    version: 1.2.1
-    alias: nim-vlm-image-captioning
-    condition: nim-vlm-image-captioning.deployed
-
-  # VLM for text extraction. Same helm chart as image captioning VLM with different NIM engine; eclair vs llama vision
-  - name: nim-vlm
-    repository: "alias:nim"
-    version: 1.2.1
-    alias: nim-vlm-text-extraction
-    condition: nim-vlm-text-extraction.deployed
-
-  # NemoRetriever OCR NIM
-  - name: nvidia-nim-nemoretriever-ocr-v1
-    repository: "alias:nvidia-nim"
-    version: 1.0.0
-    alias: nemoretriever-ocr
-    condition: nemoretriever-ocr.deployed
-
-  # PaddleOCR NIM
-  - name: nvidia-nim-paddleocr
-    repository: "alias:baidu-nim"
-    version: 1.4.0
-    alias: paddleocr-nim
-    condition: paddleocr-nim.deployed
-
-  # nv-embedqa-e5-v5 NIM. Note only text-embedding-nim OR nvidia-nim-llama-32-nv-embedqa-1b-v2 can be deployed at the same time but not both
-  - name: nvidia-nim-nv-embedqa-e5-v5
-    repository: "alias:nvidia-nim"
-    version: 1.6.0
-    alias: text-embedding-nim
-    condition: text-embedding-nim.deployed
-
-  # nvidia-nim-llama-32-nv-embedqa-1b-v2 NIM. Note only text-embedding-nim OR nvidia-nim-llama-32-nv-embedqa-1b-v2 can be deployed at the same time but not both
-  - name: nvidia-nim-llama-32-nv-embedqa-1b-v2
-    repository: "alias:nvidia-nim"
-    version: 1.9.0
-    condition: nvidia-nim-llama-32-nv-embedqa-1b-v2.deployed
-
-  - name: nvidia-nim-llama-32-nemoretriever-1b-vlm-embed-v1
-    repository: "alias:nemo-microservices"
-    version: 1.7.0
-    alias: vlm-embedding-nim
-    condition: vlm-embedding-nim.deployed
-
-  # Nvidia llama-32-nv-rerankqa-1b-v2 reranking NIM
-  - name: nvidia-nim-llama-32-nv-rerankqa-1b-v2
-    repository: "alias:nvidia-nim"
-    version: 1.7.0
-    alias: llama-32-nv-rerankqa-1b-v2
-    condition: llama-32-nv-rerankqa-1b-v2.deployed
-
-  - name: riva-nim
-    repository: "alias:nvidia-nim"
-    version: 1.0.0
-    condition: riva-nim.deployed
-
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
     version: 4.1.11

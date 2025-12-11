@@ -9,6 +9,9 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
+The [Nvidia nim-operator](https://docs.nvidia.com/nim-operator/latest/install.html) must also be installed and configured in your cluster to ensure that
+the Nvidia NIMs are properly deployed.
+
 
 ## Initial Environment Setup
 
@@ -54,16 +57,6 @@ helm upgrade \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
     --set image.tag="25.9.0"
 ```
-
-> [!NOTE]
-> The Bitnami project has moved certain Redis container artifacts, which might affect availability of some image tags. To use a supported and working version of Redis, you can override the Redis image with the following additional flags in your `helm upgrade` command:
->
-> ```bash
-> --set redis.image.repository=bitnamilegacy/redis \
-> --set redis.image.tag=8.2.1-debian-12-r0 \
-> ```
->
-> This uses the Bitnami Legacy Redis 8.2.1-debian-12-r0 image. Adjust the tag as needed for your environment.
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
 
