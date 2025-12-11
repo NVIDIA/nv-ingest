@@ -122,9 +122,9 @@ tmpDirSize: 50Gi
 ## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
 ## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
 ## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
-## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"] HTTP endpoint for NeMo Retriever Parse service
-## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"] Protocol for NeMo Retriever Parse service
-## @param envVars.NEMORETRIEVER_PARSE_MODEL_NAME [default: "nvidia/nemoretriever-parse"] Model name for NeMo Retriever Parse
+## @param envVars.NEMOTRON_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"] HTTP endpoint for Nemotron Parse service
+## @param envVars.NEMOTRON_PARSE_INFER_PROTOCOL [default: "http"] Protocol for Nemotron Parse service
+## @param envVars.NEMOTRON_PARSE_MODEL_NAME [default: "nvidia/nemotron-parse"] Model name for Nemotron Parse
 ## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
 ## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v3:8000/v1/infer"] HTTP endpoint for YOLOX page elements
 ## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements
@@ -177,9 +177,9 @@ envVars:
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
   PADDLE_INFER_PROTOCOL: grpc
 
-  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
-  NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
-  NEMORETRIEVER_PARSE_MODEL_NAME: nvidia/nemoretriever-parse
+  NEMOTRON_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions
+  NEMOTRON_PARSE_INFER_PROTOCOL: http
+  NEMOTRON_PARSE_MODEL_NAME: nvidia/nemotron-parse
 
   YOLOX_PAGE_IMAGE_FORMAT: JPEG
   YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v3:8001
