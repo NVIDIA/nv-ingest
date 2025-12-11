@@ -330,7 +330,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.RAY_num_grpc_threads | int | `1` |  |
+| envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/nemotron-nano-12b-v2-vl"` |  |
+| envVars.VLM_CAPTION_PROMPT | string | `"Caption the content of this image:"` |  |
+| envVars.VLM_CAPTION_SYSTEM_PROMPT | string | `"/no_think"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |

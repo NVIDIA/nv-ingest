@@ -177,7 +177,9 @@ EXTRACT_IMAGES=true API_VERSION=v2 python run.py --case=e2e --dataset=bo767
 - `table_output_format` (string): Table output format - `markdown`, `html`, `latex`, `pseudo_markdown`, `simple`
 
 #### Pipeline Options
-- `enable_caption` (boolean): Enable image captioning
+- `enable_caption` (boolean): Enable image captioning (requires the VLM profile to be running)
+- `caption_prompt` (string): Override the user prompt sent to the captioning VLM. Defaults to `"Caption the content of this image:"`.
+- `caption_system_prompt` (string): Override the system prompt sent to the captioning VLM. Defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card. This is passed through to the model as the system message.
 - `enable_split` (boolean): Enable text chunking
 - `split_chunk_size` (integer): Chunk size for text splitting
 - `split_chunk_overlap` (integer): Overlap for text splitting
