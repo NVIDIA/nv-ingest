@@ -30,7 +30,7 @@ import numpy as np
 import pypdfium2 as pdfium
 
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements
-from nv_ingest_api.internal.primitives.nim.model_interface import nemoretriever_parse as nemotron_parse_utils
+from nv_ingest_api.internal.primitives.nim.model_interface import nemotron_parse as nemotron_parse_utils
 from nv_ingest_api.internal.enums.common import AccessLevelEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentDescriptionEnum
