@@ -186,3 +186,21 @@ def test_traceable_func_dedupe_disabled():
 
     assert "trace::entry::no_dedupe_test_1" not in trace_info
     assert "trace::exit::no_dedupe_test_1" not in trace_info
+
+
+def test_traceable_func_passes_trace_info_into_function():
+    """
+    Ensure functions that explicitly accept trace_info receive the dictionary instance.
+    """
+
+    @traceable_func(trace_name="needs_trace_info")
+    def needs_trace_info(trace_info=None):
+        trace_info["inside_func"] = True
+        return trace_info
+
+    external_trace = {}
+    result = needs_trace_info(trace_info=external_trace)
+
+    assert result is external_trace
+    assert result.get("inside_func") is True
+    assert any(key.startswith("trace::entry::needs_trace_info") for key in result)
