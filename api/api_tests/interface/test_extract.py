@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
     "extract_method",
     [
         "pdfium",
-        "nemotron",
+        "nemotron_parse",
         pytest.param("adobe", marks=pytest.mark.xfail(reason="Adobe extraction not configured in test environment")),
         pytest.param("llama", marks=pytest.mark.xfail(reason="Llama extraction not configured in test environment")),
         pytest.param(
