@@ -56,7 +56,7 @@ def readiness_wait(timeout_s: int) -> bool:
 
 
 def create_artifacts_dir(base: str | None, dataset_name: str | None = None) -> str:
-    root = base or os.path.join(os.path.dirname(__file__), "artifacts")
+    root = base or Path(__file__).resolve().parents[3] / "artifacts"
 
     # Create directory name with dataset info if available
     timestamp = now_timestr()
