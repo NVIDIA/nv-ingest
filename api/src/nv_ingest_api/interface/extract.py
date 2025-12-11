@@ -148,7 +148,7 @@ def extract_primitives_from_pdf(
         Protocol to use for YOLOX inference. Options: "http" or "grpc".
 
     nemotron_parse_endpoints : tuple of (str, str), optional
-        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
+        A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
         Required when extract_method="nemotron_parse".
 
     nemotron_parse_protocol : str, default "http"
@@ -319,10 +319,10 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     nemotron_parse_model_name: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Extract primitives from PDF documents using the NemoRetriever Parse extraction method.
+    Extract primitives from PDF documents using the Nemotron Parse extraction method.
 
     This function serves as a specialized wrapper around the general extract_primitives_from_pdf
-    function, pre-configured to use NemoRetriever Parse as the extraction engine. It processes
+    function, pre-configured to use Nemotron Parse as the extraction engine. It processes
     PDF documents to extract various content types including text, images, tables, charts, and
     infographics, returning the results in a structured DataFrame.
 
@@ -385,15 +385,15 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         - "grpc" : Use gRPC protocol for YOLOX inference services
 
     nemotron_parse_endpoints : Optional[Tuple[str, str]], default None
-        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
+        A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
         Format: (grpc_endpoint, http_endpoint)
         Example: (None, "http://localhost:8015/v1/chat/completions")
         Required for this extraction method.
 
     nemotron_parse_protocol : str, default "http"
         Protocol to use for Nemotron Parse. Options:
-        - "http" : Use HTTP protocol for NemoRetriever Parse services
-        - "grpc" : Use gRPC protocol for NemoRetriever Parse services
+        - "http" : Use HTTP protocol for Nemotron Parse services
+        - "grpc" : Use gRPC protocol for Nemotron Parse services
 
     nemotron_parse_model_name : Optional[str], default None
         Model name for Nemotron Parse.
@@ -441,7 +441,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     >>>     "metadata": [{"content_metadata": {"type": "document"}}]
     >>> })
     >>>
-    >>> # Extract primitives using NemoRetriever Parse
+    >>> # Extract primitives using Nemotron Parse
     >>> result_df = extract_primitives_from_pdf_nemoretriever_parse(
     >>>     df_extraction_ledger=df,
     >>>     nemotron_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
@@ -452,12 +452,12 @@ def extract_primitives_from_pdf_nemoretriever_parse(
 
     Notes
     -----
-    - NemoRetriever Parse excels at extracting structured data like tables from PDFs
-    - For optimal results, ensure both NemoRetriever Parse and YOLOX services are
+    - Nemotron Parse excels at extracting structured data like tables from PDFs
+    - For optimal results, ensure both Nemotron Parse and YOLOX services are
       properly configured and accessible
     - The extraction quality may vary depending on the complexity and quality of the input PDF
     - This function wraps the more general `extract_primitives_from_pdf` function with
-      pre-configured parameters for NemoRetriever Parse extraction
+      pre-configured parameters for Nemotron Parse extraction
     """
     return extract_primitives_from_pdf(
         df_extraction_ledger=df_extraction_ledger,
