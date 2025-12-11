@@ -15,6 +15,7 @@ dependencies = [
 [project.scripts]
 nv-ingest-harness-run = "nv_ingest_harness.cli.run:main"
 nv-ingest-harness-sweep = "nv_ingest_harness.cli.sweep:main"
+nv-ingest-harness-ingest = "nv_ingest_harness.cli.ingest:main"
 
 [dependency-groups]
 dev = [

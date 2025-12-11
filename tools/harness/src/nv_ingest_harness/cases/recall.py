@@ -8,7 +8,7 @@ import sys
 import time
 from typing import Callable, Dict, Tuple
 
-from nv_ingest_harness.interact import embed_info, kv_event_log, load_collection, unload_collection
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, load_collection, unload_collection
 from nv_ingest_harness.utils.recall import get_dataset_evaluator, get_recall_collection_name
 
 
