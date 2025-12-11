@@ -163,9 +163,7 @@ def nemoretriever_parse_extractor(
     elif isinstance(nemotron_parse_config_raw, NemotronParseConfigSchema):
         nemotron_parse_config = nemotron_parse_config_raw
     else:
-        raise ValueError(
-            "`nemotron_parse_config` must be a dictionary or a NemotronParseConfigSchema instance."
-        )
+        raise ValueError("`nemotron_parse_config` must be a dictionary or a NemotronParseConfigSchema instance.")
 
     # Get base metadata.
     metadata_col = extractor_config.get("metadata_column", "metadata")
