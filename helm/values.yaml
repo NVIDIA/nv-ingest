@@ -139,6 +139,8 @@ tmpDirSize: 50Gi
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://integrate.api.nvidia.com/v1/chat/completions"] Endpoint for VLM caption service
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/nemotron-nano-12b-v2-vl"] Model name for VLM caption service
+## @param envVars.VLM_CAPTION_PROMPT [default: "Caption the content of this image:"] Override caption prompt sent as the user message
+## @param envVars.VLM_CAPTION_SYSTEM_PROMPT [default: "/no_think"] Override system prompt for reasoning toggle (/think or /no_think)
 ## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
@@ -211,6 +213,8 @@ envVars:
   # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
+  VLM_CAPTION_PROMPT: "Caption the content of this image:"
+  VLM_CAPTION_SYSTEM_PROMPT: "/no_think"
 
 
   # "ready" check configuration.
