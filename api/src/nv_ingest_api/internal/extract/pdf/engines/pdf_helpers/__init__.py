@@ -41,7 +41,6 @@ EXTRACTOR_LOOKUP = {
 METHOD_TO_CONFIG_KEY_MAP = {
     "pdfium_hybrid": "pdfium_config",
     "ocr": "pdfium_config",
-    "nemotron_parse": "nemotron_parse_config",
 }
 
 
