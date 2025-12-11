@@ -25,7 +25,7 @@ Use the following procedure to run the NIM locally.
 
 !!! important
 
-    Due to the VRAM usage of nemotron_parse in addition to the other nv-ingest services, it is recommended to run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set nemotron-parse's device_id to a dedicated GPU: device_ids: ["1"] or higher.
+    Due to the VRAM usage of nemotron_parse in addition to the other nv-ingest services, we recommend that you run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the nemotron-parse `device_id` to a dedicated GPU: device_ids: ["1"] or higher.
 
 
 1. Start the nv-ingest services with the `nemotron-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
