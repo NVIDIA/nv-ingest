@@ -74,7 +74,7 @@ def extract_primitives_from_pdf(
     Extract text, images, tables, charts, and infographics from PDF documents.
 
     This function serves as a unified interface for PDF primitive extraction, supporting multiple
-    extraction engines (pdfium, adobe, llama, nemoretriever_parse, unstructured_io, and tika).
+    extraction engines (pdfium, adobe, llama, nemotron_parse, unstructured_io, and tika).
     It processes a DataFrame containing base64-encoded PDF data and returns a new DataFrame
     with structured information about the extracted elements.
 
@@ -302,7 +302,7 @@ def extract_primitives_from_pdf_pdfium(
     )
 
 
-def extract_primitives_from_pdf_nemoretriever_parse(
+def extract_primitives_from_pdf_nemotron_parse(
     df_extraction_ledger: pd.DataFrame,
     *,
     extract_text: bool = True,
@@ -442,7 +442,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     >>> })
     >>>
     >>> # Extract primitives using Nemotron Parse
-    >>> result_df = extract_primitives_from_pdf_nemoretriever_parse(
+    >>> result_df = extract_primitives_from_pdf_nemotron_parse(
     >>>     df_extraction_ledger=df,
     >>>     nemotron_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
     >>> )

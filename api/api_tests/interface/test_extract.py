@@ -21,7 +21,7 @@ from nv_ingest_api.interface.extract import (
     extract_primitives_from_audio,
     extract_primitives_from_pdf,
     extract_primitives_from_pdf_pdfium,
-    extract_primitives_from_pdf_nemoretriever_parse,
+    extract_primitives_from_pdf_nemotron_parse,
 )
 from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum, TableFormatEnum
 
@@ -325,9 +325,9 @@ def test_extract_pdf_with_pdfium_integration():
 
 
 @pytest.mark.integration
-def test_extract_pdf_with_nemoretriever_integration():
+def test_extract_pdf_with_nemotron_parse_integration():
     """
-    Integration test for the extract_pdf_with_nemoretriever function.
+    Integration test for the extract_pdf_with_nemotron function.
 
     Verifies that the Nemotron Parse extraction correctly processes a test PDF document
     and returns a DataFrame with the expected structure and content.
@@ -397,7 +397,7 @@ def test_extract_pdf_with_nemoretriever_integration():
     auth_token = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Call the specialized Nemotron Parse extraction function
-    df_result = extract_primitives_from_pdf_nemoretriever_parse(
+    df_result = extract_primitives_from_pdf_nemotron_parse(
         df_extraction_ledger=df_ledger,
         extract_text=True,
         extract_images=True,

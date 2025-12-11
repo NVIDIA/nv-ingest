@@ -9,7 +9,7 @@ import numpy as np
 
 import nv_ingest_api.internal.primitives.nim.model_interface.nemoretriever_parse as module_under_test
 from nv_ingest_api.internal.primitives.nim.model_interface.nemoretriever_parse import (
-    NemoRetrieverParseModelInterface,
+    NemotronParseModelInterface,
     ACCEPTED_TEXT_CLASSES,
     ACCEPTED_TABLE_CLASSES,
     ACCEPTED_CLASSES,
@@ -19,11 +19,11 @@ from nv_ingest_api.internal.primitives.nim.model_interface.nemoretriever_parse i
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
-class TestNemoRetrieverParseModelInterface(unittest.TestCase):
+class TestNemotronParseModelInterface(unittest.TestCase):
 
     def setUp(self):
         # Create an instance of the model interface
-        self.model_interface = NemoRetrieverParseModelInterface()
+        self.model_interface = NemotronParseModelInterface()
 
         # Mock the logger to prevent actual logging during tests
         self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
@@ -50,12 +50,12 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
         self.assertEqual(self.model_interface.model_name, "nvidia/nemotron-parse")
 
         # Test custom model name
-        custom_model = NemoRetrieverParseModelInterface(model_name="custom/model")
+        custom_model = NemotronParseModelInterface(model_name="custom/model")
         self.assertEqual(custom_model.model_name, "custom/model")
 
     def test_name(self):
         """Test the name method."""
-        self.assertEqual(self.model_interface.name(), "nemoretriever_parse")
+        self.assertEqual(self.model_interface.name(), "nemotron_parse")
 
     def test_prepare_data_for_inference(self):
         """Test prepare_data_for_inference method."""
@@ -180,11 +180,11 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
         result = self.model_interface.process_inference_results(test_output)
         self.assertEqual(result, test_output)
 
-    def test_prepare_nemoretriever_parse_payload(self):
-        """Test _prepare_nemoretriever_parse_payload method."""
+    def test_prepare_nemotron_parse_payload(self):
+        """Test _prepare_nemotron_parse_payload method."""
         base64_list = ["base64_data1", "base64_data2"]
 
-        payload = self.model_interface._prepare_nemoretriever_parse_payload(base64_list)
+        payload = self.model_interface._prepare_nemotron_parse_payload(base64_list)
 
         # Check the payload structure
         self.assertEqual(payload["model"], "nvidia/nemotron-parse")
@@ -200,15 +200,15 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
         self.assertEqual(payload["messages"][1]["content"][0]["type"], "image_url")
         self.assertEqual(payload["messages"][1]["content"][0]["image_url"]["url"], "data:image/png;base64,base64_data2")
 
-    def test_extract_content_from_nemoretriever_parse_response(self):
-        """Test _extract_content_from_nemoretriever_parse_response method."""
+    def test_extract_content_from_nemotron_parse_response(self):
+        """Test _extract_content_from_nemotron_parse_response method."""
         # Create a mock response
         expected_content = {"parsed": "content", "items": [1, 2, 3]}
         mock_response = {
             "choices": [{"message": {"tool_calls": [{"function": {"arguments": json.dumps(expected_content)}}]}}]
         }
 
-        result = self.model_interface._extract_content_from_nemoretriever_parse_response(mock_response)
+        result = self.model_interface._extract_content_from_nemotron_parse_response(mock_response)
 
         # Check that the content was correctly extracted and parsed
         self.assertEqual(result, expected_content)

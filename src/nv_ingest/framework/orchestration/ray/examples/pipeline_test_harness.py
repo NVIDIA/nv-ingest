@@ -170,8 +170,8 @@ if __name__ == "__main__":
         yolox_graphic_elements_auth,
         yolox_graphic_elements_protocol,
     ) = get_nim_service("yolox_graphic_elements")
-    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemotron_parse_protocol = (
-        get_nim_service("nemoretriever_parse")
+    nemotron_parse_grpc, nemotron_parse_http, nemotron_parse_auth, nemotron_parse_protocol = (
+        get_nim_service("nemotron_parse")
     )
     ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
@@ -183,8 +183,8 @@ if __name__ == "__main__":
             "yolox_infer_protocol": yolox_protocol,
         },
         "nemotron_parse_config": {
-            "auth_token": nemoretriever_parse_auth,
-            "nemotron_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
+            "auth_token": nemotron_parse_auth,
+            "nemotron_parse_endpoints": (nemotron_parse_grpc, nemotron_parse_http),
             "nemotron_parse_infer_protocol": nemotron_parse_protocol,
             "nemotron_parse_model_name": model_name,
             "yolox_endpoints": (yolox_grpc, yolox_http),
