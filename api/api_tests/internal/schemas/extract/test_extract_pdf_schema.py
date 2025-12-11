@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import (
     PDFiumConfigSchema,
-    NemoRetrieverParseConfigSchema,
+    NemotronParseConfigSchema,
     PDFExtractorSchema,
 )
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
@@ -44,35 +44,35 @@ def test_pdfium_extra_fields_forbidden():
         PDFiumConfigSchema(yolox_endpoints=("grpc_service", None), extra_field="fail")
 
 
-### Tests for NemoRetrieverParseConfigSchema ###
+### Tests for NemotronParseConfigSchema ###
 
 
 def test_nemo_valid_parse_grpc_only():
-    config = NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None))
+    config = NemotronParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None))
     assert config.nemotron_parse_endpoints == ("grpc_service", None)
     assert config.nemotron_parse_infer_protocol == "grpc"
 
 
 def test_nemo_valid_parse_http_only():
-    config = NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=(None, "http_service"))
+    config = NemotronParseConfigSchema(nemotron_parse_endpoints=(None, "http_service"))
     assert config.nemotron_parse_endpoints == (None, "http_service")
     assert config.nemotron_parse_infer_protocol == "http"
 
 
 def test_nemo_invalid_parse_both_empty():
     with pytest.raises(ValidationError) as excinfo:
-        NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=(None, None))
+        NemotronParseConfigSchema(nemotron_parse_endpoints=(None, None))
     assert "Both gRPC and HTTP services cannot be empty for nemotron_parse_endpoints." in str(excinfo.value)
 
 
 def test_nemo_cleaning_parse_endpoints_spaces_and_quotes():
     with pytest.raises(ValidationError):
-        NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=("  ", '  "  '))
+        NemotronParseConfigSchema(nemotron_parse_endpoints=("  ", '  "  '))
 
 
 def test_nemo_extra_fields_forbidden():
     with pytest.raises(ValidationError):
-        NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None), extra_field="fail")
+        NemotronParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None), extra_field="fail")
 
 
 ### Tests for PDFExtractorSchema ###
@@ -89,7 +89,7 @@ def test_pdf_extractor_schema_defaults():
 
 def test_pdf_extractor_with_configs():
     pdfium_config = PDFiumConfigSchema(yolox_endpoints=("grpc_service", None))
-    nemo_config = NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None))
+    nemo_config = NemotronParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None))
     schema = PDFExtractorSchema(
         max_queue_size=10,
         n_workers=8,
@@ -134,7 +134,7 @@ def test_pdfium_config_repr_hides_sensitive_fields_and_sanitize_redacts():
 
 
 def test_nemo_config_repr_hides_sensitive_fields_and_sanitize_redacts():
-    cfg = NemoRetrieverParseConfigSchema(
+    cfg = NemotronParseConfigSchema(
         nemotron_parse_endpoints=("grpc_service", None),
         auth_token="nemo_secret",
     )
@@ -151,7 +151,7 @@ def test_nemo_config_repr_hides_sensitive_fields_and_sanitize_redacts():
 
 def test_pdf_extractor_schema_sanitize_nested_configs():
     pdfium_cfg = PDFiumConfigSchema(yolox_endpoints=("grpc_service", None), auth_token="tok1")
-    nemo_cfg = NemoRetrieverParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None), auth_token="tok2")
+    nemo_cfg = NemotronParseConfigSchema(nemotron_parse_endpoints=("grpc_service", None), auth_token="tok2")
     schema = PDFExtractorSchema(
         max_queue_size=5,
         n_workers=3,

@@ -96,7 +96,7 @@ class PDFiumConfigSchema(LowercaseProtocolMixin):
     model_config = ConfigDict(extra="forbid")
 
 
-class NemoRetrieverParseConfigSchema(LowercaseProtocolMixin):
+class NemotronParseConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for NemoRetrieverParse endpoints and options.
 
@@ -208,7 +208,7 @@ class PDFExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     pdfium_config: Optional[PDFiumConfigSchema] = None
-    nemotron_parse_config: Optional[NemoRetrieverParseConfigSchema] = None
+    nemotron_parse_config: Optional[NemotronParseConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
 

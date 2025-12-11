@@ -42,7 +42,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
     YOLOX_PAGE_IMAGE_FORMAT,
 )
-from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemoRetrieverParseConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemotronParseConfigSchema
 from nv_ingest_api.util.metadata.aggregators import (
     extract_pdf_metadata,
     LatexTable,
@@ -159,12 +159,12 @@ def nemoretriever_parse_extractor(
     # Process nemoretriever_parse configuration.
     nemotron_parse_config_raw = extractor_config.get("nemotron_parse_config", {})
     if isinstance(nemotron_parse_config_raw, dict):
-        nemotron_parse_config = NemoRetrieverParseConfigSchema(**nemotron_parse_config_raw)
-    elif isinstance(nemotron_parse_config_raw, NemoRetrieverParseConfigSchema):
+        nemotron_parse_config = NemotronParseConfigSchema(**nemotron_parse_config_raw)
+    elif isinstance(nemotron_parse_config_raw, NemotronParseConfigSchema):
         nemotron_parse_config = nemotron_parse_config_raw
     else:
         raise ValueError(
-            "`nemotron_parse_config` must be a dictionary or a NemoRetrieverParseConfigSchema instance."
+            "`nemotron_parse_config` must be a dictionary or a NemotronParseConfigSchema instance."
         )
 
     # Get base metadata.
