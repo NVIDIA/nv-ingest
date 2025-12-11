@@ -479,13 +479,13 @@ def _extract_text_and_bounding_boxes(
 
 def _create_clients(nemoretriever_parse_config):
     model_interface = nemoretriever_parse_utils.NemoRetrieverParseModelInterface(
-        model_name=nemoretriever_parse_config.nemoretriever_parse_model_name,
+        model_name=nemoretriever_parse_config.nemotron_parse_model_name,
     )
     nemoretriever_parse_client = create_inference_client(
-        nemoretriever_parse_config.nemoretriever_parse_endpoints,
+        nemoretriever_parse_config.nemotron_parse_endpoints,
         model_interface,
         nemoretriever_parse_config.auth_token,
-        nemoretriever_parse_config.nemoretriever_parse_infer_protocol,
+        nemoretriever_parse_config.nemotron_parse_infer_protocol,
         nemoretriever_parse_config.timeout,
     )
 

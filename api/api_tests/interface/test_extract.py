@@ -165,12 +165,12 @@ def test_extract_primitives_from_pdf_integration(extract_method):
         extraction_params.update(
             {
                 # NemoRetriever Parse specific parameters
-                "nemoretriever_parse_endpoints": (
+                "nemotron_parse_endpoints": (
                     _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT,
                     _NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT,
                 ),
-                "nemoretriever_parse_protocol": _NEMO_RETRIEVER_PARSE_PROTOCOL,
-                "nemoretriever_parse_model_name": _NEMO_RETRIEVER_PARSE_MODEL_NAME,
+                "nemotron_parse_protocol": _NEMO_RETRIEVER_PARSE_PROTOCOL,
+                "nemotron_parse_model_name": _NEMO_RETRIEVER_PARSE_MODEL_NAME,
                 # Also include YOLOX parameters for image processing capability
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
@@ -408,9 +408,9 @@ def test_extract_pdf_with_nemoretriever_integration():
         yolox_endpoints=(yolox_grpc_endpoint, yolox_http_endpoint),
         yolox_infer_protocol=yolox_protocol,
         yolox_auth_token=auth_token,
-        nemoretriever_parse_endpoints=(nemo_grpc_endpoint, nemo_http_endpoint),
-        nemoretriever_parse_protocol=nemo_protocol,
-        nemoretriever_parse_model_name=nemo_model_name,
+        nemotron_parse_endpoints=(nemo_grpc_endpoint, nemo_http_endpoint),
+        nemotron_parse_protocol=nemo_protocol,
+        nemotron_parse_model_name=nemo_model_name,
     )
 
     # Validate results

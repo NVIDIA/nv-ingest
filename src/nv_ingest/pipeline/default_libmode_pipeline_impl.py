@@ -73,12 +73,12 @@ stages:
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-        nemoretriever_parse_endpoints: [
+        nemotron_parse_endpoints: [
           $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
           $NEMOTRON_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
         ]
-        nemoretriever_parse_infer_protocol: $NEMOTRON_PARSE_INFER_PROTOCOL|http
-        nemoretriever_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
+        nemotron_parse_infer_protocol: $NEMOTRON_PARSE_INFER_PROTOCOL|http
+        nemotron_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"

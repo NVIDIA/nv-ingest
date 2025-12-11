@@ -315,7 +315,7 @@ stages:
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|""
-        nemoretriever_parse_endpoints: [
+        nemotron_parse_endpoints: [
           $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
           $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
         ]

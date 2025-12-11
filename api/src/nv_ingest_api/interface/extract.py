@@ -62,9 +62,9 @@ def extract_primitives_from_pdf(
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
     # Nemoretriver Parse parameters:
-    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
-    nemoretriever_parse_protocol: str = "http",
-    nemoretriever_parse_model_name: str = None,
+    nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemotron_parse_protocol: str = "http",
+    nemotron_parse_model_name: str = None,
     # UnstructuredIO parameters:
     unstructured_io_api_key: Optional[str] = None,
     # Tika-specific parameter:
@@ -147,14 +147,14 @@ def extract_primitives_from_pdf(
     yolox_infer_protocol : str, default "http"
         Protocol to use for YOLOX inference. Options: "http" or "grpc".
 
-    nemoretriever_parse_endpoints : tuple of (str, str), optional
+    nemotron_parse_endpoints : tuple of (str, str), optional
         A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
-        Required when extract_method="nemoretriever_parse".
+        Required when extract_method="nemotron_parse".
 
-    nemoretriever_parse_protocol : str, default "http"
-        Protocol to use for NemoRetriever Parse. Options: "http" or "grpc".
+    nemotron_parse_protocol : str, default "http"
+        Protocol to use for Nemotron Parse. Options: "http" or "grpc".
 
-    nemoretriever_parse_model_name : str, optional
+    nemotron_parse_model_name : str, optional
         Model name for NemoRetriever Parse. Default is "nvidia/nemoretriever-parse".
 
     unstructured_io_api_key : str, optional
@@ -195,7 +195,7 @@ def extract_primitives_from_pdf(
     - pdfium: yolox_endpoints
     - adobe: adobe_client_id, adobe_client_secret
     - llama: llama_api_key
-    - nemoretriever_parse: nemoretriever_parse_endpoints
+    - nemotron_parse: nemotron_parse_endpoints
     - unstructured_io: unstructured_io_api_key
     - tika: tika_server_url
 
@@ -314,9 +314,9 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
-    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
-    nemoretriever_parse_protocol: str = "http",
-    nemoretriever_parse_model_name: Optional[str] = None,
+    nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemotron_parse_protocol: str = "http",
+    nemotron_parse_model_name: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Extract primitives from PDF documents using the NemoRetriever Parse extraction method.
@@ -384,18 +384,18 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         - "http" : Use HTTP protocol for YOLOX inference services
         - "grpc" : Use gRPC protocol for YOLOX inference services
 
-    nemoretriever_parse_endpoints : Optional[Tuple[str, str]], default None
+    nemotron_parse_endpoints : Optional[Tuple[str, str]], default None
         A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
         Format: (grpc_endpoint, http_endpoint)
         Example: (None, "http://localhost:8015/v1/chat/completions")
         Required for this extraction method.
 
-    nemoretriever_parse_protocol : str, default "http"
+    nemotron_parse_protocol : str, default "http"
         Protocol to use for NemoRetriever Parse. Options:
         - "http" : Use HTTP protocol for NemoRetriever Parse services
         - "grpc" : Use gRPC protocol for NemoRetriever Parse services
 
-    nemoretriever_parse_model_name : Optional[str], default None
+    nemotron_parse_model_name : Optional[str], default None
         Model name for NemoRetriever Parse.
         Default is typically "nvidia/nemoretriever-parse" if None is provided.
 
@@ -414,7 +414,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     Raises
     ------
     ValueError
-        If `nemoretriever_parse_endpoints` is None or empty
+        If `nemotron_parse_endpoints` is None or empty
         If the input DataFrame does not have the required structure
 
     KeyError
@@ -444,7 +444,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     >>> # Extract primitives using NemoRetriever Parse
     >>> result_df = extract_primitives_from_pdf_nemoretriever_parse(
     >>>     df_extraction_ledger=df,
-    >>>     nemoretriever_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
+    >>>     nemotron_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
     >>> )
     >>>
     >>> # Display the types of extracted elements
@@ -471,9 +471,9 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         yolox_endpoints=yolox_endpoints,
         yolox_auth_token=yolox_auth_token,
         yolox_infer_protocol=yolox_infer_protocol,
-        nemoretriever_parse_endpoints=nemoretriever_parse_endpoints,
-        nemoretriever_parse_protocol=nemoretriever_parse_protocol,
-        nemoretriever_parse_model_name=nemoretriever_parse_model_name,
+        nemotron_parse_endpoints=nemotron_parse_endpoints,
+        nemotron_parse_protocol=nemotron_parse_protocol,
+        nemotron_parse_model_name=nemotron_parse_model_name,
     )
 
 
