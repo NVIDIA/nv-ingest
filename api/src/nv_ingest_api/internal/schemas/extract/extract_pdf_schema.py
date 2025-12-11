@@ -98,7 +98,7 @@ class PDFiumConfigSchema(LowercaseProtocolMixin):
 
 class NemotronParseConfigSchema(LowercaseProtocolMixin):
     """
-    Configuration schema for NemoRetrieverParse endpoints and options.
+    Configuration schema for Nemotron Parse endpoints and options.
 
     Parameters
     ----------

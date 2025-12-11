@@ -103,7 +103,7 @@ def nemotron_parse_extractor(
             - identify_nearby_objects : bool, optional (default is True)
             - table_output_format : str, optional (default is "pseudo_markdown")
             - pdfium_config : dict, optional (configuration for PDFium)
-            - nemotron_parse_config : dict, optional (configuration for NemoRetrieverParse)
+            - nemotron_parse_config : dict, optional (configuration for Nemotron Parse)
             - metadata_column : str, optional (default is "metadata")
 
     Returns
@@ -367,7 +367,7 @@ def nemotron_parse_extractor(
                     )
                     accumulated_images.append(image)
 
-        # If NemoRetrieverParse fails to extract anything, fall back to using pdfium.
+        # If Nemotron Parse fails to extract anything, fall back to using pdfium.
         if not "".join(page_text).strip():
             if page is None:
                 page = doc.get_page(page_idx)
@@ -503,7 +503,7 @@ def _send_inference_request(
             model_name="nemotron_parse",
         )
     except Exception as e:
-        logger.exception(f"Unhandled error during NemoRetrieverParse inference: {e}")
+        logger.exception(f"Unhandled error during Nemotron Parse inference: {e}")
         raise e
 
     return response
