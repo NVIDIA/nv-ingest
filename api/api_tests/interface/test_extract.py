@@ -120,7 +120,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
     )
     _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT", None)
     _NEMO_RETRIEVER_PARSE_PROTOCOL = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_PROTOCOL", "http")
-    _NEMO_RETRIEVER_PARSE_MODEL_NAME = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    _NEMO_RETRIEVER_PARSE_MODEL_NAME = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
 
     # Method-specific configuration parameters
     extraction_params = {
@@ -388,7 +388,7 @@ def test_extract_pdf_with_nemoretriever_integration():
     )
     nemo_grpc_endpoint = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT", None)
     nemo_protocol = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_PROTOCOL", "http")
-    nemo_model_name = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    nemo_model_name = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
 
     # Also get YOLOX parameters (needed for image processing)
     yolox_http_endpoint = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8000/v1/infer")

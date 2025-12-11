@@ -155,7 +155,7 @@ def extract_primitives_from_pdf(
         Protocol to use for Nemotron Parse. Options: "http" or "grpc".
 
     nemotron_parse_model_name : str, optional
-        Model name for NemoRetriever Parse. Default is "nvidia/nemoretriever-parse".
+        Model name for Nemotron Parse. Default is "nvidia/nemotron-parse".
 
     unstructured_io_api_key : str, optional
         API key for Unstructured.io services. Required when extract_method="unstructured_io".
@@ -391,13 +391,13 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         Required for this extraction method.
 
     nemotron_parse_protocol : str, default "http"
-        Protocol to use for NemoRetriever Parse. Options:
+        Protocol to use for Nemotron Parse. Options:
         - "http" : Use HTTP protocol for NemoRetriever Parse services
         - "grpc" : Use gRPC protocol for NemoRetriever Parse services
 
     nemotron_parse_model_name : Optional[str], default None
-        Model name for NemoRetriever Parse.
-        Default is typically "nvidia/nemoretriever-parse" if None is provided.
+        Model name for Nemotron Parse.
+        Default is typically "nvidia/nemotron-parse" if None is provided.
 
     Returns
     -------

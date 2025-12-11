@@ -658,10 +658,10 @@ stages:
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|"grpc"
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|""
-        model_name: $NEMORETRIEVER_MODEL|"nvidia/nemoretriever-parse"
+        model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         endpoints: [
-          $NEMORETRIEVER_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_HTTP_ENDPOINT|"http://nemoretriever:8000/v1/chat/completions"
+          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
+          $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemoretriever:8000/v1/chat/completions"
         ]
     replicas:
       cpu_count_min: 1
@@ -692,7 +692,7 @@ pipeline:
 
                     nemo_config = config.stages[0].config["nemoretriever_parse_config"]
                     assert nemo_config["auth_token"] == "test-key"
-                    assert nemo_config["model_name"] == "nvidia/nemoretriever-parse"
+                    assert nemo_config["model_name"] == "nvidia/nemotron-parse"
 
                     assert config.pipeline.launch_simple_broker == True
             finally:

@@ -47,7 +47,7 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
     def test_initialization(self):
         """Test the initialization of the model interface."""
         # Test default initialization
-        self.assertEqual(self.model_interface.model_name, "nvidia/nemoretriever-parse")
+        self.assertEqual(self.model_interface.model_name, "nvidia/nemotron-parse")
 
         # Test custom model name
         custom_model = NemoRetrieverParseModelInterface(model_name="custom/model")
@@ -79,7 +79,7 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
         self.assertEqual(len(formatted_batch_data), 1)
 
         payload = formatted_batches[0]
-        self.assertEqual(payload["model"], "nvidia/nemoretriever-parse")
+        self.assertEqual(payload["model"], "nvidia/nemotron-parse")
         self.assertEqual(len(payload["messages"]), 1)
         self.assertEqual(payload["messages"][0]["role"], "user")
 
@@ -187,7 +187,7 @@ class TestNemoRetrieverParseModelInterface(unittest.TestCase):
         payload = self.model_interface._prepare_nemoretriever_parse_payload(base64_list)
 
         # Check the payload structure
-        self.assertEqual(payload["model"], "nvidia/nemoretriever-parse")
+        self.assertEqual(payload["model"], "nvidia/nemotron-parse")
         self.assertEqual(len(payload["messages"]), 2)
 
         # Check the first message
