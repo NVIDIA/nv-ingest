@@ -10,6 +10,7 @@ import logging
 import os
 import tempfile
 from concurrent.futures import Future
+from io import BytesIO
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -17,7 +18,7 @@ from unittest.mock import patch
 import nv_ingest_client.client.interface as module_under_test
 import pytest
 
-from client.client_tests.utilities_for_test import (
+from client_tests.utilities_for_test import (
     cleanup_test_workspace,
     create_test_workspace,
     get_git_root,
@@ -127,6 +128,12 @@ def text_documents():
         "data/test.md",
         "data/test.sh",
     ]
+
+
+@pytest.fixture
+def buffers(documents, text_documents):
+    all_documents = documents + text_documents
+    return [(doc, BytesIO(open(doc, "rb").read())) for doc in all_documents]
 
 
 @pytest.fixture
@@ -241,6 +248,18 @@ def test_extract_task_text_filetypes(text_documents):
         )
 
 
+def test_extract_task_buffers(buffers):
+    for buffer in buffers:
+        Ingestor(client=mock_client).buffers([buffer]).extract(
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_images=False,
+            extract_infographics=False,
+            document_type=buffer[0].split(".")[1],
+        )
+
+
 def test_filter_task_no_args(ingestor):
     ingestor.filter()
 
@@ -278,11 +297,12 @@ def test_store_task_no_args(ingestor):
 
 
 def test_store_task_some_args(ingestor):
-    ingestor.store(store_method="s3")
+    ingestor.store(storage_uri="s3://bucket/assets", public_base_url="http://public")
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, StoreTask)
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket/assets"
+    assert task._public_base_url == "http://public"
 
 
 def test_store_embed_task_no_args(ingestor):
@@ -367,7 +387,9 @@ def test_ingest(ingestor, mock_client):
     ingestor._output_conig = None
 
     # Act
-    result = ingestor.ingest(timeout=30)  # timeout=30 is passed to process_jobs_concurrently
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    result = ingestor.ingest(timeout=30)
 
     # Assert
     # Verify add_job was called (if ingestor is responsible for it)
@@ -384,6 +406,7 @@ def test_ingest(ingestor, mock_client):
         return_failures=True,
         stream_to_callback_only=False,
         verbose=expected_verbose,
+        return_traces=False,  # Default value
     )
     # Verify the result returned by ingestor matches the mocked result
     assert result == expected_results
@@ -413,6 +436,7 @@ def test_ingest_return_failures(ingestor, mock_client):
         expected_results,
         expected_failures,
     )
+    mock_client.consume_completed_parent_trace_ids.return_value = ["parent-trace-123"]
 
     # Store expected arguments used in process_jobs_concurrently
     expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
@@ -422,7 +446,7 @@ def test_ingest_return_failures(ingestor, mock_client):
     ingestor._output_conig = None
 
     # Act
-    results, failures = ingestor.ingest(timeout=30, return_failures=True)  # Pass return_failures=True
+    results, failures = ingestor.ingest(timeout=30, return_failures=True)
 
     # Assert
     # Verify add_job was called (if applicable)
@@ -440,6 +464,7 @@ def test_ingest_return_failures(ingestor, mock_client):
         # data_only=False, # Removed
         stream_to_callback_only=False,
         verbose=expected_verbose,
+        return_traces=False,  # Default value
     )
     # Verify the results and failures returned match the mocked tuple
     assert results == expected_results
@@ -451,28 +476,101 @@ def test_ingest_return_failures(ingestor, mock_client):
         mock_client.fetch_job_result.assert_not_called()
 
 
-def test_ingest_async(ingestor, mock_client):
+def _make_mock_processor(desired_results, desired_failures=None, desired_traces=None):
+    if desired_failures is None:
+        desired_failures = []
+
+    if desired_traces is None:
+        desired_traces = []
+
+    proc_future = Future()
+    proc_future.set_result((desired_results, desired_failures, desired_traces))
+
+    mock_proc = MagicMock()
+    mock_proc.run_async.return_value = proc_future
+    return mock_proc
+
+
+def test_ingest_async_returns_success_list(monkeypatch, ingestor, mock_client):
     mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
 
-    future1 = Future()
-    future2 = Future()
-    future1.set_result("result_1")
-    future2.set_result("result_2")
-    mock_client.submit_job_async.return_value = {
-        future1: "job_id_1",
-        future2: "job_id_2",
-    }
+    proc_future = Future()
+    mock_results = ["result_1", "result_2"]
+    proc_future.set_result((mock_results, [], []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
 
-    ingestor._job_states = {}
-    ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
-    ingestor._job_states["job_id_2"] = MagicMock(state=JobStateEnum.FAILED)
+    future = ingestor.ingest_async()
+    result = future.result(timeout=1)
 
-    mock_client.fetch_job_result.side_effect = lambda job_id, *args, **kwargs: (
-        ["result_1"] if job_id == "job_id_1" else ["result_2"]
-    )
+    assert result == mock_results
+    mock_client.process_jobs_concurrently_async.assert_called_once()
 
-    combined_result = ingestor.ingest_async(timeout=15).result()
-    assert combined_result == ["result_1", "result_2"]
+
+def test_ingest_async_with_failures(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+
+    mock_successes = ["result_1"]
+    mock_failures = [("job_id_2", "boom")]
+
+    proc_future = Future()
+    proc_future.set_result((mock_successes, mock_failures, []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    future = ingestor.ingest_async(return_failures=True)
+    results, returned_failures = future.result(timeout=1)
+
+    assert results == mock_successes
+    assert returned_failures == mock_failures
+    mock_client.process_jobs_concurrently_async.assert_called_once()
+
+
+def test_ingest_async_with_vdb_upload(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+
+    mock_vdb_op = MagicMock(spec=Milvus)
+    ingestor.vdb_upload(vdb_op=mock_vdb_op)
+
+    proc_future = Future()
+    mock_results = ["result_1", "result_2"]
+    proc_future.set_result((mock_results, [], []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    future = ingestor.ingest_async()
+    result = future.result(timeout=2)
+
+    assert result == mock_results
+
+    mock_client.process_jobs_concurrently_async.assert_called_once()
+
+    mock_vdb_op.run_async.assert_called_once()
+    vdb_arg_future = mock_vdb_op.run_async.call_args[0][0]
+    assert isinstance(vdb_arg_future, Future)
+    assert vdb_arg_future.result() == mock_results
+
+
+def test_ingest_async_dynamic_return_values(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    mock_results = ["result_1", "result_2"]
+    mock_failures = [("error_1", "msg")]
+    mock_traces = [{"trace": "data"}]
+
+    # --- Test Case 1: return_failures=True ---
+    proc_future_1 = Future()
+    proc_future_1.set_result((mock_results, mock_failures, []))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future_1
+
+    future_case_1 = ingestor.ingest_async(return_failures=True)
+    assert future_case_1.result(timeout=1) == (mock_results, mock_failures)
+
+    # --- Test Case 2: return_failures=True, return_traces=True ---
+    proc_future_2 = Future()
+    proc_future_2.set_result((mock_results, mock_failures, mock_traces))
+    mock_client.process_jobs_concurrently_async.return_value = proc_future_2
+
+    future_case_2 = ingestor.ingest_async(return_failures=True, return_traces=True)
+    assert future_case_2.result(timeout=1) == (mock_results, mock_failures, mock_traces)
 
 
 def test_create_client(ingestor):
@@ -509,6 +607,39 @@ def test_job_state_counting(ingestor):
     assert ingestor.failed_jobs() == 1
     assert ingestor.cancelled_jobs() == 1
     assert ingestor.remaining_jobs() == 0  # All jobs are in terminal states
+
+
+def test_get_status(ingestor):
+    ingestor._job_states = {
+        "job_1": MagicMock(state=JobStateEnum.SUBMITTED),
+        "job_2": MagicMock(state=JobStateEnum.SUBMITTED_ASYNC),
+        "job_3": MagicMock(state=JobStateEnum.PENDING),
+        "job_4": MagicMock(state=JobStateEnum.PROCESSING),
+        "job_5": MagicMock(state=JobStateEnum.FAILED),
+        "job_6": MagicMock(state=JobStateEnum.CANCELLED),
+        "job_7": MagicMock(state=JobStateEnum.COMPLETED),
+    }
+
+    ingestor._client._job_index_to_job_spec = {
+        "job_1": MagicMock(source_name="job_1"),
+        "job_2": MagicMock(source_name="job_2"),
+        "job_3": MagicMock(source_name="job_3"),
+        "job_4": MagicMock(source_name="job_4"),
+        "job_5": MagicMock(source_name="job_5"),
+        "job_6": MagicMock(source_name="job_6"),
+        "job_7": MagicMock(source_name="job_7"),
+    }
+    print(ingestor.get_status())
+
+    assert ingestor.get_status() == {
+        "job_1": "submitted",
+        "job_2": "submitted",
+        "job_3": "pending",
+        "job_4": "processing",
+        "job_5": "failed",
+        "job_6": "cancelled",
+        "job_7": "completed",
+    }
 
 
 @patch("glob.glob")
@@ -655,6 +786,7 @@ def test_save_to_disk_config_structure(ingestor, tmp_path):
     expected_config = {
         "output_directory": output_dir_str,
         "cleanup": True,
+        "compression": "gzip",
     }
     assert ingestor._output_config == expected_config
 
@@ -701,14 +833,14 @@ def test_lazy_list_core_functionality(create_jsonl_file):
     ]
     filepath = create_jsonl_file(data=default_data)
 
-    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
+    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3, compression=None)
     assert len(lazy_list_prelen) == 3
     assert list(lazy_list_prelen) == default_data
     assert lazy_list_prelen[1] == default_data[1]
     assert lazy_list_prelen[-1] == default_data[-1]
     assert "len=3" in repr(lazy_list_prelen)
 
-    lazy_list_ondemand = LazyLoadedList(filepath)
+    lazy_list_ondemand = LazyLoadedList(filepath, compression=None)
     assert lazy_list_ondemand._len is None
     assert len(lazy_list_ondemand) == 3
     assert lazy_list_ondemand._len == 3  # Check caching
@@ -751,7 +883,36 @@ def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
     assert not os.path.exists(user_dir), "User-provided directory should be removed when cleanup=True"
 
 
-def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
+def test_save_to_disk_defaults_to_gzip_compression(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "default_compression_output")
+
+    with patch(ENSURE_DIR_PATH):
+        ingestor.save_to_disk(output_directory=output_dir_str)
+
+    expected_config = {
+        "output_directory": output_dir_str,
+        "cleanup": True,
+        "compression": "gzip",
+    }
+    assert ingestor._output_config == expected_config
+
+
+def test_save_to_disk_can_disable_compression(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "no_compression_output")
+
+    with patch(ENSURE_DIR_PATH):
+        ingestor.save_to_disk(output_directory=output_dir_str, compression=None)
+
+    expected_config = {
+        "output_directory": output_dir_str,
+        "cleanup": True,
+        "compression": None,
+    }
+    assert ingestor._output_config == expected_config
+
+
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch, compression):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
     monkeypatch.setattr(
@@ -763,7 +924,10 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     results_dir = os.path.join(test_workspace, "vdb_purge_test")
     os.makedirs(results_dir)
 
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     def fake_processor(completion_callback=None, **kwargs):
         if completion_callback:
@@ -776,7 +940,7 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=compression)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
         ingestor.ingest(show_progress=False)
 
@@ -786,7 +950,8 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     assert os.path.exists(results_dir)
 
 
-def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch):
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch, compression):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
     monkeypatch.setattr(
@@ -797,7 +962,10 @@ def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch)
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_preserve_test")
     os.makedirs(results_dir)
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     def fake_processor(completion_callback=None, **kwargs):
         if completion_callback:
@@ -852,7 +1020,7 @@ def test_vdb_upload_with_failures_return_failures_true(workspace, monkeypatch, c
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=None)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Should return results and failures when return_failures=True
@@ -921,7 +1089,8 @@ def test_vdb_upload_with_failures_return_failures_false(workspace, monkeypatch):
         mock_vdb_op.run.assert_not_called()
 
 
-def test_vdb_upload_with_no_failures(workspace, monkeypatch):
+@pytest.mark.parametrize("compression", ["gzip", None])
+def test_vdb_upload_with_no_failures(workspace, monkeypatch, compression):
     """Test VDB upload with no failures.
 
     Should work normally regardless of return_failures setting.
@@ -936,7 +1105,10 @@ def test_vdb_upload_with_no_failures(workspace, monkeypatch):
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_success_test")
     os.makedirs(results_dir)
-    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+    filename = "doc1.txt.results.jsonl"
+    if compression == "gzip":
+        filename += ".gz"
+    dummy_result_filepath = os.path.join(results_dir, filename)
 
     # Mock only successful results, no failures
     successful_results = [[{"data": "embedding1"}], [{"data": "embedding2"}]]
@@ -955,7 +1127,7 @@ def test_vdb_upload_with_no_failures(workspace, monkeypatch):
     mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path), "1": MagicMock(source_name="doc2.txt")}
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=compression)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Test with return_failures=False (should return only results)
@@ -1001,7 +1173,7 @@ def test_vdb_upload_with_all_failures_return_failures_true(workspace, monkeypatc
     mock_client.process_jobs_concurrently.side_effect = fake_processor
 
     with Ingestor(documents=[doc1_path]) as ingestor:
-        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False, compression=None)
         ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
 
         # Should return empty results and all failures when return_failures=True
@@ -1061,3 +1233,146 @@ def test_vdb_upload_return_failures_true_with_tuple_return(workspace, monkeypatc
         mock_vdb_op.run.assert_called_once()
         called_args = mock_vdb_op.run.call_args[0][0]
         assert called_args == successful_results  # Should be raw data when save_to_disk() is not used
+
+
+def test_ingest_with_parent_trace_ids(ingestor, mock_client):
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [])
+    mock_client.consume_completed_parent_trace_ids.return_value = ["trace-1"]
+
+    results, parent_trace_ids = ingestor.ingest(include_parent_trace_ids=True)
+
+    assert results == [{"result": "ok"}]
+    assert parent_trace_ids == ["trace-1"]
+
+
+def test_ingest_return_failures_with_parent_trace_ids(ingestor, mock_client):
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [("job-2", "err")])
+    mock_client.consume_completed_parent_trace_ids.return_value = ["trace-2"]
+
+    results, failures, parent_trace_ids = ingestor.ingest(return_failures=True, include_parent_trace_ids=True)
+
+    assert results == [{"result": "ok"}]
+    assert failures == [("job-2", "err")]
+    assert parent_trace_ids == ["trace-2"]
+
+
+def test_ingest_with_return_traces(ingestor, mock_client):
+    """Test that return_traces=True extracts and returns trace dictionaries."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+
+    # Mock traces returned from process_jobs_concurrently
+    trace_dict = {
+        "trace::entry::pdf_extractor": 1000,
+        "trace::exit::pdf_extractor": 2000,
+        "trace::resident_time::pdf_extractor": 1000,
+    }
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [], [trace_dict])
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    results, traces = ingestor.ingest(return_traces=True)
+
+    assert results == [{"result": "ok"}]
+    assert traces == [trace_dict]
+    assert "trace::resident_time::pdf_extractor" in traces[0]
+
+
+def test_ingest_with_return_failures_and_traces(ingestor, mock_client):
+    """Test that return_failures=True and return_traces=True return both."""
+    job_indices = ["job-1", "job-2"]
+    mock_client.add_job.return_value = job_indices
+
+    trace_dict = {"trace::entry::pdf_extractor": 1000, "trace::exit::pdf_extractor": 2000}
+    mock_client.process_jobs_concurrently.return_value = (
+        [{"result": "ok"}],
+        [("job-2", "error")],
+        [trace_dict],
+    )
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    results, failures, traces = ingestor.ingest(return_failures=True, return_traces=True)
+
+    assert results == [{"result": "ok"}]
+    assert failures == [("job-2", "error")]
+    assert traces == [trace_dict]
+
+
+def test_ingest_with_all_three_flags(ingestor, mock_client):
+    """Test return_failures, return_traces, and include_parent_trace_ids together."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+
+    trace_dict = {"trace::entry::pdf_extractor": 1000}
+    mock_client.process_jobs_concurrently.return_value = (
+        [{"result": "ok"}],
+        [],
+        [trace_dict],
+    )
+    mock_client.consume_completed_parent_trace_ids.return_value = ["parent-trace-1"]
+
+    results, failures, traces, parent_trace_ids = ingestor.ingest(
+        return_failures=True, return_traces=True, include_parent_trace_ids=True
+    )
+
+    assert results == [{"result": "ok"}]
+    assert failures == []
+    assert traces == [trace_dict]
+    assert parent_trace_ids == ["parent-trace-1"]
+
+
+def test_ingest_passes_return_traces_to_client(ingestor, mock_client):
+    """Test that return_traces parameter is passed to process_jobs_concurrently."""
+    job_indices = ["job-1"]
+    mock_client.add_job.return_value = job_indices
+    mock_client.process_jobs_concurrently.return_value = ([{"result": "ok"}], [], [])
+    mock_client.consume_completed_parent_trace_ids.return_value = []
+
+    ingestor.ingest(return_traces=True)
+
+    # Verify return_traces=True was passed to the client
+    call_kwargs = mock_client.process_jobs_concurrently.call_args[1]
+    assert call_kwargs["return_traces"] is True
+
+
+def test_ingest_async_save_to_disk(ingestor, mock_client, tmp_path):
+    """Test that configuring save_to_disk sets up the processor correctly."""
+    out_dir = tmp_path / "out"
+
+    mock_client._job_index_to_job_spec = {}
+    mock_client.add_job.return_value = ["job1"]
+
+    proc_future = Future()
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    with patch("nv_ingest_client.client.interface.ThreadPoolExecutor") as mock_executor_cls:
+        mock_executor = MagicMock()
+        mock_executor_cls.return_value = mock_executor
+
+        def immediate_submit(fn, *args, **kwargs):
+            fn(*args, **kwargs)
+            f = Future()
+            f.set_result(None)
+            return f
+
+        mock_executor.submit.side_effect = immediate_submit
+
+        ingestor.save_to_disk(output_directory=str(out_dir), cleanup=True)
+
+        ingestor.ingest_async()
+
+        call_args = mock_client.process_jobs_concurrently_async.call_args[1]
+
+        assert call_args["stream_to_callback_only"] is True
+        callback = call_args["completion_callback"]
+        assert callable(callback)
+
+        test_data = {"metadata": {"source_metadata": {"source_id": "test_doc.txt"}, "content": "foo"}}
+        callback(test_data, "job1")
+
+        files = list(out_dir.glob("*.jsonl.gz"))
+        assert len(files) == 1
+        assert "test_doc" in files[0].name

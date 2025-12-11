@@ -44,6 +44,7 @@ from scipy.sparse import csr_array
 logger = logging.getLogger(__name__)
 
 CONSISTENCY = CONSISTENCY_BOUNDED
+DENSE_INDEX_NAME = "dense_index"
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -93,7 +94,7 @@ def create_meta_collection(
     index_params = MilvusClient.prepare_index_params()
     index_params.add_index(
         field_name="vector",
-        index_name="dense_index",
+        index_name=DENSE_INDEX_NAME,
         index_type="FLAT",
         metric_type="L2",
     )
@@ -286,6 +287,10 @@ def create_nvingest_index_params(
     gpu_index: bool = True,
     gpu_search: bool = False,
     local_index: bool = True,
+    intermediate_graph_degree: int = 128,
+    graph_degree: int = 100,
+    m: int = 64,
+    ef_construction: int = 512,
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -313,7 +318,7 @@ def create_nvingest_index_params(
     if local_index:
         index_params.add_index(
             field_name="vector",
-            index_name="dense_index",
+            index_name=DENSE_INDEX_NAME,
             index_type="FLAT",
             metric_type="L2",
         )
@@ -321,12 +326,12 @@ def create_nvingest_index_params(
         if gpu_index:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="GPU_CAGRA",
                 metric_type="L2",
                 params={
-                    "intermediate_graph_degree": 128,
-                    "graph_degree": 100,
+                    "intermediate_graph_degree": intermediate_graph_degree,
+                    "graph_degree": graph_degree,
                     "build_algo": "NN_DESCENT",
                     "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
@@ -335,10 +340,10 @@ def create_nvingest_index_params(
         else:
             index_params.add_index(
                 field_name="vector",
-                index_name="dense_index",
+                index_name=DENSE_INDEX_NAME,
                 index_type="HNSW",
                 metric_type="L2",
-                params={"M": 64, "efConstruction": 512},
+                params={"M": m, "efConstruction": ef_construction},
             )
     if sparse and local_index:
         index_params.add_index(
@@ -406,6 +411,10 @@ def create_nvingest_collection(
     recreate_meta: bool = False,
     username: str = None,
     password: str = None,
+    intermediate_graph_degree: int = 128,
+    graph_degree: int = 100,
+    m: int = 64,
+    ef_construction: int = 512,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -456,6 +465,10 @@ def create_nvingest_collection(
         gpu_index=gpu_index,
         gpu_search=gpu_search,
         local_index=local_index,
+        intermediate_graph_degree=intermediate_graph_degree,
+        graph_degree=graph_degree,
+        m=m,
+        ef_construction=ef_construction,
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
     d_idx, s_idx = _get_index_types(index_params, sparse=sparse)
@@ -493,7 +506,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
     if isinstance(indexes, dict):
         # Old Milvus behavior (< 2.5.6)
         for k, v in indexes.items():
-            if k[1] == "dense_index" and hasattr(v, "_index_type"):
+            if k[1] == DENSE_INDEX_NAME and hasattr(v, "_index_type"):
                 d_idx = v._index_type
             if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
                 s_idx = v._index_type
@@ -504,7 +517,7 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
             index_name = getattr(idx, "index_name", None)
             index_type = getattr(idx, "index_type", None)
 
-            if index_name == "dense_index":
+            if index_name == DENSE_INDEX_NAME:
                 d_idx = index_type
             if sparse and index_name == "sparse_index":
                 s_idx = index_type
@@ -776,13 +789,13 @@ def bulk_insert_milvus(
     t_bulk_start = time.time()
     task_ids = []
 
-    task_ids.append(
-        utility.do_bulk_insert(
+    for files in writer.batch_files:
+        task_id = utility.do_bulk_insert(
             collection_name=collection_name,
-            files=[file for files in writer.batch_files for file in files],
+            files=files,
             consistency_level=CONSISTENCY,
         )
-    )
+        task_ids.append(task_id)
 
     while len(task_ids) > 0:
         time.sleep(1)
@@ -891,7 +904,7 @@ def stream_insert_milvus(records, client: MilvusClient, collection_name: str, ba
     logger.info(f"streamed {count} records")
 
 
-def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient):
+def wait_for_index(collection_name: str, expected_rows_dict: dict, client: MilvusClient):
     """
     This function waits for the index to be built. It checks
     the indexed_rows of the index and waits for it to be equal
@@ -900,28 +913,28 @@ def wait_for_index(collection_name: str, num_elements: int, client: MilvusClient
     (refer to MilvusClient.refresh_load for bulk inserts).
     """
     client.flush(collection_name)
-    index_names = utility.list_indexes(collection_name)
     indexed_rows = 0
-    for index_name in index_names:
-        indexed_rows = 0
-        while indexed_rows < num_elements:
-            pos_movement = 10  # number of iteration allowed without noticing an increase in indexed_rows
+    # observe dense_index, all indexes get populated simultaneously
+    for index_name, rows_expected in expected_rows_dict.items():
+        indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+        while indexed_rows < rows_expected:
+            # 0.5% of rows expected allowed without noticing an increase in indexed_rows
+            pos_movement = start_pos_movement = max((rows_expected - indexed_rows) * 0.005, 10)
             for i in range(20):
-                new_indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
+                prev_indexed_rows = indexed_rows
+                indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
-                logger.info(
-                    f"polling for indexed rows, {collection_name}, {index_name} -  {new_indexed_rows} / {num_elements}"
-                )
-                if new_indexed_rows == num_elements:
-                    indexed_rows = new_indexed_rows
+                logger.info(f"Indexed rows, {collection_name}, {index_name} -  {indexed_rows} / {rows_expected}")
+                if indexed_rows == rows_expected:
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
-                if new_indexed_rows == indexed_rows:
-                    pos_movement = -1
+                if indexed_rows == prev_indexed_rows:
+                    pos_movement -= 1
+                else:
+                    pos_movement = start_pos_movement
                 # if pos_movement is 0, raise an error, means the rows are not getting indexed as expected
                 if pos_movement == 0:
-                    raise ValueError("Rows are not getting indexed as expected")
-                indexed_rows = new_indexed_rows
+                    raise ValueError(f"Rows are not getting indexed as expected for: {index_name} - {collection_name}")
     return indexed_rows
 
 
@@ -948,6 +961,7 @@ def write_to_nvingest_collection(
     stream: bool = False,
     username: str = None,
     password: str = None,
+    no_wait_index: bool = False,
     **kwargs,
 ):
     """
@@ -1041,14 +1055,22 @@ def write_to_nvingest_collection(
     if num_elements < threshold:
         stream = True
     if stream:
+        # most be accessed/saved before adding new records
+        index_names = utility.list_indexes(collection_name)
+        expected_rows = {}
+        for index_name in index_names:
+            expected_rows[index_name] = (
+                int(client.describe_index(collection_name, index_name)["indexed_rows"]) + num_elements
+            )
         stream_insert_milvus(
             cleaned_records,
             client,
             collection_name,
         )
-        # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
-        # know how long this should take, it is num_elements dependent.
-        wait_for_index(collection_name, num_elements, client)
+        if not local_index and not no_wait_index:
+            # Make sure all rows are indexed, decided not to wrap in a timeout because we dont
+            # know how long this should take, it is num_elements dependent.
+            wait_for_index(collection_name, expected_rows, client)
     else:
         minio_client = Minio(minio_endpoint, access_key=access_key, secret_key=secret_key, secure=False)
         bucket_name = bucket_name if bucket_name else ClientConfigSchema().minio_bucket_name
@@ -1349,7 +1371,7 @@ def nvingest_retrieval(
         nvidia_api_key=nvidia_api_key,
         input_type="query",
         output_names=["embeddings"],
-        grpc=not (urlparse(embedding_endpoint).scheme == "http"),
+        grpc=not ("http" in urlparse(embedding_endpoint).scheme),
     )
     client = client or MilvusClient(milvus_uri, token=f"{username}:{password}")
     final_top_k = top_k
@@ -1962,6 +1984,7 @@ class Milvus(VDB):
         threshold: int = 1000,
         username: str = None,
         password: str = None,
+        no_wait_index: bool = False,
         **kwargs,
     ):
         """
@@ -1999,6 +2022,12 @@ class Milvus(VDB):
         """
         kwargs = locals().copy()
         kwargs.pop("self", None)
+        bucket_name = kwargs.get("bucket_name", None)
+        if bucket_name is not None and bucket_name != ClientConfigSchema().minio_bucket_name:
+            raise ValueError(
+                "You must use the environment variable MINIO_BUCKET to specify bucket_name, detected:",
+                f"`bucket_name`: {bucket_name} and MINIO_BUCKET: {ClientConfigSchema().minio_bucket_name}",
+            )
         super().__init__(**kwargs)
 
     def create_index(self, **kwargs):
@@ -2054,3 +2083,24 @@ class Milvus(VDB):
                 self.write_to_index(records, collection_name=coll_name, **sub_write_params)
         else:
             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records
+
+    def run_async(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            logger.info(f"creating index - {collection_name}")
+            self.create_index(collection_name=collection_name, **create_params)
+            records = records.result()
+            logger.info(f"writing to index, for collection - {collection_name}")
+            self.write_to_index(records, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                sub_write_params.pop("collection_name", None)
+                self.create_index(collection_name=coll_name, **create_params)
+                self.write_to_index(records, collection_name=coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+        return records

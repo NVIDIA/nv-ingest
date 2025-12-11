@@ -10,6 +10,9 @@ import logging
 import math
 import os
 import time
+import threading
+import copy
+from statistics import mean, median
 from collections import defaultdict
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
@@ -32,9 +35,57 @@ from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result, IngestJobFailure
-from nv_ingest_client.util.util import create_job_specs_for_batch, check_ingest_result
+from nv_ingest_client.util.util import (
+    create_job_specs_for_batch,
+    check_ingest_result,
+    apply_pdf_split_config_to_job_specs,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _compute_resident_times(trace_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compute resident_time entries from entry/exit pairs if not already present.
+
+    This ensures consistency between split jobs (where server computes resident_time)
+    and non-split jobs (where we compute it client-side).
+
+    Parameters
+    ----------
+    trace_dict : Dict[str, Any]
+        Trace dictionary with entry/exit pairs
+
+    Returns
+    -------
+    Dict[str, Any]
+        Trace dictionary with resident_time entries added
+    """
+    if not trace_dict or not isinstance(trace_dict, dict):
+        return trace_dict
+
+    # Check if resident_time already exists (server-computed for split jobs)
+    has_resident = any(k.startswith("trace::resident_time::") for k in trace_dict.keys())
+    if has_resident:
+        return trace_dict  # Already computed by server
+
+    # Compute resident_time from entry/exit pairs
+    result = dict(trace_dict)
+    stages = set()
+
+    # Find all unique stages
+    for key in trace_dict:
+        if key.startswith("trace::entry::"):
+            stages.add(key.replace("trace::entry::", ""))
+
+    # Compute resident_time for each stage
+    for stage in stages:
+        entry_key = f"trace::entry::{stage}"
+        exit_key = f"trace::exit::{stage}"
+        if entry_key in trace_dict and exit_key in trace_dict:
+            result[f"trace::resident_time::{stage}"] = trace_dict[exit_key] - trace_dict[entry_key]
+
+    return result
 
 
 class DataDecodeException(Exception):
@@ -57,15 +108,12 @@ class DataDecodeException(Exception):
 
 class _ConcurrentProcessor:
     """
-    Manages the asynchronous submission and result fetching of jobs using a
-    client's public methods, mirroring the batching structure of the CLI path.
-
-    This processor takes a list of pre-created job indices, submits them in
-    batches via the client's `submit_job_async`, and then fetches results
-    for each batch using `fetch_job_result_async`. It processes results as
-    they become available within the batch using `as_completed`. Retries due
-    to job readiness timeouts are handled by adding the job index to the next
-    processing batch.
+    Manages asynchronous submission and result fetching while keeping a steady
+    pool of up to `batch_size` in-flight jobs:
+    - Retries (202/TimeoutError) are re-queued immediately.
+    - New jobs are submitted as capacity frees up.
+    - Fetches are started for jobs added each cycle.
+    - We always attempt to keep the executor saturated up to `batch_size`.
     """
 
     def __init__(
@@ -76,10 +124,14 @@ class _ConcurrentProcessor:
         batch_size: int,
         timeout: Tuple[int, Union[float, None]],
         max_job_retries: Optional[int],
+        retry_delay: float,
+        initial_fetch_delay: float,
         completion_callback: Optional[Callable[[Dict[str, Any], str], None]],
         fail_on_submit_error: bool,
         stream_to_callback_only: bool,
+        return_full_response: bool,
         verbose: bool = False,
+        return_traces: bool = False,
     ):
         """
         Initializes the concurrent processor.
@@ -113,6 +165,8 @@ class _ConcurrentProcessor:
             initiating job submission or fetching fails for a batch.
         verbose : bool, optional
             If True, enables detailed debug logging. Default is False.
+        return_traces : bool, optional
+            If True, parent-level trace data for each completed job is stored.
 
         Raises
         ------
@@ -128,20 +182,32 @@ class _ConcurrentProcessor:
         self.batch_size = batch_size
         self.timeout = timeout
         self.max_job_retries = max_job_retries
+        self.retry_delay = retry_delay
+        self.initial_fetch_delay = initial_fetch_delay
         self.completion_callback = completion_callback
         self.fail_on_submit_error = fail_on_submit_error
         self.stream_to_callback_only = stream_to_callback_only
+        self.return_full_response = return_full_response
         self.verbose = verbose
+        self.return_traces = return_traces
 
         # State variables managed across batch cycles
         self.retry_job_ids: List[str] = []
         self.retry_counts: Dict[str, int] = defaultdict(int)
         self.results: List[Dict[str, Any]] = []  # Stores successful results (full dicts)
         self.failures: List[Tuple[str, str]] = []  # (job_index, error_message)
+        self.traces: List[Optional[Dict[str, Any]]] = []
 
         # --- Initial Checks ---
         if not self.job_queue_id:
             logger.warning("job_queue_id is not set; submission of new jobs will fail.")
+
+        # Executor check required for run_async
+        if not hasattr(client, "_worker_pool"):
+            raise AttributeError("Client object is missing the '_worker_pool' attribute, required for run_async.")
+        if not isinstance(client._worker_pool, ThreadPoolExecutor):
+            raise TypeError("Client's '_worker_pool' must be a ThreadPoolExecutor for run_async.")
+        self._executor = client._worker_pool
 
     # --------------------------------------------------------------------------
     # Private Methods
@@ -187,7 +253,7 @@ class _ConcurrentProcessor:
         # Attempt to mark state as FAILED locally in the client (best effort)
         try:
             # Use a method assumed to safely get the state object
-            job_state = self.client._get_job_state_object(job_index)
+            job_state = self.client._get_and_check_job_state(job_index)
             # Check state exists and is not already terminal before updating
             if (
                 job_state and hasattr(job_state, "state") and job_state.state not in ["FAILED", "COMPLETED"]
@@ -225,13 +291,25 @@ class _ConcurrentProcessor:
 
         is_failed, description = check_ingest_result(result_data)
 
+        if trace_id:
+            self.client.register_parent_trace_id(trace_id)
+
         if is_failed:
             failed_job_spec = self.client._job_index_to_job_spec.get(job_index)
             self.failures.append((f"{job_index}:{failed_job_spec.source_id}", description))
         elif self.stream_to_callback_only:
             self.results.append(job_index)
         else:
-            self.results.append(result_data.get("data"))
+            # When requested, return the full response envelope (includes 'trace' and 'annotations')
+            self.results.append(result_data if self.return_full_response else result_data.get("data"))
+
+        # Extract trace data for all successful (non-failed) jobs
+        if self.return_traces and not is_failed:
+            trace_payload = result_data.get("trace") if result_data else None
+            # Compute resident_time if not already present (for consistency)
+            if trace_payload:
+                trace_payload = _compute_resident_times(trace_payload)
+            self.traces.append(trace_payload if trace_payload else None)
 
         # Cleanup retry count if it exists
         if job_index in self.retry_counts:
@@ -275,21 +353,159 @@ class _ConcurrentProcessor:
             except Exception:
                 logger.warning("Could not reliably extract job indices from results for final check.")
 
-            initial_indices = set(self.all_job_indices_list)
-            unaccounted_indices = initial_indices - processed_indices
-
-            if unaccounted_indices:
-                logger.warning(f"Potentially unaccounted for jobs: {unaccounted_indices}")
-                # Optionally add them to failures
-                # for idx in unaccounted_indices:
-                #     if not any(f[0] == idx for f in self.failures):
-                #         self.failures.append((idx, "Job lost or unaccounted for at exit"))
-
     # --------------------------------------------------------------------------
-    # Public Methods
+    # Declarative Helper Methods (behavior preserved)
     # --------------------------------------------------------------------------
 
-    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
+    def _collect_retry_jobs_for_batch(self) -> List[str]:
+        """
+        Collect retry jobs for this batch, mirroring handler behavior (no pacing filter).
+
+        Returns
+        -------
+        List[str]
+            The list of job indices that should be retried in this batch.
+        """
+        if not self.retry_job_ids:
+            return []
+
+        # Take all retries this cycle and clear the list (handler resets per-iteration)
+        eligible: List[str] = list(self.retry_job_ids)
+        self.retry_job_ids = []
+        if eligible and self.verbose:
+            logger.debug(f"Adding {len(eligible)} retry jobs to current batch.")
+        return eligible
+
+    def _schedule_retry(self, job_index: str) -> None:
+        """
+        Schedule an immediate retry for a job (no pacing), mirroring handler behavior.
+        """
+        if job_index not in self.retry_job_ids:
+            self.retry_job_ids.append(job_index)
+
+    def _select_new_jobs_for_batch(
+        self,
+        submitted_new_indices_count: int,
+        total_jobs: int,
+        already_in_batch: int,
+    ) -> Tuple[List[str], int]:
+        """
+        Determine the slice of new jobs to include in the current batch based on
+        remaining capacity and unsubmitted jobs.
+
+        Note: This does NOT change submitted_new_indices_count. The original code
+        increments that counter only after submission is attempted/handled.
+        """
+        if (already_in_batch < self.batch_size) and (submitted_new_indices_count < total_jobs):
+            num_new_to_add = min(self.batch_size - already_in_batch, total_jobs - submitted_new_indices_count)
+            start_idx = submitted_new_indices_count
+            end_idx = submitted_new_indices_count + num_new_to_add
+            new_job_indices = self.all_job_indices_list[start_idx:end_idx]
+
+            if self.verbose:
+                logger.debug(f"Adding {len(new_job_indices)} new jobs to current batch.")
+
+            return new_job_indices, submitted_new_indices_count
+
+        return [], submitted_new_indices_count
+
+    def _submit_new_jobs_async(
+        self,
+        current_batch_new_job_indices: List[str],
+        current_batch_job_indices: List[str],
+        submitted_new_indices_count: int,
+    ) -> Tuple[List[str], int]:
+        """
+        Initiate asynchronous submission for the new jobs selected for this batch.
+
+        Mirrors the original inline submission block, including error handling and
+        fail_on_submit_error semantics. Returns potentially updated batch indices and
+        submitted count.
+        """
+        if not current_batch_new_job_indices:
+            return current_batch_job_indices, submitted_new_indices_count
+
+        if not self.job_queue_id:
+            error_msg = "Cannot submit new jobs: job_queue_id is not set."
+            logger.error(error_msg)
+            # Fail these jobs immediately
+            for job_index in current_batch_new_job_indices:
+                self._handle_processing_failure(job_index, error_msg, is_submission_failure=True)
+            # Mark as "submitted" (to prevent reprocessing) but failed
+            submitted_new_indices_count += len(current_batch_new_job_indices)
+            if self.fail_on_submit_error:
+                raise ValueError(error_msg)
+            return current_batch_job_indices, submitted_new_indices_count
+
+        try:
+            # Fire-and-forget submission initiation
+            _ = self.client.submit_job_async(current_batch_new_job_indices, self.job_queue_id)
+            # Add successfully initiated jobs to the overall batch list
+            current_batch_job_indices.extend(current_batch_new_job_indices)
+            # Update count of total initiated jobs
+            submitted_new_indices_count += len(current_batch_new_job_indices)
+            return current_batch_job_indices, submitted_new_indices_count
+        except Exception as e:
+            error_msg = (
+                f"Batch async submission initiation failed for {len(current_batch_new_job_indices)} new jobs: {e}"
+            )
+            logger.error(error_msg, exc_info=True)
+            # Fail these jobs immediately
+            for job_index in current_batch_new_job_indices:
+                self._handle_processing_failure(
+                    job_index, f"Batch submission initiation error: {e}", is_submission_failure=True
+                )
+            # Mark as "submitted" (to prevent reprocessing) but failed
+            submitted_new_indices_count += len(current_batch_new_job_indices)
+            if self.fail_on_submit_error:
+                raise RuntimeError(error_msg) from e
+            return current_batch_job_indices, submitted_new_indices_count
+
+    def _initiate_fetch_for_batch(self, current_batch_job_indices: List[str]) -> Tuple[Dict[Future, str], List[str]]:
+        """
+        Initiate fetching for the prepared batch and ensure consistency of returned futures.
+
+        Returns
+        -------
+        batch_futures_dict : Dict[Future, str]
+            Mapping of futures to their associated job indices.
+        normalized_job_indices : List[str]
+            The job indices normalized to those actually returned by the client if a discrepancy occurs.
+        """
+        if self.verbose:
+            logger.debug(f"Calling fetch_job_result_async for {len(current_batch_job_indices)} jobs.")
+        batch_futures_dict: Dict[Future, str] = (
+            self.client.fetch_job_result_async(current_batch_job_indices, data_only=False, timeout=None)
+            if current_batch_job_indices
+            else {}
+        )
+
+        # Check for discrepancies where client might not return all futures
+        if current_batch_job_indices and (len(batch_futures_dict) != len(current_batch_job_indices)):
+            returned_indices = set(batch_futures_dict.values())
+            missing_indices = [idx for idx in current_batch_job_indices if idx not in returned_indices]
+            logger.error(
+                f"fetch_job_result_async discrepancy: Expected {len(current_batch_job_indices)}, got "
+                f"{len(batch_futures_dict)}. Missing: {missing_indices}"
+            )
+            # Fail the missing ones explicitly
+            for missing_idx in missing_indices:
+                self._handle_processing_failure(
+                    missing_idx, "Future not returned by fetch_job_result_async", is_submission_failure=True
+                )
+            if self.fail_on_submit_error:
+                raise RuntimeError("fetch_job_result_async failed to return all expected futures.")
+            # Continue processing only the futures we received
+            normalized_job_indices = list(returned_indices)
+        else:
+            normalized_job_indices = list(current_batch_job_indices)
+
+        return batch_futures_dict, normalized_job_indices
+
+    # --------------------------------------------------------------------------
+    # Core Processing Logic
+    # --------------------------------------------------------------------------
+    def _process_all_jobs(self) -> Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
         """
         Executes the main processing loop in batches.
 
@@ -315,210 +531,162 @@ class _ConcurrentProcessor:
              initiation error occurs.
         """
         total_jobs = len(self.all_job_indices_list)
-        # Tracks indices for which submission has been initiated at least once
-        submitted_new_indices_count = 0
+        submitted_new_indices_count = 0  # Tracks indices for which submission has been initiated at least once
 
-        logger.info(f"Starting batch processing for {total_jobs} jobs with batch " f"size {self.batch_size}.")
+        logger.debug(f"Starting batch processing for {total_jobs} jobs with batch size {self.batch_size}.")
 
-        # Main loop: continues as long as there are new jobs to submit
-        # or jobs waiting for retry.
-        while (submitted_new_indices_count < total_jobs) or self.retry_job_ids:
+        # Keep up to batch_size jobs in-flight at all times
+        inflight_futures: Dict[Future, str] = {}
 
-            # --- Determine Jobs for Current Batch ---
-            current_batch_job_indices: List[str] = []
+        while (submitted_new_indices_count < total_jobs) or self.retry_job_ids or inflight_futures:
+            # 1) Top up from retries first
+            capacity = max(0, self.batch_size - len(inflight_futures))
+            to_fetch: List[str] = []
+            if capacity > 0 and self.retry_job_ids:
+                take = min(capacity, len(self.retry_job_ids))
+                retry_now = self.retry_job_ids[:take]
+                self.retry_job_ids = self.retry_job_ids[take:]
+                to_fetch.extend(retry_now)
+                capacity -= len(retry_now)
 
-            # Add retries from the previous batch first
-            if self.retry_job_ids:
-                num_retries = len(self.retry_job_ids)
-                current_batch_job_indices.extend(self.retry_job_ids)
-                if self.verbose:
-                    logger.debug(f"Adding {num_retries} retry jobs to current batch.")
-                # Clear the list; retries for *this* batch will be collected later
-                self.retry_job_ids = []
+            # 2) Then add new jobs up to capacity
+            if capacity > 0 and (submitted_new_indices_count < total_jobs):
+                new_count = min(capacity, total_jobs - submitted_new_indices_count)
+                new_job_indices = self.all_job_indices_list[
+                    submitted_new_indices_count : submitted_new_indices_count + new_count
+                ]
 
-            # Determine and add new jobs to the batch
-            num_already_in_batch = len(current_batch_job_indices)
-            if (num_already_in_batch < self.batch_size) and (submitted_new_indices_count < total_jobs):
-                num_new_to_add = min(self.batch_size - num_already_in_batch, total_jobs - submitted_new_indices_count)
-                start_idx = submitted_new_indices_count
-                end_idx = submitted_new_indices_count + num_new_to_add
-                current_batch_new_job_indices = self.all_job_indices_list[start_idx:end_idx]
-
-                if self.verbose:
-                    logger.debug(f"Adding {len(current_batch_new_job_indices)} new " f"jobs to current batch.")
-
-                # Initiate async submission for ONLY the NEW jobs
-                if current_batch_new_job_indices:
-                    if not self.job_queue_id:
-                        error_msg = "Cannot submit new jobs: job_queue_id is not set."
-                        logger.error(error_msg)
-                        # Fail these jobs immediately
-                        for job_index in current_batch_new_job_indices:
-                            self._handle_processing_failure(job_index, error_msg, is_submission_failure=True)
-                        # Mark as "submitted" (to prevent reprocessing) but failed
-                        submitted_new_indices_count += len(current_batch_new_job_indices)
-                        if self.fail_on_submit_error:
-                            raise ValueError(error_msg)
-                    else:
-                        try:
-                            # Fire-and-forget submission initiation
-                            _ = self.client.submit_job_async(current_batch_new_job_indices, self.job_queue_id)
-                            # Add successfully initiated jobs to the overall batch list
-                            current_batch_job_indices.extend(current_batch_new_job_indices)
-                            # Update count of total initiated jobs
-                            submitted_new_indices_count += len(current_batch_new_job_indices)
-                        except Exception as e:
-                            error_msg = (
-                                f"Batch async submission initiation failed for "
-                                f"{len(current_batch_new_job_indices)} new jobs: {e}"
+                if not self.job_queue_id:
+                    error_msg = "Cannot submit new jobs: job_queue_id is not set."
+                    logger.error(error_msg)
+                    for job_index in new_job_indices:
+                        self._handle_processing_failure(job_index, error_msg, is_submission_failure=True)
+                    submitted_new_indices_count += len(new_job_indices)
+                    if self.fail_on_submit_error:
+                        raise ValueError(error_msg)
+                else:
+                    try:
+                        _ = self.client.submit_job_async(new_job_indices, self.job_queue_id)
+                        submitted_new_indices_count += len(new_job_indices)
+                        to_fetch.extend(new_job_indices)
+                    except Exception as e:
+                        error_msg = f"Batch async submission initiation failed for {len(new_job_indices)} new jobs: {e}"
+                        logger.error(error_msg, exc_info=True)
+                        for job_index in new_job_indices:
+                            self._handle_processing_failure(
+                                job_index, f"Batch submission initiation error: {e}", is_submission_failure=True
                             )
-                            logger.error(error_msg, exc_info=True)
-                            # Fail these jobs immediately
-                            for job_index in current_batch_new_job_indices:
-                                self._handle_processing_failure(
-                                    job_index, f"Batch submission initiation error: {e}", is_submission_failure=True
-                                )
-                            # Mark as "submitted" (to prevent reprocessing) but failed
-                            submitted_new_indices_count += len(current_batch_new_job_indices)
-                            if self.fail_on_submit_error:
-                                raise RuntimeError(error_msg) from e
+                        submitted_new_indices_count += len(new_job_indices)
+                        if self.fail_on_submit_error:
+                            raise RuntimeError(error_msg) from e
 
-            # If nothing ended up in the batch (e.g., only submission failures)
-            if not current_batch_job_indices:
-                if self.verbose:
-                    logger.debug("No jobs identified for fetching in this batch iteration.")
-                # If there are no retries pending either, break the loop
-                if not self.retry_job_ids and submitted_new_indices_count >= total_jobs:
-                    logger.debug("Exiting loop: No jobs to fetch and no retries pending.")
-                    break
-                continue  # Otherwise, proceed to next iteration
-
-            # --- Initiate Fetching for the Current Batch ---
-            try:
-                if self.verbose:
-                    logger.debug(
-                        f"Calling fetch_job_result_async for "
-                        f"{len(current_batch_job_indices)} jobs in current batch."
-                    )
-                # Use data_only=False to get full response for callback/results
-                batch_futures_dict = self.client.fetch_job_result_async(current_batch_job_indices, data_only=False)
-
-                # Check for discrepancies where client might not return all futures
-                if len(batch_futures_dict) != len(current_batch_job_indices):
-                    returned_indices = set(batch_futures_dict.values())
-                    missing_indices = [idx for idx in current_batch_job_indices if idx not in returned_indices]
+            # 3) Launch fetches for the jobs we added to this cycle
+            if to_fetch:
+                try:
+                    new_futures = self.client.fetch_job_result_async(to_fetch, data_only=False, timeout=None)
+                    inflight_futures.update(new_futures)
+                except Exception as fetch_init_err:
                     logger.error(
-                        f"fetch_job_result_async discrepancy: Expected "
-                        f"{len(current_batch_job_indices)}, got "
-                        f"{len(batch_futures_dict)}. Missing: {missing_indices}"
+                        f"fetch_job_result_async failed to start for {len(to_fetch)} jobs: {fetch_init_err}",
+                        exc_info=True,
                     )
-                    # Fail the missing ones explicitly
-                    for missing_idx in missing_indices:
+                    for job_index in to_fetch:
                         self._handle_processing_failure(
-                            missing_idx, "Future not returned by fetch_job_result_async", is_submission_failure=True
+                            job_index, f"Fetch initiation error: {fetch_init_err}", is_submission_failure=True
                         )
                     if self.fail_on_submit_error:
-                        raise RuntimeError("fetch_job_result_async failed to return all " "expected futures.")
-                    # Continue processing only the futures we received
-                    current_batch_job_indices = list(returned_indices)
+                        raise RuntimeError(
+                            f"Stopping due to fetch initiation failure: {fetch_init_err}"
+                        ) from fetch_init_err
 
-            except Exception as fetch_init_err:
-                error_msg = (
-                    f"fetch_job_result_async failed for batch "
-                    f"({len(current_batch_job_indices)} jobs): {fetch_init_err}"
+            # 4) If nothing left anywhere, exit
+            if not inflight_futures and not self.retry_job_ids and submitted_new_indices_count >= total_jobs:
+                logger.debug("Exiting loop: No in-flight jobs, no retries, and all jobs submitted.")
+                break
+
+            # 5) Wait for at least one in-flight future to complete, then process done ones
+            if inflight_futures:
+                done, _ = concurrent.futures.wait(
+                    set(inflight_futures.keys()), return_when=concurrent.futures.FIRST_COMPLETED
                 )
-                logger.error(error_msg, exc_info=True)
-                logger.warning(
-                    f"Marking all {len(current_batch_job_indices)} jobs in " f"failed fetch initiation batch as failed."
-                )
-                # Fail all jobs intended for this batch
-                for job_index in current_batch_job_indices:
-                    self._handle_processing_failure(
-                        job_index, f"Fetch initiation failed for batch: {fetch_init_err}", is_submission_failure=True
-                    )
-                if self.fail_on_submit_error:
-                    raise RuntimeError(
-                        f"Stopping due to fetch initiation failure: {fetch_init_err}"
-                    ) from fetch_init_err
-                continue  # Skip processing results for this failed batch
-
-            # --- Process Results for the Current Batch ---
-            if not batch_futures_dict:
-                if self.verbose:
-                    logger.debug("No futures returned/available for processing in this batch.")
-                continue  # Skip processing if no futures
-
-            batch_timeout = 600.0  # Timeout for waiting on the whole batch
-            try:
-                # Process futures as they complete within this batch
-                for future in as_completed(batch_futures_dict.keys(), timeout=batch_timeout):
-                    job_index = batch_futures_dict[future]
+                for future in done:
+                    job_index = inflight_futures.pop(future, None)
+                    if job_index is None:
+                        continue
                     try:
-                        # Expect list with one tuple: [(data, index, trace)]
                         result_list = future.result()
                         if not isinstance(result_list, list) or len(result_list) != 1:
                             raise ValueError(f"Expected list length 1, got {len(result_list)}")
-
                         result_tuple = result_list[0]
                         if not isinstance(result_tuple, (tuple, list)) or len(result_tuple) != 3:
                             raise ValueError(f"Expected tuple/list length 3, got {len(result_tuple)}")
-
                         full_response_dict, fetched_job_index, trace_id = result_tuple
-
                         if fetched_job_index != job_index:
-                            logger.warning(f"Mismatch: Future for {job_index} returned " f"{fetched_job_index}")
-
+                            logger.warning(f"Mismatch: Future for {job_index} returned {fetched_job_index}")
                         self._handle_processing_success(job_index, full_response_dict, trace_id)
-
                     except TimeoutError:
-                        # Handle job not ready - check retry policy
+                        # Not ready -> immediate retry
                         self.retry_counts[job_index] += 1
                         if self.max_job_retries is None or self.retry_counts[job_index] <= self.max_job_retries:
                             if self.verbose:
                                 logger.info(
-                                    f"Job {job_index} not ready, adding to next "
-                                    f"batch's retry list (Attempt "
-                                    f"{self.retry_counts[job_index]}/"
-                                    f"{self.max_job_retries or 'inf'})."
+                                    f"Job {job_index} not ready, scheduling retry "
+                                    f"(Attempt {self.retry_counts[job_index]}/{self.max_job_retries or 'inf'})."
                                 )
-                            # Collect for the *next* batch
-                            self.retry_job_ids.append(job_index)
+                            self._schedule_retry(job_index)
                         else:
-                            error_msg = f"Exceeded max fetch retries " f"({self.max_job_retries}) for job {job_index}."
+                            error_msg = f"Exceeded max fetch retries ({self.max_job_retries}) for job {job_index}."
                             logger.error(error_msg)
                             self._handle_processing_failure(job_index, error_msg)
-
                     except (ValueError, RuntimeError) as e:
                         logger.error(f"Job {job_index} failed processing result: {e}", exc_info=self.verbose)
                         self._handle_processing_failure(job_index, f"Error processing result: {e}")
                     except Exception as e:
                         logger.exception(f"Unhandled error processing future for job {job_index}: {e}")
                         self._handle_processing_failure(job_index, f"Unhandled error processing future: {e}")
-                    # No finally block incrementing count here; tracking is batch-based
-
-            except TimeoutError:
-                # `as_completed` timed out waiting for remaining futures in batch
-                logger.error(
-                    f"Batch processing timed out after {batch_timeout}s waiting "
-                    f"for futures. Some jobs in batch may be lost or incomplete."
-                )
-                # Identify and fail remaining futures
-                remaining_indices_in_batch = []
-                for f, idx in batch_futures_dict.items():
-                    if not f.done():
-                        remaining_indices_in_batch.append(idx)
-                        f.cancel()  # Attempt to cancel underlying task
-                logger.warning(
-                    f"Jobs potentially lost/cancelled due to batch timeout: " f"{remaining_indices_in_batch}"
-                )
-                for idx in remaining_indices_in_batch:
-                    self._handle_processing_failure(idx, f"Batch processing timed out after {batch_timeout}s")
-            # End of processing for this batch cycle
 
         # --- Final Logging ---
         self._log_final_status(total_jobs)
 
-        return self.results, self.failures
+        return self.results, self.failures, self.traces if self.return_traces else []
+
+    # --------------------------------------------------------------------------
+    # Public Methods
+    # --------------------------------------------------------------------------
+
+    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
+        """
+        Executes the main processing loop synchronously.
+
+        This method orchestrates the job processing by maintaining a constant
+        pool of in-flight jobs, handling submissions, fetches, and retries until
+        all jobs are complete. It blocks until all jobs are processed.
+
+        Returns
+        -------
+        Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]
+            A tuple containing:
+            1. A list of successfully fetched job results.
+            2. A list of tuples for failed jobs (job_index, error_message).
+            3. A list of trace dictionaries if `return_traces` was True.
+        """
+        return self._process_all_jobs()
+
+    def run_async(self) -> Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]:
+        """
+        Executes the main processing loop asynchronously.
+
+        Submits the entire processing logic to the client's background
+        thread pool and returns a Future that resolves with the final
+        results, failures, and traces once all jobs are complete.
+
+        Returns
+        -------
+        Future
+            A future representing the asynchronous execution. Its result()
+            will be a tuple containing (results, failures, traces).
+        """
+        return self._executor.submit(self._process_all_jobs)
 
 
 class NvIngestClient:
@@ -547,11 +715,12 @@ class NvIngestClient:
         message_client_port : int, optional
             Port of the REST/message service. Defaults to 7670.
         message_client_kwargs : dict, optional
-            Extra keyword arguments passed to the client allocator.
+            Extra keyword arguments passed to the client allocator. For RestClient,
+            can include 'api_version' (e.g., 'v1' or 'v2'). Defaults to 'v1'.
         msg_counter_id : str, optional
             Identifier for message counting. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
-            Number of workers in the thread pool. Defaults to 1.
+            Number of workers in the thread pool. Defaults to 8.
 
         Returns
         -------
@@ -573,10 +742,19 @@ class NvIngestClient:
             **self._message_client_kwargs,
         )
 
-        # Initialize the worker pool with the specified size
+        # Initialize the worker pool with the specified size (used for both submit and fetch)
         self._worker_pool = ThreadPoolExecutor(max_workers=worker_pool_size)
 
+        # Telemetry state and controls
+        self._telemetry_lock = threading.Lock()
+        self._telemetry_enabled: bool = bool(int(os.getenv("NV_INGEST_CLIENT_TELEMETRY", "1")))
+        try:
+            self._telemetry_max_calls: int = int(os.getenv("NV_INGEST_CLIENT_TELEMETRY_MAX_CALLS", "10000"))
+        except ValueError:
+            self._telemetry_max_calls = 10000
         self._telemetry = {}
+        self._completed_parent_trace_ids: List[str] = []  # 1054
+        self.reset_telemetry()
 
     def __str__(self) -> str:
         """
@@ -623,6 +801,106 @@ class NvIngestClient:
         self._job_states.pop(job_index)
 
         return job_state
+
+    # ------------------------------------------------------------------
+    # Telemetry helpers
+    # ------------------------------------------------------------------
+
+    def enable_telemetry(self, enabled: bool) -> None:
+        with self._telemetry_lock:
+            self._telemetry_enabled = bool(enabled)
+
+    def reset_telemetry(self) -> None:
+        with self._telemetry_lock:
+            self._telemetry = {
+                "started_at": time.time(),
+                "submit": {"count": 0, "calls": []},
+                "fetch": {"count": 0, "last_ts": None, "intervals": [], "calls": []},
+                "per_job": {},
+            }
+
+    def _t_per_job(self, job_index: str) -> Dict[str, Any]:
+        pj = self._telemetry["per_job"].get(job_index)
+        if pj is None:
+            pj = {"submits": [], "fetch_attempts": [], "timeouts_202": 0, "failures": 0, "first_success_ts": None}
+            self._telemetry["per_job"][job_index] = pj
+        return pj
+
+    def _t_append_capped(self, arr: List[Any], item: Any) -> None:
+        if len(arr) < self._telemetry_max_calls:
+            arr.append(item)
+
+    def _t_record_submit(self, job_index: str, status: str, ts: float, trace_id: Optional[str]) -> None:
+        if not self._telemetry_enabled:
+            return
+        with self._telemetry_lock:
+            self._telemetry["submit"]["count"] += 1
+            self._t_append_capped(
+                self._telemetry["submit"]["calls"],
+                {"job": job_index, "status": status, "ts": ts, "trace": trace_id},
+            )
+            pj = self._t_per_job(job_index)
+            self._t_append_capped(pj["submits"], ts)
+
+    def _t_record_fetch_attempt(self, job_index: str, ts: float) -> None:
+        if not self._telemetry_enabled:
+            return
+        with self._telemetry_lock:
+            self._telemetry["fetch"]["count"] += 1
+            last = self._telemetry["fetch"]["last_ts"]
+            if last is not None:
+                delta = ts - float(last)
+                if delta >= 0:
+                    self._t_append_capped(self._telemetry["fetch"]["intervals"], delta)
+            self._telemetry["fetch"]["last_ts"] = ts
+            pj = self._t_per_job(job_index)
+            self._t_append_capped(pj["fetch_attempts"], ts)
+
+    def _t_record_fetch_outcome(self, job_index: str, code: int, ts: float, ok: bool, trace_id: Optional[str]) -> None:
+        if not self._telemetry_enabled:
+            return
+        with self._telemetry_lock:
+            self._t_append_capped(
+                self._telemetry["fetch"]["calls"],
+                {"job": job_index, "code": code, "ok": ok, "ts": ts, "trace": trace_id},
+            )
+            pj = self._t_per_job(job_index)
+            if code == 2:  # 202 not ready
+                pj["timeouts_202"] += 1
+            if ok and pj["first_success_ts"] is None:
+                pj["first_success_ts"] = ts
+            if not ok and code not in (0, 2):
+                pj["failures"] += 1
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        with self._telemetry_lock:
+            return copy.deepcopy(self._telemetry)
+
+    def summarize_telemetry(self) -> Dict[str, Any]:
+        with self._telemetry_lock:
+            submit_count = self._telemetry["submit"]["count"]
+            fetch_count = self._telemetry["fetch"]["count"]
+            intervals = list(self._telemetry["fetch"]["intervals"])
+            intervals.sort()
+            avg = mean(intervals) if intervals else 0.0
+            p50 = median(intervals) if intervals else 0.0
+            # p95 via index
+            p95 = intervals[int(0.95 * (len(intervals) - 1))] if intervals else 0.0
+            per_job = self._telemetry["per_job"]
+            # Aggregate per-job stats
+            jobs = len(per_job)
+            total_timeouts = sum(pj.get("timeouts_202", 0) for pj in per_job.values())
+            total_failures = sum(pj.get("failures", 0) for pj in per_job.values())
+            return {
+                "submit_count": submit_count,
+                "fetch_count": fetch_count,
+                "fetch_interval_avg": avg,
+                "fetch_interval_p50": p50,
+                "fetch_interval_p95": p95,
+                "jobs_tracked": jobs,
+                "timeouts_202_total": total_timeouts,
+                "failures_total": total_failures,
+            }
 
     def _get_and_check_job_state(
         self,
@@ -861,6 +1139,8 @@ class NvIngestClient:
         Exception
             For unexpected issues.
         """
+        ts_attempt = time.time()
+        self._t_record_fetch_attempt(job_index, ts_attempt)
         try:
             # Get job state using the client-side index
             job_state = self._get_and_check_job_state(
@@ -901,6 +1181,7 @@ class NvIngestClient:
                     logger.debug(
                         f"Successfully processed and removed job index {job_index} (Server ID: {server_job_id})"
                     )
+                    self._t_record_fetch_outcome(job_index, 0, time.time(), ok=True, trace_id=job_state.trace_id)
                     return result_data, job_index, job_state.trace_id
 
                 except json.JSONDecodeError as err:
@@ -922,6 +1203,7 @@ class NvIngestClient:
             elif response.response_code == 2:  # Job Not Ready (e.g., HTTP 202, or r-2 from SimpleBroker)
                 # Raise TimeoutError to signal the calling retry loop in fetch_job_result
                 # Do not change job state here, remains SUBMITTED
+                self._t_record_fetch_outcome(job_index, 2, time.time(), ok=False, trace_id=job_state.trace_id)
                 raise TimeoutError(f"Job not ready: {response.response_reason}")
 
             else:
@@ -934,6 +1216,7 @@ class NvIngestClient:
                 job_state.state = JobStateEnum.FAILED  # Mark job as failed in the client
                 # Do NOT pop the state for failed jobs here
                 # Raise RuntimeError to indicate a terminal failure for this fetch attempt
+                self._t_record_fetch_outcome(job_index, 1, time.time(), ok=False, trace_id=job_state.trace_id)
                 raise RuntimeError(error_msg)
 
         except (TimeoutError, ValueError, RuntimeError):
@@ -945,12 +1228,17 @@ class NvIngestClient:
             # Attempt to mark state as FAILED if possible and state object exists
             if "job_state" in locals() and hasattr(job_state, "state"):
                 job_state.state = JobStateEnum.FAILED
+            try:
+                self._t_record_fetch_outcome(job_index, 1, time.time(), ok=False, trace_id=None)
+            except Exception:
+                pass
             raise  # Re-raise the original exception
 
     def fetch_job_result_cli(
         self,
         job_ids: Union[str, List[str]],
         data_only: bool = False,
+        timeout: Optional[Tuple[int, Optional[float]]] = None,
     ) -> List[Tuple[Any, str, Optional[str]]]:
         """
         Fetch job results via CLI semantics (synchronous list return).
@@ -970,7 +1258,8 @@ class NvIngestClient:
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
-        return [self._fetch_job_result(job_id, data_only=data_only) for job_id in job_ids]
+        eff_timeout: Tuple[int, Optional[float]] = timeout if timeout is not None else (100, None)
+        return [self._fetch_job_result(job_id, timeout=eff_timeout, data_only=data_only) for job_id in job_ids]
 
     def _validate_batch_size(self, batch_size: Optional[int]) -> int:
         """
@@ -1019,14 +1308,21 @@ class NvIngestClient:
         concurrency_limit: int = 64,
         timeout: int = 100,
         max_job_retries: Optional[int] = None,
-        retry_delay: float = 5.0,
+        retry_delay: float = 0.5,
+        initial_fetch_delay: float = 0.3,
         fail_on_submit_error: bool = False,
         completion_callback: Optional[Callable[[Any, str], None]] = None,
         return_failures: bool = False,
         data_only: bool = True,
         stream_to_callback_only: bool = False,
+        return_full_response: bool = False,
         verbose: bool = False,
-    ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
+        return_traces: bool = False,
+    ) -> Union[
+        List[Any],
+        Tuple[List[Any], List[Tuple[str, str]]],
+        Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]],
+    ]:
         """
         Submit and fetch multiple jobs concurrently.
 
@@ -1056,8 +1352,13 @@ class NvIngestClient:
             If True, return (results, failures). Default is False.
         data_only : bool, optional
             If True, return only payload 'data'. Default is True.
+        return_full_response : bool, optional
+            If True, results contain the full response envelopes (including 'trace' and 'annotations').
+            Ignored when stream_to_callback_only=True. Default is False.
         verbose : bool, optional
             If True, enable debug logging. Default is False.
+        return_traces : bool, optional
+            If True, parent-level aggregated trace metrics are extracted and returned. Default is False.
 
         Returns
         -------
@@ -1065,6 +1366,9 @@ class NvIngestClient:
             List of successful job results when `return_failures` is False.
         results, failures : tuple
             Tuple of (successful results, failure tuples) when `return_failures` is True.
+        results, failures, traces : tuple
+            Tuple of (successful results, failure tuples, trace dicts) when both
+            `return_failures` and `return_traces` are True.
 
         Raises
         ------
@@ -1077,13 +1381,18 @@ class NvIngestClient:
 
         # Handle empty input
         if not job_indices:
-            return ([], []) if return_failures else []
+            if return_failures and return_traces:
+                return [], [], []
+            elif return_failures:
+                return [], []
+            else:
+                return []
 
         # Validate and set batch_size
         validated_batch_size = self._validate_batch_size(batch_size)
 
-        # Prepare timeout tuple for fetch calls
-        effective_timeout: Tuple[int, None] = (timeout, None)
+        # Prepare timeout tuple to mirror handler behavior: finite connect, unbounded read (long-poll)
+        effective_timeout: Tuple[int, Optional[float]] = (int(timeout), None)
 
         # Delegate to the concurrent processor
         processor = _ConcurrentProcessor(
@@ -1093,20 +1402,90 @@ class NvIngestClient:
             job_queue_id=job_queue_id,
             timeout=effective_timeout,
             max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
+            initial_fetch_delay=initial_fetch_delay,
             completion_callback=completion_callback,
             fail_on_submit_error=fail_on_submit_error,
             stream_to_callback_only=stream_to_callback_only,
+            return_full_response=return_full_response,
             verbose=verbose,
+            return_traces=return_traces,
         )
 
-        results, failures = processor.run()
+        results, failures, traces = processor.run()
 
-        if return_failures:
+        if return_failures and return_traces:
+            return results, failures, traces
+        elif return_failures:
             return results, failures
+        elif return_traces:
+            return results, traces
 
         if failures:
             logger.warning(f"{len(failures)} job(s) failed during concurrent processing." " Check logs for details.")
         return results
+
+    def process_jobs_concurrently_async(
+        self,
+        job_indices: Union[str, List[str]],
+        job_queue_id: Optional[str] = None,
+        batch_size: Optional[int] = None,
+        timeout: int = 100,
+        max_job_retries: Optional[int] = None,
+        retry_delay: float = 0.5,
+        initial_fetch_delay: float = 0.3,
+        fail_on_submit_error: bool = False,
+        completion_callback: Optional[Callable[[Any, str], None]] = None,
+        stream_to_callback_only: bool = False,
+        return_full_response: bool = False,
+        verbose: bool = False,
+        return_traces: bool = False,
+    ) -> Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]:
+        """
+        Submit and fetch multiple jobs concurrently and asynchronously.
+
+        This method initializes the processing and returns a Future immediately. The Future
+        will resolve with a fixed 3-part tuple `(results, failures, traces)` once all
+        jobs have completed.
+
+        Parameters are identical to `process_jobs_concurrently`.
+
+        Returns
+        -------
+        Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]
+            A future that completes when all jobs are done. Its result is a tuple
+            containing (successful_results, failures, traces).
+        """
+        if isinstance(job_indices, str):
+            job_indices = [job_indices]
+
+        if not job_indices:
+            immediate_future: Future = Future()
+            immediate_future.set_result(([], [], []))
+            return immediate_future
+
+        validated_batch_size = self._validate_batch_size(batch_size)
+        effective_timeout: Tuple[int, Optional[float]] = (int(timeout), None)
+
+        processor = _ConcurrentProcessor(
+            client=self,
+            batch_size=validated_batch_size,
+            job_indices=job_indices,
+            job_queue_id=job_queue_id,
+            timeout=effective_timeout,
+            max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
+            initial_fetch_delay=initial_fetch_delay,
+            completion_callback=completion_callback,
+            fail_on_submit_error=fail_on_submit_error,
+            stream_to_callback_only=stream_to_callback_only,
+            return_full_response=return_full_response,
+            verbose=verbose,
+            return_traces=return_traces,
+        )
+
+        # Asynchronous call
+        return processor.run_async()
 
     def _ensure_submitted(self, job_ids: Union[str, List[str]]) -> None:
         """
@@ -1135,7 +1514,12 @@ class NvIngestClient:
             job_state.trace_id = future.result()[0]  # Trace_id from `submit_job` endpoint submission
             job_state.future = None
 
-    def fetch_job_result_async(self, job_ids: Union[str, List[str]], data_only: bool = True) -> Dict[Future, str]:
+    def fetch_job_result_async(
+        self,
+        job_ids: Union[str, List[str]],
+        data_only: bool = True,
+        timeout: Optional[Tuple[int, Optional[float]]] = None,
+    ) -> Dict[Future, str]:
         """
         Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.
 
@@ -1156,7 +1540,7 @@ class NvIngestClient:
         future_to_job_id = {}
         for job_id in job_ids:
             job_state = self._get_and_check_job_state(job_id)
-            future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, data_only)
+            future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, data_only, timeout)
             job_state.future = future
             future_to_job_id[future] = job_id
 
@@ -1207,12 +1591,19 @@ class NvIngestClient:
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
 
+            try:
+                self._t_record_submit(job_index, "ok", time.time(), x_trace_id)
+            except Exception:
+                pass
             return x_trace_id
         except Exception as err:
             err_msg = f"Failed to submit job {job_index} to queue {job_queue_id}: {err}"
             logger.exception(err_msg)
             job_state.state = JobStateEnum.FAILED
-
+            try:
+                self._t_record_submit(job_index, "fail", time.time(), None)
+            except Exception:
+                pass
             raise
 
     def submit_job(
@@ -1424,16 +1815,15 @@ class NvIngestClient:
                     )
                     logger.error(error_msg)
                     failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
-                finally:
-                    # Clean up the job spec mapping
-                    del self._job_index_to_job_spec[job_id]
 
         if return_failures:
             return results, failures
 
         return results
 
-    def create_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[str]:
+    def create_jobs_for_batch(
+        self, files_batch: List[str], tasks: Dict[str, Any], pdf_split_page_count: int = None
+    ) -> List[str]:
         """
         Create and submit job specifications (JobSpecs) for a batch of files, returning the job IDs.
         This function takes a batch of files, processes each file to extract its content and type,
@@ -1449,6 +1839,9 @@ class NvIngestClient:
             A dictionary of tasks to be added to each job. The keys represent task names, and the
             values represent task specifications or configurations. Standard tasks include "split",
             "extract", "store", "caption", "dedup", "filter", "embed".
+        pdf_split_page_count : int, optional
+            Number of pages per PDF chunk for splitting (1-128). If provided, this will be added
+            to the job spec's extended_options for PDF files.
 
         Returns
         -------
@@ -1495,6 +1888,10 @@ class NvIngestClient:
 
         job_specs = create_job_specs_for_batch(files_batch)
 
+        # Apply PDF split config if provided
+        if pdf_split_page_count is not None:
+            apply_pdf_split_config_to_job_specs(job_specs, pdf_split_page_count)
+
         job_ids = []
         for job_spec in job_specs:
             logger.debug(f"Tasks: {tasks.keys()}")
@@ -1524,3 +1921,19 @@ class NvIngestClient:
             job_ids.append(job_id)
 
         return job_ids
+
+    def register_parent_trace_id(self, trace_id: Optional[str]) -> None:
+        """Record a parent trace identifier once its aggregation completed."""
+
+        if not trace_id:
+            return
+
+        if trace_id not in self._completed_parent_trace_ids:
+            self._completed_parent_trace_ids.append(trace_id)
+
+    def consume_completed_parent_trace_ids(self) -> List[str]:
+        """Return and clear the set of completed parent trace identifiers."""
+
+        trace_ids = list(self._completed_parent_trace_ids)
+        self._completed_parent_trace_ids.clear()
+        return trace_ids

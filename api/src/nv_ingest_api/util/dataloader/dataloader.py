@@ -18,6 +18,8 @@ from tqdm import tqdm
 import os
 import glob
 
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -152,6 +154,7 @@ else:
             split_type: SplitType = SplitType.SIZE,
             cache_path: str = None,
             video_audio_separate: bool = False,
+            audio_only: bool = False,
         ):
             """
             Split a media file into smaller chunks of `split_interval` size. if
@@ -163,15 +166,22 @@ else:
             split_interval: the size of the chunk to split the media file into depending on the split type
             split_type: SplitType, type of split to perform, either size, time, or frame
             video_audio_separate: bool, whether to separate the video and audio files
+            audio_only: bool, whether to only return the audio files
             """
             import ffmpeg
 
+            files_to_remove = []
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            original_input_path = input_path
+            if audio_only and Path(input_path).suffix in [".mp4", ".mov", ".avi", ".mkv"]:
+                input_path = self.get_audio_from_video(input_path, output_dir / f"{input_path.stem}.mp3")
+                files_to_remove.append(input_path)
             path_file = Path(input_path)
             file_name = path_file.stem
             suffix = path_file.suffix
-            output_dir = Path(output_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
             output_pattern = output_dir / f"{file_name}_chunk_%04d{suffix}"
+
             num_splits = 0
             cache_path = cache_path if cache_path else output_dir
             try:
@@ -183,6 +193,9 @@ else:
                     "segment_time": segment_time,
                     "c": "copy",
                     "map": "0",
+                    # use 10% of the available cores, but at least 4 threads
+                    # each core has 2 threads
+                    "threads": int(max(SystemResourceProbe().get_effective_cores() * 0.2, 4)),
                 }
                 if suffix == ".mp4":
                     output_kwargs.update(
@@ -200,10 +213,13 @@ else:
                 )
                 logging.debug(f"Split {input_path} into {num_splits} chunks")
                 self.path_metadata[input_path] = probe
-                print(capture_output)
-                print(capture_error)
+                logging.debug(capture_output)
+                logging.debug(f"{original_input_path} -  {capture_error}")
             except ffmpeg.Error as e:
-                logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
+                logging.error(
+                    f"FFmpeg error for file {original_input_path}: {e.stderr.decode()} {capture_output} {capture_error}"
+                )
+                return []
             files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
             if video_audio_separate and suffix in [".mp4", ".mov", ".avi", ".mkv"]:
                 video_audio_files = []
@@ -214,7 +230,12 @@ else:
                         video_audio_files.append(audio_path)
                     else:
                         logging.error(f"Failed to extract audio from {file}")
-                return list(zip(files, video_audio_files))
+                return files + video_audio_files
+            for to_remove in files_to_remove:
+                to_remove = Path(to_remove)
+                if to_remove.is_file():
+                    logger.debug(f"Removing file {to_remove}")
+                    to_remove.unlink()
             return files
 
         def find_num_splits(
@@ -252,24 +273,18 @@ else:
 
     def load_data(queue: queue.Queue, paths: list[str], thread_stop: threading.Event):
         file = None
+        logger.info(f"Loading data for {len(paths)} files")
         try:
             for file in paths:
-                if isinstance(file, tuple):
-                    video_file, audio_file = file
-                    with open(video_file, "rb") as f:
-                        video = f.read()
-                    with open(audio_file, "rb") as f:
-                        audio = f.read()
-                    queue.put((video, audio))
-                else:
-                    if thread_stop:
-                        return
-                    with open(file, "rb") as f:
-                        queue.put(f.read())
+                if thread_stop.is_set():
+                    return
+                with open(file, "rb") as f:
+                    queue.put(f.read())
         except Exception as e:
-            logging.error(f"Error processing file {file}: {e}")
+            logging.error(f"Error processing file {file} type: {type(file)} {e}")
             queue.put(RuntimeError(f"Error processing file {file}: {e}"))
-        queue.put(StopIteration)
+        finally:
+            queue.put(StopIteration)
 
     class DataLoader:
         """
@@ -287,10 +302,11 @@ else:
             interface: LoaderInterface = None,
             size: int = 2,
             video_audio_separate: bool = False,
+            audio_only: bool = False,
         ):
             interface = interface if interface else MediaInterface()
             self.thread = None
-            self.thread_stop = False
+            self.thread_stop = threading.Event()
             self.queue = queue.Queue(size)
             self.path = Path(path)
             self.output_dir = output_dir
@@ -299,17 +315,28 @@ else:
             self.files_completed = []
             self.split_type = split_type
             self.video_audio_separate = video_audio_separate
+            self.audio_only = audio_only
             # process the file immediately on instantiation
-            self._split()
+            self._process()
 
-        def _split(self):
-            self.files_completed = self.interface.split(
+        def _process(self):
+            files_completed = self.interface.split(
                 self.path,
                 self.output_dir,
                 split_interval=self.split_interval,
                 split_type=self.split_type,
                 video_audio_separate=self.video_audio_separate,
+                audio_only=self.audio_only,
             )
+            # get durations for files in self.files_completed
+            durations = []
+            for file in files_completed:
+                _, _, duration = self.interface.probe_media(
+                    Path(file), split_interval=self.split_interval, split_type=self.split_type
+                )
+                durations.append(duration)
+
+            self.files_completed = list(zip(files_completed, durations))
 
         def __next__(self):
             payload = self.queue.get()
@@ -323,21 +350,25 @@ else:
             Reset itertor by stopping the thread and clearing the queue.
             """
             if self.thread:
-                self.thread_stop = True
+                self.thread_stop.set()
                 self.thread.join()
-            self.thread_stop = False
-            while self.queue.qsize() != 0:
-                with self.queue.mutex:
-                    self.queue.queue.clear()
+                self.thread = None
+            try:
+                while True:
+                    self.queue.get_nowait()
+            except Exception:
+                pass
+            finally:
+                self.thread_stop.clear()
 
         def __iter__(self):
             self.stop()
-            self.thread_stop = False
+            self.thread_stop.clear()
             self.thread = threading.Thread(
                 target=load_data,
                 args=(
                     self.queue,
-                    self.files_completed,
+                    [file for file, _ in self.files_completed],
                     self.thread_stop,
                 ),
                 daemon=True,
@@ -349,9 +380,16 @@ else:
             return len(self.files_completed)
 
         def __getitem__(self, index):
+            file_path = self.files_completed[index]
+            if isinstance(file_path, tuple):
+                file_path = file_path[0]
+            results = None
             try:
-                with open(self.files_completed[index], "rb") as f:
-                    return f.read()
+                if isinstance(file_path, tuple):
+                    file_path = file_path[0]
+                with open(file_path, "rb") as f:
+                    results = f.read()
+                return results
             except Exception as e:
                 logging.error(f"Error getting item {index}: {e}")
                 raise e

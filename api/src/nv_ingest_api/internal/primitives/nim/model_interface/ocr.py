@@ -20,8 +20,11 @@ from nv_ingest_api.internal.primitives.nim.model_interface.decorators import mul
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
-DEFAULT_OCR_MODEL_NAME = "paddle"
-NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_ensemble"
+DEFAULT_OCR_MODEL_NAME = "scene_text_ensemble"
+NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
+NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
+NEMORETRIEVER_OCR_BLS_MODEL_NAME = "scene_text_python"
+
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +234,11 @@ class OCRModelInterfaceBase(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name == NEMORETRIEVER_OCR_MODEL_NAME:
+        if model_name in [
+            NEMORETRIEVER_OCR_MODEL_NAME,
+            NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME,
+            NEMORETRIEVER_OCR_BLS_MODEL_NAME,
+        ]:
             response = response.transpose((1, 0))
 
         # If we have shape (3,), convert to (3, 1)
@@ -751,8 +758,8 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MO
     if ocr_model_name is not None:
         return ocr_model_name
 
-    # 2. If no gRPC endpoint is provided, fall back to the default immediately.
-    if not ocr_grpc_endpoint:
+    # 2. If no gRPC endpoint is provided or the endpoint is a NVCF endpoint, fall back to the default immediately.
+    if (not ocr_grpc_endpoint) or ("grpc.nvcf.nvidia.com" in ocr_grpc_endpoint):
         logger.debug(f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'.")
         return default_model_name
 

@@ -1,0 +1,47 @@
+name: Build NV-Ingest Runtime Image (arm64)
+
+on:
+  # Trigger only for pushing to main since build may take > 1 hour.
+  push:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: linux-large-disk
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get current date (yyyy.mm.dd)
+        run: echo "CURRENT_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
+      # Set up QEMU emulation for arm64
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx, useful for building multi-platform images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the Docker image using the Dockerfile
+      # Github does not allowing access secrets on pull requests. Therefore for this action we use the open source ubuntu
+      # base image and not the one hosted in nvcr.io
+      - name: Build Docker image
+        run: |
+          docker buildx create --use
+          docker buildx build --platform linux/arm64 --load --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
+
+      # Only test a random subset (see --random-selection) because running pytest with QEMU emulation can be very slow.
+      - name: Run Pytest inside Docker container
+        run: |
+          docker run --platform=linux/arm64 nv-ingest:latest pytest -rs -m "not integration" --random-selection 100 tests/service_tests client/client_tests api/api_tests
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: coverage.xml

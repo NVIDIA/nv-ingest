@@ -13,7 +13,7 @@ The Nemo Retriever extraction core pipeline features run on a single A10G or bet
 The core pipeline features include the following:
 
 - llama3.2-nv-embedqa-1b-v2 — Embedding model for converting text chunks into vectors.
-- nemoretriever-page-elements-v2 — Detects and classifies images on a page as a table, chart or infographic. 
+- nemoretriever-page-elements-v3 — Detects and classifies images on a page as a table, chart or infographic.
 - nemoretriever-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
 - nemoretriever-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
 - paddleocr — Image OCR model to detect and extract text from images.
@@ -24,7 +24,7 @@ This includes the following:
 
 - Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md).
 - `nemoretriever-parse` — Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
-- VLM image captioning — Use [llama 3.1 nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. For more information, refer to [Use Multimodal Embedding](vlm-embed.md).
+- VLM image captioning — Use [llama 3.1 nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 
 
 
@@ -32,7 +32,7 @@ This includes the following:
 
 NeMo Retriever extraction supports the following GPU hardware.
 
-- [RTX Pro 6000 Blackwell Workstation Edition](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/)
+- [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
 - [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
 - [A100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/a100/)

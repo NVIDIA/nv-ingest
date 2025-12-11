@@ -31,7 +31,7 @@ class FilterTask(Task):
         min_size: int = 128,
         max_aspect_ratio: Union[int, float] = 5.0,
         min_aspect_ratio: Union[int, float] = 0.2,
-        filter: bool = False,
+        filter: bool = True,
     ) -> None:
         """
         Setup Filter Task Config

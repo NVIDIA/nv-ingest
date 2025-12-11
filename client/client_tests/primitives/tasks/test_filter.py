@@ -97,7 +97,7 @@ def test_filter_task_default_params():
         "min_size: 128",
         "max_aspect_ratio: 5.0",
         "min_aspect_ratio: 0.2",
-        "filter: False",
+        "filter: True",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
@@ -106,7 +106,7 @@ def test_filter_task_default_params():
         "type": "filter",
         "task_properties": {
             "content_type": "image",
-            "params": {"min_size": 128, "max_aspect_ratio": 5.0, "min_aspect_ratio": 0.2, "filter": False},
+            "params": {"min_size": 128, "max_aspect_ratio": 5.0, "min_aspect_ratio": 0.2, "filter": True},
         },
     }
     assert task.to_dict() == expected_dict

@@ -44,3 +44,6 @@ time-slicing/
 
 # Ignore helm-docs template file
 README.md.gotmpl
+
+# Ignore nim-operator directory
+nim-operator/

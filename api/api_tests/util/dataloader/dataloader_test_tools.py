@@ -96,8 +96,8 @@ def create_test_file(filepath, fps=24, width=100, height=100, file_size_mb=100, 
         audio_clip = AudioFileClip(audio_path)
         clip = clip.with_audio(audio_clip.with_duration(duration))
     codec_type = {
-        ".mp4": "libx264",
-        ".mkv": "libx264",
+        ".mp4": "mpeg4",
+        ".mkv": "libvpx",
         ".avi": "rawvideo",
         ".webm": "libvpx",
     }

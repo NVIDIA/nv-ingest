@@ -14,7 +14,7 @@ User-Defined Functions (UDFs) let you inject custom processing logic into the NV
 - **Purpose**: Reusable UDFs that are part of the API library
 - **Audience**: Production deployments, advanced users
 - **Characteristics**: Robust error handling, configurable, tested for production use
-- **Example**: `llm_summarizer_udf.py` - production-grade AI summarization
+- **Example**: `llm_summarizer_udf.py` - summarize extracted document content with an LLM
 
 > **💡 Placement Guide**: Put learning examples in `examples/udfs/`, put reusable production UDFs in `api/src/udfs/`
 
@@ -142,16 +142,100 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 ```
 
 
+## HTML Tables to Markdown Example
+
+**Problem**: You have HTML documents with one or more `<table>` elements and want machine-friendly table representations. Default HTML-to-text extraction will flatten HTML, losing table structure.
+
+**Solution**: The `html_to_markdown_udf.py` finds top-level HTML tables and converts them into Markdown tables. It stores the result in metadata without altering the original content.
+
+> **Works with**: HTML files containing `<table>` elements
+>
+> **Does not work with**: Non-HTML files or HTML without tables
+
+### Quick Start
+
+1. **Understand the UDF Pattern**
+   ```python
+   def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+       df = control_message.payload()  # Get documents as DataFrame
+       # Process documents (modify df)
+       control_message.payload(df)     # Return updated documents
+       return control_message
+   ```
+
+2. **Use with CLI**
+   ```bash
+   # For HTML files - run UDF BEFORE html_extractor so it can see raw <table> tags
+   nv-ingest-cli \
+     --doc './my_html_docs/' \
+     --task='extract:{"document_type":"html"}' \
+     --task='udf:{"udf_function": "./examples/udfs/html_to_markdown_udf.py:extract_html_tables_to_markdown", "target_stage": "html_extractor", "run_before": true}' \
+     --output_directory=./output
+   ```
+
+3. **Use with Python API**
+   ```python
+   from nv_ingest_client.client.interface import Ingestor
+
+   ingestor = Ingestor()
+   results = ingestor.files("./my_html_docs/") \
+       .extract(document_type="html") \
+       .udf(
+           udf_function="./examples/udfs/html_to_markdown_udf.py:extract_html_tables_to_markdown",
+           target_stage="html_extractor",
+           run_before=True
+       ) \
+       .ingest()
+   ```
+
+### Expected Output
+
+- Adds to each processed row:
+  - `metadata.custom_content.html_tables_markdown: List[str]`
+  - Each list item is a complete Markdown table string
+- Original content is preserved for downstream stages
+- Access CLI outputs in the standard output directory; Python API returns nested results (`results[0]` for the first document)
+
+### Implementation Details
+
+The UDF processes HTML in `metadata["content"]` by:
+- Finding only top-level `<table>` elements (ignores tables nested inside other tables)
+- Converting cell content to Markdown inline formatting (bold, italic, code, links)
+- Preserving row/column alignment with `rowspan` and `colspan` handling
+- Building Markdown tables:
+  - First row is treated as header
+  - Fills merged cells across rows/columns for alignment
+  - Replaces internal newlines with `<br>` for readability
+- Storing results at `metadata["custom_content"]["html_tables_markdown"]`
+
+### Dependencies
+
+This example requires BeautifulSoup:
+```bash
+pip install beautifulsoup4
+```
+
 
 ## LLM Content Summarizer (Production Example)
 
-**Purpose**: Generate AI-powered summaries of your text content using NVIDIA's LLM APIs. This demonstrates how to structure UDFs for production use with robust error handling, configuration, and testing.
+**Purpose**: Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline payload,
+run custom code (summarization), and inject results into the metadata for downstream usecases (such as retrieval).
 
-### Setup
+### Setup & Configuration
+
+Before running the nv-ingest pipeline with the LLM Content Summarizer, set the following environment variables in your shell:
 
 ```bash
-export NVIDIA_API_KEY="your-nvidia-api-key"
+export NVIDIA_API_KEY="your-nvidia-api-key"                                # (required) API key for NVIDIA NIM endpoints
+export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"    # (optional) LLM model for summarization
+export LLM_BASE_URL="https://integrate.api.nvidia.com/v1"                  # (optional) Base URL for NVIDIA API
+export TIMEOUT=60                         # (optional) API timeout in seconds
+export MIN_CONTENT_LENGTH=50              # (optional) Minimum content length to trigger summarization
+export MAX_CONTENT_LENGTH=12000           # (optional) Maximum content length sent to the API
 ```
+
+- `NVIDIA_API_KEY` is required for calling NVIDIA LLM APIs.
+- Other settings are optional and will fall back to their defaults if unset.
 
 ### Usage
 
@@ -198,7 +282,7 @@ After processing, summaries are stored in the output metadata files. Look for th
 {
   "metadata": {
     "custom_content": {
-      "llm_summary": {
+      "llm_summarizer_udf": {
         "summary": "Your AI-generated summary appears here...",
         "model": "nvidia/llama-3.1-nemotron-70b-instruct"
       }
@@ -212,22 +296,9 @@ After processing, summaries are stored in the output metadata files. Look for th
 # Access summaries from results
 chunks = results[0]  # Get document chunks
 for chunk in chunks:
-    summary_info = chunk["metadata"]["custom_content"]["llm_summary"]
+    summary_info = chunk["metadata"]["custom_content"]["llm_summarizer_udf"]
     summary_text = summary_info["summary"]
     print(f"Summary: {summary_text}")
-```
-
-### Configuration
-
-Environment variables to customize behavior:
-
-```bash
-export NVIDIA_API_KEY="your-nvidia-api-key"                              # Required API key
-export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"  # Model choice
-export LLM_SUMMARIZATION_BASE_URL="https://integrate.api.nvidia.com/v1"  # API base URL
-export LLM_SUMMARIZATION_TIMEOUT="60"                                    # API timeout seconds
-export LLM_MIN_CONTENT_LENGTH="50"                                       # Skip content shorter than this  
-export LLM_MAX_CONTENT_LENGTH="12000"                                    # Content limit per summary
 ```
 
 ### Testing

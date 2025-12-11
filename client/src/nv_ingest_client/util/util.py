@@ -12,10 +12,12 @@ import math
 import heapq
 from typing import Dict
 from typing import List
+from typing import Tuple
+from io import BytesIO
 
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.file_processing.extract import extract_file_content
+from nv_ingest_client.util.file_processing.extract import extract_file_content, extract_content_from_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -348,6 +350,63 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
         job_specs.append(job_spec)
 
     return job_specs
+
+
+def create_job_specs_for_buffers(buffers: List[Tuple[str, BytesIO]]) -> List[JobSpec]:
+    """
+    Create and job specifications (JobSpecs) for a list of buffers.
+    This function takes a list of buffers, processes each buffer to extract its content and type,
+    creates a job specification (JobSpec) for each buffer.
+
+    Parameters
+    ----------
+    buffers : List[Tuple[str, BytesIO]]
+        A list of tuples containing the name of the buffer and the BytesIO object.
+
+    Returns
+    -------
+    List[JobSpec]
+        A list of JobSpecs.
+    """
+
+    job_specs = []
+    for name, buffer in buffers:
+        content, file_type = extract_content_from_buffer((name, buffer))
+        job_spec = JobSpec(
+            document_type=file_type,
+            payload=content,
+            source_id=name,
+            source_name=name,
+        )
+        job_specs.append(job_spec)
+
+    return job_specs
+
+
+def apply_pdf_split_config_to_job_specs(job_specs: List[JobSpec], pages_per_chunk: int) -> None:
+    """
+    Apply PDF split configuration to a list of JobSpec objects.
+
+    Modifies job specs in-place by adding pdf_config to extended_options for PDF files only.
+
+    Parameters
+    ----------
+    job_specs : List[JobSpec]
+        List of job specifications to potentially modify
+    pages_per_chunk : int
+        Number of pages per PDF chunk (will be stored as-is; server performs clamping)
+
+    Notes
+    -----
+    - Only modifies job specs with document_type == "pdf" (case-insensitive)
+    - Modifies job specs in-place
+    - Safe to call on mixed document types (only PDFs are affected)
+    """
+    for job_spec in job_specs:
+        if job_spec.document_type.lower() == "pdf":
+            if "pdf_config" not in job_spec._extended_options:
+                job_spec._extended_options["pdf_config"] = {}
+            job_spec._extended_options["pdf_config"]["split_page_count"] = pages_per_chunk
 
 
 def filter_function_kwargs(func, **kwargs):

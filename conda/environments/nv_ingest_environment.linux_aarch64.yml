@@ -1,0 +1,10 @@
+name: nv_ingest_runtime
+channels:
+  - nvidia/label/dev
+  - rapidsai
+  - nvidia
+  - conda-forge
+dependencies:
+  - pip:
+      - pypdfium2>=4.30.0
+      - ray[all]>=2.52.0

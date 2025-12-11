@@ -1,9 +1,10 @@
 import os
-import sys
-import time
 import json
 import logging
-from datetime import datetime
+import shutil
+import sys
+import time
+from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -11,7 +12,7 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 # Import from interact module (now properly structured)
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, milvus_chunks, segment_results, kv_event_log  # noqa: E402
+from interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -24,56 +25,61 @@ try:
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
-
-def _now_timestr() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M")
+from utils import get_repo_root
 
 
-def _get_env(name: str, default: str | None = None) -> str | None:
-    val = os.environ.get(name)
-    if val is None or val == "":
-        return default
-    return val
+def main(config=None, log_path: str = "test_results") -> int:
+    """
+    E2E test with LLM summarization via UDF.
 
+    Args:
+        config: TestConfig object with all settings
+        log_path: Path for logging output
 
-def _default_collection_name() -> str:
-    # Make collection name configurable via TEST_NAME env var, default to dc20
-    test_name = _get_env("TEST_NAME", "dc20")
-    return f"{test_name}_{_now_timestr()}"
-
-
-def main() -> int:
-    # Dataset-agnostic: no hardcoded paths, configurable via environment
-    data_dir = _get_env("DATASET_DIR")
-    if not data_dir:
-        print("ERROR: DATASET_DIR environment variable is required")
-        print("Example: DATASET_DIR=/datasets/bo20 python dc20_e2e.py")
+    Returns:
+        Exit code (0 = success)
+    """
+    # Backward compatibility: if no config provided, error
+    if config is None:
+        print("ERROR: No configuration provided")
+        print("This test case requires a config object from the test runner")
         return 2
 
-    if not os.path.isdir(data_dir):
-        print(f"ERROR: Dataset directory does not exist: {data_dir}")
-        print("Please check the DATASET_DIR path and ensure it's accessible")
-        return 2
-
-    spill_dir = _get_env("SPILL_DIR", "/tmp/spill")
+    # Extract configuration from config object
+    data_dir = config.dataset_dir
+    spill_dir = config.spill_dir
     os.makedirs(spill_dir, exist_ok=True)
 
-    collection_name = _get_env("COLLECTION_NAME", _default_collection_name())
-    hostname = _get_env("HOSTNAME", "localhost")
-    sparse = _get_env("SPARSE", "true").lower() == "true"
-    gpu_search = _get_env("GPU_SEARCH", "false").lower() == "true"
+    # Use consistent collection naming with recall pattern
+    # If collection_name not set, generate from test_name or dataset basename
+    if config.collection_name:
+        collection_name = config.collection_name
+    else:
+        from recall_utils import get_recall_collection_name
 
-    # Extraction configuration from environment variables
-    extract_text = _get_env("EXTRACT_TEXT", "true").lower() == "true"
-    extract_tables = _get_env("EXTRACT_TABLES", "true").lower() == "true"
-    extract_charts = _get_env("EXTRACT_CHARTS", "true").lower() == "true"
-    extract_images = _get_env("EXTRACT_IMAGES", "false").lower() == "true"
-    text_depth = _get_env("TEXT_DEPTH", "page")
-    table_output_format = _get_env("TABLE_OUTPUT_FORMAT", "markdown")
-    extract_infographics = _get_env("EXTRACT_INFOGRAPHICS", "true").lower() == "true"
+        test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+        collection_name = get_recall_collection_name(test_name)
+    hostname = config.hostname
+    sparse = config.sparse
+    gpu_search = config.gpu_search
 
-    # Logging configuration
-    log_path = _get_env("LOG_PATH", "test_results")
+    # Extraction configuration
+    extract_text = config.extract_text
+    extract_tables = config.extract_tables
+    extract_charts = config.extract_charts
+    extract_images = config.extract_images
+    extract_infographics = config.extract_infographics
+    text_depth = config.text_depth
+    table_output_format = config.table_output_format
+
+    # Optional pipeline steps
+    enable_caption = config.enable_caption
+    enable_split = config.enable_split
+
+    # UDF and LLM Summaries
+    udf_path = Path(get_repo_root()) / "api/src/udfs/llm_summarizer_udf.py:content_summarizer"
+    print(f"Path to User-Defined Function: {str(udf_path)}")
+    llm_model = config.llm_summarization_model
 
     model_name, dense_dim = embed_info()
 
@@ -81,17 +87,22 @@ def main() -> int:
     print("=== Configuration ===")
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
-    print(f"Spill: {spill_dir}")
     print(f"Hostname: {hostname}")
     print(f"Embed model: {model_name}, dim: {dense_dim}")
+    print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")
+    if enable_caption:
+        print("Caption: enabled")
+    if enable_split:
+        print("Split: enabled")
     print("====================")
 
     ingestion_start = time.time()
 
+    # Build ingestor pipeline (simplified)
     ingestor = (
         Ingestor(message_client_hostname=hostname, message_client_port=7670)
         .files(data_dir)
@@ -104,7 +115,20 @@ def main() -> int:
             table_output_format=table_output_format,
             extract_infographics=extract_infographics,
         )
-        .embed(model_name=model_name)
+        .udf(udf_function=str(udf_path), target_stage="text_splitter", run_after=True)
+    )
+
+    # Optional pipeline steps
+    if enable_caption:
+        ingestor = ingestor.caption()
+
+    if enable_split:
+        ingestor = ingestor.split()
+
+    # Embed and upload (core pipeline)
+    print("Uploading to collection:", collection_name)
+    ingestor = (
+        ingestor.embed(model_name=model_name)
         .vdb_upload(
             collection_name=collection_name,
             dense_dim=dense_dim,
@@ -122,6 +146,12 @@ def main() -> int:
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
+    total_pages = pdf_page_count(data_dir)
+    pages_per_second = None
+    if total_pages > 0 and ingestion_time > 0:
+        pages_per_second = total_pages / ingestion_time
+        kv_event_log("pages_per_second", pages_per_second, log_path)
+
     # Optional: log chunk stats and per-type breakdown
     milvus_chunks(f"http://{hostname}:19530", collection_name)
     text_results, table_results, chart_results = segment_results(results)
@@ -130,7 +160,7 @@ def main() -> int:
     kv_event_log("chart_chunks", sum(len(x) for x in chart_results), log_path)
 
     # Document-level analysis
-    if _get_env("DOC_ANALYSIS", "false").lower() == "true":
+    if os.getenv("DOC_ANALYSIS", "false").lower() == "true":  # DOC_ANALYSIS set by run.py
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
@@ -167,7 +197,8 @@ def main() -> int:
     kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
-    test_name = _get_env("TEST_NAME", "dc20")
+    dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
+    test_name = config.test_name or dataset_name
     summary = {
         "test_name": test_name,
         "dataset_dir": data_dir,
@@ -183,6 +214,10 @@ def main() -> int:
     }
     print(f"{test_name}_e2e summary:")
     print(json.dumps(summary, indent=2))
+
+    print(f"Removing spill directory: {spill_dir}")
+    shutil.rmtree(spill_dir)
+
     return 0
 
 

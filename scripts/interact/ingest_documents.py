@@ -8,7 +8,6 @@ Command-line arguments take precedence over environment variables.
 """
 
 import time
-from typing import Optional
 
 import click
 
@@ -147,7 +146,7 @@ def main(
     extract_images: bool,
     text_depth: str,
     table_output_format: str,
-    model_name: Optional[str],
+    model_name: str | None,
     spill_path: str,
     pre_clean_spill: bool,
     post_clean_spill: bool,

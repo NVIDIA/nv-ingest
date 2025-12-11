@@ -151,7 +151,7 @@ class TextMetadataSchema(BaseModelNoExt):
     keywords: Union[str, List[str], Dict] = ""
     """Keywords, named entities, or other phrases."""
 
-    language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
+    language: LanguageEnum = LanguageEnum.EN  # default to Unknown? Maybe do some kind of heuristic check
     """The language of the content."""
 
     text_location: tuple = (0, 0, 0, 0)
@@ -244,7 +244,7 @@ class TableMetadataSchema(BaseModelNoExt):
 
 class ChartMetadataSchema(BaseModelNoExt):
     """
-    The schema for extracted chart content.
+    The schema for table content extracted from charts.
     """
 
     caption: str = ""
@@ -351,6 +351,15 @@ class MetadataSchema(BaseModelNoExt):
 
     raise_on_failure: bool = False
     """If True, indicates that processing should halt on failure."""
+
+    total_pages: Optional[int] = None
+    """Total number of pages in the source document (V2 API)."""
+
+    original_source_id: Optional[str] = None
+    """The original source identifier before any splitting or chunking (V2 API)."""
+
+    original_source_name: Optional[str] = None
+    """The original source name before any splitting or chunking (V2 API)."""
 
     custom_content: Optional[Dict[str, Any]] = None
 

@@ -609,3 +609,107 @@ def test_create_jobs_for_batch_extract_mismatch(nv_ingest_client, mock_create_jo
     assert tasks["split"] in calls
     assert tasks["extract_pptx"] in calls
     assert tasks["extract_pdf"] not in calls, "extract_pdf should not have been added"
+
+
+def test_create_jobs_for_batch_with_pdf_split_config(nv_ingest_client, tasks, mock_create_job_specs_for_batch):
+    """Test that PDF split config is correctly applied to PDF job specs."""
+    mock_job_spec_pdf = Mock(spec=JobSpec)
+    mock_job_spec_pdf.document_type = "pdf"
+    mock_job_spec_pdf._extended_options = {}
+
+    mock_job_spec_txt = Mock(spec=JobSpec)
+    mock_job_spec_txt.document_type = "txt"
+    mock_job_spec_txt._extended_options = {}
+
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec_pdf, mock_job_spec_txt]
+
+    files = ["file1.pdf", "file2.txt"]
+    pdf_split_page_count = 64
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks, pdf_split_page_count=pdf_split_page_count)
+
+    assert job_ids == ["0", "1"]
+
+    # Check that PDF split config was applied only to PDF files
+    assert "pdf_config" in mock_job_spec_pdf._extended_options
+    assert mock_job_spec_pdf._extended_options["pdf_config"]["split_page_count"] == 64
+
+    # Check that non-PDF files don't have the config
+    assert "pdf_config" not in mock_job_spec_txt._extended_options
+
+
+def test_create_jobs_for_batch_without_pdf_split_config(nv_ingest_client, tasks, mock_create_job_specs_for_batch):
+    """Test that jobs work correctly when PDF split config is not provided."""
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_job_spec.document_type = "pdf"
+    mock_job_spec._extended_options = {}
+
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec]
+
+    files = ["file1.pdf"]
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks)
+
+    assert job_ids == ["0"]
+
+    # Check that no PDF split config was added
+    assert "pdf_config" not in mock_job_spec._extended_options
+
+
+# Test API version configuration integration
+class TestNvIngestClientApiVersionConfiguration:
+    """Test suite for API version configuration through NvIngestClient"""
+
+    def test_default_creates_v1_client(self):
+        """Test that NvIngestClient creates RestClient with v1 by default"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+        )
+
+        # Access the underlying RestClient
+        rest_client = client._message_client
+        assert rest_client._api_version == "v2"
+        assert rest_client._submit_endpoint == "/v2/submit_job"
+        assert rest_client._fetch_endpoint == "/v2/fetch_job"
+
+    def test_explicit_v2_via_message_client_kwargs(self):
+        """Test that NvIngestClient can be configured to use v2 explicitly"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={"api_version": "v2"},
+        )
+
+        # Access the underlying RestClient
+        rest_client = client._message_client
+        assert rest_client._api_version == "v2"
+        assert rest_client._submit_endpoint == "/v2/submit_job"
+        assert rest_client._fetch_endpoint == "/v2/fetch_job"
+
+    def test_explicit_v1_via_message_client_kwargs(self):
+        """Test that v1 can be explicitly configured (for clarity)"""
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={"api_version": "v1"},
+        )
+
+        rest_client = client._message_client
+        assert rest_client._api_version == "v1"
+
+    def test_other_kwargs_pass_through(self):
+        """Test that other message_client_kwargs pass through correctly"""
+        custom_headers = {"X-Custom-Header": "test"}
+        client = NvIngestClient(
+            message_client_hostname="localhost",
+            message_client_port=7670,
+            message_client_kwargs={
+                "api_version": "v2",
+                "headers": custom_headers,
+            },
+        )
+
+        rest_client = client._message_client
+        assert rest_client._api_version == "v2"
+        assert rest_client._headers == custom_headers

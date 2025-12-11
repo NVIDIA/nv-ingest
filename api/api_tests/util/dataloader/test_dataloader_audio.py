@@ -10,6 +10,7 @@ from nv_ingest_api.util.dataloader import DataLoader, MediaInterface
 import subprocess
 import json
 import math
+import time
 from .dataloader_test_tools import create_test_wav, create_test_mp3
 
 test_file_size_mb = 100
@@ -17,6 +18,24 @@ test_file_size_mb = 100
 
 if not DataLoader or not MediaInterface:
     pytest.skip("DataLoader or MediaInterface is not available", allow_module_level=True)
+
+
+class _FakeInterface:
+    def split(self, input_path: str, output_dir: str, **kwargs):
+        out_dir = Path(output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stem = Path(input_path).stem
+        suffix = Path(input_path).suffix or ".bin"
+        files = []
+        for i in range(3):
+            p = out_dir / f"{stem}_chunk_{i:04d}{suffix}"
+            with open(p, "wb") as f:
+                f.write(b"x" * 1024)  # 1KB
+            files.append(str(p))
+        return files
+
+    def probe_media(self, path_file: Path, split_interval: int, split_type):
+        return None, 3, 600
 
 
 def get_audio_info(filepath):
@@ -84,20 +103,18 @@ def test_dataloader_wav_content(temp_dir):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_wav.stat().st_size
+    actual_size_kb = input_wav.stat().st_size
     # Initialize DataLoader
-    split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
+    split_size_kb = math.ceil(actual_size_kb / 3)  # Should result in 3 chunks
     loader = DataLoader(
-        path=str(input_wav), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+        path=str(input_wav), output_dir=str(chunks_dir), split_interval=split_size_kb, interface=MediaInterface()
     )
 
     # Test that each chunk can be read as valid WAV data
-    for i, chunk_data in enumerate(loader):
-        # Write chunk to temporary file
-        chunk_path = chunks_dir / f"test_chunk_{i}.wav"
+    for i, chunk in enumerate(loader):
+        chunk_path = f"{chunks_dir}/test_chunk_{i}.wav"
         with open(chunk_path, "wb") as f:
-            f.write(chunk_data)
-
+            f.write(chunk)
         # Verify the chunk is valid WAV data
         with wave.open(str(chunk_path), "rb") as wav_file:
             # Check WAV parameters
@@ -230,3 +247,87 @@ def test_dataloader_getitem(temp_dir):
     # Test that accessing negative index raises an exception
     with pytest.raises(Exception):
         loader[-4]  # Should raise an exception for negative index
+
+
+def test_dataloader_stop_drains_queue_and_joins_thread(temp_dir):
+    """Validate that DataLoader.stop() signals the thread via Event, joins it, and drains the queue."""
+
+    # Use a lightweight fake interface to avoid invoking ffmpeg and keep the test fast/stable.
+
+    # Create a small WAV file (content size is irrelevant due to _FakeInterface)
+    input_wav = temp_dir / "large_input.wav"
+    original_audio, sample_rate = create_test_wav(input_wav, file_size_mb=1)
+
+    chunks_dir = temp_dir / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+
+    actual_size_bytes = input_wav.stat().st_size
+    split_size_bytes = math.ceil(actual_size_bytes / 3)  # target ~3 chunks
+    loader = DataLoader(
+        path=str(input_wav),
+        output_dir=str(chunks_dir),
+        split_interval=split_size_bytes,
+        interface=_FakeInterface(),
+        size=4,
+    )
+
+    # Start background loader thread by iterating
+    _ = iter(loader)
+
+    # Wait briefly until the background thread reports alive
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    # Now stop and validate
+    loader.stop()
+
+    # Thread should be joined and cleared
+    assert (loader.thread is None) or (
+        not loader.thread.is_alive()
+    ), "Loader thread should be None or not alive after stop()"
+    # Event should be cleared for reuse
+    assert not loader.thread_stop.is_set(), "thread_stop Event should be cleared after stop()"
+    # Queue should be fully drained
+    assert loader.queue.qsize() == 0, "Queue should be empty after stop() drains it"
+
+
+def test_dataloader_stop_is_idempotent_and_cleans_multiple_times(temp_dir):
+    """Validate repeated stop calls leave the queue empty and no thread running."""
+
+    # Create a small WAV file (content size is irrelevant due to _FakeInterface)
+    input_wav = temp_dir / "large_input.wav"
+    original_audio, sample_rate = create_test_wav(input_wav, file_size_mb=1)
+
+    chunks_dir = temp_dir / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+
+    actual_size_bytes = input_wav.stat().st_size
+    split_size_bytes = math.ceil(actual_size_bytes / 3)
+    loader = DataLoader(
+        path=str(input_wav),
+        output_dir=str(chunks_dir),
+        split_interval=split_size_bytes,
+        interface=_FakeInterface(),
+        size=4,
+    )
+
+    # Start and stop first time
+    _ = iter(loader)
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    loader.stop()
+    assert (loader.thread is None) or (not loader.thread.is_alive())
+    assert not loader.thread_stop.is_set()
+    assert loader.queue.qsize() == 0
+
+    # Start and stop second time to ensure idempotence
+    _ = iter(loader)
+    deadline = time.monotonic() + 5.0
+    while (loader.thread is None or not loader.thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    loader.stop()
+    assert (loader.thread is None) or (not loader.thread.is_alive())
+    assert not loader.thread_stop.is_set()
+    assert loader.queue.qsize() == 0
