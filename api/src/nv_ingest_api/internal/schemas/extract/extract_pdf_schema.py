@@ -208,7 +208,7 @@ class PDFExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     pdfium_config: Optional[PDFiumConfigSchema] = None
-    nemoretriever_parse_config: Optional[NemoRetrieverParseConfigSchema] = None
+    nemotron_parse_config: Optional[NemoRetrieverParseConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
 

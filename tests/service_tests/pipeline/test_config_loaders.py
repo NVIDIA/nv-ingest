@@ -656,7 +656,7 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|"grpc"
-      nemoretriever_parse_config:
+      nemotron_parse_config:
         auth_token: $NGC_API_KEY|""
         model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         endpoints: [
@@ -690,7 +690,7 @@ pipeline:
                     assert pdfium_config["auth_token"] == "test-key"
                     assert len(pdfium_config["yolox_endpoints"]) == 2
 
-                    nemo_config = config.stages[0].config["nemoretriever_parse_config"]
+                    nemo_config = config.stages[0].config["nemotron_parse_config"]
                     assert nemo_config["auth_token"] == "test-key"
                     assert nemo_config["model_name"] == "nvidia/nemotron-parse"
 

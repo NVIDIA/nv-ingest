@@ -182,7 +182,7 @@ if __name__ == "__main__":
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
         },
-        "nemoretriever_parse_config": {
+        "nemotron_parse_config": {
             "auth_token": nemoretriever_parse_auth,
             "nemotron_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
             "nemotron_parse_infer_protocol": nemotron_parse_protocol,

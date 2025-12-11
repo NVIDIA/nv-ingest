@@ -71,7 +71,7 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
-      nemoretriever_parse_config:
+      nemotron_parse_config:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
         nemotron_parse_endpoints: [
           $NEMOTRON_PARSE_GRPC_ENDPOINT|"",

@@ -103,7 +103,7 @@ def nemoretriever_parse_extractor(
             - identify_nearby_objects : bool, optional (default is True)
             - table_output_format : str, optional (default is "pseudo_markdown")
             - pdfium_config : dict, optional (configuration for PDFium)
-            - nemoretriever_parse_config : dict, optional (configuration for NemoRetrieverParse)
+            - nemotron_parse_config : dict, optional (configuration for NemoRetrieverParse)
             - metadata_column : str, optional (default is "metadata")
 
     Returns
@@ -157,14 +157,14 @@ def nemoretriever_parse_extractor(
         )
 
     # Process nemoretriever_parse configuration.
-    nemoretriever_parse_config_raw = extractor_config.get("nemoretriever_parse_config", {})
-    if isinstance(nemoretriever_parse_config_raw, dict):
-        nemoretriever_parse_config = NemoRetrieverParseConfigSchema(**nemoretriever_parse_config_raw)
-    elif isinstance(nemoretriever_parse_config_raw, NemoRetrieverParseConfigSchema):
-        nemoretriever_parse_config = nemoretriever_parse_config_raw
+    nemotron_parse_config_raw = extractor_config.get("nemotron_parse_config", {})
+    if isinstance(nemotron_parse_config_raw, dict):
+        nemotron_parse_config = NemoRetrieverParseConfigSchema(**nemotron_parse_config_raw)
+    elif isinstance(nemotron_parse_config_raw, NemoRetrieverParseConfigSchema):
+        nemotron_parse_config = nemotron_parse_config_raw
     else:
         raise ValueError(
-            "`nemoretriever_parse_config` must be a dictionary or a NemoRetrieverParseConfigSchema instance."
+            "`nemotron_parse_config` must be a dictionary or a NemoRetrieverParseConfigSchema instance."
         )
 
     # Get base metadata.
@@ -213,9 +213,9 @@ def nemoretriever_parse_extractor(
 
     nemoretriever_parse_client = None
     if extract_text:
-        nemoretriever_parse_client = _create_clients(nemoretriever_parse_config)
+        nemoretriever_parse_client = _create_clients(nemotron_parse_config)
 
-    max_workers = nemoretriever_parse_config.workers_per_progress_engine
+    max_workers = nemotron_parse_config.workers_per_progress_engine
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
 
         for page_idx in range(page_count):
@@ -256,9 +256,9 @@ def nemoretriever_parse_extractor(
                     extract_infographics,
                     {},  # page_to_text_flag_map
                     table_output_format,
-                    nemoretriever_parse_config.yolox_endpoints,
-                    nemoretriever_parse_config.yolox_infer_protocol,
-                    nemoretriever_parse_config.auth_token,
+                    nemotron_parse_config.yolox_endpoints,
+                    nemotron_parse_config.yolox_infer_protocol,
+                    nemotron_parse_config.auth_token,
                     execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_yolox)
@@ -291,9 +291,9 @@ def nemoretriever_parse_extractor(
                 extract_infographics,
                 {},  # page_to_text_flag_map
                 table_output_format,
-                nemoretriever_parse_config.yolox_endpoints,
-                nemoretriever_parse_config.yolox_infer_protocol,
-                nemoretriever_parse_config.auth_token,
+                nemotron_parse_config.yolox_endpoints,
+                nemotron_parse_config.yolox_infer_protocol,
+                nemotron_parse_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future_yolox)
@@ -477,16 +477,16 @@ def _extract_text_and_bounding_boxes(
     return list(zip(image_page_indices, inference_results))
 
 
-def _create_clients(nemoretriever_parse_config):
+def _create_clients(nemotron_parse_config):
     model_interface = nemoretriever_parse_utils.NemoRetrieverParseModelInterface(
-        model_name=nemoretriever_parse_config.nemotron_parse_model_name,
+        model_name=nemotron_parse_config.nemotron_parse_model_name,
     )
     nemoretriever_parse_client = create_inference_client(
-        nemoretriever_parse_config.nemotron_parse_endpoints,
+        nemotron_parse_config.nemotron_parse_endpoints,
         model_interface,
-        nemoretriever_parse_config.auth_token,
-        nemoretriever_parse_config.nemotron_parse_infer_protocol,
-        nemoretriever_parse_config.timeout,
+        nemotron_parse_config.auth_token,
+        nemotron_parse_config.nemotron_parse_infer_protocol,
+        nemotron_parse_config.timeout,
     )
 
     return nemoretriever_parse_client

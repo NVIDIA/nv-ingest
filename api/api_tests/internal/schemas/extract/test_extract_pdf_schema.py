@@ -84,7 +84,7 @@ def test_pdf_extractor_schema_defaults():
     assert schema.n_workers == 16
     assert schema.raise_on_failure is False
     assert schema.pdfium_config is None
-    assert schema.nemoretriever_parse_config is None
+    assert schema.nemotron_parse_config is None
 
 
 def test_pdf_extractor_with_configs():
@@ -95,13 +95,13 @@ def test_pdf_extractor_with_configs():
         n_workers=8,
         raise_on_failure=True,
         pdfium_config=pdfium_config,
-        nemoretriever_parse_config=nemo_config,
+        nemotron_parse_config=nemo_config,
     )
     assert schema.max_queue_size == 10
     assert schema.n_workers == 8
     assert schema.raise_on_failure is True
     assert schema.pdfium_config == pdfium_config
-    assert schema.nemoretriever_parse_config == nemo_config
+    assert schema.nemotron_parse_config == nemo_config
 
 
 def test_pdf_extractor_forbid_extra_fields():
@@ -157,10 +157,10 @@ def test_pdf_extractor_schema_sanitize_nested_configs():
         n_workers=3,
         raise_on_failure=False,
         pdfium_config=pdfium_cfg,
-        nemoretriever_parse_config=nemo_cfg,
+        nemotron_parse_config=nemo_cfg,
     )
 
     sanitized = sanitize_for_logging(schema)
     assert isinstance(sanitized, dict)
     assert sanitized["pdfium_config"]["auth_token"] == "***REDACTED***"
-    assert sanitized["nemoretriever_parse_config"]["auth_token"] == "***REDACTED***"
+    assert sanitized["nemotron_parse_config"]["auth_token"] == "***REDACTED***"
