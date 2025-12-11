@@ -228,20 +228,21 @@ def process_shape(
             prog_id = getattr(shape.ole_format, "prog_id", "")
             ext = _get_ole_extension(prog_id)
 
-            png_streams = convert_stream_with_libreoffice(io.BytesIO(ole_blob), ext, "png")
+            if ext in {"docx", "pptx", "xlsx", "pdf"}:
+                png_streams = convert_stream_with_libreoffice(io.BytesIO(ole_blob), ext, "png")
 
-            for png_stream in png_streams:
-                pending_images.append(
-                    (
-                        png_stream.getvalue(),
-                        shape_idx,
-                        slide_idx,
-                        slide_count,
-                        page_nearby_blocks,
-                        source_metadata,
-                        base_unified_metadata,
+                for png_stream in png_streams:
+                    pending_images.append(
+                        (
+                            png_stream.getvalue(),
+                            shape_idx,
+                            slide_idx,
+                            slide_count,
+                            page_nearby_blocks,
+                            source_metadata,
+                            base_unified_metadata,
+                        )
                     )
-                )
         except Exception as e:
             logger.warning(f"Failed to convert OLE object (shape {shape_idx}, slide {slide_idx}) via LibreOffice: {e}")
             # Fallback: Try to use the standard image representation if it exists (the preview image)
@@ -954,9 +955,11 @@ def _get_ole_extension(prog_id: str) -> str:
     pid = prog_id.lower()
     if "excel" in pid or "sheet" in pid:
         return "xlsx"
-    if "word" in pid or "document" in pid:
+    if "word" in pid:
         return "docx"
     if "powerpoint" in pid or "show" in pid or "presentation" in pid:
         return "pptx"
     if "acrobat" in pid or "pdf" in pid:
         return "pdf"
+
+    return "bin"

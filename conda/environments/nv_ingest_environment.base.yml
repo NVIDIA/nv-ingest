@@ -21,7 +21,7 @@ dependencies:
   - opentelemetry-api>=1.27.0
   - opentelemetry-exporter-otlp>=1.27.0
   - opentelemetry-sdk>=1.27.0
-  - protobuf=5.29.3
+  - protobuf>=5.29.3
   - psutil=7.1.0
   - pydantic>2.0.0
   - pydantic-settings>2.0.0

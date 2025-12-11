@@ -112,7 +112,6 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${OCR_CUDA_MEMORY_POOL_MB:-8192}
       - NIM_TRITON_MAX_BATCH_SIZE=${OCR_BATCH_SIZE:-32}
       - NIM_TRITON_ENABLE_MODEL_CONTROL=1
     deploy:
@@ -176,6 +175,7 @@ services:
 
   nemoretriever-parse:
     image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -199,6 +199,7 @@ services:
 
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8018:8000"
     user: root
@@ -369,7 +370,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
-    user: "${UID}:${GID}"
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
