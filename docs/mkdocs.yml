@@ -75,7 +75,7 @@ nav:
         - Split Documents: extraction/chunking.md
         - Upload Data: extraction/data-store.md
         - Filter Search Results: extraction/custom-metadata.md
-        - Use Nemotron Parse: extraction/nemotron-parse.md
+        - Use Nemotron Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
         - Use Multimodal Embedding: extraction/vlm-embed.md
         - Configure Ray Logging: extraction/ray-logging.md

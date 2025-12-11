@@ -41,7 +41,7 @@ For more information, refer to [Extract Captions from Images](nv-ingest-python-a
 For scanned documents, or documents with complex layouts, 
 we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
 Nemo Retriever parse provides higher-accuracy text extraction. 
-For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemotron-parse.md).
+For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
 
 
 

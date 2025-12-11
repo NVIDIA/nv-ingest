@@ -212,7 +212,7 @@ if failures:
 
 !!! note
 
-    To use library mode with nemotron_parse, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemotron-parse.md).
+    To use library mode with nemotron_parse, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
 
 
 The output looks similar to the following.
@@ -428,8 +428,8 @@ You can specify multiple `--profile` options.
 |-----------------------|----------|-------------------------------------------------------------------| 
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | 
-| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemotron-parse.md). | 
-| `nemotron-parse` | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemotron-parse.md). | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | 
+| `nemotron-parse` | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
 
