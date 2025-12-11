@@ -26,4 +26,3 @@ services:
   reranker:
     environment:
       - NIM_TRITON_MAX_BATCH_SIZE=1
-
