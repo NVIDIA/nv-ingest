@@ -170,8 +170,8 @@ if __name__ == "__main__":
         yolox_graphic_elements_auth,
         yolox_graphic_elements_protocol,
     ) = get_nim_service("yolox_graphic_elements")
-    nemotron_parse_grpc, nemotron_parse_http, nemotron_parse_auth, nemotron_parse_protocol = (
-        get_nim_service("nemotron_parse")
+    nemotron_parse_grpc, nemotron_parse_http, nemotron_parse_auth, nemotron_parse_protocol = get_nim_service(
+        "nemotron_parse"
     )
     ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
