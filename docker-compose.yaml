@@ -175,6 +175,7 @@ services:
 
   nemoretriever-parse:
     image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -198,6 +199,7 @@ services:
 
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8018:8000"
     user: root
