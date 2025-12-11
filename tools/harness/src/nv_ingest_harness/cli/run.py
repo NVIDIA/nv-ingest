@@ -4,14 +4,14 @@ import subprocess
 import sys
 import time
 import click
+from pathlib import Path
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-COMPOSE_FILE = os.path.join(REPO_ROOT, "docker-compose.yaml")
-
-from cases.utils import last_commit, now_timestr
-from config import load_config
+from nv_ingest_harness.config import load_config
+from nv_ingest_harness.utils.cases import last_commit, now_timestr
 
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
+COMPOSE_FILE = str(REPO_ROOT / "docker-compose.yaml")
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 
 
@@ -158,7 +158,7 @@ def run_datasets(
 
             # Set collection_name from dataset if not set
             if case == "recall" and not config.collection_name:
-                from cases.recall_utils import get_recall_collection_name
+                from tools.harness.src.nv_ingest_harness.utils.recall_utils import get_recall_collection_name
 
                 # Use same logic as recall.py: test_name from config, or basename of dataset_dir
                 test_name_for_collection = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
@@ -233,8 +233,6 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     """Run a test case directly in the same process with real-time output."""
     import importlib.util
 
-    case_path = os.path.join(os.path.dirname(__file__), "cases", f"{case_name}.py")
-
     # Set LOG_PATH for kv_event_log
     log_path = os.path.dirname(stdout_path)
 
@@ -267,26 +265,20 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
         sys.stdout = tee_stdout
         sys.stderr = tee_stdout
 
-        # Add cases directory to sys.path so modules can import from utils
-        cases_dir = os.path.dirname(case_path)
-        if cases_dir not in sys.path:
-            sys.path.insert(0, cases_dir)
-
-        # Load and execute the test case module
-        spec = importlib.util.spec_from_file_location(case_name, case_path)
-        if spec is None or spec.loader is None:
-            print(f"Error: Could not load case {case_name} from {case_path}")
+        # Dynamically import from the package
+        try:
+            module = importlib.import_module(f"nv_ingest_harness.cases.{case_name}")
+        except ImportError as e:
+            print(f"Error: Could not import case module 'nv_ingest_harness.cases.{case_name}': {e}")
             return 1
-
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[case_name] = module
-        spec.loader.exec_module(module)
 
         # If the module has a main function, call it with config and log_path
         if hasattr(module, "main"):
             result = module.main(config=config, log_path=log_path)
             return result if isinstance(result, int) else 0
-        return 0
+        else:
+            print(f"Error: Module {case_name} does not have a main() function")
+            return 1
 
     except Exception as e:
         print(f"Error running case {case_name}: {e}", file=sys.stderr)

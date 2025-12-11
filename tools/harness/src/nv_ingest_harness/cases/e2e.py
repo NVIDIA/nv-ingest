@@ -9,9 +9,7 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
-# Import from interact module (now properly structured)
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
 
 # Future: Will integrate with modular ingest_documents.py when VDB upload is separated
 
@@ -52,7 +50,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     if config.collection_name:
         collection_name = config.collection_name
     else:
-        from recall_utils import get_recall_collection_name
+        from nv_ingest_harness.utils.recall import get_recall_collection_name
 
         test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
         collection_name = get_recall_collection_name(test_name)
