@@ -13,7 +13,7 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_harness.utils.cases import get_repo_root
 from nv_ingest_harness.utils.interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
 
-# Future: Will integrate with modular ingest_documents.py when VDB upload is separated
+# Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
 # Suppress LazyLoadedList file not found errors to reduce terminal bloat
 lazy_logger = logging.getLogger("nv_ingest_client.client.interface")

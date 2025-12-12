@@ -11,7 +11,7 @@ from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
 
-# Future: Will integrate with modular ingest_documents.py when VDB upload is separated
+# Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
 # Suppress LazyLoadedList file not found errors to reduce terminal bloat
 lazy_logger = logging.getLogger("nv_ingest_client.client.interface")
