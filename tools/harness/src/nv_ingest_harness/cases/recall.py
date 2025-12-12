@@ -4,14 +4,11 @@ Recall-only test case - evaluates recall against existing collections.
 
 import json
 import os
-import sys
 import time
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from interact import embed_info, kv_event_log, load_collection, unload_collection
-
-from recall_utils import get_dataset_evaluator, get_recall_collection_name
 from typing import Callable, Dict, Tuple
+
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, load_collection, unload_collection
+from nv_ingest_harness.utils.recall import get_dataset_evaluator, get_recall_collection_name
 
 
 def evaluate_recall_with_reranker(

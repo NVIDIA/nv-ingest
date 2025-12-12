@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 import click
 
-from cases.utils import now_timestr
+from nv_ingest_harness.utils.cases import now_timestr
 
 
 def run_single_test(run_py_path: str, test_args: list[str]) -> tuple[int, dict | None]:
