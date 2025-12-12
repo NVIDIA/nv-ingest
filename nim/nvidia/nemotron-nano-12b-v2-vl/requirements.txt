@@ -1,0 +1,16 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.9.2
+pydantic-settings==2.7.1
+numpy>=1.26.4
+pillow>=10.4.0
+torch>=2.3.0
+transformers>=4.53.0,<4.54.0
+accelerate>=1.2.1
+timm>=1.0.11
+causal_conv1d>=1.0.0
+mamba-ssm==2.2.5
+open_clip_torch>=2.30.0
+prometheus-client==0.21.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
