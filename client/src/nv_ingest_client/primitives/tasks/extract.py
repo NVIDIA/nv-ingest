@@ -122,6 +122,10 @@ class ExtractTask(Task):
                 )
             extract_method = _DEFAULT_EXTRACTOR_MAP[document_type_lower]
 
+        if extract_method == "nemoretriever_parse":
+            logger.warning("'nemoretriever_parse' is deprecated. Please use 'nemotron_parse' instead.")
+            extract_method = "nemotron_parse"
+
         self._validate_extract_method(document_type, extract_method)
 
         # Set default extract_charts if None
