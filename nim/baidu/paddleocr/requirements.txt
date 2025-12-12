@@ -1,0 +1,15 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.9.2
+pydantic-settings==2.7.0
+numpy==2.0.2
+requests==2.32.3
+Pillow==11.0.0
+grpcio==1.67.1
+prometheus-client==0.21.0
+tritonclient[grpc]==2.47.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
+paddleocr==3.3.2
+paddlex==3.3.11
+opencv-contrib-python==4.10.0.84
