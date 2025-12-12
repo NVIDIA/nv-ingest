@@ -24,6 +24,9 @@ dev = [
     "nv-ingest-client",
 ]
 
+[tool.uv]
+package = true
+
 [tool.uv.sources]
 nv-ingest = { path = "../../src" }
 nv-ingest-api = { path = "../../api/" }
