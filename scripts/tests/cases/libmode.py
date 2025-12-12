@@ -51,7 +51,7 @@ def main():
             table_output_format="markdown",
             extract_infographics=True,
             # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-            # extract_method="nemoretriever_parse",
+            # extract_method="nemotron_parse",
             text_depth="page",
         )
         .embed()

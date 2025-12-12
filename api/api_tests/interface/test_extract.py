@@ -21,7 +21,7 @@ from nv_ingest_api.interface.extract import (
     extract_primitives_from_audio,
     extract_primitives_from_pdf,
     extract_primitives_from_pdf_pdfium,
-    extract_primitives_from_pdf_nemoretriever_parse,
+    extract_primitives_from_pdf_nemotron_parse,
 )
 from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum, TableFormatEnum
 
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
     "extract_method",
     [
         "pdfium",
-        "nemoretriever_parse",
+        "nemotron_parse",
         pytest.param("adobe", marks=pytest.mark.xfail(reason="Adobe extraction not configured in test environment")),
         pytest.param("llama", marks=pytest.mark.xfail(reason="Llama extraction not configured in test environment")),
         pytest.param(
@@ -114,13 +114,13 @@ def test_extract_primitives_from_pdf_integration(extract_method):
     _YOLOX_INFER_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
-    # NemoRetriever Parse parameters
-    _NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT = os.getenv(
-        "INGEST_NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT", "http://localhost:8000/v1/chat/completions:8015"
+    # Nemotron Parse parameters
+    _NEMOTRON_PARSE_HTTP_ENDPOINT = os.getenv(
+        "INGEST_NEMOTRON_PARSE_HTTP_ENDPOINT", "http://localhost:8000/v1/chat/completions:8015"
     )
-    _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT", None)
-    _NEMO_RETRIEVER_PARSE_PROTOCOL = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_PROTOCOL", "http")
-    _NEMO_RETRIEVER_PARSE_MODEL_NAME = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    _NEMOTRON_PARSE_GRPC_ENDPOINT = os.getenv("INGEST_NEMOTRON_PARSE_GRPC_ENDPOINT", None)
+    _NEMOTRON_PARSE_PROTOCOL = os.getenv("INGEST_NEMOTRON_PARSE_PROTOCOL", "http")
+    _NEMOTRON_PARSE_MODEL_NAME = os.getenv("INGEST_NEMOTRON_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
 
     # Method-specific configuration parameters
     extraction_params = {
@@ -161,16 +161,16 @@ def test_extract_primitives_from_pdf_integration(extract_method):
                 "yolox_auth_token": _AUTH_TOKEN,
             }
         )
-    elif extract_method == "nemoretriever_parse":
+    elif extract_method == "nemotron_parse":
         extraction_params.update(
             {
-                # NemoRetriever Parse specific parameters
-                "nemoretriever_parse_endpoints": (
-                    _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT,
-                    _NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT,
+                # Nemotron Parse specific parameters
+                "nemotron_parse_endpoints": (
+                    _NEMOTRON_PARSE_GRPC_ENDPOINT,
+                    _NEMOTRON_PARSE_HTTP_ENDPOINT,
                 ),
-                "nemoretriever_parse_protocol": _NEMO_RETRIEVER_PARSE_PROTOCOL,
-                "nemoretriever_parse_model_name": _NEMO_RETRIEVER_PARSE_MODEL_NAME,
+                "nemotron_parse_protocol": _NEMOTRON_PARSE_PROTOCOL,
+                "nemotron_parse_model_name": _NEMOTRON_PARSE_MODEL_NAME,
                 # Also include YOLOX parameters for image processing capability
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
@@ -325,11 +325,11 @@ def test_extract_pdf_with_pdfium_integration():
 
 
 @pytest.mark.integration
-def test_extract_pdf_with_nemoretriever_integration():
+def test_extract_pdf_with_nemotron_parse_integration():
     """
-    Integration test for the extract_pdf_with_nemoretriever function.
+    Integration test for the extract_pdf_with_nemotron function.
 
-    Verifies that the NemoRetriever Parse extraction correctly processes a test PDF document
+    Verifies that the Nemotron Parse extraction correctly processes a test PDF document
     and returns a DataFrame with the expected structure and content.
     """
     # Get the test file path
@@ -382,13 +382,13 @@ def test_extract_pdf_with_nemoretriever_integration():
         }
     )
 
-    # Get NemoRetriever Parse environment variables
+    # Get Nemotron Parse environment variables
     nemo_http_endpoint = os.getenv(
-        "INGEST_NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT", "http://localhost:8000/v1/chat/completions:8015"
+        "INGEST_NEMOTRON_PARSE_HTTP_ENDPOINT", "http://localhost:8000/v1/chat/completions:8015"
     )
-    nemo_grpc_endpoint = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT", None)
-    nemo_protocol = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_PROTOCOL", "http")
-    nemo_model_name = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    nemo_grpc_endpoint = os.getenv("INGEST_NEMOTRON_PARSE_GRPC_ENDPOINT", None)
+    nemo_protocol = os.getenv("INGEST_NEMOTRON_PARSE_PROTOCOL", "http")
+    nemo_model_name = os.getenv("INGEST_NEMOTRON_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
 
     # Also get YOLOX parameters (needed for image processing)
     yolox_http_endpoint = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8000/v1/infer")
@@ -396,8 +396,8 @@ def test_extract_pdf_with_nemoretriever_integration():
     yolox_protocol = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
     auth_token = os.getenv("INGEST_AUTH_TOKEN", None)
 
-    # Call the specialized NemoRetriever extraction function
-    df_result = extract_primitives_from_pdf_nemoretriever_parse(
+    # Call the specialized Nemotron Parse extraction function
+    df_result = extract_primitives_from_pdf_nemotron_parse(
         df_extraction_ledger=df_ledger,
         extract_text=True,
         extract_images=True,
@@ -408,9 +408,9 @@ def test_extract_pdf_with_nemoretriever_integration():
         yolox_endpoints=(yolox_grpc_endpoint, yolox_http_endpoint),
         yolox_infer_protocol=yolox_protocol,
         yolox_auth_token=auth_token,
-        nemoretriever_parse_endpoints=(nemo_grpc_endpoint, nemo_http_endpoint),
-        nemoretriever_parse_protocol=nemo_protocol,
-        nemoretriever_parse_model_name=nemo_model_name,
+        nemotron_parse_endpoints=(nemo_grpc_endpoint, nemo_http_endpoint),
+        nemotron_parse_protocol=nemo_protocol,
+        nemotron_parse_model_name=nemo_model_name,
     )
 
     # Validate results

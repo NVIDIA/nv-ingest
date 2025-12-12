@@ -133,7 +133,7 @@ def test_orchestrate_row_extraction_missing_extractor_config_key(mock_work_extra
     [
         "adobe",
         "llama",
-        "nemoretriever_parse",
+        "nemotron_parse",
         "pdfium",
         "tika",
         "unstructured_io",
