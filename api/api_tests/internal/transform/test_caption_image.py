@@ -29,6 +29,7 @@ def dummy_task_config():
     return {
         "api_key": "api_key",
         "prompt": "Describe the image",
+        "system_prompt": "You are a helpful assistant.",
         "endpoint_url": "https://fake.endpoint",
         "model_name": "fake_model",
     }
@@ -40,6 +41,7 @@ def dummy_transform_config():
     class Dummy:
         api_key = "default_api_key"
         prompt = "default_prompt"
+        system_prompt = "/no_think"  # Default system prompt for Nemotron Nano 12B v2 VL (reasoning off)
         endpoint_url = "https://default.endpoint"
         model_name = "default_model"
 
@@ -66,6 +68,7 @@ def test_transform_image_create_vlm_caption_internal_happy_path(
     mock_generate.assert_called_once_with(
         ["base64_image_1", "base64_image_2"],
         dummy_task_config["prompt"],
+        dummy_task_config["system_prompt"],
         dummy_task_config["api_key"],
         dummy_task_config["endpoint_url"],
         dummy_task_config["model_name"],
@@ -118,6 +121,7 @@ def test_transform_image_create_vlm_caption_internal_uses_fallback_config(
     mock_generate.assert_called_once_with(
         ["base64_image_1", "base64_image_2"],
         dummy_transform_config.prompt,
+        dummy_transform_config.system_prompt,
         dummy_transform_config.api_key,
         dummy_transform_config.endpoint_url,
         dummy_transform_config.model_name,
@@ -213,6 +217,7 @@ def test_generate_captions_happy_path(mock_scale, mock_create_client):
     result = module_under_test._generate_captions(
         base64_images,
         prompt="describe this",
+        system_prompt=None,
         api_key="test_api_key",
         endpoint_url="https://fake.endpoint",
         model_name="test_model",
@@ -249,6 +254,7 @@ def test_generate_captions_raises_on_client_error(mock_scale, mock_create_client
         module_under_test._generate_captions(
             ["b64img1"],
             prompt="describe this",
+            system_prompt=None,
             api_key="test_api_key",
             endpoint_url="https://fake.endpoint",
             model_name="test_model",
@@ -268,6 +274,7 @@ def test_generate_captions_empty_images_returns_empty_list(mock_scale, mock_crea
     result = module_under_test._generate_captions(
         [],
         prompt="describe this",
+        system_prompt=None,
         api_key="test_api_key",
         endpoint_url="https://fake.endpoint",
         model_name="test_model",

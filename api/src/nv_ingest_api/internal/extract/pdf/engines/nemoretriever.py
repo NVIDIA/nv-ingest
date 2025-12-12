@@ -254,6 +254,7 @@ def nemoretriever_parse_extractor(
                     extract_tables,
                     extract_charts,
                     extract_infographics,
+                    {},  # page_to_text_flag_map
                     table_output_format,
                     nemoretriever_parse_config.yolox_endpoints,
                     nemoretriever_parse_config.yolox_infer_protocol,
@@ -288,6 +289,7 @@ def nemoretriever_parse_extractor(
                 extract_tables,
                 extract_charts,
                 extract_infographics,
+                {},  # page_to_text_flag_map
                 table_output_format,
                 nemoretriever_parse_config.yolox_endpoints,
                 nemoretriever_parse_config.yolox_infer_protocol,

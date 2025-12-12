@@ -564,6 +564,7 @@ def extract_primitives_from_audio(
 def extract_primitives_from_pptx(
     *,
     df_ledger: pd.DataFrame,
+    extract_method: str = "python_pptx",
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -620,6 +621,7 @@ def extract_primitives_from_pptx(
     and the extraction configuration.
     """
     task_config: Dict[str, Any] = {
+        "method": extract_method,
         "params": {
             "extract_text": extract_text,
             "extract_images": extract_images,
@@ -651,6 +653,7 @@ def extract_primitives_from_pptx(
 def extract_primitives_from_docx(
     *,
     df_ledger: pd.DataFrame,
+    extract_method: str = "python_docx",
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -704,6 +707,7 @@ def extract_primitives_from_docx(
     """
     # Build the task configuration with parameters and DOCX-specific extraction settings.
     task_config: Dict[str, Any] = {
+        "method": extract_method,
         "params": {
             "extract_text": extract_text,
             "extract_images": extract_images,

@@ -39,6 +39,45 @@ RUN chmod +x scripts/install_ffmpeg.sh \
     && bash scripts/install_ffmpeg.sh \
     && rm scripts/install_ffmpeg.sh
 
+# Install libreoffice
+# For GPL-licensed components, we provide their source code in the container
+# via `apt-get source` below to satisfy GPL requirements.
+ARG GPL_LIBS="\
+    libltdl7 \
+    libhunspell-1.7-0 \
+    libhyphen0 \
+    libdbus-1-3 \
+"
+ARG FORCE_REMOVE_PKGS="\
+    libfreetype6 \
+    ucf \
+    liblangtag-common \
+    libjbig0 \
+    pinentry-curses \
+    gpg-agent \
+    gnupg-utils \
+    gpgsm \
+    gpg-wks-server \
+    gpg-wks-client \
+    gpgconf \
+    gnupg \
+    readline-common \
+    libreadline8 \
+    dirmngr \
+    libjpeg8 \
+"
+RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      dpkg-dev \
+      libreoffice \
+      $GPL_LIBS \
+    && apt-get source $GPL_LIBS \
+    && for pkg in $FORCE_REMOVE_PKGS; do \
+         dpkg --remove --force-depends "$pkg" || true; \
+       done \
+    && apt-get clean
+
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh

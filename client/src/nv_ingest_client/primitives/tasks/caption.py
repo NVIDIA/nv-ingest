@@ -22,18 +22,24 @@ class CaptionTask(Task):
         api_key: str = None,
         endpoint_url: str = None,
         prompt: str = None,
+        system_prompt: str = None,
         model_name: str = None,
     ) -> None:
         super().__init__()
 
         # Use the API schema for validation
         validated_data = IngestTaskCaptionSchema(
-            api_key=api_key, endpoint_url=endpoint_url, prompt=prompt, model_name=model_name
+            api_key=api_key,
+            endpoint_url=endpoint_url,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model_name=model_name,
         )
 
         self._api_key = validated_data.api_key
         self._endpoint_url = validated_data.endpoint_url
         self._prompt = validated_data.prompt
+        self._system_prompt = validated_data.system_prompt
         self._model_name = validated_data.model_name
 
     def __str__(self) -> str:
@@ -49,6 +55,8 @@ class CaptionTask(Task):
             info += f"  endpoint_url: {self._endpoint_url}\n"
         if self._prompt:
             info += f"  prompt: {self._prompt}\n"
+        if self._system_prompt:
+            info += f"  system_prompt: {self._system_prompt}\n"
         if self._model_name:
             info += f"  model_name: {self._model_name}\n"
 
@@ -68,6 +76,9 @@ class CaptionTask(Task):
 
         if self._prompt:
             task_properties["prompt"] = self._prompt
+
+        if self._system_prompt:
+            task_properties["system_prompt"] = self._system_prompt
 
         if self._model_name:
             task_properties["model_name"] = self._model_name

@@ -20,7 +20,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.decorators import mul
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
-DEFAULT_OCR_MODEL_NAME = "paddle"
+DEFAULT_OCR_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
 NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_BLS_MODEL_NAME = "scene_text_python"

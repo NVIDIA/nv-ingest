@@ -52,9 +52,12 @@ class TestConfig:
 
     # Optional pipeline steps
     enable_caption: bool = False
+    caption_prompt: Optional[str] = None
+    caption_system_prompt: Optional[str] = None
     enable_split: bool = False
     split_chunk_size: int = 1024
     split_chunk_overlap: int = 150
+    enable_image_storage: bool = False  # Server-side image storage (MinIO/local disk)
 
     # Trace configuration
     enable_traces: bool = False
@@ -266,11 +269,14 @@ def _load_env_overrides() -> dict:
         "TEXT_DEPTH": ("text_depth", str),
         "TABLE_OUTPUT_FORMAT": ("table_output_format", str),
         "ENABLE_CAPTION": ("enable_caption", parse_bool),
+        "CAPTION_PROMPT": ("caption_prompt", str),
+        "CAPTION_SYSTEM_PROMPT": ("caption_system_prompt", str),
         "ENABLE_SPLIT": ("enable_split", parse_bool),
         "SPLIT_CHUNK_SIZE": ("split_chunk_size", parse_int),
         "SPLIT_CHUNK_OVERLAP": ("split_chunk_overlap", parse_int),
         "ENABLE_TRACES": ("enable_traces", parse_bool),
         "TRACE_OUTPUT_DIR": ("trace_output_dir", str),
+        "ENABLE_IMAGE_STORAGE": ("enable_image_storage", parse_bool),
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),

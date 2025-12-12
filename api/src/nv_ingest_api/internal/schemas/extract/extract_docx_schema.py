@@ -9,6 +9,7 @@ from typing import Tuple
 
 from pydantic import model_validator, ConfigDict, BaseModel, Field
 
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
 
 logger = logging.getLogger(__name__)
@@ -123,4 +124,6 @@ class DocxExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     docx_extraction_config: Optional[DocxConfigSchema] = None
+    pdfium_config: Optional[PDFiumConfigSchema] = None
+
     model_config = ConfigDict(extra="forbid")

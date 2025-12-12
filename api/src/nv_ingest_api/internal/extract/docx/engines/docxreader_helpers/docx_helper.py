@@ -17,7 +17,6 @@
 
 # pylint: disable=too-many-locals
 
-
 import logging
 from typing import IO, Optional, List
 

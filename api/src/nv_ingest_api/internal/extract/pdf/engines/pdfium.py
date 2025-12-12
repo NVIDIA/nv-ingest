@@ -108,7 +108,7 @@ def _extract_page_elements_using_image_ensemble(
         # Perform inference using the NimClient.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox_ensemble",
+            model_name="pipeline" if yolox_client.model_interface.version.endswith("-v3") else "yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],
             dtypes=["BYTES", "FP32"],

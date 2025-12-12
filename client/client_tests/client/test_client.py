@@ -669,9 +669,9 @@ class TestNvIngestClientApiVersionConfiguration:
 
         # Access the underlying RestClient
         rest_client = client._message_client
-        assert rest_client._api_version == "v1"
-        assert rest_client._submit_endpoint == "/v1/submit_job"
-        assert rest_client._fetch_endpoint == "/v1/fetch_job"
+        assert rest_client._api_version == "v2"
+        assert rest_client._submit_endpoint == "/v2/submit_job"
+        assert rest_client._fetch_endpoint == "/v2/fetch_job"
 
     def test_explicit_v2_via_message_client_kwargs(self):
         """Test that NvIngestClient can be configured to use v2 explicitly"""

@@ -7,8 +7,7 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict
-from typing import Literal
+from typing import Dict, Literal, Optional
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
@@ -17,23 +16,19 @@ from .task_base import Task
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_STORE_METHOD = "minio"
-
 
 class StoreTask(Task):
     """
     Object for image storage task.
     """
 
-    _Type_Content_Type = Literal["image",]
-
-    _Type_Store_Method = Literal["minio",]
-
     def __init__(
         self,
         structured: bool = True,
         images: bool = False,
-        store_method: _Type_Store_Method = None,
+        storage_uri: Optional[str] = None,
+        storage_options: Optional[dict] = None,
+        public_base_url: Optional[str] = None,
         params: dict = None,
         **extra_params,
     ) -> None:
@@ -51,12 +46,19 @@ class StoreTask(Task):
 
         # Use the API schema for validation
         validated_data = IngestTaskStoreSchema(
-            structured=structured, images=images, method=store_method or _DEFAULT_STORE_METHOD, params=merged_params
+            structured=structured,
+            images=images,
+            storage_uri=storage_uri,
+            storage_options=storage_options or {},
+            public_base_url=public_base_url,
+            params=merged_params,
         )
 
         self._structured = validated_data.structured
         self._images = validated_data.images
-        self._store_method = validated_data.method
+        self._storage_uri = validated_data.storage_uri
+        self._storage_options = validated_data.storage_options
+        self._public_base_url = validated_data.public_base_url
         self._params = validated_data.params
         self._extra_params = extra_params
 
@@ -68,7 +70,8 @@ class StoreTask(Task):
         info += "Store Task:\n"
         info += f"  store structured types: {self._structured}\n"
         info += f"  store image types: {self._images}\n"
-        info += f"  store method: {self._store_method}\n"
+        info += f"  storage uri: {self._storage_uri}\n"
+        info += f"  public base url: {self._public_base_url}\n"
         for key, value in self._extra_params.items():
             info += f"  {key}: {value}\n"
         for key, value in self._params.items():
@@ -81,9 +84,11 @@ class StoreTask(Task):
         """
 
         task_properties = {
-            "method": self._store_method,
             "structured": self._structured,
             "images": self._images,
+            "storage_uri": self._storage_uri,
+            "storage_options": self._storage_options,
+            "public_base_url": self._public_base_url,
             "params": self._params,
             **self._extra_params,
         }

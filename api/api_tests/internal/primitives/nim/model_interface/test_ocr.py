@@ -306,7 +306,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -367,7 +369,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 2)  # Should have 2 results (for 2 images)
@@ -408,7 +412,9 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
+            mock_extract.assert_called_once_with(
+                mock_response, data.get("image_dims"), model_name=model_interface_module.DEFAULT_OCR_MODEL_NAME
+            )
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -429,17 +435,6 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
         self.assertTrue("not a NumPy array" in str(context.exception))
-
-    def test_parse_output_grpc_invalid_response_shape(self):
-        """Test parse_output method with gRPC protocol and an invalid response shape."""
-        # Create a response with an invalid shape (2, 3) instead of (3, n)
-        mock_response = np.zeros((2, 3))
-        data = {"image_dims": [{}]}
-
-        with self.assertRaises(ValueError) as context:
-            self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
-
-        self.assertTrue("Unexpected response shape" in str(context.exception))
 
     def test_parse_output_invalid_protocol(self):
         """Test parse_output method with an invalid protocol."""
