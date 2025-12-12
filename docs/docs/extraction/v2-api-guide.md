@@ -370,7 +370,7 @@ ingestor = Ingestor(
 
 ### Test Script Pattern
 
-For test scripts like `scripts/tests/cases/e2e.py`:
+For test scripts like `tools/harness/src/nv_ingest_harness/cases/e2e.py`:
 
 ```python
 import os

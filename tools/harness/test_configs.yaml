@@ -41,7 +41,7 @@ active:
 
   # Storage configuration
   spill_dir: /tmp/spill
-  artifacts_dir: null  # null = use default (scripts/tests/artifacts)
+  artifacts_dir: null  # null = use default (tools/harness/artifacts)
   collection_name: null  # null = auto-generated
 
   # Custom UDF Configs - add specific udf configs here if needed.
@@ -58,10 +58,10 @@ recall:
 
 # Pre-configured datasets
 # Each dataset includes path, extraction settings, and recall evaluator
-# Use: python run.py --case=e2e --dataset=bo767
+# Use: nv-ingest-harness-run --case=e2e --dataset=bo767
 datasets:
   bo767:
-    path: /path/to/bo767
+    path: /home/charlesb/datasets/bo767
     extract_text: true
     extract_tables: true
     extract_charts: true
