@@ -313,7 +313,7 @@ services:
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
