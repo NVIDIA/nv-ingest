@@ -69,7 +69,7 @@ def run_basic_extract_test(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("extract_method", [None])  # , "nemoretriever_parse"])
+@pytest.mark.parametrize("extract_method", [None])  # , "nemotron_parse"])
 def test_extract_only(
     extract_method,
     pipeline_process,

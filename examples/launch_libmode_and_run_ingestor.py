@@ -5,7 +5,6 @@
 import logging
 import os
 import time
-import sys
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
@@ -64,13 +63,15 @@ def main():
     Launch the libmode pipeline service and run the ingestor against it.
     Uses the embedded default libmode pipeline configuration.
     """
+    pipeline = None
     try:
+        # Start pipeline in subprocess
+        # Note: stdout/stderr cannot be passed when run_in_subprocess=True (not picklable)
+        # Use quiet=False to see verbose startup logs
         pipeline = run_pipeline(
             block=False,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
         )
         time.sleep(10)
         run_ingestor()
@@ -80,8 +81,9 @@ def main():
     except Exception as e:
         logger.error(f"Error running pipeline: {e}")
     finally:
-        pipeline.stop()
-        logger.info("Shutting down pipeline...")
+        if pipeline:
+            pipeline.stop()
+            logger.info("Shutting down pipeline...")
 
 
 if __name__ == "__main__":
