@@ -1,3 +1,5 @@
+import docker
+
 import glob
 import inspect
 import json
@@ -25,8 +27,6 @@ def check_container_running(container_name):
     Returns:
         bool: True if a container with the specified name is running, False otherwise.
     """
-    import docker
-
     client = docker.from_env()
     containers = client.containers.list()
 
