@@ -5,11 +5,11 @@
 active:
   # Dataset configuration
   dataset_dir: /path/to/dataset
-  test_name: multimodal_test  # Auto-generated if null
+  test_name: null  # Auto-generated if null
 
   # API configuration
-  api_version: v1  # v1 or v2
-  pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
+  api_version: v2 # v1 or v2
+  pdf_split_page_count: null # V2 only: pages per chunk (null = default 32)
 
   # Infrastructure
   hostname: localhost
@@ -30,10 +30,13 @@ active:
   extract_images: false
   extract_infographics: true
   text_depth: page
-  table_output_format: markdown
+  # table_output_format: markdown
 
   # Optional pipeline steps
-  enable_caption: false  # Enable image captioning
+  enable_caption: false  # Enable image captioning (ensure vlm profile is enabled)
+  caption_prompt: null  # Override caption user prompt (null = service default)
+  caption_system_prompt: null  # Set "/think" or "/no_think" to control reasoning (null = service default)
+
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
   split_chunk_overlap: 150  # Overlap for text splitting

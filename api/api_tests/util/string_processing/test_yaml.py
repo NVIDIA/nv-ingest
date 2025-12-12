@@ -313,11 +313,11 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
-      nemoretriever_parse_config:
+      nemotron_parse_config:
         auth_token: $NGC_API_KEY|""
-        nemoretriever_parse_endpoints: [
-          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
+        nemotron_parse_endpoints: [
+          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
+          $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemotron-parse:8000/v1/chat/completions"
         ]
 """
         with patch.dict(os.environ, {"NGC_API_KEY": "secret-key", "YOLOX_GRPC_ENDPOINT": "prod-yolox:9001"}):
@@ -327,7 +327,7 @@ stages:
             assert "prod-yolox:9001" in result
             assert "http://page-elements:8000/v1/infer" in result
             assert "yolox_infer_protocol: grpc" in result
-            assert "http://nemoretriever-parse:8000/v1/chat/completions" in result
+            assert "http://nemotron-parse:8000/v1/chat/completions" in result
 
     def test_env_var_with_special_values(self):
         """Test environment variables with special values."""

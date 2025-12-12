@@ -317,9 +317,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MINIO_PUBLIC_ADDRESS | string | `"http://localhost:9000"` |  |
 | envVars.MINIO_SECRET_KEY | string | `"minioadmin"` |  |
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
-| envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"` |  |
-| envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
-| envVars.NEMORETRIEVER_PARSE_MODEL_NAME | string | `"nvidia/nemoretriever-parse"` |  |
+| envVars.NEMOTRON_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"` |  |
+| envVars.NEMOTRON_PARSE_INFER_PROTOCOL | string | `"http"` |  |
+| envVars.NEMOTRON_PARSE_MODEL_NAME | string | `"nvidia/nemotron-parse"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
 | envVars.OCR_GRPC_ENDPOINT | string | `"nemoretriever-ocr-v1:8001"` |  |
 | envVars.OCR_HTTP_ENDPOINT | string | `"http://nemoretriever-ocr-v1:8000/v1/infer"` |  |
@@ -330,7 +330,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.RAY_num_grpc_threads | int | `1` |  |
+| envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/nemotron-nano-12b-v2-vl"` |  |
+| envVars.VLM_CAPTION_PROMPT | string | `"Caption the content of this image:"` |  |
+| envVars.VLM_CAPTION_SYSTEM_PROMPT | string | `"/no_think"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |

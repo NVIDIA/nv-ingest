@@ -113,7 +113,15 @@ def main(config=None, log_path: str = "test_results") -> int:
         pipeline_opts.append("PDF split: 32 pages (default)")
 
     if enable_caption:
-        pipeline_opts.append("caption")
+        caption_flags = []
+        if config.caption_prompt:
+            caption_flags.append("prompt override")
+        if config.caption_system_prompt:
+            caption_flags.append("system prompt override")
+        if caption_flags:
+            pipeline_opts.append(f"caption ({', '.join(caption_flags)})")
+        else:
+            pipeline_opts.append("caption")
     if enable_split:
         pipeline_opts.append(f"text split: {split_chunk_size}/{split_chunk_overlap}")
     if enable_image_storage:
@@ -157,7 +165,12 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     # Optional pipeline steps
     if enable_caption:
-        ingestor = ingestor.caption()
+        caption_kwargs = {}
+        if config.caption_prompt:
+            caption_kwargs["prompt"] = config.caption_prompt
+        if config.caption_system_prompt:
+            caption_kwargs["system_prompt"] = config.caption_system_prompt
+        ingestor = ingestor.caption(**caption_kwargs)
 
     if enable_split:
         ingestor = ingestor.split(

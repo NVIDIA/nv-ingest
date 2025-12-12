@@ -30,6 +30,29 @@ The following table describes methods of the `Ingestor` class.
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
+### Caption images and control reasoning
+
+The caption task can call a VLM with optional prompt and system prompt overrides:
+
+- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
+- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+
+Example:
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/doc-with-images.pdf")
+    .extract(extract_images=True)
+    .caption(
+        prompt="Caption the content of this image:",
+        system_prompt="/think",  # or "/no_think"
+    )
+    .ingest()
+)
+```
+
 
 
 ## Track Job Progress
@@ -166,6 +189,42 @@ Use the following code to specify a custom document type for extraction.
 
 ```python
 ingestor = ingestor.extract(document_type="pdf")
+```
+
+
+
+### Extract Office Documents (DOCX and PPTX)
+
+NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+
+- Native extraction
+- Render as PDF
+
+#### Native Extraction (Default)
+
+The default methods (`python_docx` and `python_pptx`) extract content directly from the file structure.
+This is generally faster, but you might lose some visual layout information.
+
+```python
+# Uses default native extraction
+ingestor = Ingestor().files(["report.docx", "presentation.pptx"]).extract()
+```
+
+#### Render as PDF
+
+The `render_as_pdf` method uses [LibreOffice](https://www.libreoffice.org/) to convert the document to a PDF before extraction.
+We recommend this approach when preserving the visual layout is critical, or when you need to extract visual elements, such as tables and charts, that are better detected by using computer vision on a rendered page.
+
+```python
+ingestor = Ingestor().files(["report.docx", "presentation.pptx"])
+
+ingestor = ingestor.extract(
+    extract_text=True,
+    extract_tables=True,
+    extract_charts=True,
+    extract_infographics=True,
+    extract_method="render_as_pdf"  # Convert to PDF first for improved visual extraction
+)
 ```
 
 
@@ -378,6 +437,6 @@ results = ingestor.ingest()
 
 - [Split Documents](chunking.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
-- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)
