@@ -1,0 +1,14 @@
+numpy==1.26.4
+scipy==1.13.1
+transformers==4.46.2
+pydantic==2.9.2
+pydantic-settings==2.7.1
+grpcio==1.67.1
+nvidia-riva-client==2.20.0
+torch>=2.3.0
+prometheus-client==0.21.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-http==1.27.0
+deepmultilingualpunctuation==1.0.1
+webrtcvad==2.0.10
+tritonclient[grpc]==2.47.0
