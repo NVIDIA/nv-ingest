@@ -13,6 +13,7 @@ from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
+from nv_ingest_harness.utils.cases import get_repo_root
 
 def get_recall_scores(
     query_df: pd.DataFrame,
@@ -235,8 +236,7 @@ def bo767_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFr
         pdf_page format: '{pdf_id}_{page_number}' (1-indexed page numbers).
     """
     if ground_truth_dir is None:
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        ground_truth_dir = os.path.join(repo_root, "data")
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
 
     csv_path = os.path.join(ground_truth_dir, "bo767_query_gt.csv")
     if not os.path.exists(csv_path):
@@ -307,8 +307,7 @@ def finance_bench_load_ground_truth(ground_truth_dir: Optional[str] = None) -> p
     """
     if ground_truth_dir is None:
         # Default to repo data/ directory
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        ground_truth_dir = os.path.join(repo_root, "data")
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
 
     # Load finance_bench JSON - expected format: list of dicts with 'question' and 'contexts'
     json_path = os.path.join(ground_truth_dir, "financebench_train.json")
@@ -409,8 +408,7 @@ def earnings_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.Dat
     """
     if ground_truth_dir is None:
         # Default to repo data/ directory
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        ground_truth_dir = os.path.join(repo_root, "data")
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
 
     # Load earnings CSV - expected format: dir, pdf, page, query, answer, modality
     csv_path = os.path.join(ground_truth_dir, "earnings_consulting_multimodal.csv")

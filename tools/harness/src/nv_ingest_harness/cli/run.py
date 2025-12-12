@@ -158,7 +158,7 @@ def run_datasets(
 
             # Set collection_name from dataset if not set
             if case == "recall" and not config.collection_name:
-                from tools.harness.src.nv_ingest_harness.utils.recall_utils import get_recall_collection_name
+                from nv_ingest_harness.utils.recall import get_recall_collection_name
 
                 # Use same logic as recall.py: test_name from config, or basename of dataset_dir
                 test_name_for_collection = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
