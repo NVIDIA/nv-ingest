@@ -64,7 +64,7 @@ recall:
 # Use: uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 datasets:
   bo767:
-    path: /home/charlesb/datasets/bo767
+    path: /path/to/bo767
     extract_text: true
     extract_tables: true
     extract_charts: true
