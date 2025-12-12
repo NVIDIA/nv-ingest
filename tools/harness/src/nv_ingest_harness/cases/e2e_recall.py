@@ -6,7 +6,6 @@ Calls e2e.py to handle ingestion and collection creation, then recall.py for eva
 
 import json
 import os
-import sys
 
 from nv_ingest_harness.cases.e2e import main as e2e_main
 from nv_ingest_harness.cases.recall import main as recall_main

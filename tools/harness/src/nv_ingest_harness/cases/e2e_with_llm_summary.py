@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import shutil
-import sys
 import time
 from pathlib import Path
 
@@ -11,7 +10,13 @@ from nv_ingest_client.util.milvus import nvingest_retrieval
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
 
 from nv_ingest_harness.utils.cases import get_repo_root
-from nv_ingest_harness.utils.interact import embed_info, milvus_chunks, segment_results, kv_event_log, pdf_page_count  # noqa: E402
+from nv_ingest_harness.utils.interact import (
+    embed_info,
+    milvus_chunks,
+    segment_results,
+    kv_event_log,
+    pdf_page_count,
+)  # noqa: E402
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
@@ -23,6 +28,7 @@ try:
     from pymilvus import MilvusClient
 except Exception:
     MilvusClient = None  # Optional; stats logging will be skipped if unavailable
+
 
 def main(config=None, log_path: str = "test_results") -> int:
     """

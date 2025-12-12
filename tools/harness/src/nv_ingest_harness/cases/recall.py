@@ -4,7 +4,6 @@ Recall-only test case - evaluates recall against existing collections.
 
 import json
 import os
-import sys
 import time
 from typing import Callable, Dict, Tuple
 

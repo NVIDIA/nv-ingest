@@ -15,6 +15,7 @@ from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.cases import get_repo_root
 
+
 def get_recall_scores(
     query_df: pd.DataFrame,
     collection_name: str,

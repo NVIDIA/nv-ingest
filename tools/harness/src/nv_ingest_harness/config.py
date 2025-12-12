@@ -162,9 +162,7 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
     config_path = Path(__file__).resolve().parents[2] / config_file
 
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Config file not found: {config_path}\n"
-        )
+        raise FileNotFoundError(f"Config file not found: {config_path}\n")
 
     with open(config_path) as f:
         yaml_data = yaml.safe_load(f)
