@@ -309,10 +309,10 @@ cd tools/harness
 uv sync
 
 # Run end-to-end benchmark
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Evaluate retrieval accuracy
-nv-ingest-harness-run --case=e2e_recall --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767
 ```
 
 ### Available Benchmarks

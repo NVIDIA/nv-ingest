@@ -19,13 +19,13 @@ cd tools/harness
 uv sync
 
 # 3. Run with a pre-configured dataset (assumes services are running)
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Or use a custom path that uses the "active" configuration
-nv-ingest-harness-run --case=e2e --dataset=/path/to/your/data
+uv run nv-ingest-harness-run --case=e2e --dataset=/path/to/your/data
 
 # With managed infrastructure (starts/stops services)
-nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 ```
 
 ## Configuration System
@@ -121,13 +121,13 @@ datasets:
 **Usage:**
 ```bash
 # Single dataset - configs applied automatically
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Multiple datasets (sweeping) - each gets its own config
-nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 
 # Custom path still works (uses active section config)
-nv-ingest-harness-run --case=e2e --dataset=/custom/path
+uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 ```
 
 **Dataset Extraction Settings:**
@@ -153,7 +153,7 @@ Example:
 # YAML active section has api_version: v1
 # Dataset bo767 has extract_images: false
 # Override via environment variable (highest priority)
-EXTRACT_IMAGES=true API_VERSION=v2 nv-ingest-harness-run --case=e2e --dataset=bo767
+EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 # Result: Uses bo767 path, but extract_images=true (env override) and api_version=v2 (env override)
 ```
 
@@ -215,13 +215,13 @@ Configuration is validated on load with helpful error messages.
 
 ```bash
 # Run with default YAML configuration (assumes services are running)
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # With document-level analysis
-nv-ingest-harness-run --case=e2e --dataset=bo767 --doc-analysis
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --doc-analysis
 
 # With managed infrastructure (starts/stops services)
-nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 ```
 
 ### Dataset Sweeping
@@ -230,7 +230,7 @@ Run multiple datasets in a single command - each dataset automatically gets its 
 
 ```bash
 # Sweep multiple datasets
-nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 
 # Each dataset runs sequentially with its own:
 # - Extraction settings (from dataset config)
@@ -238,13 +238,13 @@ nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 # - Results summary at the end
 
 # With managed infrastructure (services start once, shared across all datasets)
-nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20 --managed
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20 --managed
 
 # E2E+Recall sweep (each dataset ingests then evaluates recall)
-nv-ingest-harness-run --case=e2e_recall --dataset=bo767,earnings
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767,earnings
 
 # Recall-only sweep (evaluates existing collections)
-nv-ingest-harness-run --case=recall --dataset=bo767,earnings
+uv run nv-ingest-harness-run --case=recall --dataset=bo767,earnings
 ```
 
 **Sweep Behavior:**
@@ -258,10 +258,10 @@ nv-ingest-harness-run --case=recall --dataset=bo767,earnings
 
 ```bash
 # Override via environment (useful for CI/CD)
-API_VERSION=v2 EXTRACT_TABLES=false nv-ingest-harness-run --case=e2e
+API_VERSION=v2 EXTRACT_TABLES=false uv run nv-ingest-harness-run --case=e2e
 
 # Temporary changes without editing YAML
-DATASET_DIR=/custom/path nv-ingest-harness-run --case=e2e
+DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 ```
 
 ## Test Scenarios
@@ -447,23 +447,23 @@ recall:
 ```bash
 # Evaluate existing bo767 collections (no reranker)
 # recall_dataset automatically set from dataset config
-nv-ingest-harness-run --case=recall --dataset=bo767
+uv run nv-ingest-harness-run --case=recall --dataset=bo767
 
 # With reranker only (set reranker_mode in YAML recall section)
-nv-ingest-harness-run --case=recall --dataset=bo767
+uv run nv-ingest-harness-run --case=recall --dataset=bo767
 
 # Sweep multiple datasets for recall evaluation
-nv-ingest-harness-run --case=recall --dataset=bo767,earnings
+uv run nv-ingest-harness-run --case=recall --dataset=bo767,earnings
 ```
 
 **E2E + Recall (fresh ingestion):**
 ```bash
 # Fresh ingestion with recall evaluation
 # recall_dataset automatically set from dataset config
-nv-ingest-harness-run --case=e2e_recall --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767
 
 # Sweep multiple datasets (each ingests then evaluates)
-nv-ingest-harness-run --case=e2e_recall --dataset=bo767,earnings
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767,earnings
 ```
 
 **Dataset configuration:**
@@ -511,7 +511,7 @@ The easiest way to test multiple datasets is using dataset sweeping:
 
 ```bash
 # Test multiple datasets - each gets its native config automatically
-nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 
 # Each dataset runs with its pre-configured extraction settings
 # Results are organized in separate artifact directories
@@ -522,7 +522,7 @@ nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 To sweep through different parameter values:
 
 1. **Edit** `test_configs.yaml` - Update values in the `active` section
-2. **Run** the test: `nv-ingest-harness-run --case=e2e --dataset=<name>`
+2. **Run** the test: `uv run nv-ingest-harness-run --case=e2e --dataset=<name>`
 3. **Analyze** results in `artifacts/<test_name>_<timestamp>/`
 4. **Repeat** steps 1-3 for next parameter combination
 
@@ -530,18 +530,18 @@ Example parameter sweep workflow:
 ```bash
 # Test 1: Baseline V1
 vim test_configs.yaml  # Set: api_version=v1, extract_tables=true
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Test 2: V2 with 32-page splitting
 vim test_configs.yaml  # Set: api_version=v2, pdf_split_page_count=32
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Test 3: V2 with 8-page splitting
 vim test_configs.yaml  # Set: pdf_split_page_count=8
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Test 4: Tables disabled (override via env var)
-EXTRACT_TABLES=false nv-ingest-harness-run --case=e2e --dataset=bo767
+EXTRACT_TABLES=false uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 ```
 
 **Note**: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.
@@ -551,7 +551,7 @@ EXTRACT_TABLES=false nv-ingest-harness-run --case=e2e --dataset=bo767
 ### Attach Mode (Default)
 
 ```bash
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 ```
 
 - **Default behavior**: Assumes services are already running
@@ -563,7 +563,7 @@ nv-ingest-harness-run --case=e2e --dataset=bo767
 ### Managed Mode
 
 ```bash
-nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 ```
 
 - Starts Docker services automatically
@@ -575,10 +575,10 @@ nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 **Managed mode options:**
 ```bash
 # Skip Docker image rebuild (faster startup)
-nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
 
 # Keep services running after test (useful for multi-test scenarios)
-nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
 ```
 
 ## Artifacts and Logging
@@ -606,7 +606,7 @@ tools/harness/artifacts/<test_name>_<timestamp>_UTC/
 Enable per-document element breakdown:
 
 ```bash
-nv-ingest-harness-run --case=e2e --doc-analysis
+uv run nv-ingest-harness-run --case=e2e --doc-analysis
 ```
 
 **Sample Output:**
@@ -787,7 +787,7 @@ The framework is dataset-agnostic and supports multiple approaches:
 **Option 1: Use pre-configured dataset (Recommended)**
 ```bash
 # Dataset configs automatically applied
-nv-ingest-harness-run --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 ```
 
 **Option 2: Add new dataset to YAML**
@@ -802,17 +802,17 @@ datasets:
     extract_infographics: false
     recall_dataset: null  # or set to evaluator name if applicable
 ```
-Then use: `nv-ingest-harness-run --case=e2e --dataset=my_dataset`
+Then use: `uv run nv-ingest-harness-run --case=e2e --dataset=my_dataset`
 
 **Option 3: Use custom path (uses active section config)**
 ```bash
-nv-ingest-harness-run --case=e2e --dataset=/path/to/your/dataset
+uv run nv-ingest-harness-run --case=e2e --dataset=/path/to/your/dataset
 ```
 
 **Option 4: Environment variable override**
 ```bash
 # Override specific settings via env vars
-EXTRACT_IMAGES=true nv-ingest-harness-run --case=e2e --dataset=bo767
+EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 ```
 
 **Best Practice**: For repeated testing, add your dataset to the `datasets` section with its native extraction settings. This ensures consistent configuration and enables dataset sweeping.

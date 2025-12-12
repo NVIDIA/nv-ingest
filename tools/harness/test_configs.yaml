@@ -58,7 +58,7 @@ recall:
 
 # Pre-configured datasets
 # Each dataset includes path, extraction settings, and recall evaluator
-# Use: nv-ingest-harness-run --case=e2e --dataset=bo767
+# Use: uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 datasets:
   bo767:
     path: /home/charlesb/datasets/bo767
