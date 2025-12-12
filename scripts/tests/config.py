@@ -59,6 +59,10 @@ class TestConfig:
     split_chunk_overlap: int = 150
     enable_image_storage: bool = False  # Server-side image storage (MinIO/local disk)
 
+    # Trace configuration
+    enable_traces: bool = False
+    trace_output_dir: Optional[str] = None
+
     # Storage configuration
     spill_dir: str = "/tmp/spill"
     artifacts_dir: Optional[str] = None
@@ -270,6 +274,8 @@ def _load_env_overrides() -> dict:
         "ENABLE_SPLIT": ("enable_split", parse_bool),
         "SPLIT_CHUNK_SIZE": ("split_chunk_size", parse_int),
         "SPLIT_CHUNK_OVERLAP": ("split_chunk_overlap", parse_int),
+        "ENABLE_TRACES": ("enable_traces", parse_bool),
+        "TRACE_OUTPUT_DIR": ("trace_output_dir", str),
         "ENABLE_IMAGE_STORAGE": ("enable_image_storage", parse_bool),
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),

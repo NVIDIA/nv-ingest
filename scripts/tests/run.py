@@ -179,6 +179,8 @@ def run_datasets(
             "infrastructure": "managed" if managed else "attach",
             "api_version": config.api_version,
             "pdf_split_page_count": config.pdf_split_page_count,
+            "enable_traces": getattr(config, "enable_traces", False),
+            "trace_output_dir": getattr(config, "trace_output_dir", None),
             "return_code": rc,
         }
 
@@ -269,8 +271,13 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
         # Add cases directory to sys.path so modules can import from utils
         cases_dir = os.path.dirname(case_path)
-        if cases_dir not in sys.path:
-            sys.path.insert(0, cases_dir)
+        tests_dir = os.path.dirname(cases_dir)
+        scripts_dir = os.path.dirname(tests_dir)
+        repo_root = os.path.dirname(scripts_dir)
+
+        for path in (cases_dir, tests_dir, scripts_dir, repo_root):
+            if path and path not in sys.path:
+                sys.path.insert(0, path)
 
         # Load and execute the test case module
         spec = importlib.util.spec_from_file_location(case_name, case_path)
