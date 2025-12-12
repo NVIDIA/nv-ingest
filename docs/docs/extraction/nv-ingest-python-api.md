@@ -401,6 +401,6 @@ results = ingestor.ingest()
 
 - [Split Documents](chunking.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
-- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)

@@ -65,7 +65,7 @@ nv-ingest-cli \
 To submit a .pdf file with both a splitting task and an extraction task, run the following code.
 
 !!! note
-    This currently only works for pdfium, nemoretriever_parse, and Unstructured.io. Haystack, Adobe, and LlamaParse have existing workflows, but have not been fully converted to use our unified metadata schema.
+    Currently, `split` only works for pdfium, nemotron_parse, and Unstructured.io.
 
 ```bash
 nv-ingest-cli \

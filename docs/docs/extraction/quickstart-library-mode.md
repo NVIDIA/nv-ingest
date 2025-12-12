@@ -113,7 +113,7 @@ def main():
             extract_images=True,
             table_output_format="markdown",
             extract_infographics=True,
-            # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            # extract_method="nemotron_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
             text_depth="page",
         )
         .embed()
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
 !!! note
 
-    To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+    To use library mode with nemotron_parse, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
 
 
 You can see the extracted text that represents the content of the ingested test document.
