@@ -354,7 +354,8 @@ stages:
       api_key: $NGC_API_KEY|$NVIDIA_API_KEY
       model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/nemotron-nano-12b-v2-vl"
       endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
-      prompt: "Caption the content of this image:"
+      prompt: $VLM_CAPTION_PROMPT|"Caption the content of this image:"
+      system_prompt: $VLM_CAPTION_SYSTEM_PROMPT|"/no_think"
     replicas:
       min_replicas: 0
       max_replicas:

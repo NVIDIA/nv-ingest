@@ -112,7 +112,6 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${OCR_CUDA_MEMORY_POOL_MB:-8192}
       - NIM_TRITON_MAX_BATCH_SIZE=${OCR_BATCH_SIZE:-32}
       - NIM_TRITON_ENABLE_MODEL_CONTROL=1
     deploy:
@@ -339,6 +338,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      # To use NVIDIA hosted endpoint (integrate.api.nvidia.com), change to: https://integrate.api.nvidia.com/v1/chat/completions
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}

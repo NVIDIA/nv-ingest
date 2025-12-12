@@ -162,6 +162,11 @@ def build_logging_config_from_env() -> LoggingConfig:
         if key not in os.environ:
             os.environ[key] = default_value
 
+    # For PRODUCTION mode, also suppress nv-ingest module INFO logs
+    if preset_level == "PRODUCTION":
+        logging.getLogger("nv_ingest").setLevel(logging.WARNING)
+        logging.getLogger("nv_ingest_api").setLevel(logging.WARNING)
+
     logger.info(f"Applied Ray logging preset: {preset_level}")
 
     # Get log level from environment, default to INFO
@@ -324,6 +329,7 @@ def launch_pipeline(
     pipeline_config = resolve_static_replicas(pipeline_config)
 
     # Pretty print the final pipeline configuration (after replica resolution)
+    # INFO level so it shows in docker/helm deployments; quiet mode suppresses in library mode
     pretty_output = pretty_print_pipeline_config(pipeline_config, config_path=None)
     logger.info("\n" + pretty_output)
 

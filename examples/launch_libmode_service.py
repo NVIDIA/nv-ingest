@@ -4,7 +4,6 @@
 
 import logging
 import os
-import sys
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
@@ -24,12 +23,13 @@ def main():
     Launch the libmode pipeline service using the embedded default configuration.
     """
     try:
+        # Start pipeline and block until interrupted
+        # Note: stdout/stderr cannot be passed when run_in_subprocess=True (not picklable)
+        # Use quiet=False to see verbose startup logs
         _ = run_pipeline(
             block=True,
             disable_dynamic_scaling=True,
             run_in_subprocess=True,
-            stderr=sys.stderr,
-            stdout=sys.stdout,
         )
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
