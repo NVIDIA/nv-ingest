@@ -1,45 +1,64 @@
 {{- if .Values.nimOperator.embedqa.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: llama-3.2-nv-embedqa-1b-v2
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.embedqa.image.repository }}:{{ .Values.nimOperator.embedqa.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.embedqa.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.embedqa.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.embedqa.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.embedqa.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.embedqa.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.embedqa.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: llama-32-nv-embedqa-1b-v2
 spec:
-  image:
-    repository: {{ .Values.nimOperator.embedqa.image.repository }}
-    tag: {{ .Values.nimOperator.embedqa.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.embedqa.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.embedqa.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.embedqa.authSecret }}
-  storage:
-    nimCache:
-      name: llama-3.2-nv-embedqa-1b-v2
   replicas: {{ .Values.nimOperator.embedqa.replicas }}
-  nodeSelector:
-{{ toYaml .Values.nimOperator.embedqa.nodeSelector | nindent 4 }}
-  resources:
-{{ toYaml .Values.nimOperator.embedqa.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.embedqa.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.embedqa.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.embedqa.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: llama-32-nv-embedqa-1b-v2
+  template:
+    metadata:
+      labels:
+        app: llama-32-nv-embedqa-1b-v2
+    spec:
+      {{- if .Values.nimOperator.embedqa.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.embedqa.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.embedqa.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.embedqa.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.embedqa.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.embedqa.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: llama-32-nv-embedqa-1b-v2
+          image: "{{ .Values.nimOperator.embedqa.image.repository }}:{{ .Values.nimOperator.embedqa.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.embedqa.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.embedqa.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.embedqa.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.embedqa.env }}
+          env:
+{{ toYaml .Values.nimOperator.embedqa.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.embedqa.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.embedqa.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-32-nv-embedqa-1b-v2
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.embedqa.expose.service.type }}
+  selector:
+    app: llama-32-nv-embedqa-1b-v2
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.embedqa.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.embedqa.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.embedqa.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.embedqa.expose.service.grpcPort }}
 {{- end }}

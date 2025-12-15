@@ -1,43 +1,64 @@
 {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemotron-nano-12b-v2-vl
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.repository }}:{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nemotron-nano-12b-v2-vl
 spec:
-  image:
-    repository: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.repository }}
-    tag: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.tag }}
-    pullPolicy: IfNotPresent
-    pullSecrets:
-{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.authSecret }}
-  storage:
-    nimCache:
-      name: nemotron-nano-12b-v2-vl
   replicas: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.replicas }}
-  resources:
-{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: nemotron-nano-12b-v2-vl
+  template:
+    metadata:
+      labels:
+        app: nemotron-nano-12b-v2-vl
+    spec:
+      {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: nemotron-nano-12b-v2-vl
+          image: "{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.repository }}:{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.env }}
+          env:
+{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemotron-nano-12b-v2-vl
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.type }}
+  selector:
+    app: nemotron-nano-12b-v2-vl
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.nemotron_nano_12b_v2_vl.expose.service.grpcPort }}
 {{- end }}

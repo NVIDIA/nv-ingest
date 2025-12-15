@@ -1,45 +1,64 @@
 {{- if .Values.nimOperator.graphic_elements.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-graphic-elements-v1
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.graphic_elements.image.repository }}:{{ .Values.nimOperator.graphic_elements.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.graphic_elements.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.graphic_elements.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.graphic_elements.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.graphic_elements.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.graphic_elements.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.graphic_elements.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nemoretriever-graphic-elements-v1
 spec:
-  image:
-    repository: {{ .Values.nimOperator.graphic_elements.image.repository }}
-    tag: {{ .Values.nimOperator.graphic_elements.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.graphic_elements.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.graphic_elements.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.graphic_elements.authSecret }}
-  storage:
-    nimCache:
-      name: nemoretriever-graphic-elements-v1
   replicas: {{ .Values.nimOperator.graphic_elements.replicas }}
-  nodeSelector:
-{{ toYaml .Values.nimOperator.graphic_elements.nodeSelector | nindent 4 }}
-  resources:
-{{ toYaml .Values.nimOperator.graphic_elements.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.graphic_elements.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.graphic_elements.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.graphic_elements.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: nemoretriever-graphic-elements-v1
+  template:
+    metadata:
+      labels:
+        app: nemoretriever-graphic-elements-v1
+    spec:
+      {{- if .Values.nimOperator.graphic_elements.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.graphic_elements.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.graphic_elements.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.graphic_elements.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.graphic_elements.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.graphic_elements.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: nemoretriever-graphic-elements-v1
+          image: "{{ .Values.nimOperator.graphic_elements.image.repository }}:{{ .Values.nimOperator.graphic_elements.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.graphic_elements.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.graphic_elements.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.graphic_elements.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.graphic_elements.env }}
+          env:
+{{ toYaml .Values.nimOperator.graphic_elements.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.graphic_elements.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.graphic_elements.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemoretriever-graphic-elements-v1
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.graphic_elements.expose.service.type }}
+  selector:
+    app: nemoretriever-graphic-elements-v1
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.graphic_elements.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.graphic_elements.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.graphic_elements.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.graphic_elements.expose.service.grpcPort }}
 {{- end }}

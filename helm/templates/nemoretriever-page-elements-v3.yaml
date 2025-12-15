@@ -1,41 +1,64 @@
 {{- if .Values.nimOperator.page_elements.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-page-elements-v3
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.page_elements.image.repository }}:{{ .Values.nimOperator.page_elements.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.page_elements.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.page_elements.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.page_elements.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.page_elements.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.page_elements.storage.pvc.volumeAccessMode }}
-  resources: {}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nemoretriever-page-elements-v3
 spec:
-  image:
-    repository: {{ .Values.nimOperator.page_elements.image.repository }}
-    tag: {{ .Values.nimOperator.page_elements.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.page_elements.image.pullPolicy }}
-    pullSecrets: {{ toYaml .Values.nimOperator.page_elements.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
-  storage:
-    nimCache:
-      name: nemoretriever-page-elements-v3
-      profile: ''
   replicas: {{ .Values.nimOperator.page_elements.replicas }}
-  nodeSelector: {{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}
-  resources: {{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
-  tolerations: {{ toYaml .Values.nimOperator.page_elements.tolerations | nindent 4 }}
-  expose: {{ toYaml .Values.nimOperator.page_elements.expose | nindent 4 }}
-  env: {{ toYaml .Values.nimOperator.page_elements.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: nemoretriever-page-elements-v3
+  template:
+    metadata:
+      labels:
+        app: nemoretriever-page-elements-v3
+    spec:
+      {{- if .Values.nimOperator.page_elements.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.page_elements.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.page_elements.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.page_elements.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.page_elements.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.page_elements.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: nemoretriever-page-elements-v3
+          image: "{{ .Values.nimOperator.page_elements.image.repository }}:{{ .Values.nimOperator.page_elements.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.page_elements.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.page_elements.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.page_elements.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.page_elements.env }}
+          env:
+{{ toYaml .Values.nimOperator.page_elements.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.page_elements.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.page_elements.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemoretriever-page-elements-v3
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.page_elements.expose.service.type }}
+  selector:
+    app: nemoretriever-page-elements-v3
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.page_elements.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.page_elements.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.page_elements.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.page_elements.expose.service.grpcPort }}
 {{- end }}

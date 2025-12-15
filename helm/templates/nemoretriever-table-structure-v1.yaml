@@ -1,45 +1,64 @@
 {{- if .Values.nimOperator.table_structure.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-table-structure-v1
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.table_structure.image.repository }}:{{ .Values.nimOperator.table_structure.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.table_structure.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.table_structure.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.table_structure.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.table_structure.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.table_structure.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.table_structure.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nemoretriever-table-structure-v1
 spec:
-  image:
-    repository: {{ .Values.nimOperator.table_structure.image.repository }}
-    tag: {{ .Values.nimOperator.table_structure.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.table_structure.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.table_structure.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.table_structure.authSecret }}
-  storage:
-    nimCache:
-      name: nemoretriever-table-structure-v1
   replicas: {{ .Values.nimOperator.table_structure.replicas }}
-  nodeSelector:
-{{ toYaml .Values.nimOperator.table_structure.nodeSelector | nindent 4 }}
-  resources:
-{{ toYaml .Values.nimOperator.table_structure.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.table_structure.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.table_structure.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.table_structure.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: nemoretriever-table-structure-v1
+  template:
+    metadata:
+      labels:
+        app: nemoretriever-table-structure-v1
+    spec:
+      {{- if .Values.nimOperator.table_structure.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.table_structure.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.table_structure.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.table_structure.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.table_structure.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.table_structure.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: nemoretriever-table-structure-v1
+          image: "{{ .Values.nimOperator.table_structure.image.repository }}:{{ .Values.nimOperator.table_structure.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.table_structure.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.table_structure.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.table_structure.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.table_structure.env }}
+          env:
+{{ toYaml .Values.nimOperator.table_structure.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.table_structure.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.table_structure.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemoretriever-table-structure-v1
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.table_structure.expose.service.type }}
+  selector:
+    app: nemoretriever-table-structure-v1
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.table_structure.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.table_structure.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.table_structure.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.table_structure.expose.service.grpcPort }}
 {{- end }}

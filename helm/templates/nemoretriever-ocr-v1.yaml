@@ -1,39 +1,64 @@
 {{- if .Values.nimOperator.nemoretriever_ocr_v1.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: nemoretriever-ocr-v1
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}:{{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nemoretriever-ocr-v1
 spec:
-  image:
-    repository: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}
-    tag: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.pullPolicy }}
-    pullSecrets: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
-  storage:
-    nimCache:
-      name: nemoretriever-ocr-v1
   replicas: {{ .Values.nimOperator.nemoretriever_ocr_v1.replicas }}
-  nodeSelector: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.nodeSelector | nindent 4 }}
-  resources: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.resources | nindent 4 }}
-  tolerations: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.tolerations | nindent 4 }}
-  expose: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.expose | nindent 4 }}
-  env: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: nemoretriever-ocr-v1
+  template:
+    metadata:
+      labels:
+        app: nemoretriever-ocr-v1
+    spec:
+      {{- if .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.nemoretriever_ocr_v1.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.nemoretriever_ocr_v1.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: nemoretriever-ocr-v1
+          image: "{{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}:{{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.nemoretriever_ocr_v1.env }}
+          env:
+{{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.nemoretriever_ocr_v1.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemoretriever-ocr-v1
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.nemoretriever_ocr_v1.expose.service.type }}
+  selector:
+    app: nemoretriever-ocr-v1
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.nemoretriever_ocr_v1.expose.service.grpcPort }}
 {{- end }}

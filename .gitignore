@@ -235,3 +235,6 @@ scripts/tests/artifacts/
 # Ignore cursor rules
 .cursor
 scripts/tests/sweep_results/
+
+# Ignore local Helm override files (env-specific)
+helm/overrides/*

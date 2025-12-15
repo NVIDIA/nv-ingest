@@ -1,45 +1,64 @@
 {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: llama-3.2-nv-rerankqa-1b-v2
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}:{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: llama-32-nv-rerankqa-1b-v2
 spec:
-  image:
-    repository: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}
-    tag: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.authSecret }}
-  storage:
-    nimCache:
-      name: llama-3.2-nv-rerankqa-1b-v2
   replicas: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.replicas }}
-  nodeSelector:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.nodeSelector | nindent 4 }}
-  resources:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources | nindent 4 }}
-  tolerations:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.tolerations | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: llama-32-nv-rerankqa-1b-v2
+  template:
+    metadata:
+      labels:
+        app: llama-32-nv-rerankqa-1b-v2
+    spec:
+      {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: llama-32-nv-rerankqa-1b-v2
+          image: "{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}:{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ default 8000 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.port }}
+            - name: grpc
+              containerPort: {{ default 8001 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.env }}
+          env:
+{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-32-nv-rerankqa-1b-v2
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.type }}
+  selector:
+    app: llama-32-nv-rerankqa-1b-v2
+  ports:
+    - name: http
+      port: {{ default 8000 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.port }}
+      targetPort: {{ default 8000 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.port }}
+    - name: grpc
+      port: {{ default 8001 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.grpcPort }}
+      targetPort: {{ default 8001 .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.grpcPort }}
 {{- end }}

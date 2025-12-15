@@ -1,41 +1,62 @@
 {{- if .Values.nimOperator.paddleocr.enabled }}
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMCache
-metadata:
-  name: paddleocr
-spec:
-  source:
-    ngc:
-      modelPuller: "{{ .Values.nimOperator.paddleocr.image.repository }}:{{ .Values.nimOperator.paddleocr.image.tag }}"
-      pullSecret: "{{ index .Values.nimOperator.paddleocr.image.pullSecrets 0 }}"
-      authSecret: {{ .Values.nimOperator.paddleocr.authSecret }}
-  storage:
-    pvc:
-      create: {{ .Values.nimOperator.paddleocr.storage.pvc.create }}
-      storageClass: {{ .Values.nimOperator.paddleocr.storage.pvc.storageClass }}
-      size: {{ .Values.nimOperator.paddleocr.storage.pvc.size }}
-      volumeAccessMode: {{ .Values.nimOperator.paddleocr.storage.pvc.volumeAccessMode }}
 ---
-apiVersion: apps.nvidia.com/v1alpha1
-kind: NIMService
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: paddleocr
 spec:
-  image:
-    repository: {{ .Values.nimOperator.paddleocr.image.repository }}
-    tag: {{ .Values.nimOperator.paddleocr.image.tag }}
-    pullPolicy: {{ .Values.nimOperator.paddleocr.image.pullPolicy }}
-    pullSecrets:
-{{ toYaml .Values.nimOperator.paddleocr.image.pullSecrets | nindent 6 }}
-  authSecret: {{ .Values.nimOperator.paddleocr.authSecret }}
-  storage:
-    nimCache:
-      name: paddleocr
   replicas: {{ .Values.nimOperator.paddleocr.replicas }}
-  resources:
-{{ toYaml .Values.nimOperator.paddleocr.resources | nindent 4 }}
-  expose:
-{{ toYaml .Values.nimOperator.paddleocr.expose | nindent 4 }}
-  env:
-{{ toYaml .Values.nimOperator.paddleocr.env | nindent 4 }}
+  selector:
+    matchLabels:
+      app: paddleocr
+  template:
+    metadata:
+      labels:
+        app: paddleocr
+    spec:
+      {{- if .Values.nimOperator.paddleocr.image.pullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.nimOperator.paddleocr.image.pullSecrets | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.paddleocr.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nimOperator.paddleocr.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.paddleocr.tolerations }}
+      tolerations:
+{{ toYaml .Values.nimOperator.paddleocr.tolerations | indent 8 }}
+      {{- end }}
+      containers:
+        - name: paddleocr
+          image: "{{ .Values.nimOperator.paddleocr.image.repository }}:{{ .Values.nimOperator.paddleocr.image.tag }}"
+          imagePullPolicy: {{ .Values.nimOperator.paddleocr.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.nimOperator.paddleocr.expose.service.port }}
+            - name: grpc
+              containerPort: {{ .Values.nimOperator.paddleocr.expose.service.grpcPort }}
+          {{- if .Values.nimOperator.paddleocr.env }}
+          env:
+{{ toYaml .Values.nimOperator.paddleocr.env | indent 12 }}
+          {{- end }}
+          {{- if .Values.nimOperator.paddleocr.resources }}
+          resources:
+{{ toYaml .Values.nimOperator.paddleocr.resources | indent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paddleocr
+spec:
+  type: {{ default "ClusterIP" .Values.nimOperator.paddleocr.expose.service.type }}
+  selector:
+    app: paddleocr
+  ports:
+    - name: http
+      port: {{ .Values.nimOperator.paddleocr.expose.service.port }}
+      targetPort: {{ .Values.nimOperator.paddleocr.expose.service.port }}
+    - name: grpc
+      port: {{ .Values.nimOperator.paddleocr.expose.service.grpcPort }}
+      targetPort: {{ .Values.nimOperator.paddleocr.expose.service.grpcPort }}
 {{- end }}
