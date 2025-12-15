@@ -460,7 +460,7 @@ class NimClient:
                     if messages and messages[0].get("role") == "system":
                         system_content = messages[0].get("content", "")
                         model_name = self.model_interface.name()
-                        logger.info(f"{model_name}: Sending HTTP request with system prompt: '{system_content}'")
+                        logger.debug(f"{model_name}: Sending HTTP request with system prompt: '{system_content}'")
 
                 response = requests.post(
                     self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout

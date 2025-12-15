@@ -102,7 +102,7 @@ class VLMModelInterface(ModelInterface):
                     }
                 )
             else:
-                logger.info("VLM: No system prompt provided, using default")
+                logger.debug("VLM: No system prompt provided, using default")
 
             # Create one message per image in the batch.
             messages.extend(
