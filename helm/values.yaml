@@ -686,8 +686,6 @@ nimOperator:
         value: "2"
       - name: OMP_NUM_THREADS
         value: "2"
-      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-        value: "2"
       - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
         value: "1"
       - name: NIM_ENABLE_OTEL

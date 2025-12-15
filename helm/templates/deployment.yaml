@@ -83,8 +83,10 @@ spec:
 
             {{- if .Values.envVars }}
             {{- range $k, $v := .Values.envVars }}
+            {{- if ne $k "INGEST_LOG_LEVEL" }}
             - name: "{{ $k }}"
               value: "{{ $v }}"
+            {{- end }}
             {{- end }}
             {{- end }}
 
