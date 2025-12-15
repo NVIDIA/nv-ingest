@@ -98,14 +98,11 @@ class VLMModelInterface(ModelInterface):
                 messages.append(
                     {
                         "role": "system",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": system_prompt,
-                            }
-                        ],
+                        "content": system_prompt,
                     }
                 )
+            else:
+                logger.debug("VLM: No system prompt provided, using default")
 
             # Create one message per image in the batch.
             messages.extend(
