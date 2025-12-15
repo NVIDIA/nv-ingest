@@ -4,6 +4,7 @@
 
 import logging
 import os
+from importlib.metadata import version
 
 from fastapi import FastAPI
 from opentelemetry import trace
@@ -19,11 +20,13 @@ from .v2.ingest import router as IngestApiRouterV2
 
 logger = logging.getLogger(__name__)
 
+APP_VERSION = version("nv-ingest")
+
 # nv-ingest FastAPI app declaration
 app = FastAPI(
     title="NV-Ingest Microservice",
     description="Service for ingesting heterogenous datatypes",
-    version="25.4.2",
+    version=APP_VERSION,
     contact={
         "name": "NVIDIA Corporation",
         "url": "https://nvidia.com",
