@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   page-elements:
-    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v3}:${YOLOX_TAG:-latest}
     shm_size: 16gb
     ports:
       - "8000:8000"
@@ -99,7 +99,7 @@ services:
     runtime: nvidia
 
   ocr:
-    image: ${OCR_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${OCR_TAG:-latest}
+    image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-latest}
     shm_size: 16gb
     ports:
       - "8009:8000"
@@ -112,7 +112,6 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${OCR_CUDA_MEMORY_POOL_MB:-8192}
       - NIM_TRITON_MAX_BATCH_SIZE=${OCR_BATCH_SIZE:-32}
       - NIM_TRITON_ENABLE_MODEL_CONTROL=1
     deploy:
@@ -174,8 +173,9 @@ services:
     profiles:
       - reranker
 
-  nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+  nemotron-parse:
+    image: ${NEMOTRON_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMOTRON_PARSE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -195,10 +195,11 @@ services:
               capabilities: [gpu]
     runtime: nvidia
     profiles:
-      - nemoretriever-parse
+      - nemotron-parse
 
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8018:8000"
     user: root
@@ -306,22 +307,24 @@ services:
       - MESSAGE_CLIENT_PORT=6379
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
-      # build.nvidia.com hosted nemoretriever-parse
-      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
-      - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
-      #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      # build.nvidia.com hosted nemotron-parse
+      # - NEMOTRON_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMOTRON_PARSE_HTTP_ENDPOINT=http://nemotron-parse:8000/v1/chat/completions
+      - NEMOTRON_PARSE_INFER_PROTOCOL=http
+      - NEMOTRON_PARSE_MODEL_NAME=nvidia/nemotron-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
       - OCR_INFER_PROTOCOL=grpc
-      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-paddle}
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-scene_text_ensemble}
       # build.nvidia.com hosted ocr endpoints.
-      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
+      #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1
       #- OCR_INFER_PROTOCOL=http
       - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
@@ -339,9 +342,16 @@ services:
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      # To use NVIDIA hosted endpoint (integrate.api.nvidia.com), change to: https://integrate.api.nvidia.com/v1/chat/completions
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
+      # Image Storage Configuration
+      # Provide a single fsspec-compatible URI (defaults to bundled MinIO)
+      # Uses existing volume mounts for file:// paths i.e. file:///workspace/data/artifacts/store/images
+      - IMAGE_STORAGE_URI=${IMAGE_STORAGE_URI:-s3://nv-ingest/artifacts/store/images}
+      # Optional public HTTP base for serving images persisted via object storage (set for download links)
+      - IMAGE_STORAGE_PUBLIC_BASE_URL=${IMAGE_STORAGE_PUBLIC_BASE_URL:-}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
       # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
@@ -365,7 +375,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
-    user: "${UID}:${GID}"
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:

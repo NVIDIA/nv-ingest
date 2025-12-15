@@ -1003,7 +1003,7 @@ async def submit_job_v2(
                         "page_count": chunk.get("page_count", 0),
                     }
                 )
-            logger.error(f"Removing uploaded file {upload_path}")
+            logger.debug(f"Removing uploaded file {upload_path}")
             os.remove(upload_path)
 
         if submission_items:

@@ -29,19 +29,19 @@ For more information, refer to [Data Upload](data-store.md).
 
 ## How would I process unstructured images?
 
-For images that `nemoretriever-page-elements-v2` does not classify as tables, charts, or infographics, 
+For images that `nemoretriever-page-elements-v3` does not classify as tables, charts, or infographics,
 you can use our VLM caption task to create a dense caption of the detected image. 
 That caption is then be embedded along with the rest of your content. 
 For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 
 
 
-## When should I consider using nemoretriever-parse?
+## When should I consider using nemotron-parse?
 
 For scanned documents, or documents with complex layouts, 
-we recommend that you use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). 
+we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
 Nemo Retriever parse provides higher-accuracy text extraction. 
-For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
 
 
 

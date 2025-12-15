@@ -71,14 +71,14 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
-      nemoretriever_parse_config:
+      nemotron_parse_config:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-        nemoretriever_parse_endpoints: [
-          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
+        nemotron_parse_endpoints: [
+          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
+          $NEMOTRON_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
         ]
-        nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
-        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
+        nemotron_parse_infer_protocol: $NEMOTRON_PARSE_INFER_PROTOCOL|http
+        nemotron_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
@@ -128,6 +128,13 @@ stages:
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
     replicas:
       min_replicas: 0
       max_replicas:
@@ -143,6 +150,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
           $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
@@ -201,7 +215,7 @@ stages:
       endpoint_config:
         ocr_endpoints: [
           $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1"
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -227,7 +241,7 @@ stages:
         yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|"http"
         ocr_endpoints: [
           $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1"
         ]
         ocr_infer_protocol: $PADDLE_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -254,7 +268,7 @@ stages:
         yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|"http"
         ocr_endpoints: [
           $OCR_GRPC_ENDPOINT|"",
-          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1"
         ]
         ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -320,7 +334,8 @@ stages:
       api_key: $NGC_API_KEY|$NVIDIA_API_KEY
       endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
       model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/nemotron-nano-12b-v2-vl"
-      prompt: "Caption the content of this image:"
+      prompt: $VLM_CAPTION_PROMPT|"Caption the content of this image:"
+      system_prompt: $VLM_CAPTION_SYSTEM_PROMPT|"/no_think"
     replicas:
       min_replicas: 0
       max_replicas:

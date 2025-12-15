@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
 @click.option(
     "--api_version",
-    default="v1",
+    default="v2",
     type=click.Choice(["v1", "v2"], case_sensitive=False),
     help="API version to use (v1 or v2). V2 required for PDF split page count feature.",
 )
@@ -120,7 +120,7 @@ Each task must be specified with its type and corresponding options in the '[tas
 Example:
   --task 'split:{"split_by":"page", "split_length":10}'
   --task 'extract:{"document_type":"pdf", "extract_text":true}'
-  --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
+  --task 'extract:{"document_type":"pdf", "extract_method":"nemotron_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'embed'

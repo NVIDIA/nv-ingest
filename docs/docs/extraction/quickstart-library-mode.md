@@ -113,7 +113,7 @@ def main():
             extract_images=True,
             table_output_format="markdown",
             extract_infographics=True,
-            # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            # extract_method="nemotron_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
             text_depth="page",
         )
         .embed()
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
 !!! note
 
-    To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+    To use library mode with nemotron_parse, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
 
 
 You can see the extracted text that represents the content of the ingested test document.
@@ -253,6 +253,38 @@ Based on these loose criteria, I'd jokingly point to:
 
 Please keep in mind that this response is purely humorous and interpretative, as the table doesn't explicitly mention typos or provide a straightforward answer to the question.
 ```
+
+
+
+## Logging Configuration
+
+Nemo Retriever extraction uses [Ray](https://docs.ray.io/en/latest/index.html) for logging. 
+For details, refer to [Configure Ray Logging](ray-logging.md).
+
+By default, library mode runs in quiet mode to minimize startup noise. 
+Quiet mode automatically configures the following environment variables.
+
+| Variable                             | Quiet Mode Value | Description |
+|--------------------------------------|------------------|-------------|
+| `INGEST_RAY_LOG_LEVEL`               | `PRODUCTION`     | Sets Ray logging to ERROR level to reduce noise. |
+| `RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO` | `0`              | Silences Ray accelerator warnings |
+| `OTEL_SDK_DISABLED`                  | `true`           | Disables OpenTelemetry trace export errors |
+
+
+If you want to see detailed startup logs for debugging, use one of the following options:
+
+- Set `quiet=False` when you run the pipeline as shown following.
+
+    ```python
+    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True, quiet=False)
+    ```
+
+- Set the environment variables manually before you run the pipeline as shown following.
+
+    ```bash
+    export INGEST_RAY_LOG_LEVEL=DEVELOPMENT  # or DEBUG for maximum verbosity
+    ```
+
 
 
 ## Library Mode Communication and Advanced Examples
@@ -380,6 +412,8 @@ The `run_pipeline` function accepts the following parameters.
 | dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
 | stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
 | stderr                   | TextIO                 | None    | No        | Redirect subprocess `stderr` to a file or stream. If `None`, defaults to `/dev/null`. |
+| libmode                  | bool                   | True    | No        | `True` to load the default library mode pipeline configuration when `ingest_config` is `None`. |
+| quiet                    | bool                   | None    | No        | `True` to suppress verbose startup logs (PRODUCTION preset). `None` defaults to `True` when `libmode=True`. Set to `False` for verbose output. |
 
 
 The `run_pipeline` function returns the following values, depending on the parameters that you set:

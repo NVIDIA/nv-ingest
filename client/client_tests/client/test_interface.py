@@ -297,11 +297,12 @@ def test_store_task_no_args(ingestor):
 
 
 def test_store_task_some_args(ingestor):
-    ingestor.store(store_method="s3")
+    ingestor.store(storage_uri="s3://bucket/assets", public_base_url="http://public")
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, StoreTask)
-    assert task._store_method == "s3"
+    assert task._storage_uri == "s3://bucket/assets"
+    assert task._public_base_url == "http://public"
 
 
 def test_store_embed_task_no_args(ingestor):
@@ -1335,3 +1336,43 @@ def test_ingest_passes_return_traces_to_client(ingestor, mock_client):
     # Verify return_traces=True was passed to the client
     call_kwargs = mock_client.process_jobs_concurrently.call_args[1]
     assert call_kwargs["return_traces"] is True
+
+
+def test_ingest_async_save_to_disk(ingestor, mock_client, tmp_path):
+    """Test that configuring save_to_disk sets up the processor correctly."""
+    out_dir = tmp_path / "out"
+
+    mock_client._job_index_to_job_spec = {}
+    mock_client.add_job.return_value = ["job1"]
+
+    proc_future = Future()
+    mock_client.process_jobs_concurrently_async.return_value = proc_future
+
+    with patch("nv_ingest_client.client.interface.ThreadPoolExecutor") as mock_executor_cls:
+        mock_executor = MagicMock()
+        mock_executor_cls.return_value = mock_executor
+
+        def immediate_submit(fn, *args, **kwargs):
+            fn(*args, **kwargs)
+            f = Future()
+            f.set_result(None)
+            return f
+
+        mock_executor.submit.side_effect = immediate_submit
+
+        ingestor.save_to_disk(output_directory=str(out_dir), cleanup=True)
+
+        ingestor.ingest_async()
+
+        call_args = mock_client.process_jobs_concurrently_async.call_args[1]
+
+        assert call_args["stream_to_callback_only"] is True
+        callback = call_args["completion_callback"]
+        assert callable(callback)
+
+        test_data = {"metadata": {"source_metadata": {"source_id": "test_doc.txt"}, "content": "foo"}}
+        callback(test_data, "job1")
+
+        files = list(out_dir.glob("*.jsonl.gz"))
+        assert len(files) == 1
+        assert "test_doc" in files[0].name

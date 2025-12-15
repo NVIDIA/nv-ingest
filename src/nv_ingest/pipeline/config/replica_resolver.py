@@ -11,6 +11,7 @@ consumption stays within the static_memory_threshold.
 """
 
 import logging
+import os
 from typing import List
 from copy import deepcopy
 
@@ -102,8 +103,17 @@ def resolve_static_replicas(pipeline_config: PipelineConfigSchema) -> PipelineCo
 
     logger.info(f"Total baseline memory demand: {total_memory_demand_mb}MB from {len(non_static_stages)} stages")
 
-    # Check if we need to scale down
-    if total_memory_demand_mb <= available_memory_mb:
+    # Optional bypass of global memory-based scale down via environment variable
+    bypass_env = os.getenv("NV_INGEST_BYPASS_STATIC_MEMORY_SCALE_DOWN", "").strip().lower()
+    bypass_scale_down = bypass_env in ("1", "true", "yes", "on")
+
+    # Check if we need to scale down (unless bypassed)
+    if bypass_scale_down:
+        logger.warning(
+            "Bypassing static memory-based replica scale-down due to NV_INGEST_BYPASS_STATIC_MEMORY_SCALE_DOWN"
+        )
+        scaling_factor = 1.0
+    elif total_memory_demand_mb <= available_memory_mb:
         logger.info("Memory demand within threshold, applying baseline replica counts")
         scaling_factor = 1.0
     else:
