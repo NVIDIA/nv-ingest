@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GRPC_PORT=8001
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git git-lfs libgl1 libglib2.0-0 \
+    && apt-get install -y --no-install-recommends git git-lfs libgl1 libglib2.0-0 build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
