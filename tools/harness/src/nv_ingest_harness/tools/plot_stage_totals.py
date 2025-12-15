@@ -2,21 +2,25 @@
 """
 Visualize per-stage resident times from scripts/tests artifacts.
 
+Generates a single stage resident time bar chart with consistent defaults for reproducibility.
+Filtering flags available for debugging purposes.
+
 Usage:
+    # Default: stage plot with clean defaults
     python scripts/tests/tools/plot_stage_totals.py \
-        scripts/tests/artifacts/<run>/results.json \
-        --pipeline config/default_pipeline.yaml \
-        --top-n 30
+        scripts/tests/artifacts/<run>/results.json
+
+    # Include additional stages for debugging
+    python scripts/tests/tools/plot_stage_totals.py \
+        scripts/tests/artifacts/<run>/results.json --include-nested --include-queues
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -121,12 +125,47 @@ def stage_sort_key(stage: str, order_map: Dict[str, int]) -> Tuple[int, str]:
     return order_map.get(base, len(order_map)), stage
 
 
-def should_keep_stage(stage: str, keep_nested: bool, exclude_network: bool) -> bool:
-    if exclude_network and ("broker_source_network_in" in stage or "network_in" in stage):
+def _is_queue_stage(stage: str) -> bool:
+    return stage.endswith("_channel_in")
+
+
+def _is_pdfium_micro_stage(stage: str) -> bool:
+    """
+    PDFium micro-spans are excluded by default from the stage plot for cleaner visualization.
+    Use --include-pdfium-micro to include them for debugging.
+    """
+    if "pdf_extractor::pdf_extraction::" not in stage:
         return False
-    if "::pdfium_pages_to_numpy" in stage:
+    return any(
+        suffix in stage
+        for suffix in (
+            "::pdfium_pages_to_numpy",
+            "::render_page",
+            "::bitmap_to_numpy",
+            "::scale_image",
+            "::pad_image",
+        )
+    )
+
+
+def should_keep_stage(
+    stage: str,
+    include_nested: bool,
+    include_network: bool,
+    include_queues: bool,
+    include_pdfium_micro: bool,
+) -> bool:
+    # Network stages: exclude by default unless explicitly included
+    if (not include_network) and ("broker_source_network_in" in stage or "network_in" in stage):
         return False
-    if keep_nested:
+    # Queue stages: exclude by default unless explicitly included
+    if (not include_queues) and _is_queue_stage(stage):
+        return False
+    # PDFium micro-stages: exclude from main stage plot by default (they have their own plot)
+    if (not include_pdfium_micro) and _is_pdfium_micro_stage(stage):
+        return False
+    # Nested stages: exclude by default unless explicitly included
+    if include_nested:
         return True
     return "::" not in stage
 
@@ -134,15 +173,10 @@ def should_keep_stage(stage: str, keep_nested: bool, exclude_network: bool) -> b
 def build_stage_plot(
     data: Dict[str, Any],
     results_path: Path,
-    pipeline_yaml: Path,
-    top_n: int | None,
-    log_scale: bool,
-    width: int,
-    keep_nested: bool,
-    sort_mode: str,
-    summary_rows: int,
-    exclude_network: bool,
-    stage_metric: str,
+    include_nested: bool,
+    include_network: bool,
+    include_queues: bool,
+    include_pdfium_micro: bool,
 ):
     trace_summary = data.get("trace_summary")
     if not trace_summary:
@@ -157,21 +191,23 @@ def build_stage_plot(
 
     stage_totals = dict(base_stage_totals)
 
+    # Hardcoded defaults for reproducibility
+    pipeline_yaml = Path("config/default_pipeline.yaml")
     stage_order = load_stage_order(pipeline_yaml)
     order_map = {stage: idx for idx, stage in enumerate(stage_order)}
+    width = 14
+    summary_rows = 10
 
     merged: Dict[str, Dict[str, float]] = {}
 
-    def metric_value(stats: Dict[str, float]) -> float:
-        if stage_metric == "average":
-            return stats.get("avg_resident_s", 0.0)
-        return stats.get("total_resident_s", 0.0)
-
-    def metric_label() -> str:
-        return "Average resident seconds per document" if stage_metric == "average" else "Total resident seconds"
-
     for stage, stats in stage_totals.items():
-        if not should_keep_stage(stage, keep_nested=keep_nested, exclude_network=exclude_network):
+        if not should_keep_stage(
+            stage,
+            include_nested=include_nested,
+            include_network=include_network,
+            include_queues=include_queues,
+            include_pdfium_micro=include_pdfium_micro,
+        ):
             continue
         merged[stage] = stats
 
@@ -180,13 +216,8 @@ def build_stage_plot(
         sort_key = stage_sort_key(stage, order_map)
         entries.append((sort_key, stage, stats))
 
-    if sort_mode == "total":
-        entries.sort(key=lambda item: metric_value(item[2]), reverse=True)
-    else:
-        entries.sort()
-
-    if top_n:
-        entries = entries[:top_n]
+    # Sort by total resident seconds (hardcoded)
+    entries.sort(key=lambda item: item[2].get("total_resident_s", 0.0), reverse=True)
 
     labeled_entries = []
     for _, stage, stats in entries:
@@ -194,7 +225,7 @@ def build_stage_plot(
             {
                 "raw_stage": stage,
                 "label": friendly_name(stage),
-                "value": metric_value(stats),
+                "value": stats.get("total_resident_s", 0.0),
                 "total": stats.get("total_resident_s", 0.0),
                 "avg": stats.get("avg_resident_s", 0.0),
                 "docs": stats.get("documents", 0),
@@ -207,11 +238,9 @@ def build_stage_plot(
     fig_height = max(6, len(stages) * 0.35)
     fig, ax = plt.subplots(figsize=(width, fig_height))
     bars = ax.barh(range(len(stages) - 1, -1, -1), totals, color="#4C72B0")
-    ax.set_xlabel(metric_label())
+    ax.set_xlabel("Total resident seconds")
     ax.set_yticks(range(len(stages) - 1, -1, -1))
     ax.set_yticklabels(stages)
-    if log_scale:
-        ax.set_xscale("log")
     ax.grid(axis="x", linestyle="--", alpha=0.3)
 
     def _format_seconds(value: float) -> str:
@@ -235,13 +264,13 @@ def build_stage_plot(
             color="#333333",
         )
 
-    title_prefix = "Average resident time per document" if stage_metric == "average" else "Stage resident time totals"
-    ax.set_title(f"{title_prefix} – {data['test_config']['test_name']}")
+    ax.set_title(f"Stage resident time totals – {data['test_config']['test_name']}")
     plt.tight_layout()
 
     out_path = results_path.with_suffix(".stage_time.png")
     plt.savefig(out_path, dpi=200)
     print(f"Wrote {out_path}")
+
     if summary_rows > 0:
         print("\nTop stages by resident time")
         print("-" * 90)
@@ -255,24 +284,6 @@ def build_stage_plot(
             print(f"{stage:<40} {total:>12.2f} {avg:>10.2f} {doc_cnt:>6}")
 
     _print_pdfium_breakdown(trace_summary)
-
-
-def _doc_wait_seconds(doc: Dict[str, Any]) -> float | None:
-    wait = doc.get("ray_wait_s")
-    if wait is not None:
-        try:
-            return float(wait)
-        except (TypeError, ValueError):
-            return None
-    start = doc.get("ray_start_ts_s")
-    submitted = doc.get("submission_ts_s")
-    if start is None or submitted is None:
-        return None
-    try:
-        wait_val = float(start) - float(submitted)
-    except (TypeError, ValueError):
-        return None
-    return max(0.0, wait_val)
 
 
 def _percentile(values: List[float], pct: float) -> float | None:
@@ -290,42 +301,12 @@ def _percentile(values: List[float], pct: float) -> float | None:
     return values[f] + (values[c] - values[f]) * (k - f)
 
 
-def _print_wait_summary(wait_values: List[float], wall_values: List[float]):
-    if not wait_values or not wall_values:
-        return
-    sorted_waits = sorted(wait_values)
-    p50 = _percentile(sorted_waits, 50)
-    p90 = _percentile(sorted_waits, 90)
-    p99 = _percentile(sorted_waits, 99)
-    max_wait = sorted_waits[-1]
-    ratio_samples = [w / w_tot for w, w_tot in zip(wait_values, wall_values) if w_tot > 0]
-    avg_ratio = sum(ratio_samples) / len(ratio_samples) if ratio_samples else 0.0
-    print("\nWait time summary (all documents)")
-    print("-" * 90)
-    print(f"Median wait: {p50:.2f}s | p90: {p90:.2f}s | p99: {p99:.2f}s | max: {max_wait:.2f}s")
-    print(f"Average wait / wall fraction: {avg_ratio * 100:.2f}%")
-
-
-def _print_queue_summary(queue_values: List[float], wall_values: List[float]):
-    if not queue_values or not wall_values:
-        return
-    sorted_queues = sorted(queue_values)
-    p50 = _percentile(sorted_queues, 50)
-    p90 = _percentile(sorted_queues, 90)
-    p99 = _percentile(sorted_queues, 99)
-    max_queue = sorted_queues[-1]
-    ratios = [queue / wall for queue, wall in zip(queue_values, wall_values) if wall > 0]
-    avg_ratio = sum(ratios) / len(ratios) if ratios else 0.0
-    print("\nIn-Ray queue time summary (all documents)")
-    print("-" * 90)
-    print(f"Median queue: {p50:.2f}s | p90: {p90:.2f}s | p99: {p99:.2f}s | max: {max_queue:.2f}s")
-    print(f"Average queue / wall fraction: {avg_ratio * 100:.2f}%")
-
-
 def _pdfium_doc_entries(trace_summary: Dict[str, Any]) -> List[Dict[str, Any]]:
     doc_breakdown = trace_summary.get("pdfium_document_breakdown")
     if not doc_breakdown:
         return []
+
+    from collections import defaultdict
 
     aggregated: Dict[str, Dict[str, Any]] = {}
     for doc in doc_breakdown:
@@ -375,9 +356,9 @@ def _pdfium_doc_entries(trace_summary: Dict[str, Any]) -> List[Dict[str, Any]]:
 def build_pdfium_doc_plot(
     trace_summary: Dict[str, Any],
     results_path: Path,
-    width: int,
-    top_n: int,
-    metric: str,
+    width: int = 14,
+    top_n: int = 15,
+    metric: str = "per_page",
 ):
     entries = _pdfium_doc_entries(trace_summary)
     if not entries:
@@ -459,6 +440,8 @@ def build_pdfium_doc_plot(
 
 
 def export_pdfium_csv(trace_summary: Dict[str, Any], results_path: Path):
+    import csv
+
     entries = _pdfium_doc_entries(trace_summary)
     if not entries:
         print("No pdfium per-document breakdown found; skipping CSV export.")
@@ -533,385 +516,95 @@ def _print_pdfium_breakdown(trace_summary: Dict[str, Any]):
         )
 
 
-def build_wall_plot(
-    data: Dict[str, Any],
-    results_path: Path,
-    doc_top_n: int | None,
-    width: int,
-    summary_rows: int,
-    title_suffix: str | None = None,
-    doc_sort: str = "wall",
-):
-    trace_summary = data.get("trace_summary")
-    if not trace_summary:
-        print("No trace_summary present; skipping wall-time plot.")
-        return
-    document_totals = trace_summary.get("document_totals")
-    if not document_totals:
-        print("No document_totals present; skipping wall-time plot.")
-        return
-
-    run_results = data.get("results", {})
-    ingestion_time = run_results.get("ingestion_time_s")
-    result_count = run_results.get("result_count") or len(document_totals)
-
-    def wait_sort_key(doc: Dict[str, Any]) -> float:
-        wait_val = _doc_wait_seconds(doc)
-        return wait_val if wait_val is not None else 0.0
-
-    if doc_sort == "wait":
-        documents = sorted(document_totals, key=wait_sort_key, reverse=True)
-    else:
-        documents = sorted(
-            document_totals,
-            key=lambda item: item.get("total_wall_s", 0.0),
-            reverse=True,
-        )
-    if doc_top_n:
-        documents = documents[:doc_top_n]
-
-    if not documents:
-        print("No document entries available after filtering; skipping wall-time plot.")
-        return
-
-    labels: List[str] = []
-    wall_vals: List[float] = []
-    resident_vals: List[float] = []
-    ratios: List[float] = []
-    ray_start_vals: List[float | None] = []
-    ray_end_vals: List[float | None] = []
-    submission_vals: List[float | None] = []
-    wait_vals: List[float | None] = []
-    queue_vals: List[float | None] = []
-
-    for doc in documents:
-        source = doc.get("source_id") or f"doc_{doc.get('document_index', '?')}"
-        source_name = Path(source).name
-        doc_idx = doc.get("document_index")
-        label = f"{doc_idx}: {source_name}" if doc_idx is not None else source_name
-        labels.append(label)
-        wall = float(doc.get("total_wall_s", 0.0))
-        resident = float(doc.get("total_resident_s", 0.0))
-        wall_vals.append(wall)
-        resident_vals.append(resident)
-        ratios.append(resident / wall if wall > 0 else math.inf)
-        ray_start_vals.append(doc.get("ray_start_ts_s"))
-        ray_end_vals.append(doc.get("ray_end_ts_s"))
-        submission_vals.append(doc.get("submission_ts_s"))
-        wait_vals.append(_doc_wait_seconds(doc))
-        queue_val = doc.get("in_ray_queue_s")
-        if queue_val is None:
-            queue_vals.append(None)
-        else:
-            try:
-                queue_vals.append(float(queue_val))
-            except (TypeError, ValueError):
-                queue_vals.append(None)
-
-    labels = labels[::-1]
-    wall_vals = wall_vals[::-1]
-    resident_vals = resident_vals[::-1]
-    ratios = ratios[::-1]
-    wait_vals = wait_vals[::-1]
-    ray_start_vals = ray_start_vals[::-1]
-    ray_end_vals = ray_end_vals[::-1]
-    submission_vals = submission_vals[::-1]
-    queue_vals = queue_vals[::-1]
-
-    base_positions = list(range(len(labels)))
-    wall_positions = [pos + 0.2 for pos in base_positions]
-    resident_positions = [pos - 0.2 for pos in base_positions]
-    queue_positions = [pos + 0.05 for pos in base_positions]
-
-    fig_height = max(6, len(labels) * 0.35)
-    fig, ax = plt.subplots(figsize=(width, fig_height))
-
-    ax.barh(
-        wall_positions,
-        wall_vals,
-        height=0.35,
-        color="#55A868",
-        label="Wall seconds",
-    )
-    ax.barh(
-        resident_positions,
-        resident_vals,
-        height=0.35,
-        color="#C44E52",
-        label="Resident seconds",
-    )
-    wait_display_vals = [val if val is not None else 0.0 for val in wait_vals]
-    ax.barh(
-        base_positions,
-        wait_display_vals,
-        height=0.15,
-        color="#FFA600",
-        label="Wait before Ray",
-    )
-    queue_display_vals = [val if val is not None else 0.0 for val in queue_vals]
-    ax.barh(
-        queue_positions,
-        queue_display_vals,
-        height=0.12,
-        color="#AA65D2",
-        label="In-Ray queue",
-    )
-
-    ax.set_yticks(base_positions)
-    ax.set_yticklabels(labels)
-    ax.invert_yaxis()
-    ax.set_xlabel("Seconds per document")
-    title = "Document wall vs resident time"
-    if title_suffix:
-        title = f"{title} – {title_suffix}"
-    ax.set_title(title)
-    ax.legend(loc="upper right")
-
-    max_val = max(wall_vals + resident_vals)
-    text_x = max_val * 1.02 if max_val > 0 else 0.5
-
-    for pos, wall, resident, ratio in zip(base_positions, wall_vals, resident_vals, ratios):
-        if wall <= 0 and resident <= 0:
-            continue
-        ratio_str = "∞" if math.isinf(ratio) else f"{ratio:.1f}×"
-        ax.text(
-            text_x,
-            pos,
-            f"resident/wall {ratio_str}",
-            va="center",
-            fontsize=8,
-            color="#333333",
-        )
-
-    info_lines = []
-    if ingestion_time is not None:
-        info_lines.append(f"Run wall time: {ingestion_time:.1f}s")
-    if result_count:
-        info_lines.append(f"Documents: {result_count}")
-    if info_lines:
-        ax.text(
-            0.01,
-            1.02,
-            " • ".join(info_lines),
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=9,
-            color="#333333",
-        )
-
-    plt.tight_layout()
-    out_path = results_path.with_suffix(".wall_time.png")
-    plt.savefig(out_path, dpi=200)
-    print(f"Wrote {out_path}")
-
-    all_wait_values: List[float] = []
-    all_queue_values: List[float] = []
-    all_walls: List[float] = []
-    for doc in document_totals:
-        wait_value = _doc_wait_seconds(doc)
-        if wait_value is None:
-            continue
-        all_wait_values.append(wait_value)
-        wall_value = doc.get("total_wall_s")
-        if wall_value is None:
-            all_walls.append(wait_value)  # Dummy placeholder to keep lengths equal
-        else:
-            try:
-                all_walls.append(float(wall_value))
-            except (TypeError, ValueError):
-                all_walls.append(wait_value)
-        queue_val = doc.get("in_ray_queue_s")
-        if queue_val is not None:
-            try:
-                all_queue_values.append(float(queue_val))
-            except (TypeError, ValueError):
-                pass
-    _print_wait_summary(all_wait_values, all_walls)
-    _print_queue_summary(all_queue_values, all_walls)
-
-    has_ray = any(value is not None for value in ray_start_vals)
-    has_submission = any(value is not None for value in submission_vals)
-    has_wait = any(value is not None for value in wait_vals)
-    has_queue = any(value is not None for value in queue_vals)
-
-    if summary_rows > 0:
-        print("\nTop documents by wall time")
-        print("-" * 90)
-        header = f"{'Document':<40} {'Wall (s)':>12} {'Resident (s)':>14} {'Ratio':>8}"
-        if has_wait:
-            header += f" {'Wait (s)':>10}"
-        if has_queue:
-            header += f" {'Ray queue (s)':>14}"
-        if has_submission:
-            header += f" {'Submitted (s)':>15}"
-        if has_ray:
-            header += f" {'Ray start (s)':>15} {'Ray end (s)':>15}"
-        print(header)
-        print("-" * 90)
-        truncated = list(
-            zip(
-                labels[::-1],
-                wall_vals[::-1],
-                resident_vals[::-1],
-                ratios[::-1],
-                wait_vals[::-1],
-                queue_vals[::-1],
-                submission_vals[::-1],
-                ray_start_vals[::-1],
-                ray_end_vals[::-1],
-            )
-        )[:summary_rows]
-        for label, wall, resident, ratio, wait, queue, submitted, ray_start, ray_end in truncated:
-            ratio_str = "∞" if math.isinf(ratio) else f"{ratio:.2f}"
-            row = f"{label:<40} {wall:>12.2f} {resident:>14.2f} {ratio_str:>8}"
-            if has_wait:
-                row += f" {wait if wait is not None else '-':>10}"
-            if has_queue:
-                row += f" {queue if queue is not None else '-':>10}"
-            if has_submission:
-                row += f" {submitted if submitted is not None else '-':>15}"
-            if has_ray:
-                row += f" {ray_start if ray_start is not None else '-':>15}"
-                row += f" {ray_end if ray_end is not None else '-':>15}"
-            print(row)
-
-
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Plot stage resident times from results.json")
+    parser = argparse.ArgumentParser(
+        description="Plot stage resident times from results.json",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Default: stage plot with clean defaults (excludes queues, network, nested, PDFium micro)
+  python plot_stage_totals.py artifacts/run/results.json
+
+  # Include additional stages for debugging
+  python plot_stage_totals.py artifacts/run/results.json --include-nested --include-queues
+
+  # Generate PDFium breakdown plot (for benchmarking PDFium rendering changes)
+  python plot_stage_totals.py artifacts/run/results.json --pdfium-plot --pdfium-csv
+        """,
+    )
     parser.add_argument("results", type=Path, help="Path to results.json artifact")
+
     parser.add_argument(
         "--trace-dir",
         type=Path,
-        help="Optional directory containing raw trace *.json files (auto-detected if omitted)",
+        help="Directory containing raw trace *.json files (auto-detected if omitted)",
     )
+
+    # Filtering options (for debugging)
     parser.add_argument(
-        "--pipeline",
-        type=Path,
-        default=Path("config/default_pipeline.yaml"),
-        help="Pipeline YAML to derive stage ordering",
-    )
-    parser.add_argument("--top-n", type=int, help="Limit to top N stages")
-    parser.add_argument("--log-scale", action="store_true", help="Use log scale on x-axis")
-    parser.add_argument("--width", type=int, default=14, help="Plot width in inches")
-    parser.add_argument(
-        "--keep-nested",
+        "--include-nested",
         action="store_true",
-        help="Keep nested stage names (default: drop entries containing '::')",
+        help="Include nested stage names (default: excluded)",
     )
     parser.add_argument(
-        "--sort",
-        choices=["total", "pipeline"],
-        default="total",
-        help="Sort bars by total resident seconds or pipeline order",
-    )
-    parser.add_argument(
-        "--stage-metric",
-        choices=["total", "average"],
-        default="total",
-        help="Bar length metric for stage plot (total seconds or avg per document)",
-    )
-    parser.add_argument(
-        "--summary-rows",
-        type=int,
-        default=10,
-        help="Print textual summary for top N stages (0 disables)",
-    )
-    parser.add_argument(
-        "--exclude-network",
+        "--include-network",
         action="store_true",
-        help="Exclude broker/network-in stages from the visualization",
+        help="Include broker/network-in stages (default: excluded)",
     )
     parser.add_argument(
-        "--doc-top-n",
-        type=int,
-        default=30,
-        help="Limit wall-time plot to top N documents by wall seconds (0 disables limit)",
-    )
-    parser.add_argument(
-        "--doc-summary-rows",
-        type=int,
-        default=10,
-        help="Print textual summary for document wall times (0 disables)",
-    )
-    parser.add_argument(
-        "--doc-sort",
-        choices=["wall", "wait"],
-        default="wall",
-        help="Sort document chart by wall time or wait time",
-    )
-    parser.add_argument(
-        "--skip-wall-plot",
+        "--include-queues",
         action="store_true",
-        help="Only emit the stage resident-time plot",
+        help="Include *_channel_in queue stages (default: excluded)",
     )
     parser.add_argument(
-        "--skip-pdfium-doc-plot",
+        "--include-pdfium-micro",
         action="store_true",
-        help="Disable the PDFium per-document stacked chart",
+        help="Include PDFium micro-spans in stage plot (default: excluded)",
     )
+
+    # PDFium plot options (optional, for benchmarking PDFium rendering changes)
     parser.add_argument(
-        "--pdfium-doc-top-n",
-        type=int,
-        default=15,
-        help="Show top N documents in PDFium stacked plot (0 shows all)",
-    )
-    parser.add_argument(
-        "--pdfium-doc-metric",
-        choices=["total", "per_page"],
-        default="per_page",
-        help="Sort/scale PDFium doc plot by total seconds or per-page average",
-    )
-    parser.add_argument(
-        "--pdfium-export-csv",
+        "--pdfium-plot",
         action="store_true",
-        help="Export per-document PDFium breakdown to CSV",
+        help="Generate PDFium per-document breakdown plot (default: disabled)",
     )
+    parser.add_argument(
+        "--pdfium-csv",
+        action="store_true",
+        help="Export PDFium breakdown to CSV (requires --pdfium-plot)",
+    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     data = json.loads(args.results.read_text())
+
+    # Always rebuild trace summary (hardcoded for reproducibility)
     if ensure_trace_summary is None:
         print("trace_loader helpers unavailable; proceeding with existing trace_summary.")
     else:
-        ensure_trace_summary(data, args.results, args.trace_dir)
+        ensure_trace_summary(data, args.results, args.trace_dir, force=True)
+
     build_stage_plot(
         data=data,
         results_path=args.results,
-        pipeline_yaml=args.pipeline,
-        top_n=args.top_n,
-        log_scale=args.log_scale,
-        width=args.width,
-        keep_nested=args.keep_nested,
-        sort_mode=args.sort,
-        summary_rows=args.summary_rows,
-        exclude_network=args.exclude_network,
-        stage_metric=args.stage_metric,
+        include_nested=args.include_nested,
+        include_network=args.include_network,
+        include_queues=args.include_queues,
+        include_pdfium_micro=args.include_pdfium_micro,
     )
+
+    # Optional PDFium plot (for benchmarking PDFium rendering changes)
     trace_summary = data.get("trace_summary", {})
-    if (not args.skip_pdfium_doc_plot) and trace_summary:
+    if args.pdfium_plot and trace_summary:
         build_pdfium_doc_plot(
             trace_summary=trace_summary,
             results_path=args.results,
-            width=args.width,
-            top_n=args.pdfium_doc_top_n,
-            metric=args.pdfium_doc_metric,
         )
-    if args.pdfium_export_csv and trace_summary:
-        export_pdfium_csv(trace_summary, args.results)
-    if not args.skip_wall_plot:
-        test_name = data.get("test_config", {}).get("test_name")
-        build_wall_plot(
-            data=data,
-            results_path=args.results,
-            doc_top_n=args.doc_top_n or None,
-            width=args.width,
-            summary_rows=args.doc_summary_rows,
-            title_suffix=test_name,
-            doc_sort=args.doc_sort,
-        )
+        if args.pdfium_csv:
+            export_pdfium_csv(trace_summary, args.results)
 
 
 if __name__ == "__main__":

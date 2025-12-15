@@ -235,14 +235,25 @@ def _collect_pdfium_nested_spans(trace_payload: dict) -> Tuple[Dict[str, int], D
         normalized = _strip_dedupe_suffix(stage)
         if normalized not in PDFIUM_STAGE_NAMES:
             continue
-        exit_key = f"trace::exit::{stage}"
-        exit_value = trace_payload.get(exit_key)
-        if exit_value is None:
-            continue
-        try:
-            duration_ns = int(exit_value) - int(entry)
-        except (TypeError, ValueError):
-            continue
+        # Prefer resident_time when available (true compute time), fall back to entry/exit deltas
+        # if resident_time is missing.
+        # TODO: review that this fall back / fork is necessary or ai slop
+        resident_key = f"trace::resident_time::{stage}"
+        resident_value = trace_payload.get(resident_key)
+        if resident_value is not None:
+            try:
+                duration_ns = int(resident_value)
+            except (TypeError, ValueError):
+                continue
+        else:
+            exit_key = f"trace::exit::{stage}"
+            exit_value = trace_payload.get(exit_key)
+            if exit_value is None:
+                continue
+            try:
+                duration_ns = int(exit_value) - int(entry)
+            except (TypeError, ValueError):
+                continue
         if duration_ns <= 0:
             continue
         durations[normalized] += duration_ns

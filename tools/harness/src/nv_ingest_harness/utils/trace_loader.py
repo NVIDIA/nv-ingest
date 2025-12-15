@@ -47,14 +47,17 @@ def _load_traces_from_dir(
 
 
 def ensure_trace_summary(
-    data: Dict[str, Any], results_path: Path, trace_dir_override: Optional[Path] = None
+    data: Dict[str, Any],
+    results_path: Path,
+    trace_dir_override: Optional[Path] = None,
+    force: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Ensure data["trace_summary"] exists and contains per-document totals.
     Attempts to rebuild from raw traces if missing.
     """
     trace_summary = data.get("trace_summary")
-    if isinstance(trace_summary, dict) and trace_summary.get("document_totals"):
+    if (not force) and isinstance(trace_summary, dict) and trace_summary.get("document_totals"):
         return trace_summary
 
     candidate_dirs: List[Path] = []

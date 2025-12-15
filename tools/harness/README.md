@@ -157,6 +157,19 @@ EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dat
 # Result: Uses bo767 path, but extract_images=true (env override) and api_version=v2 (env override)
 ```
 
+### Optional: Capture CPU/memory utilization
+
+To connect wall-time vs resident-time to actual infrastructure saturation, you can capture Docker-level utilization during a run:
+
+```bash
+python run.py --case=e2e --dataset=bo20 --docker-stats
+```
+
+This writes `docker_stats.csv` into the artifact directory and records its path in `results.json` under `docker_stats`.
+Use `--docker-stats-interval-s` (or `DOCKER_STATS_INTERVAL_S`) to adjust the sampling rate.
+
+#### Summarize `docker_stats.csv`
+
 **Precedence Details:**
 1. **Environment variables** - Highest priority, useful for CI/CD overrides
 2. **Dataset-specific config** - Applied automatically when using `--dataset=<name>`
@@ -917,27 +930,38 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
    - `results.json` → includes `trace_summary` with per-stage resident seconds
    - `traces/*.json` → raw payloads identical to `scripts/private_local/trace.json`
    - Use descriptive folder names (e.g., copy artifacts to `artifacts/baseline_bo20/`) to keep baseline vs RC side-by-side.
-5. **Visualize stage + wall/wait timings**
+5. **Visualize stage resident times**
    ```bash
-   # Positional argument = results.json path; emits stage + wall PNGs
+   # Default: stage plot with clean defaults (excludes queues, network, nested, PDFium micro)
    python scripts/tests/tools/plot_stage_totals.py \
-     scripts/tests/artifacts/<run>/results.json \
-     --doc-top-n 25 \
-     --doc-sort wait \
-     --sort total \
-     --keep-nested \
-     --exclude-network
+     scripts/tests/artifacts/<run>/results.json
+   
+   # Include additional stages for debugging
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json --include-nested --include-queues
+   
+   # Generate PDFium breakdown plot (for benchmarking PDFium rendering changes)
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json --pdfium-plot --pdfium-csv
    ```
-   - `--keep-nested` preserves nested entries such as chart/table OCR workloads
-   - `--exclude-network` hides broker/Redis wait time so the chart focuses on Ray stages
-   - `--doc-top-n` controls how many documents appear on the wall-time plot (set `0` for all)
-   - `--doc-sort wait` sorts documents by Ray wait time instead of wall time (useful for large jobs)
-   - `--skip-wall-plot` emits only the resident-time chart if you want the legacy behavior
-   - Wall-time output now includes:
-     - Pre-Ray wait (submission → Ray start)
-     - In-Ray queue totals (sum of `*_channel_in` resident time)
-     - Execution window (Ray start/stop timestamps + wall vs resident bars)
-   - Percentile summaries for wait and queue time are printed in the CLI output for the entire dataset.
+   
+   **Default behavior:**
+   - Generates `results.stage_time.png` - Stage resident time bar chart
+   - Always rebuilds trace summary from raw traces for reproducibility
+   - Sorts by total resident seconds (descending)
+   - Excludes queues, network stages, nested stages, and PDFium micro-stages by default
+   - Prints top 10 stages summary to console
+   
+   **Filtering options (for debugging):**
+   - `--include-nested` - Include nested stage names (e.g., chart/table OCR workloads)
+   - `--include-network` - Include broker/network-in stages
+   - `--include-queues` - Include queue stages (`*_channel_in`)
+   - `--include-pdfium-micro` - Include PDFium micro-spans (render/bitmap/scale/pad)
+   - `--trace-dir` - Override trace directory (auto-detected if omitted)
+   
+   **PDFium benchmarking (optional):**
+   - `--pdfium-plot` - Generate PDFium per-document breakdown plot (`results.pdfium_docs.png`)
+   - `--pdfium-csv` - Export PDFium breakdown to CSV (`results.pdfium_breakdown.csv`, requires `--pdfium-plot`)
 
 ### Future Trace Visualization Case (roadmap)
 

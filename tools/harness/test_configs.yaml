@@ -57,7 +57,7 @@ active:
 # Recall configuration (only used when running recall or e2e_recall tests)
 recall:
   recall_dataset: null
-  reranker_mode: none  # Options: "none", "with", "both"
+  reranker_mode: both  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
