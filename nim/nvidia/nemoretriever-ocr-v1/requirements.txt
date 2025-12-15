@@ -6,7 +6,7 @@ numpy==2.3.5
 pillow==12.0.0
 requests==2.32.5
 torch==2.9.1
-grpcio==1.76.0
+grpcio==1.67.1
 prometheus-client==0.23.1
 tritonclient[grpc]==2.63.0
 opentelemetry-api==1.39.1
