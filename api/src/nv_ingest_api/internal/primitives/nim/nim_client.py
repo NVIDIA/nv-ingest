@@ -454,6 +454,14 @@ class NimClient:
 
         while attempt < self.max_retries:
             try:
+                # Log system prompt for VLM requests
+                if isinstance(formatted_input, dict) and "messages" in formatted_input:
+                    messages = formatted_input.get("messages", [])
+                    if messages and messages[0].get("role") == "system":
+                        system_content = messages[0].get("content", "")
+                        model_name = self.model_interface.name()
+                        logger.info(f"{model_name}: Sending HTTP request with system prompt: '{system_content}'")
+
                 response = requests.post(
                     self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
                 )
