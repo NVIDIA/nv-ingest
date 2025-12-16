@@ -710,7 +710,14 @@ class DocxReader:
             self._extracted_data.append(text_extraction)
             self._accumulated_text = []
 
-    def _finalize_images(self, extract_tables: bool, extract_charts: bool, **kwargs) -> None:
+    def _finalize_images(
+        self,
+        extract_tables: bool,
+        extract_charts: bool,
+        extract_infographics: bool,
+        extract_images: bool,
+        **kwargs,
+    ) -> None:
         """
         Build and append final metadata for each pending image in batches.
 
@@ -750,7 +757,7 @@ class DocxReader:
         # 2) If the user wants to detect tables/charts, do it in one pass for all images.
         detection_map = defaultdict(list)  # maps image_index -> list of CroppedImageWithContent
 
-        if extract_tables or extract_charts:
+        if extract_tables or extract_charts or extract_infographics:
             try:
                 # Perform the batched detection on all images
                 detection_results = extract_page_elements_from_images(
@@ -761,6 +768,15 @@ class DocxReader:
                 # detection_results is typically List[Tuple[int, CroppedImageWithContent]]
                 # Group by image_index
                 for image_idx, cropped_item in detection_results:
+                    # Skip elements that shouldn't be extracted based on flags
+                    element_type = cropped_item.type_string
+                    if (not extract_tables) and (element_type == "table"):
+                        continue
+                    if (not extract_charts) and (element_type == "chart"):
+                        continue
+                    if (not extract_infographics) and (element_type == "infographic"):
+                        continue
+
                     detection_map[image_idx].append(cropped_item)
 
             except Exception as e:
@@ -787,13 +803,14 @@ class DocxReader:
                     self._extracted_data.append(structured_entry)
             else:
                 # Either detection was not requested, or no table/chart was found
-                image_entry = self._construct_image_metadata(
-                    para_idx_i,
-                    caption_i,
-                    base_unified_metadata_i,
-                    base64_img_i,
-                )
-                self._extracted_data.append(image_entry)
+                if extract_images:
+                    image_entry = self._construct_image_metadata(
+                        para_idx_i,
+                        caption_i,
+                        base_unified_metadata_i,
+                        base64_img_i,
+                    )
+                    self._extracted_data.append(image_entry)
 
         # 4) Clear out the pending images after finalizing
         self._pending_images = []
@@ -853,8 +870,9 @@ class DocxReader:
         base_unified_metadata: Dict,
         text_depth: "TextTypeEnum",
         extract_text: bool,
-        extract_charts: bool,
         extract_tables: bool,
+        extract_charts: bool,
+        extract_infographics: bool,
         extract_images: bool,
     ) -> list[list[str | dict]]:
         """
@@ -941,10 +959,12 @@ class DocxReader:
                 self._extracted_data.append(text_extraction)
 
         # Final pass: Decide if images are just images or contain tables/charts
-        if extract_images or extract_tables or extract_charts:
+        if extract_images or extract_tables or extract_charts or extract_infographics:
             self._finalize_images(
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                extract_images=extract_images,
                 trace_info=None,
             )
 
