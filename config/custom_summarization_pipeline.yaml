@@ -1,23 +1,23 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
-# All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Custom Summarization Pipeline Configuration
+# This is an example pipeline configuration that includes the udf_parallel_helper stage
+# for high-concurrency LLM summarization workflows.
+#
+# Usage:
+#   1. Copy this file and customize as needed
+#   2. Mount it into your Docker container
+#   3. Set INGEST_CONFIG_PATH environment variable in docker compose to point to this file
+#
+# Example docker-compose.yaml:
+#   nv-ingest-ms-runtime:
+#     volumes:
+#       - ./config/custom_summarization_pipeline.yaml:/config/custom_pipeline.yaml:ro
+#     environment:
+#       - INGEST_CONFIG_PATH=/config/custom_pipeline.yaml
+#       - NGC_API_KEY=your-nvidia-api-key
 
-# noqa
-# flake8: noqa
-# pylint: disable=line-too-long
+name: "Custom Summarization Pipeline"
+description: "Pipeline with dedicated udf_parallel_helper stage for LLM summarization"
 
-"""
-Default pipeline implementation (runtime default).
-
-This module embeds the exact contents of config/default_pipeline.yaml so code can
-load the default pipeline without reading the YAML file at runtime.
-"""
-
-DEFAULT_PIPELINE_YAML = """# Default Ingestion Pipeline Configuration
-# This file replicates the static pipeline defined in pipeline_builders.py
-
-name: "NVIngest default pipeline"
-description: "This is the default ingestion pipeline for NVIngest"
 stages:
   # Source
   - name: "source_stage"
@@ -70,14 +70,14 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
-      nemotron_parse_config:
+      nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-        nemotron_parse_endpoints: [
-          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
-          $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemotron-parse:8000/v1/chat/completions",
+        nemoretriever_parse_endpoints: [
+          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions",
         ]
-        nemotron_parse_infer_protocol: $NEMOTRON_PARSE_INFER_PROTOCOL|http
-        nemotron_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
+        nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
+        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
@@ -87,7 +87,7 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000 # Heuristic max consumption
+        memory_per_replica_mb: 10000
       static_replicas:
         strategy: "memory_static_global_percent"
         memory_per_replica_mb: 10000
@@ -123,14 +123,7 @@ stages:
       docx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
-        ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
-        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-      pdfium_config:
-        yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+          $YOLOX_HTTP_ENDPOINT|"",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -149,13 +142,6 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
-        yolox_endpoints: [
-          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
-        ]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
-        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-      pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
@@ -205,27 +191,6 @@ stages:
       static_replicas:
         strategy: "static"
         value: 1
-
-  - name: "ocr_extractor"
-    type: "stage"
-    phase: 1  # EXTRACTION
-    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor:OCRExtractorStage"
-    config:
-      endpoint_config:
-        ocr_endpoints: [
-          $OCR_GRPC_ENDPOINT|"ocr:8001",
-          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
-        ]
-        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
-        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-    replicas:
-      min_replicas: 0
-      max_replicas:
-        strategy: "static"
-        value: 4
-      static_replicas:
-        strategy: "static"
-        value: 3
 
   - name: "infographic_extractor"
     type: "stage"
@@ -352,10 +317,8 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|$NVIDIA_API_KEY
-      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/nemotron-nano-12b-v2-vl"
-      endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
-      prompt: $VLM_CAPTION_PROMPT|"Caption the content of this image:"
-      system_prompt: $VLM_CAPTION_SYSTEM_PROMPT|"/no_think"
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      prompt: "Caption the content of this image:"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -387,9 +350,6 @@ stages:
     type: "stage"
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
-    config:
-      storage_uri: $IMAGE_STORAGE_URI|"s3://nv-ingest/artifacts/store/images"
-      public_base_url: $IMAGE_STORAGE_PUBLIC_BASE_URL|""
     replicas:
       min_replicas: 0
       max_replicas:
@@ -411,6 +371,22 @@ stages:
       static_replicas:
         strategy: "static"
         value: 1
+
+  # High-concurrency UDF execution stage for summarization
+  # CUSTOMIZE THIS: Adjust replica counts based on your throughput requirements
+  - name: "udf_parallel_helper"
+    type: "stage"
+    phase: 5  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.meta.udf_parallel_helper:UDFParallelStage"
+    config: {}
+    replicas:
+      min_replicas: 8        # Minimum workers for LLM calls
+      max_replicas:
+        strategy: "static"
+        value: 10           # Maximum workers (if dynamic scaling enabled)
+      static_replicas:
+        strategy: "static"
+        value: 8            # Static worker count (default)
 
   - name: "broker_response"
     type: "stage"
@@ -467,79 +443,79 @@ edges:
   # Intake
   - from: "source_stage"
     to: "metadata_injector"
-    queue_size: 4
+    queue_size: 32
 
   # Document Extractors
   - from: "metadata_injector"
     to: "pdf_extractor"
-    queue_size: 8
+    queue_size: 32
   - from: "pdf_extractor"
     to: "audio_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "audio_extractor"
     to: "docx_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "docx_extractor"
     to: "pptx_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "pptx_extractor"
     to: "image_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "image_extractor"
     to: "html_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "html_extractor"
     to: "infographic_extractor"
-    queue_size: 4
+    queue_size: 32
 
   # Primitive Extractors
   - from: "infographic_extractor"
     to: "table_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "table_extractor"
     to: "chart_extractor"
-    queue_size: 4
+    queue_size: 32
   - from: "chart_extractor"
-    to: "ocr_extractor"
-    queue_size: 8
-  - from: "ocr_extractor"
     to: "image_filter"
-    queue_size: 4
+    queue_size: 32
 
   # Primitive Mutators
   - from: "image_filter"
     to: "image_dedup"
-    queue_size: 4
+    queue_size: 32
   - from: "image_dedup"
     to: "text_splitter"
-    queue_size: 4
+    queue_size: 32
 
   # Primitive Transforms
   - from: "text_splitter"
     to: "image_caption"
-    queue_size: 4
+    queue_size: 32
   - from: "image_caption"
     to: "text_embedder"
-    queue_size: 4
+    queue_size: 32
   - from: "text_embedder"
     to: "image_storage"
-    queue_size: 4
+    queue_size: 32
 
   # Primitive Storage
   - from: "image_storage"
     to: "embedding_storage"
-    queue_size: 4
+    queue_size: 32
   - from: "embedding_storage"
+    to: "udf_parallel_helper"
+    queue_size: 32
+  - from: "udf_parallel_helper"
     to: "broker_response"
-    queue_size: 4
+    queue_size: 32
 
   # Response and Telemetry
   - from: "broker_response"
     to: "otel_tracer"
-    queue_size: 4
+    queue_size: 32
   - from: "otel_tracer"
     to: "default_drain"
-    queue_size: 4
+    queue_size: 32
 
 # Pipeline Runtime Configuration
 pipeline:
@@ -555,4 +531,3 @@ pipeline:
     error_boost_factor: $INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR|1.5
     rcm_memory_safety_buffer_fraction: $INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION|0.15
   launch_simple_broker: $INGEST_LAUNCH_SIMPLE_BROKER|false
-"""

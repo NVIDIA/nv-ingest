@@ -1464,6 +1464,7 @@ class Ingestor:
             "api_key": task_options.api_key,
             "endpoint_url": task_options.endpoint_url,
             "prompt": task_options.prompt,
+            "system_prompt": task_options.system_prompt,
             "model_name": task_options.model_name,
         }
         caption_task = CaptionTask(**caption_params)

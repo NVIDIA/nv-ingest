@@ -54,13 +54,14 @@ _DEFAULT_EXTRACTOR_MAP = {
 
 _Type_Extract_Method_PDF = Literal[
     "adobe",
-    "nemoretriever_parse",
+    "nemotron_parse",
     "haystack",
     "llama_parse",
     "pdfium",
     "tika",
     "unstructured_io",
     "unstructured_local",
+    "pdfium_hybrid",
     "ocr",
 ]
 
@@ -121,6 +122,10 @@ class ExtractTask(Task):
                     f" Supported types are: {list(_DEFAULT_EXTRACTOR_MAP.keys())}"
                 )
             extract_method = _DEFAULT_EXTRACTOR_MAP[document_type_lower]
+
+        if extract_method == "nemoretriever_parse":
+            logger.warning("'nemoretriever_parse' is deprecated. Please use 'nemotron_parse' instead.")
+            extract_method = "nemotron_parse"
 
         self._validate_extract_method(document_type, extract_method)
 

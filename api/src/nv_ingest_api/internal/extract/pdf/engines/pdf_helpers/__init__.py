@@ -16,7 +16,7 @@ from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 import pandas as pd
 from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
 from nv_ingest_api.internal.extract.pdf.engines import llama_parse_extractor
-from nv_ingest_api.internal.extract.pdf.engines import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import nemotron_parse_extractor
 from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
 from nv_ingest_api.internal.extract.pdf.engines import tika_extractor
 from nv_ingest_api.internal.extract.pdf.engines import unstructured_io_extractor
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 EXTRACTOR_LOOKUP = {
     "adobe": adobe_extractor,
     "llama": llama_parse_extractor,
-    "nemoretriever_parse": nemoretriever_parse_extractor,
+    "nemotron_parse": nemotron_parse_extractor,
     "pdfium": pdfium_extractor,
     "pdfium_hybrid": pdfium_extractor,  # Uses pdfium for native text and switches to OCR pipeline only for scanned pages.  # noqa: E501
     "tika": tika_extractor,

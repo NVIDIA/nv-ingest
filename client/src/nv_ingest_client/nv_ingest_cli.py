@@ -120,7 +120,7 @@ Each task must be specified with its type and corresponding options in the '[tas
 Example:
   --task 'split:{"split_by":"page", "split_length":10}'
   --task 'extract:{"document_type":"pdf", "extract_text":true}'
-  --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
+  --task 'extract:{"document_type":"pdf", "extract_method":"nemotron_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'embed'

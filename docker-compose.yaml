@@ -173,8 +173,8 @@ services:
     profiles:
       - reranker
 
-  nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+  nemotron-parse:
+    image: ${NEMOTRON_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMOTRON_PARSE_TAG:-latest}
     shm_size: 16gb
     ports:
       - "8015:8000"
@@ -195,7 +195,7 @@ services:
               capabilities: [gpu]
     runtime: nvidia
     profiles:
-      - nemoretriever-parse
+      - nemotron-parse
 
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
@@ -259,6 +259,8 @@ services:
         MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
+      # Optional: Mount config directory for custom pipeline YAML files
+      #- ./config:/workspace/config
     ports:
       # HTTP API
       - "7670:7670"
@@ -274,6 +276,8 @@ services:
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
+      # Optional: Load custom pipeline YAML (uncomment and mount ./config volume above)
+      #- INGEST_CONFIG_PATH=/workspace/config/custom_summarization_pipeline.yaml
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
@@ -305,15 +309,15 @@ services:
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
-      # build.nvidia.com hosted nemoretriever-parse
-      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
-      - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
-      #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
+      # build.nvidia.com hosted nemotron-parse
+      # - NEMOTRON_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMOTRON_PARSE_HTTP_ENDPOINT=http://nemotron-parse:8000/v1/chat/completions
+      - NEMOTRON_PARSE_INFER_PROTOCOL=http
+      - NEMOTRON_PARSE_MODEL_NAME=nvidia/nemotron-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
@@ -338,6 +342,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      # To use NVIDIA hosted endpoint (integrate.api.nvidia.com), change to: https://integrate.api.nvidia.com/v1/chat/completions
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=nvidia/nemotron-nano-12b-v2-vl
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
@@ -367,7 +372,7 @@ services:
               capabilities: [gpu]
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.91.0
+    image: otel/opentelemetry-collector-contrib:0.140.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     user: "${UID:-1000}:${GID:-1000}"
