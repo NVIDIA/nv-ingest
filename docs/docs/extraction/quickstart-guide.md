@@ -69,7 +69,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     !!! tip
 
-    	For optimal performance on specific hardware, you can use `docker-compose` override files. Override files adjust settings, such as memory allocation, for different GPU architectures. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+        The default configuration may not fit on a single GPU for some hardware targets. If you are running on any of the following GPUs, use a `docker compose` override file to reduce VRAM usage:
+        - A100-SXM4-40GB
+        - A10G
+        - RTX PRO 6000 Blackwell Server Edition
+        Override files typically lower per-service memory allocation, batch sizes, or concurrency. This trades peak throughput for making the full pipeline runnable on the available GPU. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
 
     The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
     ```shell
