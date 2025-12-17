@@ -142,7 +142,8 @@ pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L265). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the [nv-ingest-cli](#ingest_cli_example) and [Python](#ingest_python_example) examples described below.
+    Because various service URIs default to `localhost`, running within the NV-Ingest container will also require URIs to be manually specified in order for services to be accessed between containers on the internal Docker network. See the [code below](#ingest_python_example) for an example specifying `milvus_uri`.
 
 
 ## Step 3: Ingesting Documents
@@ -163,7 +164,7 @@ In the following examples, we do text, chart, table, and image extraction.
 
     For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
-
+<a id="ingest_python_example"></a>
 ```python
 import logging, os, time
 from nv_ingest_client.client import Ingestor, NvIngestClient
@@ -190,7 +191,8 @@ ingestor = (
         collection_name="test",
         sparse=False,
         # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048
+        dense_dim=2048,
+        # milvus_uri="http://milvus:19530"  # When running from within a container, the URI to the Milvus service is specified using the internal Docker network.
     )
 )
 
@@ -303,6 +305,7 @@ image_caption:[]
 
     There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
+<a id="ingest_cli_example"></a>
 ```shell
 nv-ingest-cli \
   --doc ./data/multimodal_test.pdf \
