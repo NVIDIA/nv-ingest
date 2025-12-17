@@ -1049,7 +1049,8 @@ def write_to_nvingest_collection(
     )
     num_elements = len(cleaned_records)
     if num_elements == 0:
-        raise ValueError("No records with Embeddings to insert detected.")
+        logger.warning("No records with Embeddings to insert detected.")
+        return
     logger.info(f"{num_elements} elements to insert to milvus")
     logger.info(f"threshold for streaming is {threshold}")
     if num_elements < threshold:
