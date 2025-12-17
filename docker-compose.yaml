@@ -15,7 +15,6 @@ services:
       - "8000:8000"
       - "8001:8001"
       - "8002:8002"
-    user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -53,7 +52,6 @@ services:
       - "8003:8000"
       - "8004:8001"
       - "8005:8002"
-    user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -79,7 +77,6 @@ services:
       - "8006:8000"
       - "8007:8001"
       - "8008:8002"
-    user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -105,7 +102,6 @@ services:
       - "8009:8000"
       - "8010:8001"
       - "8011:8002"
-    user: root
     environment:
       - OMP_NUM_THREADS=${OCR_OMP_NUM_THREADS:-8}
       - NIM_HTTP_API_PORT=8000
@@ -180,7 +176,6 @@ services:
       - "8015:8000"
       - "8016:8001"
       - "8017:8002"
-    user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -201,7 +196,6 @@ services:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-latest}
     ports:
       - "8018:8000"
-    user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -228,7 +222,6 @@ services:
     ports:
       - "8021:50051"  # grpc
       - "8022:9000"  # http
-    user: root
     environment:
       - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-en-us,mode=ofl
       - NIM_TRITON_LOG_VERBOSE=1
@@ -357,13 +350,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["0"]
-              capabilities: [gpu]
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
