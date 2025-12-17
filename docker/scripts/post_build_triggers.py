@@ -11,5 +11,5 @@ else:
     tokenizer_path = os.path.join(os.environ.get("MODEL_PREDOWNLOAD_PATH"), "e5-large-unsupervised/tokenizer/")
     os.makedirs(tokenizer_path)
 
-    tokenizer = AutoTokenizer.from_pretrained("intfloat/e5-large-unsupervised")
+    tokenizer = AutoTokenizer.from_pretrained("intfloat/e5-large-unsupervised", token=os.getenv("HF_ACCESS_TOKEN"))
     tokenizer.save_pretrained(tokenizer_path)

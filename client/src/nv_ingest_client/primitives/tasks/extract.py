@@ -61,6 +61,7 @@ _Type_Extract_Method_PDF = Literal[
     "tika",
     "unstructured_io",
     "unstructured_local",
+    "pdfium_hybrid",
     "ocr",
 ]
 
