@@ -63,6 +63,7 @@ def _finalize_images(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    extract_images: bool = False,
     trace_info: Optional[Dict] = None,
 ):
     """
@@ -156,16 +157,17 @@ def _finalize_images(
                 extracted_data.append(structured_entry)
         else:
             # No table detected => build normal image metadata
-            image_entry = _construct_image_metadata(
-                shape_idx=shape_idx,
-                slide_idx=slide_idx,
-                slide_count=slide_count,
-                page_nearby_blocks=page_nearby_blocks,
-                base64_img=base64_img,
-                source_metadata=source_metadata,
-                base_unified_metadata=base_unified_metadata,
-            )
-            extracted_data.append(image_entry)
+            if extract_images:
+                image_entry = _construct_image_metadata(
+                    shape_idx=shape_idx,
+                    slide_idx=slide_idx,
+                    slide_count=slide_count,
+                    page_nearby_blocks=page_nearby_blocks,
+                    base64_img=base64_img,
+                    source_metadata=source_metadata,
+                    base_unified_metadata=base_unified_metadata,
+                )
+                extracted_data.append(image_entry)
 
 
 def _safe_position(shape):
@@ -539,6 +541,7 @@ def python_pptx(
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
+                extract_images=extract_images,
                 trace_info=trace_info,
             )
         except Exception as e:
