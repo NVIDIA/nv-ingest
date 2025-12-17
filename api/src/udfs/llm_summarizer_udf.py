@@ -15,7 +15,7 @@ Environment variables (can be treated as kwargs):
 - LLM_SUMMARIZATION_BASE_URL: Base URL for OpenAI-compatible API (default: https://integrate.api.nvidia.com/v1)
 - LLM_SUMMARIZATION_TIMEOUT: API timeout in seconds (default: 60)
 - LLM_MIN_CONTENT_LENGTH: Minimum content length to summarize (default: 50)
-- LLM_MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 12000)
+- LLM_MAX_CONTENT_LENGTH: Maximum content length to send to API (default: 4000)
 
 More info can be found in `examples/udfs/README.md`
 """
@@ -60,7 +60,7 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     model_name = os.getenv("LLM_SUMMARIZATION_MODEL", "nvidia/nemotron-mini-4b-instruct")
     base_url = os.getenv("LLM_SUMMARIZATION_BASE_URL", "https://integrate.api.nvidia.com/v1")
     min_content_length = int(os.getenv("LLM_MIN_CONTENT_LENGTH", 50))
-    max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 12000))
+    max_content_length = int(os.getenv("LLM_MAX_CONTENT_LENGTH", 4000))
     timeout = int(os.getenv("LLM_SUMMARIZATION_TIMEOUT", 60))
 
     stats = {
@@ -88,6 +88,15 @@ def content_summarizer(control_message: "IngestControlMessage") -> "IngestContro
     # Extract document name
     doc_name = _extract_document_name(df)
     logger.info(f"LLM summarization starting: {doc_name} ({len(df)} chunks, model={model_name})")
+
+    # Skip non-first sections to avoid duplicate summaries for pre-split documents
+    # Pre-splitting creates sections like: doc.pdf#pages_1-32, doc.pdf#pages_33-64, etc.
+    # We only summarize the first section (pages_1-N) and skip the rest
+    source_name = df.iloc[0].get("metadata", {}).get("source_metadata", {}).get("source_name", "")
+    if "#pages_" in source_name and "#pages_1-" not in source_name:
+        logger.info(f"Skipping non-first section (no API call): {source_name}")
+        control_message.payload(df)
+        return control_message
 
     # Save original dataframe to preserve all chunks
     original_df = df.copy()
@@ -201,24 +210,32 @@ def _generate_llm_summary(
     tuple[str | None, float]
         Summary text (or None if failed) and duration in seconds
     """
+    import httpx
+
     start_time = time.time()
 
     try:
-        from openai import OpenAI
+        url = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": PROMPT.format(content=content)}],
+            "max_tokens": 400,
+            "temperature": 0.7,
+        }
 
-        client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
-
-        completion = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": PROMPT.format(content=content)}],
-            max_tokens=400,
-            temperature=0.7,
-        )
+        with httpx.Client(timeout=timeout) as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
 
         duration = time.time() - start_time
 
-        if completion.choices:
-            summary = completion.choices[0].message.content.strip()
+        if data.get("choices") and len(data["choices"]) > 0:
+            summary = data["choices"][0]["message"]["content"].strip()
             return summary, duration
 
         logger.warning("LLM returned no completion choices")
