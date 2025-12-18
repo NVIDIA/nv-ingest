@@ -304,13 +304,15 @@ nv-ingest includes a comprehensive testing framework for benchmarking performanc
 ### Quick Start
 
 ```bash
-cd scripts/tests
+cd tools/harness
+
+uv sync
 
 # Run end-to-end benchmark
-python run.py --case=e2e --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Evaluate retrieval accuracy
-python run.py --case=e2e_recall --dataset=bo767
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767
 ```
 
 ### Available Benchmarks
@@ -321,7 +323,7 @@ python run.py --case=e2e_recall --dataset=bo767
 
 ### Documentation
 
-- **[Testing Framework Guide](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/)** - Complete guide to benchmarking and testing nv-ingest (same as `scripts/tests/README.md`)
+- **[Testing Framework Guide](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/)** - Complete guide to benchmarking and testing nv-ingest (same as `tools/harness/README.md`)
 - **[MIG Benchmarking](https://docs.nvidia.com/nemo/retriever/extraction/mig-benchmarking/)** - GPU partitioning for multi-tenant deployments on Kubernetes/Helm
 
 ### Benchmark Datasets

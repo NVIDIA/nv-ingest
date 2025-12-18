@@ -6,14 +6,10 @@ Calls e2e.py to handle ingestion and collection creation, then recall.py for eva
 
 import json
 import os
-import sys
 
-# Import from interact module
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from e2e import main as e2e_main
-from recall import main as recall_main
-from recall_utils import get_recall_collection_name
+from nv_ingest_harness.cases.e2e import main as e2e_main
+from nv_ingest_harness.cases.recall import main as recall_main
+from nv_ingest_harness.utils.recall import get_recall_collection_name
 
 
 def main(config=None, log_path: str = "test_results") -> int:
