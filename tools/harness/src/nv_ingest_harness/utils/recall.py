@@ -503,16 +503,18 @@ def get_recall_collection_name(test_name: str) -> str:
     """
     Generate collection name for recall evaluation.
 
-    All recall evaluations use a single multimodal collection with the pattern:
-    {test_name}_multimodal
+    For normal datasets, uses the pattern {test_name}_multimodal.
+    If the input is a single file (contains '.' or ends with '.pdf' or similar),
+    it converts the period, which is not allowed in Milvus collection names, to an underscore.
 
     Args:
-        test_name: Test identifier (e.g., 'bo767', 'finance_bench')
+        test_name: Test identifier (e.g., 'bo767', 'finance_bench', 'somefilename.pdf')
 
     Returns:
-        Collection name string (e.g., 'bo767_multimodal')
+        Collection name string (e.g., 'bo767_multimodal', 'somefilename_pdf_multimodal')
     """
-    return f"{test_name}_multimodal"
+    sanitized_name = test_name.replace(".", "_")
+    return f"{sanitized_name}_multimodal"
 
 
 def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
