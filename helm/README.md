@@ -409,12 +409,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.embedqa.env[0].value | string | `"8000"` |  |
 | nimOperator.embedqa.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
 | nimOperator.embedqa.env[1].value | string | `"1"` |  |
-| nimOperator.embedqa.env[2].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
-| nimOperator.embedqa.env[2].value | string | `"3"` |  |
-| nimOperator.embedqa.env[3].name | string | `"OMP_NUM_THREADS"` |  |
-| nimOperator.embedqa.env[3].value | string | `"1"` |  |
-| nimOperator.embedqa.env[4].name | string | `"NIM_TRITON_PERFORMANCE_MODE"` |  |
-| nimOperator.embedqa.env[4].value | string | `"throughput"` |  |
+| nimOperator.embedqa.env[2].name | string | `"OMP_NUM_THREADS"` |  |
+| nimOperator.embedqa.env[2].value | string | `"1"` |  |
+| nimOperator.embedqa.env[3].name | string | `"NIM_TRITON_PERFORMANCE_MODE"` |  |
+| nimOperator.embedqa.env[3].value | string | `"throughput"` |  |
 | nimOperator.embedqa.expose.service.grpcPort | int | `8001` |  |
 | nimOperator.embedqa.expose.service.port | int | `8000` |  |
 | nimOperator.embedqa.expose.service.type | string | `"ClusterIP"` |  |
