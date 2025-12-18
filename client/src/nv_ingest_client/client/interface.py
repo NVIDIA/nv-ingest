@@ -1454,13 +1454,22 @@ class Ingestor:
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the CaptionTask.
+            Parameters specific to the CaptionTask. Supports `reasoning` (bool),
+            `prompt` (str), `api_key` (str), `endpoint_url` (str), and `model_name` (str).
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
         """
+        if "reasoning" in kwargs:
+            reasoning = kwargs.pop("reasoning")
+            if not isinstance(reasoning, bool):
+                raise ValueError("'reasoning' parameter must be a boolean (True or False)")
+            kwargs["system_prompt"] = "/think" if reasoning else "/no_think"
+        elif "system_prompt" in kwargs:
+            raise ValueError("'system_prompt' parameter is not supported. Use 'reasoning' (bool) instead.")
+
         task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
 
         # Extract individual parameters from API schema for CaptionTask constructor

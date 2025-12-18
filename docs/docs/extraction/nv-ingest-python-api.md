@@ -55,10 +55,13 @@ The following table describes the `extract_method` options.
 
 ### Caption images and control reasoning
 
-The caption task can call a VLM with optional prompt and system prompt overrides:
+The caption task can call a VLM with optional prompt and reasoning controls:
 
-- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
-- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+- `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
+- `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
+
+!!! note
+    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` per the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
 
 Example:
 ```python
@@ -70,7 +73,7 @@ ingestor = (
     .extract(extract_images=True)
     .caption(
         prompt="Caption the content of this image:",
-        system_prompt="/think",  # or "/no_think"
+        reasoning=True,  # Enable reasoning
     )
     .ingest()
 )
