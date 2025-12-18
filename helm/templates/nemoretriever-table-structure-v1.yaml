@@ -5,7 +5,7 @@ metadata:
   name: nemoretriever-table-structure-v1
   annotations:
     helm.sh/resource-policy: keep
-spec: 
+spec:
   source:
     ngc:
       modelPuller: "{{ .Values.nimOperator.table_structure.image.repository }}:{{ .Values.nimOperator.table_structure.image.tag }}"
