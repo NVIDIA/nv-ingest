@@ -1,8 +1,10 @@
-{{- if .Values.nimOperator.graphic_elements.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.graphic_elements.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nemoretriever-graphic-elements-v1
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   source:
     ngc:
