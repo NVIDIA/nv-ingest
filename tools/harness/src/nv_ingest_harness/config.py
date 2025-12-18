@@ -18,6 +18,21 @@ from pathlib import Path
 from typing import Optional, List
 
 
+def get_repo_root() -> Path:
+    """Get the nv-ingest repository root directory."""
+    # config.py is at: tools/harness/src/nv_ingest_harness/config.py
+    # parents[4] = nv-ingest repo root
+    return Path(__file__).resolve().parents[4]
+
+
+def resolve_path(path: str) -> str:
+    """Resolve relative paths against repo root; absolute paths unchanged."""
+    p = Path(path)
+    if p.is_absolute():
+        return str(p)
+    return str(get_repo_root() / p)
+
+
 @dataclass
 class TestConfig:
     """Test configuration matching YAML active section"""
@@ -213,6 +228,10 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
     # Convert kebab-case CLI args to snake_case config keys
     normalized_cli = {k.replace("-", "_"): v for k, v in cli_overrides.items() if v is not None}
     config_dict.update(normalized_cli)
+
+    # Resolve dataset_dir relative to repo root
+    if "dataset_dir" in config_dict:
+        config_dict["dataset_dir"] = resolve_path(config_dict["dataset_dir"])
 
     # Build config object
     try:
