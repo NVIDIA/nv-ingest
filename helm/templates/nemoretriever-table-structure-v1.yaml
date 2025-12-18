@@ -1,9 +1,11 @@
-{{- if .Values.nimOperator.table_structure.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.table_structure.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nemoretriever-table-structure-v1
-spec:
+  annotations:
+    helm.sh/resource-policy: keep
+spec: 
   source:
     ngc:
       modelPuller: "{{ .Values.nimOperator.table_structure.image.repository }}:{{ .Values.nimOperator.table_structure.image.tag }}"
