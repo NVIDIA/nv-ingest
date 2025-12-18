@@ -13,7 +13,7 @@ import click
 
 from nv_ingest_client.client import Ingestor
 
-from utils import clean_spill, kv_event_log, _load_env_file_from_same_directory
+from nv_ingest_harness.utils.interact import clean_spill, kv_event_log, _load_env_file_from_same_directory
 
 
 @click.command(

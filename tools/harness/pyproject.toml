@@ -1,0 +1,33 @@
+[project]
+name = "nv-ingest-harness"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docker>=7.1.0",
+    "milvus-lite==2.4.12",
+    "nv-ingest",
+    "nv-ingest-api",
+    "nv-ingest-client",
+]
+
+[project.scripts]
+nv-ingest-harness-run = "nv_ingest_harness.cli.run:main"
+nv-ingest-harness-sweep = "nv_ingest_harness.cli.sweep:main"
+nv-ingest-harness-ingest = "nv_ingest_harness.cli.ingest:main"
+
+[dependency-groups]
+dev = [
+    "nv-ingest",
+    "nv-ingest-api",
+    "nv-ingest-client",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+nv-ingest = { path = "../../src" }
+nv-ingest-api = { path = "../../api/" }
+nv-ingest-client = { path = "../../client/" }
