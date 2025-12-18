@@ -1,8 +1,10 @@
-{{- if .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nemotron-nano-12b-v2-vl
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   source:
     ngc:

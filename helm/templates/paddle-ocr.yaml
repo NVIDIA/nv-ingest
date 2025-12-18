@@ -1,8 +1,10 @@
-{{- if .Values.nimOperator.paddleocr.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.paddleocr.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: paddleocr
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   source:
     ngc:
