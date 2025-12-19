@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
 !!! note
 
-    To use library mode with nemotron_parse, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
+    For advanced visual parsing with library mode, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
 
 
 You can see the extracted text that represents the content of the ingested test document.

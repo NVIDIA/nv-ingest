@@ -128,11 +128,6 @@ The NeMo Retriever extraction 25.03 release includes accuracy improvements, feat
 - Added support for Llama-3.2 VLM for Image Captioning capability.
 - docX, pptx, jpg, png support for image detection & extraction.
 - Deprecated DePlot and CACHED NIMs.
-<!-- - Integrated with nemotron-parse NIM for state-of-the-art text extraction -->
-<!-- - Integrated with new NVIDIA NIMs -->
-<!--   - Nemoretriever-table-structure-v1 -->
-<!--   - Nemoretriever-graphic-elements-v1 -->
-<!--   - Nemoretriever-page-elements-v2 -->
 
 
 

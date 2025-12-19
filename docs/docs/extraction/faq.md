@@ -36,12 +36,12 @@ For more information, refer to [Extract Captions from Images](nv-ingest-python-a
 
 
 
-## When should I consider using nemotron-parse?
+## When should I consider advanced visual parsing?
 
 For scanned documents, or documents with complex layouts, 
 we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
-Nemo Retriever parse provides higher-accuracy text extraction. 
-For more information, refer to [Use Nemo Retriever Extraction with nemotron-parse](nemoretriever-parse.md).
+Nemotron parse provides higher-accuracy text extraction. 
+For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
 
 
 
