@@ -34,10 +34,11 @@ NeMo Retriever extraction supports the following GPU hardware.
 
 - [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
+- [H200 NVL](https://www.nvidia.com/en-us/data-center/h200/)
 - [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
 - [A100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/a100/)
-<!-- - [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/) -->
-<!-- - [L40S](https://www.nvidia.com/en-us/data-center/l40s/)  -->
+- [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/)
+- [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
 
 
 The following are the hardware requirements to run NeMo Retriever extraction.
