@@ -220,6 +220,8 @@ services:
     ports:
       - "8021:50051"  # grpc
       - "8022:9000"  # http
+    ulimits:
+      nofile: 2048
     environment:
       - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-en-us,mode=ofl
       - NIM_TRITON_LOG_VERBOSE=1
