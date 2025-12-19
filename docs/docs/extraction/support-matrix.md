@@ -42,18 +42,17 @@ NeMo Retriever extraction supports the following GPU hardware.
 
 The following are the hardware requirements to run NeMo Retriever extraction.
 
-|Feature         | GPU Option                | RTX Pro 6000  | B200          | H100        | A100 80GB   | A100 40GB   | A10G    | L40S   |
-|----------------|---------------------------|---------------|---------------|-------------|-------------|-------------|---------|--------|
-| GPU            | Family                    | PCIe          | SXM           | SXM         | SXM         | SXM         | —       | —      |
-| GPU            | Memory                    | 96GB          | 192GB         | 80GB        | 80GB        | 40GB        | 24GB    | 48GB   |
-| Core Features  | Total GPUs                | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
-| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB      | ~150GB  | ~150GB |
-| Audio          | Additional Dedicated GPUs | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
-| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB       | ~37GB   | ~37GB  |
-| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported | 1           | 1           | 1           | 1       | 1      |
-| nemotron-parse | Additional Disk Space     | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB       | ~16GB   | ~16GB  |
-| VLM            | Additional Dedicated GPUs | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
-| VLM            | Additional Disk Space     | ~16GB         | ~16GB         | ~16GB       | ~16GB       | ~16GB       | ~16GB   | ~16GB  |
+|Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB   | A10G    | L40S   |
+|----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|-------------|---------|--------|
+| GPU            | Memory                    | 96GB          | 192GB         | 141GB         | 80GB        | 80GB        | 40GB        | 24GB    | 48GB   |
+| Core Features  | Total GPUs                | 1             | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
+| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB      | ~150GB  | ~150GB |
+| Audio          | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
+| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB       | ~37GB   | ~37GB  |
+| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported | Not supported | 1           | 1           | 1           | 1       | 1      |
+| nemotron-parse | Additional Disk Space     | Not supported | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB       | ~16GB   | ~16GB  |
+| VLM            | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
+| VLM            | Additional Disk Space     | ~16GB         | ~16GB         | ~16GB         | ~16GB       | ~16GB       | ~16GB       | ~16GB   | ~16GB  |
 
 
 
