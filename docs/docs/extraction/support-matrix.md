@@ -42,18 +42,18 @@ NeMo Retriever extraction supports the following GPU hardware.
 
 The following are the hardware requirements to run NeMo Retriever extraction.
 
-| GPU Option                                    | RTX Pro 6000  | B200          | H100        | A100        |
-|-----------------------------------------------|---------------|---------------|-------------|-------------|
-| Family                                        | PCIe          | SXM           | SXM         | SXM         |
-| Memory                                        | 96GB          | 192GB         | 80GB        | 80GB        |
-| Core Features Total GPUs                      | 1             | 1             | 1           | 1           |
-| Core Features Total Disk Space                | ~150GB        | ~150GB        | ~150GB      | ~150GB      |
-| Audio Additional Dedicated GPUs               | 1             | 1             | 1           | 1           |
-| Audio Additional Disk Space                   | ~37GB         | ~37GB         | ~37GB       | ~37GB       |
-| nemotron-parse Additional Dedicated GPUs      | Not supported | Not supported | 1           | 1           |
-| nemotron-parse Additional Disk Space          | Not supported | Not supported | ~16GB       | ~16GB       |
-| VLM Additional Dedicated GPUs                 | 1             | 1             | 1           | 1           |
-| VLM Additional Disk Space                     | ~16GB         | ~16GB         | ~16GB       | ~16GB       |
+|Feature         | GPU Option                | RTX Pro 6000  | B200          | H100        | A100 80GB   | A100 40GB   |
+|----------------|---------------------------|---------------|---------------|-------------|-------------|-------------|
+| GPU            | Family                    | PCIe          | SXM           | SXM         | SXM         | SXM         |
+| GPU            | Memory                    | 96GB          | 192GB         | 80GB        | 80GB        | 40GB        |
+| Core Features  | Total GPUs                | 1             | 1             | 1           | 1           | 1           |
+| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB      |
+| Audio          | Additional Dedicated GPUs | 1             | 1             | 1           | 1           | 1           |
+| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB       |
+| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported | 1           | 1           | 1           |
+| nemotron-parse | Additional Disk Space     | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB       |
+| VLM            | Additional Dedicated GPUs | 1             | 1             | 1           | 1           | 1           |
+| VLM            | Additional Disk Space     | ~16GB         | ~16GB         | ~16GB       | ~16GB       | ~16GB       |
 
 <!-- A10G    | L40S   | -->
 <!-- --------|--------| -->
@@ -74,6 +74,5 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 
 - [Prerequisites](prerequisites.md)
 - [Release Notes](releasenotes-nv-ingest.md)
-- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
-- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
-- [Deploy With Helm](helm.md)
+- [NVIDIA NIM for Vision Language Models Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html)
+- [NVIDIA NVIDIA Riva Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix/support-matrix.html)
