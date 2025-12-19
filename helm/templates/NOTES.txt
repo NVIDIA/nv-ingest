@@ -11,7 +11,7 @@ Visit the application via:
 {{- end }}
 
 To learn more about the release, try:
-
-  $ helm status {{ .Release.Name }}
-  $ helm get {{ .Release.Name }}
-  $ helm test {{ .Release.Name }}
+​
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
