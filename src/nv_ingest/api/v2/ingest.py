@@ -955,7 +955,7 @@ async def submit_job_v2(
                         "subjob_order": subjob_ids,
                     }
                 )
-        elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav"]:
+        elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav", "mkv"]:
             document_type = document_types[0]
             upload_path = f"./{Path(original_source_id).name}"
             # dump the payload to a file, just came from client
