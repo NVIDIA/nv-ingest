@@ -835,8 +835,6 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
-      - name: NIM_TRITON_MAX_BATCH_SIZE
-        value: "3"
       - name: OMP_NUM_THREADS
         value: "1"
       - name: NIM_TRITON_PERFORMANCE_MODE

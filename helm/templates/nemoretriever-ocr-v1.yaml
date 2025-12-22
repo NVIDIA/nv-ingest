@@ -1,8 +1,10 @@
-{{- if .Values.nimOperator.nemoretriever_ocr_v1.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.nemoretriever_ocr_v1.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: nemoretriever-ocr-v1
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   source:
     ngc:

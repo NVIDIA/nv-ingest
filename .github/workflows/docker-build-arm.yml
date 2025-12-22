@@ -33,7 +33,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker buildx create --use
-          docker buildx build --platform linux/arm64 --load --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
+          docker buildx build --platform linux/arm64 --load --target runtime --build-arg HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }} --build-arg DOWNLOAD_LLAMA_TOKENIZER=True --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
 
       # Only test a random subset (see --random-selection) because running pytest with QEMU emulation can be very slow.
       - name: Run Pytest inside Docker container

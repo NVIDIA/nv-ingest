@@ -69,13 +69,6 @@ spec:
             - name: TMPDIR
               value: /scratch/tmp
 
-            {{- if .Values.envVars.INGEST_LOG_LEVEL }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.envVars.INGEST_LOG_LEVEL }}"
-            {{- else }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            {{- end }}
             - name: CONSOLE_LOG_LEVEL
               value: "{{ .Values.logLevel }}"
             - name: LOG_LEVEL
@@ -131,11 +124,11 @@ spec:
               protocol: TCP
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
-            - toYaml .Values.livenessProbe | nindent 12
+            {{- toYaml (omit .Values.livenessProbe "enabled") | nindent 12 }}
           {{- end }}
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
-            - toYaml .Values.readinessProbe | nindent 12
+            {{- toYaml (omit .Values.readinessProbe "enabled") | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

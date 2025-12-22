@@ -71,11 +71,11 @@ nav:
         - Notebooks: extraction/notebooks.md
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
-        - V2 API Guide: extraction/v2-api-guide.md
+        - Use the API (V2): extraction/v2-api-guide.md
         - Split Documents: extraction/chunking.md
         - Upload Data: extraction/data-store.md
         - Filter Search Results: extraction/custom-metadata.md
-        - Use Advanced VLM Parsing: extraction/nemoretriever-parse.md
+        - Advanced Visual Parsing: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
         - Use Multimodal Embedding: extraction/vlm-embed.md
         - Configure Ray Logging: extraction/ray-logging.md

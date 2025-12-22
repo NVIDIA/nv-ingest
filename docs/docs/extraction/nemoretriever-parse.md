@@ -1,7 +1,11 @@
-# Use NeMo Retriever Extraction with nemotron-parse
+# Advanced Visual Parsing in NeMo Retriever Extraction
 
-This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
-with [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse).
+For scanned documents, or documents with complex layouts, 
+we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
+Nemotron parse provides higher-accuracy text extraction. 
+
+This documentation describes the following two methods 
+to run [NeMo Retriever extraction](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
@@ -13,10 +17,10 @@ with [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse).
 
 ## Limitations
 
-Currently, the limitations to using `nemotron-parse` with Nemo Retriever Extraction are the following:
+Currently, the limitations to using `nemotron-parse` with NeMo Retriever Extraction are the following:
 
 - Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
-- `nemotron-parse` is not supported on RTX Pro 6000 or B200. For more information, refer to [Support Matrix](support-matrix.md).
+- `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).
 
 
 ## Run the NIM Locally by Using Docker Compose
@@ -25,7 +29,7 @@ Use the following procedure to run the NIM locally.
 
 !!! important
 
-    Due to the VRAM usage of nemotron_parse in addition to the other nv-ingest services, we recommend that you run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the nemotron-parse `device_id` to a dedicated GPU: device_ids: ["1"] or higher.
+    Due to limitations in available VRAM controls in the current release of nemotron-parse, it must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set nemotron-parse's device_id to a dedicated GPU: device_ids: ["1"] or higher.
 
 
 1. Start the nv-ingest services with the `nemotron-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.

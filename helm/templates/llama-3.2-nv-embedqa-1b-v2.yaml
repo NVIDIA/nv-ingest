@@ -1,8 +1,10 @@
-{{- if .Values.nimOperator.embedqa.enabled }}
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.embedqa.enabled true) -}}
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
   name: llama-3.2-nv-embedqa-1b-v2
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   source:
     ngc:

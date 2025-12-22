@@ -38,7 +38,7 @@ These fields apply to all content types including text, images, and tables.
 | Subtype | The type of the content for structured data types, such as table or chart. | — |
 | Content | Content extracted from the source.  | Extracted |
 | Description | A text description of the content object. | Generated |
-| Page \# | The page \# of the content in the source. | Extracted |
+| Page \# | The page \# of the content in the source. Prior to 26.1.0, this field was 0-indexed. Beginning with 26.1.0, this field is 1-indexed. | Extracted |
 | Hierarchy | The location or order of the content within the source.  | Extracted |
 
 

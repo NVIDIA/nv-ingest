@@ -65,7 +65,7 @@ nv-ingest-cli \
 To submit a .pdf file with both a splitting task and an extraction task, run the following code.
 
 !!! note
-    Currently, `split` only works for pdfium, nemotron_parse, and Unstructured.io.
+    Currently, `split` only works for pdfium, nemotron-parse, and Unstructured.io.
 
 ```bash
 nv-ingest-cli \
