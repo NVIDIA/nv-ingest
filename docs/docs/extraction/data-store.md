@@ -11,12 +11,15 @@ Use this documentation to learn how [NeMo Retriever extraction](overview.md) han
 
 NeMo Retriever extraction supports extracting text representations of various forms of content, 
 and ingesting to the [Milvus vector database](https://milvus.io/). 
-NeMo Retriever extraction does not store data on disk directly, except through Milvus. 
-The data upload task pulls extraction results to the Python client, 
+The data upload task (`vdb_upload`) pulls extraction results to the Python client, 
 and then pushes them to Milvus by using its underlying MinIO object store service.
 
 The vector database stores only the extracted text representations of ingested data. 
 It does not store the embeddings for images.
+
+!!! tip "Storing Extracted Images"
+
+    To persist extracted images, tables, and chart renderings to disk or object storage, use the `store` task in addition to `vdb_upload`. The `store` task supports any fsspec-compatible backend (local filesystem, S3, GCS, etc.). For details, refer to [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images).
 
 NeMo Retriever extraction supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md). 
 Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
@@ -82,4 +85,6 @@ For more information, refer to [Build a Custom Vector Database Operator](https:/
 ## Related Topics
 
 - [Use the NeMo Retriever Extraction Python API](nv-ingest-python-api.md)
+- [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images)
+- [Environment Variables](environment-config.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
