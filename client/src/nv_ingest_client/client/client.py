@@ -1286,7 +1286,7 @@ class NvIngestClient:
         # Validate type and range
         if not isinstance(batch_size, int):
             logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 16.")
-            return 16 
+            return 16
 
         if batch_size < 1:
             logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 16.")
