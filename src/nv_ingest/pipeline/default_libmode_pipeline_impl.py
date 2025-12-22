@@ -68,7 +68,7 @@ stages:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
       nemotron_parse_config:
@@ -81,7 +81,7 @@ stages:
         nemotron_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
     replicas:
@@ -124,14 +124,14 @@ stages:
       docx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
       pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -152,14 +152,14 @@ stages:
       pptx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
       pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -180,7 +180,7 @@ stages:
       image_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"",
-          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3"
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
