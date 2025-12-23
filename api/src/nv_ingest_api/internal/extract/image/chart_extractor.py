@@ -95,7 +95,8 @@ def _run_chart_inference(
     if ocr_model_name == "paddle":
         future_ocr_kwargs.update(
             model_name="paddle",
-            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+            max_batch_size=1,
+            force_max_batch_size=True,
         )
     elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
         future_ocr_kwargs.update(
@@ -104,6 +105,8 @@ def _run_chart_inference(
             output_names=["OUTPUT"],
             dtypes=["BYTES", "BYTES"],
             merge_level="paragraph",
+            max_batch_size=1,
+            force_max_batch_size=True,
         )
     else:
         raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
