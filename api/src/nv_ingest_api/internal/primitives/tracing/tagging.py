@@ -174,11 +174,16 @@ def traceable_func(trace_name=None, dedupe=True):
     """
 
     def decorator_inject_trace_info(func):
+        func_signature = inspect.signature(func)
+        expects_trace_info = "trace_info" in func_signature.parameters
+
         @functools.wraps(func)
         def wrapper_inject_trace_info(*args, **kwargs):
             trace_info = kwargs.pop("trace_info", None)
             if trace_info is None:
                 trace_info = {}
+            if expects_trace_info:
+                kwargs["trace_info"] = trace_info
             trace_prefix = trace_name if trace_name else func.__name__
 
             arg_names = list(inspect.signature(func).parameters)
