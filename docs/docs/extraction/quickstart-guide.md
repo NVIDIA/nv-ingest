@@ -45,7 +45,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container. [Configure Helm](https://github.com/nvidia/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
 
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
@@ -104,20 +104,19 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
-    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  3 minutes ago   Up 3 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
-    62c6b999c413  zilliz/attu:...                                  "docker-entrypoint.s…"  13 minutes ago  Up 3 minutes            0.0.0.0:3001...  milvus-attu
-    14ef31ed7f49  milvusdb/milvus:...                              "/tini -- milvus run…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
-    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  13 minutes ago  Up 3 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
-    fb252020e4d2  nvcr.io/nvidia/nim/nemoretriever-graphic-ele...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
-    c944a9d76831  nvcr.io/nvidia/nim/paddleocr:...                 "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8009...  nv-ingest-paddle-1
-    5bea344526a2  nvcr.io/nvidia/nim/nemoretriever-page-elements   "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
-    16dc2311a6cc  nvcr.io/nvidia/nim/llama-3.2-nv-embedqa...       "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
-    cea3ce001888  nvcr.io/nvidia/nim/nemoretriever-table-struc...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
-    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          13 minutes ago  Up 3 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
-    b73bbe0c202d  minio/minio:RELEASE...                           "/usr/bin/docker-ent…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9000...  minio
-    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  13 minutes ago  Up 3 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
-    f17cb556b086  grafana/grafana                                  "/run.sh"               13 minutes ago  Up 3 minutes            0.0.0.0:3000...  grafana-service
-    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        13 minutes ago  Up 3 minutes            0.0.0.0:6379...  nv-ingest-redis-1
+    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
+    14ef31ed7f49  milvusdb/milvus:v2.5.3-gpu                       "/tini -- bash -c 's…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
+    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  7 minutes ago   Up 7 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
+    5bd0b48eb71b  nvcr.io/nim/nvidia/nemoretriever-graphic-ele...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
+    daf878669036  nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1    "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8009...  nv-ingest-ocr-1
+    216bdf11c566  nvcr.io/nim/nvidia/nemoretriever-page-elements-v3:1.7.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
+    aee9580b0b9a  nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
+    178a92bf6f7f  nvcr.io/nim/nvidia/nemoretriever-table-struc...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
+    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          7 minutes ago   Up 7 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
+    b73bbe0c202d  minio/minio:RELEASE.2023-03-20T20-16-18Z         "/usr/bin/docker-ent…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9000...  minio
+    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  7 minutes ago   Up 7 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
+    f17cb556b086  grafana/grafana                                  "/run.sh"               7 minutes ago   Up 7 minutes            0.0.0.0:3000...  grafana-service
+    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        7 minutes ago   Up 7 minutes            0.0.0.0:6379...  nv-ingest-redis-1
     ```
 
 
@@ -153,7 +152,7 @@ In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and either [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) or NemoRetriever OCR for table extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and NemoRetriever OCR for table extraction.
 - **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
