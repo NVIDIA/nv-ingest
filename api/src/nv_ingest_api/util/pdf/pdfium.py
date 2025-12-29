@@ -53,48 +53,16 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     """
     mode = bitmap.mode  # Use the mode to identify the correct format
 
-    # Important: pdfium bitmaps may reference memory owned by the PdfBitmap object.
-    # Ensure we return an independent array (copy) for safety.
-    img_arr = bitmap.to_numpy()
+    # Convert to a NumPy array using the built-in method
+    img_arr = bitmap.to_numpy().copy()
 
-    # Automatically handle channel swapping if necessary.
-    # Fancy indexing produces a copy already, so we don't need an extra .copy() in those branches.
+    # Automatically handle channel swapping if necessary
     if mode in {"BGRA", "BGRX"}:
-        return img_arr[..., [2, 1, 0, 3]].copy()  # Swap BGR(A) to RGB(A)
-    if mode == "BGR":
-        return img_arr[..., [2, 1, 0]].copy()  # Swap BGR to RGB
+        img_arr = img_arr[..., [2, 1, 0, 3]]  # Swap BGR(A) to RGB(A)
+    elif mode == "BGR":
+        img_arr = img_arr[..., [2, 1, 0]]  # Swap BGR to RGB
 
-    return img_arr.copy()
-
-
-def _compute_pdfium_render_scale_to_fit(
-    page: pdfium.PdfPage,
-    target_wh: Tuple[int, int],
-    rotation: int = 0,
-) -> float:
-    """
-    Compute a PDFium render scale that fits the rotated page within target pixel bounds.
-
-    This mirrors "thumbnail"/fit-in-box behavior: we never upscale beyond the target box,
-    but we choose the scale such that the rendered bitmap is (approximately) within target_wh.
-    """
-    target_w, target_h = target_wh
-    if target_w <= 0 or target_h <= 0:
-        return 1.0
-
-    page_w = float(page.get_width())
-    page_h = float(page.get_height())
-    if page_w <= 0.0 or page_h <= 0.0:
-        return 1.0
-
-    # If rendering is rotated, swap logical width/height for fit computation.
-    if (rotation % 180) != 0:
-        page_w, page_h = page_h, page_w
-
-    # Scale is "pixels per PDF point" (PDF points are 1/72 inch).
-    # Clamp to a small positive value to avoid pathological scales.
-    scale = min(target_w / page_w, target_h / page_h)
-    return max(scale, 1e-3)
+    return img_arr
 
 
 def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
@@ -189,7 +157,6 @@ def pdfium_pages_to_numpy(
     padding_tuple: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
     trace_info: Optional[dict] = None,
-    prefer_render_scale_to_fit: bool = True,
 ) -> tuple[list[ndarray | ndarray[Any, dtype[Any]]], list[tuple[int, int]]]:
     """
     Converts a list of PdfPage objects to a list of NumPy arrays, where each array
@@ -235,30 +202,18 @@ def pdfium_pages_to_numpy(
 
     images = []
     padding_offsets = []
-    base_scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
+    scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
 
     for idx, page in enumerate(pages):
-        # Render the page as a bitmap with the specified scale and rotation.
-        #
-        # Optimization: if a downstream stage will "thumbnail" every page into `scale_tuple`
-        # (common for YOLOX inputs), prefer rendering at the fit-to-box scale directly.
-        # This usually avoids an expensive NumPy->PIL->resize->NumPy roundtrip.
-        render_scale = base_scale
-        if prefer_render_scale_to_fit and scale_tuple:
-            render_scale = min(render_scale, _compute_pdfium_render_scale_to_fit(page, scale_tuple, rotation=rotation))
-
+        # Render the page as a bitmap with the specified scale and rotation
         with _trace_span(trace_info, "pdf_extraction::render_page"):
-            page_bitmap = page.render(scale=render_scale, rotation=rotation)
+            page_bitmap = page.render(scale=scale, rotation=rotation)
 
         with _trace_span(trace_info, "pdf_extraction::bitmap_to_numpy"):
             img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
 
-        # Safety fallback: due to rounding/rotation differences, the rendered bitmap may still
-        # slightly exceed the desired scale_tuple bounds. In that case, apply the existing
-        # thumbnail logic to match prior behavior.
-        if scale_tuple and (
-            (not prefer_render_scale_to_fit) or (img_arr.shape[1] > scale_tuple[0] or img_arr.shape[0] > scale_tuple[1])
-        ):
+        # Apply scaling using the thumbnail approach if specified
+        if scale_tuple:
             with _trace_span(trace_info, "pdf_extraction::scale_image"):
                 img_arr = scale_numpy_image(img_arr, scale_tuple)
         # Apply padding if specified
