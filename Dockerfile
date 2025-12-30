@@ -225,9 +225,12 @@ CMD ["/bin/bash"]
 FROM nv_ingest_install AS docs
 
 # Install dependencies needed for docs generation
-RUN apt-get update && apt-get install -y \
-      make \
-    && apt-get clean
+# Clear stale apt lists and use --fix-missing to handle repository issues
+RUN rm -rf /var/lib/apt/lists/* \
+    && apt-get update --fix-missing \
+    && apt-get install -y --no-install-recommends make \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY docs docs
 
