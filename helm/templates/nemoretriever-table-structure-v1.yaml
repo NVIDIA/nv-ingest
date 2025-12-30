@@ -36,8 +36,14 @@ spec:
   replicas: {{ .Values.nimOperator.table_structure.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.table_structure.nodeSelector | nindent 4 }}
+{{- if .Values.nimOperator.draResources.enabled }}
+  draResources:
+{{ toYaml .Values.nimOperator.table_structure.draResources | nindent 4 }}
+{{- end }}
+{{- if not .Values.nimOperator.draResources.enabled }}
   resources:
 {{ toYaml .Values.nimOperator.table_structure.resources | nindent 4 }}
+{{- end }}
   tolerations:
 {{ toYaml .Values.nimOperator.table_structure.tolerations | nindent 4 }}
   expose:

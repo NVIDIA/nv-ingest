@@ -90,6 +90,27 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
+### Install or Upgrade the Helm Chart with NVIDIA DRA Support
+
+To install or upgrade the Helm chart with [NVIDIA DRA](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/dra-intro-install.html), run the following code.
+
+```bash
+helm upgrade \
+    --install \
+    nv-ingest \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
+    -n ${NAMESPACE} \
+    --username '$oauthtoken' \
+    --password "${NGC_API_KEY}" \
+    --set ngcImagePullSecret.create=true \
+    --set ngcImagePullSecret.password="${NGC_API_KEY}" \
+    --set ngcApiSecret.create=true \
+    --set ngcApiSecret.password="${NGC_API_KEY}" \
+    --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
+    --set image.tag="25.9.0" \
+    --set nimOperator.draResources.enabled="true" 
+```
+
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.

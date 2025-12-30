@@ -36,8 +36,14 @@ spec:
   replicas: {{ .Values.nimOperator.graphic_elements.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.graphic_elements.nodeSelector | nindent 4 }}
+{{- if .Values.nimOperator.draResources.enabled }}
+  draResources:
+{{ toYaml .Values.nimOperator.graphic_elements.draResources | nindent 4 }}
+{{- end }}
+{{- if not .Values.nimOperator.draResources.enabled }}
   resources:
 {{ toYaml .Values.nimOperator.graphic_elements.resources | nindent 4 }}
+{{- end }}
   tolerations:
 {{ toYaml .Values.nimOperator.graphic_elements.tolerations | nindent 4 }}
   expose:

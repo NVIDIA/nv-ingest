@@ -130,8 +130,15 @@ spec:
           readinessProbe:
             {{- toYaml (omit .Values.readinessProbe "enabled") | nindent 12 }}
           {{- end }}
+          {{- if .Values.nimOperator.draResources.enabled }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            claims:
+            - name: shared-gpu
+          {{- end }}
+          {{- if not .Values.nimOperator.draResources.enabled }}
+          resources:
+            {{ toYaml .Values.resources | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /dev/shm
               name: dshm
@@ -147,6 +154,11 @@ spec:
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nimOperator.draResources.enabled }}
+      resourceClaims:
+      - name: shared-gpu
+        resourceClaimName: {{ .Values.nimOperator.draResources.name }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
