@@ -92,7 +92,32 @@ In this case, make sure to remove the following from your helm command:
 
 ### Install or Upgrade the Helm Chart with NVIDIA DRA Support
 
-- Prerequisites: 1 GPU with at least 48GB memory
+- Prerequisites: 1 GPU with at least 64GB memory
+
+create a `custom-values.yaml` with below content 
+
+```yaml
+nv-ingest:
+  nimOperator:
+    draResources:
+      enabled: true
+      name: "nvingest-claim"
+    embedqa:
+      draResources:
+      - resourceClaimName: nvingest-claim
+    page_elements:
+      draResources:
+      - resourceClaimName: nvingest-claim
+    graphic_elements:
+      draResources:
+      - resourceClaimName: nvingest-claim
+    table_structure:
+      draResources:
+      - resourceClaimName: nvingest-claim
+    nemoretriever_ocr_v1:
+      draResources:
+      - resourceClaimName: nvingest-claim
+```
 
 To install or upgrade the Helm chart with [NVIDIA DRA](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/dra-intro-install.html), run the following code.
 
@@ -110,7 +135,7 @@ helm upgrade \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
     --set image.tag="25.9.0" \
-    --set nimOperator.draResources.enabled="true" 
+    -f ./custom-values.yaml
 ```
 
 ## Usage
