@@ -92,6 +92,8 @@ In this case, make sure to remove the following from your helm command:
 
 ### Install or Upgrade the Helm Chart with NVIDIA DRA Support
 
+- Prerequisites: 1 GPU with at least 48GB memory
+
 To install or upgrade the Helm chart with [NVIDIA DRA](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/dra-intro-install.html), run the following code.
 
 ```bash
