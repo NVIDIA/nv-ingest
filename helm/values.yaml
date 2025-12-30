@@ -208,9 +208,9 @@ envVars:
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  # This environment variable is controled in the helm/deployment.yaml. There is a ternary operator that
-  # sets this value to "nim-vlm-image-captioning:8001" to use the locally deployed NIM if the nim-vlm-image-captioning.deployed
-  # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
+  # This environment variable is controlled in helm/templates/deployment.yaml. It is set to "http://nemotron-nano-12b-v2-vl:8000/v1/chat/completions"
+  # to use the locally deployed NIM if nimOperator.nemotron_nano_12b_v2_vl.enabled is true.
+  # To use the NGC hosted NIM (Build API), manually set this value to "https://integrate.api.nvidia.com/v1/chat/completions".
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
   VLM_CAPTION_PROMPT: "Caption the content of this image:"
