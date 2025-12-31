@@ -20,7 +20,7 @@ To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](ht
 This release contains the following key changes:
 
 - Add functional support for [H200 NVL](https://www.nvidia.com/en-us/data-center/h200/). For details, refer to [Support Matrix](support-matrix.md).
-- Add support for the [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse/modelcard) model which replaces the [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse/modelcard) model. For details, refer to [Advanced Visual Parsing](advanced-visual-parsing.md).
+- Add support for the [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse/modelcard) model which replaces the [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse/modelcard) model. For details, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
 - New documentation [Why Throughput Is Dataset-Dependent](throughput-is-dataset-dependent.md).
 - New documentation [Add User-defined Stages](user-defined-stages.md).
 - New documentation [Use the API (V2)](v2-api-guide.md).
