@@ -521,7 +521,7 @@ livenessProbe:
 ## @param readinessProbe.successThreshold Success threshold for `readinessProbe`
 ## @param readinessProbe.failureThreshold Failure threshold for `readinessProbe`
 readinessProbe:
-  enabled: false
+  enabled: true
   httpGet:
     path: /v1/health/ready
     port: http
@@ -669,7 +669,6 @@ nimOperator:
       service:
         type: ClusterIP
         port: 8000
-      service:
         grpcPort: 8001
     env:
       - name: NIM_HTTP_API_PORT
@@ -685,8 +684,6 @@ nimOperator:
       - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
         value: "2"
       - name: OMP_NUM_THREADS
-        value: "2"
-      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
         value: "2"
       - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
         value: "1"
