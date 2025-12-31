@@ -1,0 +1,978 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_api.internal.enums.common &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_api/internal/enums/common';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal.enums.common</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_api.internal.enums.common</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="AccessLevelEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AccessLevelEnum</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Note</span>
+<span class="sd">    ----</span>
+<span class="sd">    This is for future use, and currently has no functional use case.</span>
+
+<span class="sd">    Enum for representing different access levels.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    LEVEL_1 : int</span>
+<span class="sd">        Represents access level 1.</span>
+<span class="sd">    LEVEL_2 : int</span>
+<span class="sd">        Represents access level 2.</span>
+<span class="sd">    LEVEL_3 : int</span>
+<span class="sd">        Represents access level 3.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">UNKNOWN</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">LEVEL_1</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">LEVEL_2</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">LEVEL_3</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span></div>
+
+
+
+<div class="viewcode-block" id="ContentDescriptionEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentDescriptionEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for standard content descriptions extracted from different source types.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    DOCX_IMAGE : str</span>
+<span class="sd">        Description for image extracted from DOCX document.</span>
+<span class="sd">    DOCX_TABLE : str</span>
+<span class="sd">        Description for structured table extracted from DOCX document.</span>
+<span class="sd">    DOCX_TEXT : str</span>
+<span class="sd">        Description for unstructured text from DOCX document.</span>
+<span class="sd">    PDF_CHART : str</span>
+<span class="sd">        Description for structured chart extracted from PDF document.</span>
+<span class="sd">    PDF_IMAGE : str</span>
+<span class="sd">        Description for image extracted from PDF document.</span>
+<span class="sd">    PDF_INFOGRAPHIC : str</span>
+<span class="sd">        Description for structured infographic extracted from PDF document.</span>
+<span class="sd">    PDF_PAGE_IMAGE : str</span>
+<span class="sd">        Description for a full-page image rendered from a PDF document.</span>
+<span class="sd">    PDF_TABLE : str</span>
+<span class="sd">        Description for structured table extracted from PDF document.</span>
+<span class="sd">    PDF_TEXT : str</span>
+<span class="sd">        Description for unstructured text from PDF document.</span>
+<span class="sd">    PPTX_IMAGE : str</span>
+<span class="sd">        Description for image extracted from PPTX presentation.</span>
+<span class="sd">    PPTX_TABLE : str</span>
+<span class="sd">        Description for structured table extracted from PPTX presentation.</span>
+<span class="sd">    PPTX_TEXT : str</span>
+<span class="sd">        Description for unstructured text from PPTX presentation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DOCX_IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from DOCX document.&quot;</span>
+    <span class="n">DOCX_TABLE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from DOCX document.&quot;</span>
+    <span class="n">DOCX_TEXT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from DOCX document.&quot;</span>
+    <span class="n">PDF_CHART</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Structured chart extracted from PDF document.&quot;</span>
+    <span class="n">PDF_IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from PDF document.&quot;</span>
+    <span class="n">PDF_INFOGRAPHIC</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Structured infographic extracted from PDF document.&quot;</span>
+    <span class="n">PDF_PAGE_IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Full-page image rendered from a PDF document.&quot;</span>
+    <span class="n">PDF_TABLE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from PDF document.&quot;</span>
+    <span class="n">PDF_TEXT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from PDF document.&quot;</span>
+    <span class="n">PPTX_IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from PPTX presentation.&quot;</span>
+    <span class="n">PPTX_TABLE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from PPTX presentation.&quot;</span>
+    <span class="n">PPTX_TEXT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from PPTX presentation.&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ContentTypeEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing various content types.</span>
+
+<span class="sd">    Note: Content type declares the broad category of the content, such as text, image, audio, etc.</span>
+<span class="sd">    This is not equivalent to the Document type, which is a specific file format.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    AUDIO : str</span>
+<span class="sd">        Represents audio content.</span>
+<span class="sd">    EMBEDDING : str</span>
+<span class="sd">        Represents embedding content.</span>
+<span class="sd">    IMAGE : str</span>
+<span class="sd">        Represents image content.</span>
+<span class="sd">    INFO_MSG : str</span>
+<span class="sd">        Represents an informational message.</span>
+<span class="sd">    PAGE_IMAGE : str</span>
+<span class="sd">        Represents a full-page image rendered from a document.</span>
+<span class="sd">    STRUCTURED : str</span>
+<span class="sd">        Represents structured content.</span>
+<span class="sd">    TEXT : str</span>
+<span class="sd">        Represents text content.</span>
+<span class="sd">    UNSTRUCTURED : str</span>
+<span class="sd">        Represents unstructured content.</span>
+<span class="sd">    VIDEO : str</span>
+<span class="sd">        Represents video content.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">AUDIO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;audio&quot;</span>
+    <span class="n">CHART</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;chart&quot;</span>
+    <span class="n">EMBEDDING</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;embedding&quot;</span>
+    <span class="n">IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span>
+    <span class="n">INFOGRAPHIC</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;infographic&quot;</span>
+    <span class="n">INFO_MSG</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;info_message&quot;</span>
+    <span class="n">NONE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span>
+    <span class="n">PAGE_IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;page_image&quot;</span>
+    <span class="n">STRUCTURED</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;structured&quot;</span>
+    <span class="n">TABLE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;table&quot;</span>
+    <span class="n">TEXT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;text&quot;</span>
+    <span class="n">UNKNOWN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+    <span class="n">VIDEO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;video&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="DocumentTypeEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DocumentTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing various document file types.</span>
+
+<span class="sd">    Note: Document type refers to the specific file format of the content, such as PDF, DOCX, etc.</span>
+<span class="sd">    This is not equivalent to the Content type, which is a broad category of the content.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    BMP: str</span>
+<span class="sd">        BMP image format.</span>
+<span class="sd">    DOCX: str</span>
+<span class="sd">        Microsoft Word document format.</span>
+<span class="sd">    HTML: str</span>
+<span class="sd">        HTML document.</span>
+<span class="sd">    JPEG: str</span>
+<span class="sd">        JPEG image format.</span>
+<span class="sd">    PDF: str</span>
+<span class="sd">        PDF document format.</span>
+<span class="sd">    PNG: str</span>
+<span class="sd">        PNG image format.</span>
+<span class="sd">    PPTX: str</span>
+<span class="sd">        PowerPoint presentation format.</span>
+<span class="sd">    SVG: str</span>
+<span class="sd">        SVG image format.</span>
+<span class="sd">    TIFF: str</span>
+<span class="sd">        TIFF image format.</span>
+<span class="sd">    TXT: str</span>
+<span class="sd">        Plain text file.</span>
+<span class="sd">    MP3: str</span>
+<span class="sd">        MP3 audio format.</span>
+<span class="sd">    WAV: str</span>
+<span class="sd">        WAV audio format.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">BMP</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;bmp&quot;</span>
+    <span class="n">DOCX</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;docx&quot;</span>
+    <span class="n">HTML</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;html&quot;</span>
+    <span class="n">JPEG</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jpeg&quot;</span>
+    <span class="n">PDF</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span>
+    <span class="n">PNG</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;png&quot;</span>
+    <span class="n">PPTX</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pptx&quot;</span>
+    <span class="n">SVG</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;svg&quot;</span>
+    <span class="n">TIFF</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tiff&quot;</span>
+    <span class="n">TXT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;text&quot;</span>
+    <span class="n">MD</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;text&quot;</span>
+    <span class="n">MP3</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mp3&quot;</span>
+    <span class="n">WAV</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;wav&quot;</span>
+    <span class="n">UNKNOWN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="LanguageEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LanguageEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing various language codes.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    AF : str</span>
+<span class="sd">        Afrikaans language code.</span>
+<span class="sd">    AR : str</span>
+<span class="sd">        Arabic language code.</span>
+<span class="sd">    BG : str</span>
+<span class="sd">        Bulgarian language code.</span>
+<span class="sd">    BN : str</span>
+<span class="sd">        Bengali language code.</span>
+<span class="sd">    CA : str</span>
+<span class="sd">        Catalan language code.</span>
+<span class="sd">    CS : str</span>
+<span class="sd">        Czech language code.</span>
+<span class="sd">    CY : str</span>
+<span class="sd">        Welsh language code.</span>
+<span class="sd">    DA : str</span>
+<span class="sd">        Danish language code.</span>
+<span class="sd">    DE : str</span>
+<span class="sd">        German language code.</span>
+<span class="sd">    EL : str</span>
+<span class="sd">        Greek language code.</span>
+<span class="sd">    EN : str</span>
+<span class="sd">        English language code.</span>
+<span class="sd">    ES : str</span>
+<span class="sd">        Spanish language code.</span>
+<span class="sd">    ET : str</span>
+<span class="sd">        Estonian language code.</span>
+<span class="sd">    FA : str</span>
+<span class="sd">        Persian language code.</span>
+<span class="sd">    FI : str</span>
+<span class="sd">        Finnish language code.</span>
+<span class="sd">    FR : str</span>
+<span class="sd">        French language code.</span>
+<span class="sd">    GU : str</span>
+<span class="sd">        Gujarati language code.</span>
+<span class="sd">    HE : str</span>
+<span class="sd">        Hebrew language code.</span>
+<span class="sd">    HI : str</span>
+<span class="sd">        Hindi language code.</span>
+<span class="sd">    HR : str</span>
+<span class="sd">        Croatian language code.</span>
+<span class="sd">    HU : str</span>
+<span class="sd">        Hungarian language code.</span>
+<span class="sd">    ID : str</span>
+<span class="sd">        Indonesian language code.</span>
+<span class="sd">    IT : str</span>
+<span class="sd">        Italian language code.</span>
+<span class="sd">    JA : str</span>
+<span class="sd">        Japanese language code.</span>
+<span class="sd">    KN : str</span>
+<span class="sd">        Kannada language code.</span>
+<span class="sd">    KO : str</span>
+<span class="sd">        Korean language code.</span>
+<span class="sd">    LT : str</span>
+<span class="sd">        Lithuanian language code.</span>
+<span class="sd">    LV : str</span>
+<span class="sd">        Latvian language code.</span>
+<span class="sd">    MK : str</span>
+<span class="sd">        Macedonian language code.</span>
+<span class="sd">    ML : str</span>
+<span class="sd">        Malayalam language code.</span>
+<span class="sd">    MR : str</span>
+<span class="sd">        Marathi language code.</span>
+<span class="sd">    NE : str</span>
+<span class="sd">        Nepali language code.</span>
+<span class="sd">    NL : str</span>
+<span class="sd">        Dutch language code.</span>
+<span class="sd">    NO : str</span>
+<span class="sd">        Norwegian language code.</span>
+<span class="sd">    PA : str</span>
+<span class="sd">        Punjabi language code.</span>
+<span class="sd">    PL : str</span>
+<span class="sd">        Polish language code.</span>
+<span class="sd">    PT : str</span>
+<span class="sd">        Portuguese language code.</span>
+<span class="sd">    RO : str</span>
+<span class="sd">        Romanian language code.</span>
+<span class="sd">    RU : str</span>
+<span class="sd">        Russian language code.</span>
+<span class="sd">    SK : str</span>
+<span class="sd">        Slovak language code.</span>
+<span class="sd">    SL : str</span>
+<span class="sd">        Slovenian language code.</span>
+<span class="sd">    SO : str</span>
+<span class="sd">        Somali language code.</span>
+<span class="sd">    SQ : str</span>
+<span class="sd">        Albanian language code.</span>
+<span class="sd">    SV : str</span>
+<span class="sd">        Swedish language code.</span>
+<span class="sd">    SW : str</span>
+<span class="sd">        Swahili language code.</span>
+<span class="sd">    TA : str</span>
+<span class="sd">        Tamil language code.</span>
+<span class="sd">    TE : str</span>
+<span class="sd">        Telugu language code.</span>
+<span class="sd">    TH : str</span>
+<span class="sd">        Thai language code.</span>
+<span class="sd">    TL : str</span>
+<span class="sd">        Tagalog language code.</span>
+<span class="sd">    TR : str</span>
+<span class="sd">        Turkish language code.</span>
+<span class="sd">    UK : str</span>
+<span class="sd">        Ukrainian language code.</span>
+<span class="sd">    UR : str</span>
+<span class="sd">        Urdu language code.</span>
+<span class="sd">    VI : str</span>
+<span class="sd">        Vietnamese language code.</span>
+<span class="sd">    ZH_CN : str</span>
+<span class="sd">        Chinese (Simplified) language code.</span>
+<span class="sd">    ZH_TW : str</span>
+<span class="sd">        Chinese (Traditional) language code.</span>
+<span class="sd">    UNKNOWN : str</span>
+<span class="sd">        Represents an unknown language.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">AF</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;af&quot;</span>
+    <span class="n">AR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ar&quot;</span>
+    <span class="n">BG</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;bg&quot;</span>
+    <span class="n">BN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;bn&quot;</span>
+    <span class="n">CA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ca&quot;</span>
+    <span class="n">CS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cs&quot;</span>
+    <span class="n">CY</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cy&quot;</span>
+    <span class="n">DA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;da&quot;</span>
+    <span class="n">DE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;de&quot;</span>
+    <span class="n">EL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;el&quot;</span>
+    <span class="n">EN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;en&quot;</span>
+    <span class="n">ES</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;es&quot;</span>
+    <span class="n">ET</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;et&quot;</span>
+    <span class="n">FA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fa&quot;</span>
+    <span class="n">FI</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fi&quot;</span>
+    <span class="n">FR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fr&quot;</span>
+    <span class="n">GU</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gu&quot;</span>
+    <span class="n">HE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;he&quot;</span>
+    <span class="n">HI</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hi&quot;</span>
+    <span class="n">HR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hr&quot;</span>
+    <span class="n">HU</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hu&quot;</span>
+    <span class="n">ID</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;id&quot;</span>
+    <span class="n">IT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;it&quot;</span>
+    <span class="n">JA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span>
+    <span class="n">KN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;kn&quot;</span>
+    <span class="n">KO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ko&quot;</span>
+    <span class="n">LT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lt&quot;</span>
+    <span class="n">LV</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lv&quot;</span>
+    <span class="n">MK</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mk&quot;</span>
+    <span class="n">ML</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ml&quot;</span>
+    <span class="n">MR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mr&quot;</span>
+    <span class="n">NE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ne&quot;</span>
+    <span class="n">NL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nl&quot;</span>
+    <span class="n">NO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;no&quot;</span>
+    <span class="n">PA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pa&quot;</span>
+    <span class="n">PL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pl&quot;</span>
+    <span class="n">PT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pt&quot;</span>
+    <span class="n">RO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ro&quot;</span>
+    <span class="n">RU</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ru&quot;</span>
+    <span class="n">SK</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sk&quot;</span>
+    <span class="n">SL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sl&quot;</span>
+    <span class="n">SO</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;so&quot;</span>
+    <span class="n">SQ</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sq&quot;</span>
+    <span class="n">SV</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sv&quot;</span>
+    <span class="n">SW</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sw&quot;</span>
+    <span class="n">TA</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ta&quot;</span>
+    <span class="n">TE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;te&quot;</span>
+    <span class="n">TH</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;th&quot;</span>
+    <span class="n">TL</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tl&quot;</span>
+    <span class="n">TR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tr&quot;</span>
+    <span class="n">UK</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uk&quot;</span>
+    <span class="n">UR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">VI</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;vi&quot;</span>
+    <span class="n">ZH_CN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;zh-cn&quot;</span>
+    <span class="n">ZH_TW</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;zh-tw&quot;</span>
+    <span class="n">UNKNOWN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+<div class="viewcode-block" id="LanguageEnum.has_value">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.has_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;LanguageEnum&quot;</span><span class="p">],</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if the enum contains the given value.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        value : Any</span>
+<span class="sd">            The value to check against the enum members.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            True if the value exists in the enum, False otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="StatusEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.StatusEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StatusEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing status messages.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ERROR : str</span>
+<span class="sd">        Represents an error status.</span>
+<span class="sd">    SUCCESS : str</span>
+<span class="sd">        Represents a success status.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">ERROR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;error&quot;</span>
+    <span class="n">SUCCESS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;success&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TableFormatEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TableFormatEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing table formats.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    HTML : str</span>
+<span class="sd">        Represents HTML table format.</span>
+<span class="sd">    IMAGE : str</span>
+<span class="sd">        Represents image table format.</span>
+<span class="sd">    LATEX : str</span>
+<span class="sd">        Represents LaTeX table format.</span>
+<span class="sd">    MARKDOWN : str</span>
+<span class="sd">        Represents Markdown table format.</span>
+<span class="sd">    PSEUDO_MARKDOWN : str</span>
+<span class="sd">        Represents pseudo Markdown table format.</span>
+<span class="sd">    SIMPLE : str</span>
+<span class="sd">        Represents simple table format.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">HTML</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;html&quot;</span>
+    <span class="n">IMAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span>
+    <span class="n">LATEX</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;latex&quot;</span>
+    <span class="n">MARKDOWN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;markdown&quot;</span>
+    <span class="n">PSEUDO_MARKDOWN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pseudo_markdown&quot;</span>
+    <span class="n">SIMPLE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;simple&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TaskTypeEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TaskTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing various task types.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    CAPTION : str</span>
+<span class="sd">        Represents a caption task.</span>
+<span class="sd">    DEDUP : str</span>
+<span class="sd">        Represents a deduplication task.</span>
+<span class="sd">    EMBED : str</span>
+<span class="sd">        Represents an embedding task.</span>
+<span class="sd">    EXTRACT : str</span>
+<span class="sd">        Represents an extraction task.</span>
+<span class="sd">    FILTER : str</span>
+<span class="sd">        Represents a filtering task.</span>
+<span class="sd">    SPLIT : str</span>
+<span class="sd">        Represents a splitting task.</span>
+<span class="sd">    STORE : str</span>
+<span class="sd">        Represents a storing task.</span>
+<span class="sd">    STORE_EMBEDDING : str</span>
+<span class="sd">        Represents a task for storing embeddings.</span>
+<span class="sd">    VDB_UPLOAD : str</span>
+<span class="sd">        Represents a task for uploading to a vector database.</span>
+<span class="sd">    AUDIO_DATA_EXTRACT : str</span>
+<span class="sd">        Represents a task for extracting audio data.</span>
+<span class="sd">    TABLE_DATA_EXTRACT : str</span>
+<span class="sd">        Represents a task for extracting table data.</span>
+<span class="sd">    CHART_DATA_EXTRACT : str</span>
+<span class="sd">        Represents a task for extracting chart data.</span>
+<span class="sd">    INFOGRAPHIC_DATA_EXTRACT : str</span>
+<span class="sd">        Represents a task for extracting infographic data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">AUDIO_DATA_EXTRACT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;audio_data_extract&quot;</span>
+    <span class="n">CAPTION</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;caption&quot;</span>
+    <span class="n">CHART_DATA_EXTRACT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;chart_data_extract&quot;</span>
+    <span class="n">DEDUP</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;dedup&quot;</span>
+    <span class="n">EMBED</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;embed&quot;</span>
+    <span class="n">EXTRACT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;extract&quot;</span>
+    <span class="n">FILTER</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;filter&quot;</span>
+    <span class="n">INFOGRAPHIC_DATA_EXTRACT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;infographic_data_extract&quot;</span>
+    <span class="n">SPLIT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;split&quot;</span>
+    <span class="n">STORE_EMBEDDING</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;store_embedding&quot;</span>
+    <span class="n">STORE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;store&quot;</span>
+    <span class="n">TABLE_DATA_EXTRACT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;table_data_extract&quot;</span>
+    <span class="n">VDB_UPLOAD</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;vdb_upload&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TextTypeEnum">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TextTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum for representing different types of text segments.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    BLOCK : str</span>
+<span class="sd">        Represents a text block.</span>
+<span class="sd">    BODY : str</span>
+<span class="sd">        Represents body text.</span>
+<span class="sd">    DOCUMENT : str</span>
+<span class="sd">        Represents an entire document.</span>
+<span class="sd">    HEADER : str</span>
+<span class="sd">        Represents a header text.</span>
+<span class="sd">    LINE : str</span>
+<span class="sd">        Represents a single line of text.</span>
+<span class="sd">    NEARBY_BLOCK : str</span>
+<span class="sd">        Represents a block of text in close proximity to another.</span>
+<span class="sd">    OTHER : str</span>
+<span class="sd">        Represents other unspecified text type.</span>
+<span class="sd">    PAGE : str</span>
+<span class="sd">        Represents a page of text.</span>
+<span class="sd">    SPAN : str</span>
+<span class="sd">        Represents an inline text span.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">BLOCK</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;block&quot;</span>
+    <span class="n">BODY</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;body&quot;</span>
+    <span class="n">DOCUMENT</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;document&quot;</span>
+    <span class="n">HEADER</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;header&quot;</span>
+    <span class="n">LINE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;line&quot;</span>
+    <span class="n">NEARBY_BLOCK</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;nearby_block&quot;</span>
+    <span class="n">OTHER</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;other&quot;</span>
+    <span class="n">PAGE</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;page&quot;</span>
+    <span class="n">SPAN</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;span&quot;</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+nv\_ingest.framework.orchestration.morpheus.modules.sinks package
+=================================================================
+
+Submodules
+----------
+
+nv\_ingest.framework.orchestration.morpheus.modules.sinks.message\_broker\_task\_sink module
+--------------------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.modules.sinks.message_broker_task_sink
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest.framework.orchestration.morpheus.modules.sinks.vdb\_task\_sink module
+--------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.modules.sinks.vdb_task_sink
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.modules.sinks
+   :members:
+   :undoc-members:
+   :show-inheritance:
