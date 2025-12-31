@@ -122,11 +122,16 @@ def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
         )
         return DEFAULT_PDF_SPLIT_PAGE_COUNT
 
-    if parsed <= 0:
-        logger.warning("PDF_SPLIT_PAGE_COUNT must be >= 1; received %s. Using 1.", parsed)
-        return 1
-
-    return parsed
+    clamped = max(MIN_PAGES, min(parsed, MAX_PAGES))
+    if clamped != parsed:
+        logger.warning(
+            "Env PDF_SPLIT_PAGE_COUNT=%s clamped to %s (min=%s, max=%s)",
+            parsed,
+            clamped,
+            MIN_PAGES,
+            MAX_PAGES,
+        )
+    return clamped
 
 
 def split_pdf_to_chunks(pdf_content: bytes, pages_per_chunk: int) -> List[Dict[str, Any]]:
