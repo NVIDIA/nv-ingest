@@ -1,0 +1,30 @@
+nv\_ingest\_client.primitives package
+=====================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_client.primitives.jobs
+   nv_ingest_client.primitives.tasks
+
+Submodules
+----------
+
+nv\_ingest\_client.primitives.exceptions module
+-----------------------------------------------
+
+.. automodule:: nv_ingest_client.primitives.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_client.primitives
+   :members:
+   :undoc-members:
+   :show-inheritance:
