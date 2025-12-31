@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from contextlib import contextmanager
+from datetime import datetime
 from typing import List, Any
 from typing import Optional
 from typing import Tuple
@@ -119,6 +121,34 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
     return img_array
 
 
+@contextmanager
+def _trace_span(trace_info: Optional[dict], span_name: str):
+    """
+    Lightweight context manager to emit nested trace spans only when trace_info is provided.
+    """
+    if not trace_info:
+        yield
+        return
+
+    entry_key_base = f"trace::entry::{span_name}"
+    exit_key_base = f"trace::exit::{span_name}"
+    entry_key = entry_key_base
+    exit_key = exit_key_base
+
+    if entry_key in trace_info or exit_key in trace_info:
+        idx = 0
+        while (f"{entry_key_base}_{idx}" in trace_info) or (f"{exit_key_base}_{idx}" in trace_info):
+            idx += 1
+        entry_key = f"{entry_key_base}_{idx}"
+        exit_key = f"{exit_key_base}_{idx}"
+
+    trace_info[entry_key] = datetime.now()
+    try:
+        yield
+    finally:
+        trace_info[exit_key] = datetime.now()
+
+
 @traceable_func(trace_name="pdf_extraction::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
@@ -126,6 +156,7 @@ def pdfium_pages_to_numpy(
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
+    trace_info: Optional[dict] = None,
 ) -> tuple[list[ndarray | ndarray[Any, dtype[Any]]], list[tuple[int, int]]]:
     """
     Converts a list of PdfPage objects to a list of NumPy arrays, where each array
@@ -175,16 +206,22 @@ def pdfium_pages_to_numpy(
 
     for idx, page in enumerate(pages):
         # Render the page as a bitmap with the specified scale and rotation
-        page_bitmap = page.render(scale=scale, rotation=rotation)
-        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
+        with _trace_span(trace_info, "pdf_extraction::render_page"):
+            page_bitmap = page.render(scale=scale, rotation=rotation)
+
+        with _trace_span(trace_info, "pdf_extraction::bitmap_to_numpy"):
+            img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
+
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
-            img_arr = scale_numpy_image(img_arr, scale_tuple)
+            with _trace_span(trace_info, "pdf_extraction::scale_image"):
+                img_arr = scale_numpy_image(img_arr, scale_tuple)
         # Apply padding if specified
         if padding_tuple:
-            img_arr, (pad_width, pad_height) = pad_image(
-                img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1]
-            )
+            with _trace_span(trace_info, "pdf_extraction::pad_image"):
+                img_arr, (pad_width, pad_height) = pad_image(
+                    img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1]
+                )
             padding_offsets.append((pad_width, pad_height))
         else:
             padding_offsets.append((0, 0))
