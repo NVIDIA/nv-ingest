@@ -800,11 +800,11 @@ def extract_chart_data_from_image(
     yolox_endpoints : Tuple[str, str]
         YOLOX inference server endpoints.
     ocr_endpoints : Tuple[str, str]
-        PaddleOCR inference server endpoints.
+        OCR inference server endpoints.
     yolox_protocol : str, optional
         Protocol for YOLOX inference (default "grpc").
     ocr_protocol : str, optional
-        Protocol for PaddleOCR inference (default "grpc").
+        Protocol for OCR inference (default "grpc").
     auth_token : str, optional
         Authentication token for inference services.
     execution_trace_log : list, optional
@@ -863,11 +863,12 @@ def extract_table_data_from_image(
     yolox_endpoints : Optional[Tuple[str, str]], default=None
         YOLOX inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
     ocr_endpoints : Optional[Tuple[str, str]], default=None
-        PaddleOCR inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
+        OCR inference server endpoints. If None, the default defined in
+        ChartExtractorConfigSchema is used.
     yolox_protocol : Optional[str], default=None
         Protocol for YOLOX inference. If None, the default defined in ChartExtractorConfigSchema is used.
     ocr_protocol : Optional[str], default=None
-        Protocol for PaddleOCR inference. If None, the default defined in ChartExtractorConfigSchema is used.
+        Protocol for OCR inference. If None, the default defined in ChartExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
         Authentication token for inference services. If None, the default defined in ChartExtractorConfigSchema is used.
 
@@ -919,7 +920,7 @@ def extract_infographic_data_from_image(
     Extract infographic data from a DataFrame using the configured infographic extraction pipeline.
 
     This function creates a task configuration for infographic extraction, builds the extraction
-    configuration from the provided PaddleOCR endpoints, protocol, and authentication token (or uses
+    configuration from the provided OCR endpoints, protocol, and authentication token (or uses
     the default values from InfographicExtractorConfigSchema if None), and then calls the internal
     extraction function to process the DataFrame. The unified exception handler decorator ensures
     that any errors are appropriately logged and managed.
@@ -929,13 +930,13 @@ def extract_infographic_data_from_image(
     df_extraction_ledger : pd.DataFrame
         DataFrame containing the images and associated metadata from which infographic data is to be extracted.
     ocr_endpoints : Optional[Tuple[str, str]], default=None
-        A tuple of PaddleOCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
+        A tuple of OCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
         If None, the default endpoints from InfographicExtractorConfigSchema are used.
     ocr_protocol : Optional[str], default=None
-        The protocol (e.g., "grpc" or "http") for PaddleOCR inference.
+        The protocol (e.g., "grpc" or "http") for OCR inference.
         If None, the default protocol from InfographicExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
-        The authentication token required for secure access to PaddleOCR inference services.
+        The authentication token required for secure access to OCR inference services.
         If None, the default value from InfographicExtractorConfigSchema is used.
 
     Returns
