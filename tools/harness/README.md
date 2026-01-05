@@ -581,6 +581,19 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
 ```
 
+## Nightly Benchmarks
+
+Automated benchmarks with Slack reporting and historical tracking.
+
+```bash
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+uv run nv-ingest-harness-nightly              # Full run
+uv run nv-ingest-harness-nightly --skip-slack # No Slack
+uv run nv-ingest-harness-nightly --dry-run    # Show config only
+```
+
+Configure datasets and sinks in `nightly_config.yaml`. See [NIGHTLY.md](NIGHTLY.md) for details.
+
 ## Artifacts and Logging
 
 All test outputs are collected in timestamped directories:

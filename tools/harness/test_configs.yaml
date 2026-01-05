@@ -43,7 +43,7 @@ active:
   enable_image_storage: false  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
   # Storage configuration
-  spill_dir: /tmp/spill
+  spill_dir: /raid/jioffe/tmp/spill
   artifacts_dir: null  # null = use default (tools/harness/artifacts)
   collection_name: null  # null = auto-generated
 

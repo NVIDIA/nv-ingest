@@ -1,0 +1,16 @@
+# Artifacts (test outputs)
+artifacts/
+
+# SQLite history database and WAL files
+history.db
+history.db-shm
+history.db-wal
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor
+.idea/
+*.swp

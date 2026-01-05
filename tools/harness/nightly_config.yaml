@@ -1,0 +1,44 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Nightly Benchmark Configuration
+#
+# This file defines what runs in the nightly benchmark and how results are reported.
+# Extraction settings (text, tables, charts, etc.) come from test_configs.yaml datasets section.
+#
+# Usage:
+#   uv run nv-ingest-harness-nightly
+#   uv run nv-ingest-harness-nightly --config custom_nightly.yaml
+
+# Benchmark runs
+runs:
+  # E2E tests (ingestion only, no recall)
+  e2e:
+    - bo20  # Latency benchmark (20 docs, 496 pages)
+
+  # E2E + Recall tests (ingestion + recall evaluation)
+  e2e_recall:
+    - bo767        # Throughput + recall (767 docs)
+    - earnings     # Earnings consulting dataset
+    - financebench # Financebench full dataset
+
+# Recall configuration (applies to all e2e_recall runs)
+recall:
+  reranker_mode: both  # Options: "none", "with", "both"
+  top_k: 10
+
+# Sinks configuration
+sinks:
+  slack:
+    enabled: true
+    # webhook_url: Set via SLACK_WEBHOOK_URL environment variable
+
+  history:
+    enabled: true
+    # db_path: Set via HARNESS_HISTORY_DB environment variable
+    retention_days: 90  # Auto-prune runs older than 90 days
+
+# Infrastructure
+infrastructure:
+  fresh_start: true  # Run nv-clean && nv-start before benchmarks
+  readiness_timeout: 600  # Seconds to wait for services to be ready

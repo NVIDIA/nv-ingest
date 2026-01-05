@@ -1,58 +1,19 @@
 import json
 import os
-import subprocess
 import sys
-import time
+
 import click
 from pathlib import Path
 
 from nv_ingest_harness.config import load_config
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
+from nv_ingest_harness.utils.docker import (
+    stop_services,
+    start_services,
+    readiness_wait,
+)
 
-
-REPO_ROOT = Path(__file__).resolve().parents[5]
-COMPOSE_FILE = str(REPO_ROOT / "docker-compose.yaml")
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
-
-
-def run_cmd(cmd: list[str]) -> int:
-    print("$", " ".join(cmd))
-    return subprocess.call(cmd)
-
-
-def stop_services() -> int:
-    """Simple cleanup of Docker services"""
-    print("Performing service cleanup...")
-
-    # Stop all services with all profiles
-    down_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "down"]
-    rc = run_cmd(down_cmd)
-    if rc != 0:
-        print(f"Warning: docker compose down returned {rc}")
-
-    # Remove containers forcefully
-    rm_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "rm", "--force"]
-    rc = run_cmd(rm_cmd)
-    if rc != 0:
-        print(f"Warning: docker compose rm returned {rc}")
-
-    return 0
-
-
-def readiness_wait(timeout_s: int) -> bool:
-    import urllib.request
-
-    deadline = time.time() + timeout_s
-    url = "http://localhost:7670/v1/health/ready"
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
-                if resp.status == 200:
-                    return True
-        except Exception:
-            pass
-        time.sleep(3)
-    return False
 
 
 def create_artifacts_dir(base: str | None, dataset_name: str | None = None) -> str:
@@ -90,21 +51,13 @@ def run_datasets(
         )
 
         # Start services
-        compose_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile"]
         profile_list = first_config.profiles
         if not profile_list:
             print("No profiles specified")
             return 1
-        cmd = compose_cmd + [profile_list[0]]
-        for p in profile_list[1:]:
-            cmd += ["--profile", p]
 
-        if not no_build:
-            cmd += ["up", "--build", "-d"]
-        else:
-            cmd += ["up", "-d"]
-
-        if run_cmd(cmd) != 0:
+        build = not no_build
+        if start_services(profiles=profile_list, build=build) != 0:
             print("Failed to start services")
             return 1
 

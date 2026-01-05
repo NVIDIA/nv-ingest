@@ -1529,10 +1529,26 @@ def nv_rerank(
         "passages": texts,
         "truncate": truncate,
     }
-    start = time.time()
-    response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
-    logger.debug(f"RERANKER time: {time.time() - start}")
-    if response.status_code != 200:
+
+    max_retries = 3
+    for attempt in range(max_retries + 1):
+        start = time.time()
+        try:
+            response = requests.post(reranker_endpoint, headers=headers, json=payload, timeout=120)
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries:
+                time.sleep(2**attempt)
+                continue
+            raise ValueError(f"Reranker connection failed after {max_retries + 1} attempts: {e}")
+
+        logger.debug(f"RERANKER time: {time.time() - start}")
+
+        if response.status_code == 200:
+            break
+        if response.status_code in {500, 502, 503, 504} and attempt < max_retries:
+            logger.warning(f"Reranker {response.status_code}, retry {attempt + 1}/{max_retries + 1}")
+            time.sleep(2**attempt)
+            continue
         raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []
     for rank_vals in response.json()["rankings"]:
