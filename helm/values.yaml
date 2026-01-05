@@ -1008,3 +1008,42 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
+
+  ## @param nemotron_parse [object] Configuration for Nemotron Parse NIM
+  ## @param nemotron_parse.enabled [bool] Enable this NIM
+  ## @param nemotron_parse.image.repository [string] Image repository for this NIM
+  ## @param nemotron_parse.image.tag [string] Image tag or version
+  ## @param nemotron_parse.image.pullPolicy [string] Image pull policy
+  ## @param nemotron_parse.image.pullSecrets [array] List of image pull secrets
+  ## @param nemotron_parse.authSecret [string] Authentication secret for the NIM
+  ## @param nemotron_parse.storage.pvc.create [bool] Whether to create a persistent volume claim
+  ## @param nemotron_parse.storage.pvc.size [string] Size of the persistent volume claim (e.g., "100Gi")
+  ## @param nemotron_parse.storage.pvc.volumeAccessMode [string] Volume access mode for the PVC
+  ## @param nemotron_parse.replicas [int] Number of replicas
+  ## @param nemotron_parse.resources.limits.nvidia.com/gpu [int] Number of GPUs to allocate
+  ## @param nemotron_parse.expose.service.type [string] Kubernetes service type (e.g., "ClusterIP")
+  ## @param nemotron_parse.expose.service.port [int] HTTP service port
+  ## @param nemotron_parse.expose.service.grpcPort [int] gRPC service port
+  nemotron_parse:
+    enabled: false
+    image:
+      repository: nvcr.io/nim/nvidia/nemotron-parse
+      tag: 1.5.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api
+    storage:
+      pvc:
+        create: true
+        size: "100Gi"
+        volumeAccessMode: "ReadWriteMany"
+    replicas: 1
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    expose:
+      service:
+        type: ClusterIP
+        port: 8000
+        grpcPort: 8001

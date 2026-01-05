@@ -330,7 +330,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.RAY_num_grpc_threads | int | `1` |  |
-| envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/nemotron-nano-12b-v2-vl"` |  |
 | envVars.VLM_CAPTION_PROMPT | string | `"Caption the content of this image:"` |  |
 | envVars.VLM_CAPTION_SYSTEM_PROMPT | string | `"/no_think"` |  |
@@ -508,6 +507,20 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.create | bool | `true` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.size | string | `"300Gi"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nemotron_parse.authSecret | string | `"ngc-api"` |  |
+| nimOperator.nemotron_parse.enabled | bool | `false` |  |
+| nimOperator.nemotron_parse.expose.service.grpcPort | int | `8001` |  |
+| nimOperator.nemotron_parse.expose.service.port | int | `8000` |  |
+| nimOperator.nemotron_parse.expose.service.type | string | `"ClusterIP"` |  |
+| nimOperator.nemotron_parse.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nimOperator.nemotron_parse.image.pullSecrets[0] | string | `"ngc-secret"` |  |
+| nimOperator.nemotron_parse.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-parse"` |  |
+| nimOperator.nemotron_parse.image.tag | string | `"1.5.0"` |  |
+| nimOperator.nemotron_parse.replicas | int | `1` |  |
+| nimOperator.nemotron_parse.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| nimOperator.nemotron_parse.storage.pvc.create | bool | `true` |  |
+| nimOperator.nemotron_parse.storage.pvc.size | string | `"100Gi"` |  |
+| nimOperator.nemotron_parse.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.nimCache.pvc.create | bool | `true` |  |
 | nimOperator.nimCache.pvc.size | string | `"25Gi"` |  |
 | nimOperator.nimCache.pvc.storageClass | string | `"default"` |  |
@@ -703,8 +716,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | serviceAccount.name | string | `""` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
-| zipkin.image.repository | string | `"ghcr.io/openzipkin/alpine"` |  |
-| zipkin.image.tag | string | `"3.21.3"` |  |
+| zipkin.image.repository | string | `"openzipkin/zipkin"` |  |
+| zipkin.image.tag | string | `"3.5.0"` |  |
 | zipkin.resources.limits.cpu | string | `"500m"` |  |
 | zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
 | zipkin.resources.requests.cpu | string | `"100m"` |  |
