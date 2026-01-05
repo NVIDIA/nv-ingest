@@ -614,7 +614,7 @@ nimOperator:
       # If specified, sets the storageClass for all NIMCache PVCS created by the Helm chart.
       storageClass: "default"
       size: "25Gi"
-      volumeAccessMode: ReadWriteMany
+      volumeAccessMode: ReadWriteOnce
 
   ## @section Nim Operator NimService Configuration
   ## @param nimOperator.nimService.enabled [bool] Whether to deploy NimServices as part of operator
@@ -660,7 +660,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -728,7 +728,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -774,7 +774,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -820,7 +820,7 @@ nimOperator:
       pvc:
         create: true
         size: "50Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -862,7 +862,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -910,7 +910,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -958,7 +958,7 @@ nimOperator:
       pvc:
         create: true
         size: "50Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -998,7 +998,7 @@ nimOperator:
       pvc:
         create: true
         size: "300Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -1018,7 +1018,7 @@ nimOperator:
   ## @param nemotron_parse.authSecret [string] Name of the Kubernetes secret containing authentication credentials for the NIM model registry.
   ## @param nemotron_parse.storage.pvc.create [bool] Whether to create a PersistentVolumeClaim for model or cache storage.
   ## @param nemotron_parse.storage.pvc.size [string] Size of the PersistentVolumeClaim (e.g., "100Gi").
-  ## @param nemotron_parse.storage.pvc.volumeAccessMode [string] Access mode for the PVC (e.g., "ReadWriteMany").
+  ## @param nemotron_parse.storage.pvc.volumeAccessMode [string] Access mode for the PVC (e.g., "ReadWriteOnce").
   ## @param nemotron_parse.replicas [int] Number of Pod replicas for high availability.
   ## @param nemotron_parse.resources.limits.nvidia.com/gpu [int] Number of GPUs to allocate to this NIM Pod.
   ## @param nemotron_parse.expose.service.type [string] Type of Kubernetes Service to expose the NIM (e.g., "ClusterIP", "NodePort").
@@ -1038,7 +1038,7 @@ nimOperator:
       pvc:
         create: true
         size: "100Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -1064,7 +1064,7 @@ nimOperator:
   ## @param audio.authSecret Kubernetes secret containing registry credentials for the model.
   ## @param audio.storage.pvc.create Whether to create a persistent volume claim for Audio NIM (true/false).
   ## @param audio.storage.pvc.size Size of the persistent volume claim (e.g., "25Gi").
-  ## @param audio.storage.pvc.volumeAccessMode Persistent volume access mode ("ReadWriteMany", etc).
+  ## @param audio.storage.pvc.volumeAccessMode Persistent volume access mode ("ReadWriteOnce", etc).
   ## @param audio.replicas Number of Audio NIM pod replicas to deploy.
   ## @param audio.resources.limits.nvidia.com/gpu GPUs to request for the audio NIM pod (integer).
   ## @param audio.expose.service.type Kubernetes Service type for the Audio NIM ("ClusterIP", "NodePort", etc).
@@ -1084,7 +1084,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
