@@ -36,7 +36,14 @@ spec:
       profile: ''
   replicas: {{ .Values.nimOperator.page_elements.replicas }}
   nodeSelector: {{ toYaml .Values.nimOperator.page_elements.nodeSelector | nindent 4 }}
-  resources: {{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
+{{- if .Values.nimOperator.draResources.enabled }}
+  draResources:
+{{ toYaml .Values.nimOperator.page_elements.draResources | nindent 4 }}
+{{- end }}
+{{- if not .Values.nimOperator.draResources.enabled }}
+  resources:
+{{ toYaml .Values.nimOperator.page_elements.resources | nindent 4 }}
+{{- end }}
   tolerations: {{ toYaml .Values.nimOperator.page_elements.tolerations | nindent 4 }}
   expose: {{ toYaml .Values.nimOperator.page_elements.expose | nindent 4 }}
   env: {{ toYaml .Values.nimOperator.page_elements.env | nindent 4 }}
