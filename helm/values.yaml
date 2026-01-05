@@ -119,9 +119,6 @@ tmpDirSize: 50Gi
 ## @param envVars.MINIO_SECRET_KEY [default: "minioadmin"] MinIO secret key for authentication
 ## @param envVars.IMAGE_STORAGE_URI [default: "s3://nv-ingest/artifacts/store/images"] fsspec-compatible destination for stored images
 ## @param envVars.IMAGE_STORAGE_PUBLIC_BASE_URL [default: ""] Optional HTTP base URL for serving stored images when using object storage
-## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] gRPC endpoint for Paddle service
-## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] HTTP endpoint for Paddle service
-## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint for Paddle
 ## @param envVars.NEMOTRON_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"] HTTP endpoint for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_INFER_PROTOCOL [default: "http"] Protocol for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_MODEL_NAME [default: "nvidia/nemotron-parse"] Model name for Nemotron Parse
@@ -175,10 +172,6 @@ envVars:
   EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
 
-  PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
-  PADDLE_INFER_PROTOCOL: grpc
-
   NEMOTRON_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions
   NEMOTRON_PARSE_INFER_PROTOCOL: http
   NEMOTRON_PARSE_MODEL_NAME: nvidia/nemotron-parse
@@ -208,9 +201,9 @@ envVars:
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  # This environment variable is controled in the helm/deployment.yaml. There is a ternary operator that
-  # sets this value to "nim-vlm-image-captioning:8001" to use the locally deployed NIM if the nim-vlm-image-captioning.deployed
-  # condition is true, otherwise it is set to "https://integrate.api.nvidia.com/v1/chat/completions" to use the NGC hosted NIM
+  # This environment variable is controlled in helm/templates/deployment.yaml. It is set to "http://nemotron-nano-12b-v2-vl:8000/v1/chat/completions"
+  # to use the locally deployed NIM if nimOperator.nemotron_nano_12b_v2_vl.enabled is true.
+  # To use the NGC hosted NIM (Build API), manually set this value to "https://integrate.api.nvidia.com/v1/chat/completions".
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
   VLM_CAPTION_PROMPT: "Caption the content of this image:"
@@ -614,7 +607,7 @@ nimOperator:
       # If specified, sets the storageClass for all NIMCache PVCS created by the Helm chart.
       storageClass: "default"
       size: "25Gi"
-      volumeAccessMode: ReadWriteMany
+      volumeAccessMode: ReadWriteOnce
 
   ## @section Nim Operator NimService Configuration
   ## @param nimOperator.nimService.enabled [bool] Whether to deploy NimServices as part of operator
@@ -660,7 +653,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -728,7 +721,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -774,7 +767,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -820,7 +813,7 @@ nimOperator:
       pvc:
         create: true
         size: "50Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -839,54 +832,6 @@ nimOperator:
         value: "1"
       - name: NIM_TRITON_PERFORMANCE_MODE
         value: "throughput"
-
-  ## @param paddleocr [object] Configuration for PaddleOCR NIM
-  ## @param paddleocr.enabled [bool] Enable the PaddleOCR service
-  ## @param paddleocr.image.* [various] PaddleOCR image config
-  ## @param paddleocr.authSecret [string] Authentication secret
-  ## @param paddleocr.storage.* [object] PVC configuration
-  ## @param paddleocr.replicas [int] Number of replicas
-  ## @param paddleocr.resources [object] Resource requests/limits
-  ## @param paddleocr.expose.* [object] Service endpoint configuration
-  ## @param paddleocr.env [array] Environment variables
-  paddleocr:
-    enabled: false
-    image:
-      repository: nvcr.io/nim/baidu/paddleocr
-      tag: 1.5.0
-      pullPolicy: IfNotPresent
-      pullSecrets:
-        - ngc-secret
-    authSecret: ngc-api
-    storage:
-      pvc:
-        create: true
-        size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
-    replicas: 1
-    resources:
-      limits:
-        nvidia.com/gpu: 1
-    expose:
-      service:
-        type: ClusterIP
-        port: 8000
-        grpcPort: 8001
-    env:
-      - name: NIM_HTTP_API_PORT
-        value: "8000"
-      - name: NIM_TRITON_LOG_VERBOSE
-        value: "1"
-      - name: NIM_TRITON_RATE_LIMIT
-        value: "3"
-      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "3072"
-      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-        value: "2"
-      - name: OMP_NUM_THREADS
-        value: "8"
-      - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
-        value: "1"
 
   ## @param nemoretriever_ocr_v1 [object] Configuration for NemoRetriever OCR v1 NIM
   ## @param nemoretriever_ocr_v1.enabled [bool] Enable the NEMORetriever OCR v1 service
@@ -910,7 +855,7 @@ nimOperator:
       pvc:
         create: true
         size: "25Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -958,7 +903,7 @@ nimOperator:
       pvc:
         create: true
         size: "50Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -998,7 +943,7 @@ nimOperator:
       pvc:
         create: true
         size: "300Gi"
-        volumeAccessMode: "ReadWriteMany"
+        volumeAccessMode: "ReadWriteOnce"
     replicas: 1
     resources:
       limits:
@@ -1008,3 +953,94 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
+
+  ## @param nemotron_parse [object] Configuration for Nemotron Parse NIM
+  ## @param nemotron_parse.enabled [bool] Enable or disable the Nemotron Parse NIM deployment.
+  ## @param nemotron_parse.image.repository [string] Container image repository for Nemotron Parse NIM.
+  ## @param nemotron_parse.image.tag [string] Container image tag (version) for Nemotron Parse NIM.
+  ## @param nemotron_parse.image.pullPolicy [string] Image pull policy (e.g., Always, IfNotPresent).
+  ## @param nemotron_parse.image.pullSecrets [array] List of Kubernetes secrets to use for pulling images.
+  ## @param nemotron_parse.authSecret [string] Name of the Kubernetes secret containing authentication credentials for the NIM model registry.
+  ## @param nemotron_parse.storage.pvc.create [bool] Whether to create a PersistentVolumeClaim for model or cache storage.
+  ## @param nemotron_parse.storage.pvc.size [string] Size of the PersistentVolumeClaim (e.g., "100Gi").
+  ## @param nemotron_parse.storage.pvc.volumeAccessMode [string] Access mode for the PVC (e.g., "ReadWriteOnce").
+  ## @param nemotron_parse.replicas [int] Number of Pod replicas for high availability.
+  ## @param nemotron_parse.resources.limits.nvidia.com/gpu [int] Number of GPUs to allocate to this NIM Pod.
+  ## @param nemotron_parse.expose.service.type [string] Type of Kubernetes Service to expose the NIM (e.g., "ClusterIP", "NodePort").
+  ## @param nemotron_parse.expose.service.port [int] HTTP port number for the service.
+  ## @param nemotron_parse.expose.service.grpcPort [int] gRPC port number for the service.
+  ## @param nemotron_parse.env [array] Additional environment variables for the Nemotron Parse container.
+  nemotron_parse:
+    enabled: false
+    image:
+      repository: nvcr.io/nim/nvidia/nemotron-parse
+      tag: 1.5.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api
+    storage:
+      pvc:
+        create: true
+        size: "100Gi"
+        volumeAccessMode: "ReadWriteOnce"
+    replicas: 1
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    expose:
+      service:
+        type: ClusterIP
+        port: 8000
+        grpcPort: 8001
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+
+  ## @section Audio NIM Configuration
+  ## @param audio [object] Configuration for Audio NIM (ASR)
+  ## @param audio.enabled Enable or disable the Audio NIM deployment.
+  ## @param audio.image.repository Container image repository for the Audio NIM.
+  ## @param audio.image.tag Container image tag or version for the Audio NIM.
+  ## @param audio.image.pullPolicy Image pull policy ("Always", "IfNotPresent", etc).
+  ## @param audio.image.pullSecrets List of Kubernetes secrets to use when pulling the Audio NIM image.
+  ## @param audio.authSecret Kubernetes secret containing registry credentials for the model.
+  ## @param audio.storage.pvc.create Whether to create a persistent volume claim for Audio NIM (true/false).
+  ## @param audio.storage.pvc.size Size of the persistent volume claim (e.g., "25Gi").
+  ## @param audio.storage.pvc.volumeAccessMode Persistent volume access mode ("ReadWriteOnce", etc).
+  ## @param audio.replicas Number of Audio NIM pod replicas to deploy.
+  ## @param audio.resources.limits.nvidia.com/gpu GPUs to request for the audio NIM pod (integer).
+  ## @param audio.expose.service.type Kubernetes Service type for the Audio NIM ("ClusterIP", "NodePort", etc).
+  ## @param audio.expose.service.port HTTP service port for Audio NIM.
+  ## @param audio.expose.service.grpcPort gRPC service port for Audio NIM.
+  ## @param audio.env List of environment variables {name, value} to inject into Audio NIM.
+  audio:
+    enabled: false
+    image:
+      repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
+      tag: 1.4.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api
+    storage:
+      pvc:
+        create: true
+        size: "25Gi"
+        volumeAccessMode: "ReadWriteOnce"
+    replicas: 1
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    expose:
+      service:
+        type: ClusterIP
+        port: 9000
+        grpcPort: 50051
+    env:
+      - name: NIM_TAGS_SELECTOR
+        value: "name=parakeet-1-1b-ctc-en-us,mode=ofl"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"

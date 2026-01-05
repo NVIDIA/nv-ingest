@@ -59,6 +59,13 @@ class TestConfig:
     split_chunk_overlap: int = 150
     enable_image_storage: bool = False  # Server-side image storage (MinIO/local disk)
 
+    # Image storage configuration
+    store_structured: bool = True
+    store_images: bool = True
+    storage_uri: Optional[str] = None  # file:///path or s3://bucket/path
+    storage_options: Optional[dict] = None
+    public_base_url: Optional[str] = None
+
     # Storage configuration
     spill_dir: str = "/tmp/spill"
     artifacts_dir: Optional[str] = None

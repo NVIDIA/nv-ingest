@@ -398,11 +398,82 @@ ingestor = ingestor.store(
 )
 ```
 
+### Store Method Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `structured` | bool | Persist table and chart renderings. Default: `False` |
+| `images` | bool | Persist unstructured images extracted from documents. Default: `False` |
+| `storage_uri` | str | fsspec-compatible URI (`file://`, `s3://`, `gs://`, etc.). Defaults to server-side `IMAGE_STORAGE_URI` environment variable. |
+| `public_base_url` | str | Optional HTTP(S) base URL for serving stored images. When set, metadata includes public download links. |
+
+### Supported Storage Backends
+
+The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for storage, supporting multiple backends:
+
+| Backend | URI Format | Example |
+|---------|------------|---------|
+| Local filesystem | `file://` | `file:///workspace/data/images` |
+| Amazon S3 | `s3://` | `s3://my-bucket/extracted-images` |
+| Google Cloud Storage | `gs://` | `gs://my-bucket/images` |
+| Azure Blob Storage | `abfs://` | `abfs://container@account.dfs.core.windows.net/images` |
+| MinIO (S3-compatible) | `s3://` | `s3://nv-ingest/artifacts/store/images` (default) |
+
 !!! tip
 
     `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the nv-ingest runtime so the container picks up the new value.
 
 When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
+
+### Docker Volume Mounts for Local Storage
+
+When running nv-ingest via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+
+By default, the `docker-compose.yaml` mounts a single volume:
+
+```yaml
+volumes:
+  - ${DATASET_ROOT:-./data}:/workspace/data
+```
+
+This means:
+
+| Container Path | Host Path | Works with `file://`? |
+|----------------|-----------|----------------------|
+| `/workspace/data/...` | `${DATASET_ROOT}/...` (default: `./data/...`) | ✅ Yes |
+| `/tmp/...` | (container only) | ❌ No - files lost on restart |
+| `/raid/custom/path` | (container only) | ❌ No - path not mounted |
+
+**Example: Save to host filesystem**
+
+```python
+# Files save to ./data/artifacts/images on the host
+ingestor = ingestor.store(
+    structured=True,
+    images=True,
+    storage_uri="file:///workspace/data/artifacts/images"
+)
+```
+
+**Example: Use a custom host directory**
+
+```bash
+# Set DATASET_ROOT before starting services
+export DATASET_ROOT=/raid/my-project/nv-ingest-data
+docker compose up -d
+```
+
+```python
+# Now /workspace/data maps to /raid/my-project/nv-ingest-data
+ingestor = ingestor.store(
+    structured=True,
+    images=True,
+    storage_uri="file:///workspace/data/extracted-images"
+)
+# Files save to /raid/my-project/nv-ingest-data/extracted-images on host
+```
+
+For more information on environment variables, refer to [Environment Variables](environment-config.md).
 
 
 ## Extract Audio
