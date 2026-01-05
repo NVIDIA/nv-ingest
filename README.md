@@ -375,7 +375,7 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
-- **Built With Llama:**:
+- **Built With Llama**:
   - **Description**: The NV-Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded so 
     that the split task can use it for token-based splitting without making a network request. Please review the 
     [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials.
