@@ -37,6 +37,7 @@ processors:
 
 extensions:
   health_check:
+    endpoint: "0.0.0.0:13133"
   zpages:
 
 service:
@@ -45,8 +46,13 @@ service:
     logs:
       level: "debug"
     metrics:
-      level: "basic"
-      # listen_address: "0.0.0.0:8888"  # optional if you want to override default
+      level: "detailed"
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 9988
   pipelines:
     traces:
       receivers: [otlp]
