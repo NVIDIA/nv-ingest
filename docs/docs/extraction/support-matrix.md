@@ -16,7 +16,7 @@ The core pipeline features include the following:
 - nemoretriever-page-elements-v3 — Detects and classifies images on a page as a table, chart or infographic.
 - nemoretriever-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
 - nemoretriever-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
-- paddleocr — Image OCR model to detect and extract text from images.
+- nemoretriever-ocr-v1 — Image OCR model to detect and extract text from images.
 - retrieval — Enables embedding and indexing into Milvus.
 
 Advanced features require additional GPU support and disk space. 
@@ -24,7 +24,7 @@ This includes the following:
 
 - Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md).
 - Advanced visual parsing — Use [nemotron-parse](https://docs.nvidia.com/nim/vision-language-models/latest/examples/nemotron-parse/overview.html), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing ](nemoretriever-parse.md).
-- VLM image captioning — Use [llama 3.1 nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+- VLM image captioning — Use [nemotron-nano-12b-v2-vl](https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard) for experimental image captioning of unstructured images. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 
 
 
@@ -45,7 +45,7 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 
 |Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB   | A10G    | L40S   |
 |----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|-------------|---------|--------|
-| GPU            | Memory                    | 96GB          | 192GB         | 141GB         | 80GB        | 80GB        | 40GB        | 24GB    | 48GB   |
+| GPU            | Memory                    | 96GB          | 180GB         | 141GB         | 80GB        | 80GB        | 40GB        | 24GB    | 48GB   |
 | Core Features  | Total GPUs                | 1             | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
 | Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB      | ~150GB  | ~150GB |
 | Audio          | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | 1           | 1       | 1      |
