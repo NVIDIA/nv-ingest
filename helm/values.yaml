@@ -1047,3 +1047,42 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
+
+  ## @param audio [object] Configuration for Audio NIM
+  ## @param audio.enabled [bool] Enable this NIM
+  ## @param audio.image.repository [string] Image repository for this NIM
+  ## @param audio.image.tag [string] Image tag or version
+  ## @param audio.image.pullPolicy [string] Image pull policy
+  ## @param audio.image.pullSecrets [array] List of image pull secrets
+  ## @param audio.authSecret [string] Authentication secret for the NIM
+  ## @param audio.storage.pvc.create [bool] Whether to create a persistent volume claim
+  ## @param audio.storage.pvc.size [string] Size of the persistent volume claim (e.g., "25Gi")
+  ## @param audio.storage.pvc.volumeAccessMode [string] Volume access mode for the PVC
+  ## @param audio.replicas [int] Number of replicas
+  ## @param audio.resources.limits.nvidia.com/gpu [int] Number of GPUs to allocate
+  ## @param audio.expose.service.type [string] Kubernetes service type (e.g., "ClusterIP")
+  ## @param audio.expose.service.port [int] HTTP service port
+  ## @param audio.expose.service.grpcPort [int] gRPC service port
+  audio:
+    enabled: false
+    image:
+      repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
+      tag: 1.4.0
+      pullPolicy: IfNotPresent
+      pullSecrets:
+        - ngc-secret
+    authSecret: ngc-api
+    storage:
+      pvc:
+        create: true
+        size: "25Gi"
+        volumeAccessMode: "ReadWriteMany"
+    replicas: 1
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    expose:
+      service:
+        type: ClusterIP
+        port: 9000
+        grpcPort: 50051
