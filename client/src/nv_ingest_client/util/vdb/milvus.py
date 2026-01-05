@@ -925,7 +925,7 @@ def wait_for_index(collection_name: str, expected_rows_dict: dict, client: Milvu
                 indexed_rows = client.describe_index(collection_name, index_name)["indexed_rows"]
                 time.sleep(1)
                 logger.info(f"Indexed rows, {collection_name}, {index_name} -  {indexed_rows} / {rows_expected}")
-                if indexed_rows == rows_expected:
+                if indexed_rows >= rows_expected:
                     break
                 # check if indexed_rows is staying the same, too many times means something is wrong
                 if indexed_rows == prev_indexed_rows:
