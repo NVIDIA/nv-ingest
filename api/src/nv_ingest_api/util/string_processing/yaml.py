@@ -15,6 +15,26 @@ _ENV_VAR_PATTERN = re.compile(
     re.VERBOSE,
 )
 
+# YAML special characters that require quoting to prevent parsing errors
+# Focus on characters that cause parsing issues when unquoted in value positions
+_YAML_SPECIAL_CHARS = re.compile(r'[:\[\]{}#&*!|>\'"%@`]')
+
+
+def _quote_if_needed(value: str) -> str:
+    """
+    Quote value if it contains YAML special characters that could cause parsing errors.
+    Specifically handles cases like values ending with ':' which YAML interprets as mappings.
+    """
+    if not value:
+        return value
+    # Quote if value ends with ':' (prevents mapping interpretation - the specific bug case)
+    # or contains other problematic chars that would cause parsing errors
+    if value.endswith(":") or _YAML_SPECIAL_CHARS.search(value):
+        # Escape internal double quotes and wrap in double quotes
+        escaped = value.replace('"', '\\"')
+        return f'"{escaped}"'
+    return value
+
 
 def _replacer(match: re.Match) -> str:
     """Replaces a regex match with the corresponding environment variable."""
@@ -24,7 +44,7 @@ def _replacer(match: re.Match) -> str:
     # First try the primary env var
     value = os.environ.get(var_name)
     if value is not None:
-        return value
+        return _quote_if_needed(value)
 
     # If primary is missing, try the default.
     resolved_default = _resolve_default_with_single_fallback(default_val)
@@ -32,7 +52,14 @@ def _replacer(match: re.Match) -> str:
     if resolved_default is None:
         return ""
 
-    return resolved_default
+    # If default was already quoted, preserve it as-is
+    if resolved_default and (
+        (resolved_default.startswith('"') and resolved_default.endswith('"'))
+        or (resolved_default.startswith("'") and resolved_default.endswith("'"))
+    ):
+        return resolved_default
+
+    return _quote_if_needed(resolved_default)
 
 
 def _is_var_ref(token: str) -> Optional[str]:
