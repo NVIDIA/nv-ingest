@@ -404,6 +404,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | ngcImagePullSecret.username | string | `"$oauthtoken"` |  |
 | nimOperator.audio.authSecret | string | `"ngc-api"` |  |
 | nimOperator.audio.enabled | bool | `false` |  |
+| nimOperator.audio.env[0].name | string | `"NIM_TAGS_SELECTOR"` |  |
+| nimOperator.audio.env[0].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
+| nimOperator.audio.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.audio.env[1].value | string | `"1"` |  |
 | nimOperator.audio.expose.service.grpcPort | int | `50051` |  |
 | nimOperator.audio.expose.service.port | int | `9000` |  |
 | nimOperator.audio.expose.service.type | string | `"ClusterIP"` |  |
@@ -523,6 +527,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.nemotron_parse.authSecret | string | `"ngc-api"` |  |
 | nimOperator.nemotron_parse.enabled | bool | `false` |  |
+| nimOperator.nemotron_parse.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nimOperator.nemotron_parse.env[0].value | string | `"8000"` |  |
+| nimOperator.nemotron_parse.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.nemotron_parse.env[1].value | string | `"1"` |  |
 | nimOperator.nemotron_parse.expose.service.grpcPort | int | `8001` |  |
 | nimOperator.nemotron_parse.expose.service.port | int | `8000` |  |
 | nimOperator.nemotron_parse.expose.service.type | string | `"ClusterIP"` |  |
