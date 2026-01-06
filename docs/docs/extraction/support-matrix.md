@@ -58,7 +58,7 @@ The following are the hardware requirements to run NeMo Retriever extraction.
 | Reranker       | With Core Pipeline        | Yes           | Yes           | Yes           | Yes         | Yes         | No*         | No*     | No*    |
 | Reranker       | Standalone (recall only)  | Yes           | Yes           | Yes           | Yes         | Yes         | Yes         | Yes     | Yes    |
 
-\* GPUs with less than 80GB VRAM cannot run the reranker concurrently with the core pipeline. To perform recall testing with the reranker on these GPUs, shutdown the core pipeline NIMs and run only the embedder, reranker, and Milvus.
+\* GPUs with less than 80GB VRAM cannot run the reranker concurrently with the core pipeline. To perform recall testing with the reranker on these GPUs, shutdown the core pipeline NIMs and run only the embedder, reranker, and your VDB.
 
 
 ## Related Topics
