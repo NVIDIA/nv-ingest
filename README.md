@@ -253,7 +253,7 @@ client = OpenAI(
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-    model="nvidia/llama-3.1-nemotron-70b-instruct",
+    model="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     messages=[{"role": "user", "content": prompt}],
 )
 response = completion.choices[0].message.content
