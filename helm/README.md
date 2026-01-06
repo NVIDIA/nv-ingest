@@ -9,8 +9,20 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-The [Nvidia nim-operator](https://docs.nvidia.com/nim-operator/latest/install.html) must also be installed and configured in your cluster to ensure that
-the Nvidia NIMs are properly deployed.
+> Starting with version 26.0.0, the [NVIDIA NIM Operator](https://docs.nvidia.com/nim-operator/latest/install.html) is **required**. All NIM services are now deployed via NIM Operator CRDs (NIMCache and NIMService), not Helm subcharts.
+>
+> **Upgrading from 25.9.0:**
+> 1. Install NIM Operator before upgrading
+> 2. Update your values file with the new configuration keys:
+>
+> | 25.9.0 | 26.x |
+> |--------|------|
+> | `nim-vlm-image-captioning.deployed=true` | `nimOperator.nemotron_nano_12b_v2_vl.enabled=true` |
+> | `paddleocr-nim.deployed=true` | `nimOperator.paddleocr.enabled=true` |
+> | `riva-nim.deployed=true` | Not yet available |
+> | `nim-vlm-text-extraction.deployed=true` | Not yet available |
+
+The [Nvidia GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html) must also be installed and configured in your cluster.
 
 ## Initial Environment Setup
 
