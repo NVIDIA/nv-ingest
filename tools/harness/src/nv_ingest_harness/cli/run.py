@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import time
+import threading
+from datetime import datetime, timezone
 import click
 from pathlib import Path
 
@@ -18,6 +20,82 @@ CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 def run_cmd(cmd: list[str]) -> int:
     print("$", " ".join(cmd))
     return subprocess.call(cmd)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _compose_container_ids() -> list[str]:
+    """
+    Return container IDs for the repo's docker-compose project.
+
+    Uses `docker compose ps -q` for broad compatibility across compose versions.
+    """
+    try:
+        proc = subprocess.run(
+            ["docker", "compose", "-f", COMPOSE_FILE, "ps", "-q"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return []
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in (proc.stdout or "").splitlines() if line.strip()]
+
+
+def _start_docker_stats_sampler(
+    out_csv_path: str,
+    interval_s: float,
+    stop_event: threading.Event,
+) -> threading.Thread:
+    """
+    Sample `docker stats` periodically and write a CSV into the artifact directory.
+    """
+
+    def _write_header(fp):
+        fp.write("ts_utc,container_id,name,cpu_perc,mem_usage,mem_perc,net_io,block_io,pids\n")
+        fp.flush()
+
+    def _sample_once(fp) -> None:
+        container_ids = _compose_container_ids()
+        if not container_ids:
+            return
+        fmt = (
+            "{{.Container}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"
+        )
+        proc = subprocess.run(
+            ["docker", "stats", "--no-stream", "--format", fmt, *container_ids],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            return
+        ts = _utc_now_iso()
+        for line in (proc.stdout or "").splitlines():
+            parts = line.split("\t")
+            if len(parts) != 8:
+                continue
+            container_id, name, cpu_perc, mem_usage, mem_perc, net_io, block_io, pids = parts
+            # Defensive CSV safety
+            name = name.replace(",", "_")
+            fp.write(f"{ts},{container_id},{name},{cpu_perc},{mem_usage},{mem_perc},{net_io},{block_io},{pids}\n")
+        fp.flush()
+
+    def _loop():
+        os.makedirs(os.path.dirname(out_csv_path), exist_ok=True)
+        with open(out_csv_path, "w") as fp:
+            _write_header(fp)
+            while not stop_event.is_set():
+                _sample_once(fp)
+                stop_event.wait(max(0.1, interval_s))
+
+    thread = threading.Thread(target=_loop, name="docker-stats-sampler", daemon=True)
+    thread.start()
+    return thread
 
 
 def stop_services() -> int:
@@ -77,6 +155,8 @@ def run_datasets(
     no_build,
     keep_up,
     doc_analysis,
+    docker_stats: bool,
+    docker_stats_interval_s: float,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
@@ -164,12 +244,30 @@ def run_datasets(
                 test_name_for_collection = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
                 config.collection_name = get_recall_collection_name(test_name_for_collection)
 
-        # Run the test case
-        if case in CASES:
-            rc = run_case(case, stdout_path, config, doc_analysis)
-        else:
-            print(f"Unknown case: {case}")
-            rc = 2
+        docker_stats_csv = None
+        docker_stats_stop = None
+        docker_stats_thread = None
+        if docker_stats:
+            docker_stats_csv = os.path.join(out_dir, "docker_stats.csv")
+            docker_stats_stop = threading.Event()
+            docker_stats_thread = _start_docker_stats_sampler(
+                out_csv_path=docker_stats_csv,
+                interval_s=docker_stats_interval_s,
+                stop_event=docker_stats_stop,
+            )
+
+        try:
+            # Run the test case
+            if case in CASES:
+                rc = run_case(case, stdout_path, config, doc_analysis)
+            else:
+                print(f"Unknown case: {case}")
+                rc = 2
+        finally:
+            if docker_stats_stop is not None:
+                docker_stats_stop.set()
+            if docker_stats_thread is not None:
+                docker_stats_thread.join(timeout=5)
 
         # Consolidate runner metadata + test results into single results.json
         consolidated = {
@@ -179,8 +277,16 @@ def run_datasets(
             "infrastructure": "managed" if managed else "attach",
             "api_version": config.api_version,
             "pdf_split_page_count": config.pdf_split_page_count,
+            "enable_traces": getattr(config, "enable_traces", False),
+            "trace_output_dir": getattr(config, "trace_output_dir", None),
             "return_code": rc,
         }
+        if docker_stats_csv:
+            consolidated["docker_stats"] = {
+                "enabled": True,
+                "interval_s": docker_stats_interval_s,
+                "csv_path": docker_stats_csv,
+            }
 
         if managed:
             consolidated["profiles"] = config.profiles
@@ -303,6 +409,18 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 @click.option("--no-build", is_flag=True, help="Skip building Docker images (managed mode only)")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test (managed mode only)")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
+@click.option(
+    "--docker-stats",
+    is_flag=True,
+    help="Capture docker container CPU/memory utilization during the run (writes docker_stats.csv into artifacts/)",
+)
+@click.option(
+    "--docker-stats-interval-s",
+    type=float,
+    default=float(os.environ.get("DOCKER_STATS_INTERVAL_S", "1.0")),
+    show_default=True,
+    help="Sampling interval for --docker-stats (seconds). Also configurable via DOCKER_STATS_INTERVAL_S.",
+)
 def main(
     case,
     managed,
@@ -310,6 +428,8 @@ def main(
     no_build,
     keep_up,
     doc_analysis,
+    docker_stats,
+    docker_stats_interval_s,
 ):
 
     if not dataset:
@@ -330,6 +450,8 @@ def main(
         no_build=no_build,
         keep_up=keep_up,
         doc_analysis=doc_analysis,
+        docker_stats=docker_stats,
+        docker_stats_interval_s=docker_stats_interval_s,
     )
 
 
