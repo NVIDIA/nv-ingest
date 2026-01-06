@@ -20,7 +20,7 @@ Use the following procedure to prepare your environment.
     ```
 conda create -y --name nvingest python=3.10 && \
     conda activate nvingest && \
-    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0 && \
+    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=26.1.0 nv_ingest_client=26.1.0 nv_ingest_api=26.1.0 && \
     pip install opencv-python llama-index-embeddings-nvidia 'pymilvus==2.5.4' 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
     ```
 

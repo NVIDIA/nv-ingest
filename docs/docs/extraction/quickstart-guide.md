@@ -105,7 +105,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
-pip install nv-ingest-client==2025.3.10.dev20250310
+pip install nv-ingest-client==26.1.0
 ```
 
 !!! tip
