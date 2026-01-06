@@ -514,7 +514,7 @@ livenessProbe:
 ## @param readinessProbe.successThreshold Success threshold for `readinessProbe`
 ## @param readinessProbe.failureThreshold Failure threshold for `readinessProbe`
 readinessProbe:
-  enabled: false
+  enabled: true
   httpGet:
     path: /v1/health/ready
     port: http
