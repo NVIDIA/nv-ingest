@@ -1269,7 +1269,7 @@ class NvIngestClient:
         ----------
         batch_size : Optional[int]
             The batch_size value to validate. None uses value from
-            NV_INGEST_BATCH_SIZE environment variable or default 32.
+            NV_INGEST_BATCH_SIZE environment variable or default 16.
 
         Returns
         -------
@@ -1279,18 +1279,18 @@ class NvIngestClient:
         # Handle None/default case
         if batch_size is None:
             try:
-                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
+                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "16"))
             except ValueError:
-                batch_size = 32
+                batch_size = 16
 
         # Validate type and range
         if not isinstance(batch_size, int):
-            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 32.")
-            return 32
+            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 16.")
+            return 16
 
         if batch_size < 1:
-            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 32.")
-            return 32
+            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 16.")
+            return 16
 
         # Performance guidance warnings
         if batch_size < 8:

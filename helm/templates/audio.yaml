@@ -1,0 +1,45 @@
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.audio.enabled true) -}}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: audio
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ .Values.nimOperator.audio.image.repository }}:{{ .Values.nimOperator.audio.image.tag }}"
+      pullSecret: "{{ index .Values.nimOperator.audio.image.pullSecrets 0 }}"
+      authSecret: {{ .Values.nimOperator.audio.authSecret }}
+  storage:
+    pvc:
+      create: {{ .Values.nimOperator.audio.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.audio.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.audio.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.audio.storage.pvc.volumeAccessMode }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: audio
+spec:
+  image:
+    repository: {{ .Values.nimOperator.audio.image.repository }}
+    tag: {{ .Values.nimOperator.audio.image.tag }}
+    pullPolicy: IfNotPresent
+    pullSecrets:
+{{ toYaml .Values.nimOperator.audio.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.audio.authSecret }}
+  storage:
+    nimCache:
+      name: audio
+  replicas: {{ .Values.nimOperator.nemotron_parse.replicas }}
+  resources:
+{{ toYaml .Values.nimOperator.audio.resources | nindent 4 }}
+  tolerations:
+{{ toYaml .Values.nimOperator.audio.tolerations | nindent 4 }}
+  expose:
+{{ toYaml .Values.nimOperator.audio.expose | nindent 4 }}
+  env:
+{{ toYaml .Values.nimOperator.audio.env | nindent 4 }}
+{{- end }}

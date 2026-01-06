@@ -103,6 +103,22 @@ class TestGetPdfSplitPageCount:
 
         assert pages_per_chunk == DEFAULT_PDF_SPLIT_PAGE_COUNT
 
+    def test_env_var_above_max_clamped(self, monkeypatch):
+        """Environment variable above 128 should be clamped to maximum."""
+        monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "256")
+
+        pages_per_chunk = get_pdf_split_page_count()
+
+        assert pages_per_chunk == 128
+
+    def test_env_var_below_min_clamped(self, monkeypatch):
+        """Environment variable below 1 should be clamped to minimum."""
+        monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "0")
+
+        pages_per_chunk = get_pdf_split_page_count()
+
+        assert pages_per_chunk == 1
+
 
 class TestSplitPdfToChunks:
     """Tests for splitting a PDF into chunk descriptors."""
