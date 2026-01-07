@@ -10,6 +10,11 @@ with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/u
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+Currently, you can process the following audio file types:
+
+- `mp3`
+- `wav`
+
 
 
 ## Overview
@@ -23,7 +28,7 @@ to transcribe audio files to text, which is then embedded by using the NeMo Retr
 
     Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements to run RIVA NIM, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
 
-This Early Access pipeline enables users to now retrieve audio files at the segment level. 
+This pipeline enables users to now retrieve audio files at the segment level. 
 
 
 
