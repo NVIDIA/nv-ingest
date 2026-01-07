@@ -90,8 +90,8 @@ nav:
         - Throughput Is Dataset-Dependent: extraction/throughput-is-dataset-dependent.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
-        - Content Metadata: extraction/content-metadata.md
         - Environment Variables: extraction/environment-config.md
+        - Metadata Reference: extraction/content-metadata.md
         - API Reference: extraction/api-docs
       - Troubleshoot: extraction/troubleshoot.md
       - FAQ: extraction/faq.md
