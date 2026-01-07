@@ -63,10 +63,10 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-1g.20gb: 1
       requests:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-1g.20gb: 1
 
   nemotron_nano_12b_v2_vl:
     enabled: true
