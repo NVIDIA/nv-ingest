@@ -18,9 +18,9 @@ Before you install the Helm charts, be sure you meet the hardware and software p
 > | 25.9.0 | 26.x |
 > |--------|------|
 > | `nim-vlm-image-captioning.deployed=true` | `nimOperator.nemotron_nano_12b_v2_vl.enabled=true` |
-> | `paddleocr-nim.deployed=true` | `nimOperator.paddleocr.enabled=true` |
-> | `riva-nim.deployed=true` | Not yet available |
-> | `nim-vlm-text-extraction.deployed=true` | Not yet available |
+> | `paddleocr-nim.deployed=true` | `nimOperator.nemoretriever_ocr_v1.enabled=true` |
+> | `riva-nim.deployed=true` | `nimOperator.audio.enabled=true` |
+> | `nim-vlm-text-extraction.deployed=true` | `nimOperator.nemotron_parse.enabled=true` |
 
 The [Nvidia GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html) must also be installed and configured in your cluster.
 
