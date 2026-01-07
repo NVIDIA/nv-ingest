@@ -40,7 +40,7 @@ The following table describes the `extract_method` options.
 
 | Value                | Status       | Description                                      |
 |----------------------|--------------|--------------------------------------------------|
-| `audio`              | Early access | Extract information from audio files.            |
+| `audio`              | Current      | Extract information from audio files.            |
 | `nemotron_parse`     | Current      | NVIDIA Nemotron Parse extraction.                |
 | `ocr`                | Current      | Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt. |
 | `pdfium`             | Current      | Uses PDFium to extract native text. This is the default. This is the fastest method but does not capture text from scanned images/pages. |
