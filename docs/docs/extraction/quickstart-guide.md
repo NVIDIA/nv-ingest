@@ -111,6 +111,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     daf878669036  nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1    "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8009...  nv-ingest-ocr-1
     216bdf11c566  nvcr.io/nim/nvidia/nemoretriever-page-elements-v3:1.7.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
     aee9580b0b9a  nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
+    178a92bf6f7f  nvcr.io/nim/nvidia/nemoretriever-table-struc...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
     7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          7 minutes ago   Up 7 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
     b73bbe0c202d  minio/minio:RELEASE.2023-03-20T20-16-18Z         "/usr/bin/docker-ent…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9000...  minio
     97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  7 minutes ago   Up 7 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
