@@ -1,4 +1,8 @@
-# GitHub Actions Architecture Diagram
+# GitHub Actions Architecture
+
+Complete system architecture documentation for nv-ingest CI/CD pipeline.
+
+---
 
 ## 🏗️ High-Level Architecture
 
@@ -220,94 +224,62 @@ Release/Nightly Workflow
 
 ---
 
-## 📊 Comparison: Old vs New
+## 📊 System Architecture
 
-### Old Structure (9 workflows, high duplication)
-
-```
-build-docs.yml ────────────┐
-                           │ Each has own
-docker-build.yml ──────────┤ Docker build
-                           │ logic (5x)
-docker-build-arm.yml ──────┤
-                           │
-docker-nightly-publish.yml─┤
-                           │
-docker-release-publish.yml─┘
-
-conda-publish.yml ─────────┐ Scheduled
-docker-nightly-publish.yml─┤ separately
-pypi-nightly-publish.yml ──┘ (3 workflows)
-
-pre-commit.yml ────────────┐
-docker-build.yml ──────────┤ PR validation
-test-library-mode.yml ─────┘ (3 workflows)
-```
-
-### New Structure (7 + 6 + 3, DRY principle)
-
-```
-Main Workflows (7):
-├─ ci-pull-request.yml ───┐
-├─ ci-main.yml ───────────┤ Call reusable
-├─ scheduled-nightly.yml ─┤ workflows
-├─ release-docker.yml ────┤
-├─ release-conda.yml ─────┤
-├─ release-pypi.yml ──────┤
-└─ docs-deploy.yml ───────┘
-         │
-         ▼
-Reusable Workflows (6):
-├─ docker-build.yml ──────┐ Single source
-├─ docker-test.yml ───────┤ of truth for
-├─ conda-build.yml ───────┤ each operation
-├─ conda-publish.yml ─────┤
-├─ pypi-build.yml ────────┤
-└─ integration-test.yml ──┘
-         │
-         ▼
-Composite Actions (3):
-├─ setup-docker-buildx ───┐ Common
-├─ docker-login-ngc ──────┤ operations
-└─ determine-version ─────┘
-```
-
----
-
-## 🎯 Benefits Visualization
+### Three-Layer Design
 
 ```
 ┌─────────────────────────────────────────────────┐
-│            BEFORE REFACTORING                   │
-├─────────────────────────────────────────────────┤
-│  9 workflows × avg 50 lines = 450 lines        │
-│  Docker build repeated 5 times                  │
-│  Change requires editing 5+ files              │
-│  Inconsistent patterns                          │
-│  Hard to maintain                               │
-└─────────────────────────────────────────────────┘
-                      │
-                      │ REFACTORING
-                      ▼
-┌─────────────────────────────────────────────────┐
-│            AFTER REFACTORING                    │
-├─────────────────────────────────────────────────┤
-│  7 + 6 + 3 = 16 components                     │
-│  Docker build defined ONCE                      │
-│  Change requires editing 1 file                 │
-│  Consistent patterns everywhere                 │
-│  Easy to maintain                               │
+│            MAIN WORKFLOWS (Layer 1)             │
 │                                                 │
-│  Code Reduction: ~60%                           │
-│  Maintenance: 1 file vs 5+ files               │
-│  Clarity: Clear hierarchy                       │
-│  Reusability: Maximum                           │
+│  7 workflows that respond to GitHub events:    │
+│  - Pull request validation                     │
+│  - Main branch CI                              │
+│  - Scheduled nightly builds                    │
+│  - Release automation (3x)                     │
+│  - Documentation deployment                    │
+│                                                 │
+│  Purpose: Orchestration and event handling     │
+└─────────────────┬───────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────┐
+│        REUSABLE WORKFLOWS (Layer 2)             │
+│                                                 │
+│  7 reusable components for business logic:     │
+│  - Docker build                                │
+│  - Docker test                                 │
+│  - Conda build & publish                       │
+│  - PyPI build & publish                        │
+│  - Integration testing                         │
+│                                                 │
+│  Purpose: Reusable business logic              │
+└─────────────────┬───────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────┐
+│         COMPOSITE ACTIONS (Layer 3)             │
+│                                                 │
+│  3 actions for common operations:              │
+│  - Docker Buildx setup                         │
+│  - NGC authentication                          │
+│  - Version determination                       │
+│                                                 │
+│  Purpose: Shared utilities                     │
 └─────────────────────────────────────────────────┘
 ```
 
+### Benefits of This Architecture
+
+- ✅ **DRY Principle** - Each operation defined once
+- ✅ **Clear Separation** - Orchestration vs logic vs utilities
+- ✅ **Easy Maintenance** - Change logic in one place
+- ✅ **Better Testing** - Test components independently
+- ✅ **Type Safety** - Defined inputs/outputs with validation
+
 ---
 
-## 📈 Execution Timeline Example
+## 📈 Execution Timeline Examples
 
 ### Pull Request (Total: ~15-20 minutes)
 
@@ -351,9 +323,28 @@ Total: ~20 minutes (or ~50 min with integration tests)
 Total: ~45 minutes (parallel execution)
 ```
 
+### Release Process (Total: ~40 minutes)
+
+```
+Create release/25.4.0
+        │
+        ├──────────────┬──────────────┬──────────────┐
+        │              │              │              │
+        ▼              ▼              ▼              ▼
+    Docker        Conda          PyPI         (all parallel)
+    Release       Release        Release
+        │              │              │
+        │              │              │
+00:40 ──┴──────────────┴──────────────┴─ All complete ✓
+
+Total: ~40 minutes (parallel execution)
+```
+
 ---
 
-## 🔐 Security Flow
+## 🔐 Security Architecture
+
+### Access Control Flow
 
 ```
 ┌─────────────────────────────────────────┐
@@ -384,6 +375,13 @@ Total: ~45 minutes (parallel execution)
 └────────┘  └────────┘
 ```
 
+### Secret Management
+
+- Secrets passed explicitly to reusable workflows
+- No implicit secret access
+- Minimal permissions (least privilege principle)
+- `pull_request_target` used safely with access checks
+
 ---
 
 ## 📚 Documentation Structure
@@ -394,17 +392,136 @@ Total: ~45 minutes (parallel execution)
     ├─ README.md ◄───────────── Start here
     │   └─ Points to all other docs
     │
-    ├─ REFACTORING_SUMMARY.md ◄─ Implementation overview
-    │   └─ What was created, why, metrics
+    ├─ INDEX.md ◄───────────────── Complete index
+    │   └─ Documentation navigation guide
     │
-    ├─ WORKFLOWS_QUICKSTART.md ◄ For developers
+    ├─ WORKFLOWS_QUICKSTART.md ◄─ For developers
     │   └─ Quick reference, common tasks
     │
-    ├─ WORKFLOWS_MIGRATION.md ◄─ For DevOps
-    │   └─ Old→New mapping, migration plan
+    ├─ WORKFLOWS_REFERENCE.md ◄─── Complete reference
+    │   └─ All workflows, inputs, outputs, secrets
     │
-    └─ WORKFLOWS_REFERENCE.md ◄─ Complete reference
-        └─ All workflows, inputs, outputs, secrets
+    └─ ARCHITECTURE.md ◄────────── This file
+        └─ System design and architecture
+```
+
+---
+
+## 💡 Design Principles
+
+### 1. Separation of Concerns
+- **Main workflows**: Event handling and orchestration
+- **Reusable workflows**: Business logic and operations
+- **Composite actions**: Common utilities
+
+### 2. Single Source of Truth
+- Docker build logic exists in one place
+- Version determination centralized
+- Authentication handled consistently
+
+### 3. Type Safety
+- Inputs/outputs explicitly defined
+- Required vs optional parameters clear
+- Validation at workflow boundaries
+
+### 4. Parallel Execution
+- Independent jobs run simultaneously
+- Nightly builds publish in parallel
+- Release workflows trigger together
+
+### 5. Fail Fast
+- Pre-commit checks run first
+- Quick validation before expensive operations
+- Clear error reporting
+
+---
+
+## 🎓 Key Concepts
+
+### Reusable Workflows
+
+Workflows that can be called from other workflows:
+
+```yaml
+jobs:
+  build:
+    uses: ./.github/workflows-reusable/docker-build.yml
+    with:
+      platform: 'linux/amd64'
+      push: false
+    secrets:
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+```
+
+**Benefits:**
+- Define once, use many times
+- Type-safe interfaces
+- Centralized logic
+
+### Composite Actions
+
+Custom actions combining multiple steps:
+
+```yaml
+- uses: ./.github/actions/setup-docker-buildx
+  with:
+    use-qemu: 'true'
+    platforms: 'linux/amd64,linux/arm64'
+```
+
+**Benefits:**
+- Reusable across workflows
+- Consistent setup steps
+- Easy to maintain
+
+### Version Determination
+
+Smart version extraction from multiple sources:
+
+```yaml
+- uses: ./.github/actions/determine-version
+  with:
+    branch-name: ${{ github.ref }}
+```
+
+**Logic:**
+1. Check explicit version input
+2. Extract from branch name (`release/X.Y.Z`)
+3. Generate from date (`YYYY.MM.DD`)
+
+---
+
+## 🔄 Data Flow
+
+### Artifact Flow
+
+```
+Build Job
+    └─ Uploads: artifacts
+            │
+            ├─ conda-packages
+            ├─ python-wheels
+            └─ test-artifacts
+                    │
+                    ▼
+            Download Job
+                └─ Uses artifacts for:
+                    - Publishing
+                    - Testing
+                    - Deployment
+```
+
+### Secret Flow
+
+```
+Repository Secrets
+    │
+    ├─ Main Workflow
+    │   └─ Passes to Reusable Workflow
+    │       └─ Uses in steps
+    │
+    └─ Direct to Composite Actions
+        └─ Uses for authentication
 ```
 
 ---
@@ -416,5 +533,3 @@ Total: ~45 minutes (parallel execution)
 - ✅ Type-safe interfaces
 - ✅ Comprehensive documentation
 - ✅ Scalable design
-
-**Last Updated**: January 6, 2025

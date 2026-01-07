@@ -7,7 +7,7 @@ This directory contains all GitHub Actions workflows, reusable components, and d
 ```
 .github/
 ├── workflows/              # Main trigger workflows (7 files)
-├── workflows-reusable/     # Reusable workflow components (6 files)
+├── workflows-reusable/     # Reusable workflow components (7 files)
 ├── actions/                # Composite actions (3 actions)
 ├── ISSUE_TEMPLATE/         # Issue templates
 ├── CODEOWNERS             # Code ownership
@@ -15,10 +15,10 @@ This directory contains all GitHub Actions workflows, reusable components, and d
 ├── copy-pr-bot.yaml
 │
 └── Documentation:
-    ├── REFACTORING_SUMMARY.md    # Overview of refactoring
-    ├── WORKFLOWS_MIGRATION.md    # Migration guide
-    ├── WORKFLOWS_REFERENCE.md    # Complete reference
-    └── WORKFLOWS_QUICKSTART.md   # Quick start guide
+    ├── README.md (this file)   # Overview and quick reference
+    ├── WORKFLOWS_REFERENCE.md  # Complete technical reference
+    ├── WORKFLOWS_QUICKSTART.md # Quick start guide
+    └── ARCHITECTURE.md         # System architecture
 ```
 
 ## 🚀 Quick Start
@@ -26,14 +26,11 @@ This directory contains all GitHub Actions workflows, reusable components, and d
 ### For Developers
 Read: [`WORKFLOWS_QUICKSTART.md`](./WORKFLOWS_QUICKSTART.md)
 
-### For Maintainers
-Read: [`WORKFLOWS_MIGRATION.md`](./WORKFLOWS_MIGRATION.md)
-
 ### For Complete Reference
 Read: [`WORKFLOWS_REFERENCE.md`](./WORKFLOWS_REFERENCE.md)
 
-### For Implementation Details
-Read: [`REFACTORING_SUMMARY.md`](./REFACTORING_SUMMARY.md)
+### For Architecture Details
+Read: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 
 ## 🎯 Workflow Overview
 
@@ -89,7 +86,7 @@ Read: [`REFACTORING_SUMMARY.md`](./REFACTORING_SUMMARY.md)
 │  Main Workflows     │  (Triggered by events)
 │  - ci-pull-request │
 │  - ci-main         │
-│  - scheduled-      │
+│  - scheduled-*     │
 │  - release-*       │
 └──────┬──────────────┘
        │ calls
@@ -112,17 +109,17 @@ Read: [`REFACTORING_SUMMARY.md`](./REFACTORING_SUMMARY.md)
 
 ## 🎯 Key Features
 
-### ✅ DRY Principle
-- Docker build logic defined once
-- Reused across all workflows
-- Single source of truth
+### Reusable Workflows
+- Docker build logic defined once, used everywhere
+- Consistent patterns across all workflows
+- Type-safe interfaces with validation
 
-### ✅ Flexible Configuration
+### Flexible Configuration
 - Reusable workflows accept inputs
 - Composite actions are parameterized
 - Easy to customize per use case
 
-### ✅ Clear Separation
+### Clear Separation
 - Main workflows = triggers + orchestration
 - Reusable workflows = business logic
 - Composite actions = common operations
@@ -178,10 +175,10 @@ Actions → "Nightly Builds & Publishing" → Run workflow
 
 ### Create a release
 ```bash
-# Automatic - All three artifact types published
+# Automatic - All three artifact types (recommended)
 git checkout -b release/25.4.0
 git push origin release/25.4.0
-# → Triggers Docker, Conda, AND PyPI releases automatically!
+# → Triggers Docker, Conda, AND PyPI releases automatically
 
 # Manual (for custom options)
 Actions → Release - Docker/Conda/PyPI → Run workflow
@@ -204,9 +201,8 @@ Actions → Select workflow → View logs → Expand steps
 ## 📚 Documentation
 
 - **Quick Start**: [`WORKFLOWS_QUICKSTART.md`](./WORKFLOWS_QUICKSTART.md)
-- **Migration Guide**: [`WORKFLOWS_MIGRATION.md`](./WORKFLOWS_MIGRATION.md)
 - **Complete Reference**: [`WORKFLOWS_REFERENCE.md`](./WORKFLOWS_REFERENCE.md)
-- **Implementation Summary**: [`REFACTORING_SUMMARY.md`](./REFACTORING_SUMMARY.md)
+- **Architecture**: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 
 ## 🆘 Getting Help
 
@@ -216,22 +212,12 @@ Actions → Select workflow → View logs → Expand steps
 4. Contact DevOps team
 5. Open an issue with details
 
-## 🔄 Recent Changes
-
-**2025-01-06**: Complete refactoring of GitHub Actions
-- Introduced reusable workflows pattern
-- Created composite actions
-- Consolidated 9 workflows into cleaner structure
-- Added comprehensive documentation
-- Reduced code duplication by ~60%
-
 ## 📞 Maintainers
 
 See [`CODEOWNERS`](./CODEOWNERS) for ownership information.
 
 ---
 
-**Last Updated**: January 6, 2025  
 **Architecture**: Reusable workflows + Composite actions  
 **Documentation**: 4 comprehensive guides  
-**Total Files**: 19 (7 workflows + 6 reusable + 3 actions + 3 docs)
+**Total Components**: 17 (7 workflows + 7 reusable + 3 actions)

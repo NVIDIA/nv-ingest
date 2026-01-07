@@ -74,7 +74,7 @@ Actions → "Nightly Builds & Publishing" → Run workflow
 
 #### Quick Release Checklist
 1. Ensure main branch is stable
-2. Create release branch OR trigger manual release
+2. Create release branch
 3. Verify artifacts in respective registries
 4. Update release notes
 
@@ -233,7 +233,7 @@ Required secrets:
 ## 📚 More Information
 
 - **Detailed Reference:** [WORKFLOWS_REFERENCE.md](./WORKFLOWS_REFERENCE.md)
-- **Migration Guide:** [WORKFLOWS_MIGRATION.md](./WORKFLOWS_MIGRATION.md)
+- **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md)
 - **GitHub Actions Docs:** https://docs.github.com/actions
 
 ---
@@ -255,6 +255,6 @@ Required secrets:
 - ✅ Check PR status before requesting review
 - ✅ Re-run failed jobs once (may be transient)
 - ✅ Use workflow_dispatch for testing changes
-- ✅ Monitor first nightly build after workflow changes
+- ✅ Monitor first few nightly builds after workflow changes
 - ✅ Keep secrets up to date (especially API keys)
 - ✅ Tag releases properly for traceability
