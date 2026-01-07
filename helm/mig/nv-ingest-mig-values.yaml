@@ -93,10 +93,10 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-7g.80gb: 1
       requests:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-7g.80gb: 1
 
 # Configure Milvus to use MIG
 milvus:
