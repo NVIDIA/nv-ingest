@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 
 from pydantic import BaseModel
 
-from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema, NemoRetrieverParseConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema, NemotronParseConfigSchema
 from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 CONFIG_SCHEMAS: Dict[str, Any] = {
     "adobe": PDFiumConfigSchema,
     "llama": PDFiumConfigSchema,
-    "nemoretriever_parse": NemoRetrieverParseConfigSchema,
+    "nemotron_parse": NemotronParseConfigSchema,
     "pdfium": PDFiumConfigSchema,
     "tika": PDFiumConfigSchema,
     "unstructured_io": PDFiumConfigSchema,

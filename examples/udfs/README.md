@@ -142,25 +142,155 @@ metadata["custom_content"]["markdown_variant"] = "github_flavored"
 ```
 
 
+## HTML Tables to Markdown Example
+
+**Problem**: You have HTML documents with one or more `<table>` elements and want machine-friendly table representations. Default HTML-to-text extraction will flatten HTML, losing table structure.
+
+**Solution**: The `html_to_markdown_udf.py` finds top-level HTML tables and converts them into Markdown tables. It stores the result in metadata without altering the original content.
+
+> **Works with**: HTML files containing `<table>` elements
+>
+> **Does not work with**: Non-HTML files or HTML without tables
+
+### Quick Start
+
+1. **Understand the UDF Pattern**
+   ```python
+   def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
+       df = control_message.payload()  # Get documents as DataFrame
+       # Process documents (modify df)
+       control_message.payload(df)     # Return updated documents
+       return control_message
+   ```
+
+2. **Use with CLI**
+   ```bash
+   # For HTML files - run UDF BEFORE html_extractor so it can see raw <table> tags
+   nv-ingest-cli \
+     --doc './my_html_docs/' \
+     --task='extract:{"document_type":"html"}' \
+     --task='udf:{"udf_function": "./examples/udfs/html_to_markdown_udf.py:extract_html_tables_to_markdown", "target_stage": "html_extractor", "run_before": true}' \
+     --output_directory=./output
+   ```
+
+3. **Use with Python API**
+   ```python
+   from nv_ingest_client.client.interface import Ingestor
+
+   ingestor = Ingestor()
+   results = ingestor.files("./my_html_docs/") \
+       .extract(document_type="html") \
+       .udf(
+           udf_function="./examples/udfs/html_to_markdown_udf.py:extract_html_tables_to_markdown",
+           target_stage="html_extractor",
+           run_before=True
+       ) \
+       .ingest()
+   ```
+
+### Expected Output
+
+- Adds to each processed row:
+  - `metadata.custom_content.html_tables_markdown: List[str]`
+  - Each list item is a complete Markdown table string
+- Original content is preserved for downstream stages
+- Access CLI outputs in the standard output directory; Python API returns nested results (`results[0]` for the first document)
+
+### Implementation Details
+
+The UDF processes HTML in `metadata["content"]` by:
+- Finding only top-level `<table>` elements (ignores tables nested inside other tables)
+- Converting cell content to Markdown inline formatting (bold, italic, code, links)
+- Preserving row/column alignment with `rowspan` and `colspan` handling
+- Building Markdown tables:
+  - First row is treated as header
+  - Fills merged cells across rows/columns for alignment
+  - Replaces internal newlines with `<br>` for readability
+- Storing results at `metadata["custom_content"]["html_tables_markdown"]`
+
+### Dependencies
+
+This example requires BeautifulSoup:
+```bash
+pip install beautifulsoup4
+```
+
+
 ## LLM Content Summarizer (Production Example)
 
-**Purpose**: Generates document summaries using NVIDIA-hosted LLMs. This production UDF demonstrates how to extract the pipeline payload,
+**Purpose**: Generates document summaries using an LLM. This production UDF demonstrates how to extract the pipeline payload,
 run custom code (summarization), and inject results into the metadata for downstream usecases (such as retrieval).
+
+By default, this uses NVIDIA BUILD-hosted Nemotron-mini-4b-instruct as an example, but you can customize it to use **any OpenAI-compatible endpoint** - other NVIDIA BUILD models, local LLMs (Ollama, vLLM), self-hosted NIM deployments, or other cloud providers.
+
+### Custom Pipeline Configuration (Optional)
+
+For advanced use cases, you can load a custom pipeline configuration from a YAML file. This is **not enabled by default** but can be configured for any custom pipeline implementation.
+
+**Example: High-Concurrency Summarization Pipeline**
+
+An example configuration (`config/custom_summarization_pipeline.yaml`) demonstrates a pipeline with a dedicated high-concurrency UDF stage (8 parallel workers) for LLM summarization.
+
+**To enable custom pipeline loading:**
+
+1. **Uncomment the volume mount** in `docker-compose.yaml`:
+```yaml
+nv-ingest-ms-runtime:
+  volumes:
+    - ${DATASET_ROOT:-./data}:/workspace/data
+    - ./config:/workspace/config  # Uncomment this line
+```
+
+2. **Uncomment and set INGEST_CONFIG_PATH** in `docker-compose.yaml`:
+```yaml
+  environment:
+    # Uncomment and specify your custom pipeline YAML file
+    - INGEST_CONFIG_PATH=/workspace/config/custom_summarization_pipeline.yaml
+```
+
+3. **Rebuild and restart the nv-ingest-ms-runtime container:**
+```bash
+docker-compose up -d --build nv-ingest-ms-runtime
+```
+
+> **Important**: `INGEST_CONFIG_PATH` must point to a **YAML configuration file** inside the container (after volume mount). The file path is relative to the container's filesystem, not the host.
+
+**What's provided as an example:**
+- Sample pipeline YAML: `config/custom_summarization_pipeline.yaml`
+- Includes `udf_parallel_helper` stage with 8 parallel workers
+- Demonstrates how to add custom stages to a pipeline
+- Fully customizable for your specific use case
+
+**To create your own custom pipeline:**
+1. Copy the example: `cp config/custom_summarization_pipeline.yaml config/my_pipeline.yaml`
+2. Edit `config/my_pipeline.yaml` to add/modify stages for your needs
+3. Update `INGEST_CONFIG_PATH` in docker-compose: `/workspace/config/my_pipeline.yaml`
+4. Rebuild and restart: `docker-compose up -d --build nv-ingest-ms-runtime`
+
+**Pipeline customization options:**
+- Add custom stages (extractors, transformers, storage, etc.)
+- Adjust worker counts (`static_replicas: value`) per stage
+- Modify queue sizes between stages
+- Configure memory thresholds and scaling strategies
+- Change service endpoints and model configurations
+
+This approach is useful for production deployments requiring specific pipeline configurations beyond the default setup.
 
 ### Setup & Configuration
 
 Before running the nv-ingest pipeline with the LLM Content Summarizer, set the following environment variables in your shell:
 
 ```bash
-export NVIDIA_API_KEY="your-nvidia-api-key"                                # (required) API key for NVIDIA NIM endpoints
-export LLM_SUMMARIZATION_MODEL="nvidia/llama-3.1-nemotron-70b-instruct"    # (optional) LLM model for summarization
-export LLM_BASE_URL="https://integrate.api.nvidia.com/v1"                  # (optional) Base URL for NVIDIA API
-export TIMEOUT=60                         # (optional) API timeout in seconds
-export MIN_CONTENT_LENGTH=50              # (optional) Minimum content length to trigger summarization
-export MAX_CONTENT_LENGTH=12000           # (optional) Maximum content length sent to the API
+export NVIDIA_API_KEY="your-nvidia-api-key"                                      # (required) API key for NVIDIA NIM endpoints
+export LLM_SUMMARIZATION_MODEL="nvidia/nemotron-mini-4b-instruct"                # (optional) Model to use
+export LLM_SUMMARIZATION_BASE_URL="https://integrate.api.nvidia.com/v1"          # (optional) OpenAI-compatible API endpoint
+export LLM_SUMMARIZATION_TIMEOUT=60                                              # (optional) API timeout in seconds
+export LLM_MIN_CONTENT_LENGTH=50                                                 # (optional) Minimum content length to summarize
+export LLM_MAX_CONTENT_LENGTH=12000                                              # (optional) Maximum content length to API
 ```
 
-- `NVIDIA_API_KEY` is required for calling NVIDIA LLM APIs.
+- `NVIDIA_API_KEY` is required for NVIDIA-hosted endpoints (can use `NGC_API_KEY` as fallback).
+- To use a **local LLM** or other provider, change `LLM_SUMMARIZATION_BASE_URL` and `LLM_SUMMARIZATION_MODEL`.
 - Other settings are optional and will fall back to their defaults if unset.
 
 ### Usage
@@ -210,7 +340,7 @@ After processing, summaries are stored in the output metadata files. Look for th
     "custom_content": {
       "llm_summarizer_udf": {
         "summary": "Your AI-generated summary appears here...",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct"
+        "model": "nvidia/nemotron-mini-4b-instruct"
       }
     }
   }

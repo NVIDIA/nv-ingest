@@ -202,6 +202,13 @@ class _ConcurrentProcessor:
         if not self.job_queue_id:
             logger.warning("job_queue_id is not set; submission of new jobs will fail.")
 
+        # Executor check required for run_async
+        if not hasattr(client, "_worker_pool"):
+            raise AttributeError("Client object is missing the '_worker_pool' attribute, required for run_async.")
+        if not isinstance(client._worker_pool, ThreadPoolExecutor):
+            raise TypeError("Client's '_worker_pool' must be a ThreadPoolExecutor for run_async.")
+        self._executor = client._worker_pool
+
     # --------------------------------------------------------------------------
     # Private Methods
     # --------------------------------------------------------------------------
@@ -246,7 +253,7 @@ class _ConcurrentProcessor:
         # Attempt to mark state as FAILED locally in the client (best effort)
         try:
             # Use a method assumed to safely get the state object
-            job_state = self.client._get_job_state_object(job_index)
+            job_state = self.client._get_and_check_job_state(job_index)
             # Check state exists and is not already terminal before updating
             if (
                 job_state and hasattr(job_state, "state") and job_state.state not in ["FAILED", "COMPLETED"]
@@ -495,7 +502,10 @@ class _ConcurrentProcessor:
 
         return batch_futures_dict, normalized_job_indices
 
-    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
+    # --------------------------------------------------------------------------
+    # Core Processing Logic
+    # --------------------------------------------------------------------------
+    def _process_all_jobs(self) -> Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
         """
         Executes the main processing loop in batches.
 
@@ -639,6 +649,44 @@ class _ConcurrentProcessor:
         self._log_final_status(total_jobs)
 
         return self.results, self.failures, self.traces if self.return_traces else []
+
+    # --------------------------------------------------------------------------
+    # Public Methods
+    # --------------------------------------------------------------------------
+
+    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]:
+        """
+        Executes the main processing loop synchronously.
+
+        This method orchestrates the job processing by maintaining a constant
+        pool of in-flight jobs, handling submissions, fetches, and retries until
+        all jobs are complete. It blocks until all jobs are processed.
+
+        Returns
+        -------
+        Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]
+            A tuple containing:
+            1. A list of successfully fetched job results.
+            2. A list of tuples for failed jobs (job_index, error_message).
+            3. A list of trace dictionaries if `return_traces` was True.
+        """
+        return self._process_all_jobs()
+
+    def run_async(self) -> Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]:
+        """
+        Executes the main processing loop asynchronously.
+
+        Submits the entire processing logic to the client's background
+        thread pool and returns a Future that resolves with the final
+        results, failures, and traces once all jobs are complete.
+
+        Returns
+        -------
+        Future
+            A future representing the asynchronous execution. Its result()
+            will be a tuple containing (results, failures, traces).
+        """
+        return self._executor.submit(self._process_all_jobs)
 
 
 class NvIngestClient:
@@ -1221,7 +1269,7 @@ class NvIngestClient:
         ----------
         batch_size : Optional[int]
             The batch_size value to validate. None uses value from
-            NV_INGEST_BATCH_SIZE environment variable or default 32.
+            NV_INGEST_BATCH_SIZE environment variable or default 16.
 
         Returns
         -------
@@ -1231,18 +1279,18 @@ class NvIngestClient:
         # Handle None/default case
         if batch_size is None:
             try:
-                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "32"))
+                batch_size = int(os.getenv("NV_INGEST_CLIENT_BATCH_SIZE", "16"))
             except ValueError:
-                batch_size = 32
+                batch_size = 16
 
         # Validate type and range
         if not isinstance(batch_size, int):
-            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 32.")
-            return 32
+            logger.warning(f"batch_size must be an integer, got {type(batch_size).__name__}. Using default 16.")
+            return 16
 
         if batch_size < 1:
-            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 32.")
-            return 32
+            logger.warning(f"batch_size must be >= 1, got {batch_size}. Using default 16.")
+            return 16
 
         # Performance guidance warnings
         if batch_size < 8:
@@ -1376,6 +1424,68 @@ class NvIngestClient:
         if failures:
             logger.warning(f"{len(failures)} job(s) failed during concurrent processing." " Check logs for details.")
         return results
+
+    def process_jobs_concurrently_async(
+        self,
+        job_indices: Union[str, List[str]],
+        job_queue_id: Optional[str] = None,
+        batch_size: Optional[int] = None,
+        timeout: int = 100,
+        max_job_retries: Optional[int] = None,
+        retry_delay: float = 0.5,
+        initial_fetch_delay: float = 0.3,
+        fail_on_submit_error: bool = False,
+        completion_callback: Optional[Callable[[Any, str], None]] = None,
+        stream_to_callback_only: bool = False,
+        return_full_response: bool = False,
+        verbose: bool = False,
+        return_traces: bool = False,
+    ) -> Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]:
+        """
+        Submit and fetch multiple jobs concurrently and asynchronously.
+
+        This method initializes the processing and returns a Future immediately. The Future
+        will resolve with a fixed 3-part tuple `(results, failures, traces)` once all
+        jobs have completed.
+
+        Parameters are identical to `process_jobs_concurrently`.
+
+        Returns
+        -------
+        Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]]
+            A future that completes when all jobs are done. Its result is a tuple
+            containing (successful_results, failures, traces).
+        """
+        if isinstance(job_indices, str):
+            job_indices = [job_indices]
+
+        if not job_indices:
+            immediate_future: Future = Future()
+            immediate_future.set_result(([], [], []))
+            return immediate_future
+
+        validated_batch_size = self._validate_batch_size(batch_size)
+        effective_timeout: Tuple[int, Optional[float]] = (int(timeout), None)
+
+        processor = _ConcurrentProcessor(
+            client=self,
+            batch_size=validated_batch_size,
+            job_indices=job_indices,
+            job_queue_id=job_queue_id,
+            timeout=effective_timeout,
+            max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
+            initial_fetch_delay=initial_fetch_delay,
+            completion_callback=completion_callback,
+            fail_on_submit_error=fail_on_submit_error,
+            stream_to_callback_only=stream_to_callback_only,
+            return_full_response=return_full_response,
+            verbose=verbose,
+            return_traces=return_traces,
+        )
+
+        # Asynchronous call
+        return processor.run_async()
 
     def _ensure_submitted(self, job_ids: Union[str, List[str]]) -> None:
         """

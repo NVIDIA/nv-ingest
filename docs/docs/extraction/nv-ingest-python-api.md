@@ -26,8 +26,32 @@ The following table describes methods of the `Ingestor` class.
 | `ingest`       | Submit jobs and retrieve results synchronously. |
 | `load`         | Ensure files are locally accessible (downloads if needed). |
 | `save_to_disk` | Save ingestion results to disk instead of memory. |
+| `store`        | Persist extracted images/structured renderings to an fsspec-compatible backend. |
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+
+### Caption images and control reasoning
+
+The caption task can call a VLM with optional prompt and system prompt overrides:
+
+- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
+- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+
+Example:
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/doc-with-images.pdf")
+    .extract(extract_images=True)
+    .caption(
+        prompt="Caption the content of this image:",
+        system_prompt="/think",  # or "/no_think"
+    )
+    .ingest()
+)
+```
 
 
 
@@ -169,6 +193,64 @@ ingestor = ingestor.extract(document_type="pdf")
 
 
 
+### Extract Office Documents (DOCX and PPTX)
+
+NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+
+- Native extraction
+- Render as PDF
+
+#### Native Extraction (Default)
+
+The default methods (`python_docx` and `python_pptx`) extract content directly from the file structure.
+This is generally faster, but you might lose some visual layout information.
+
+```python
+# Uses default native extraction
+ingestor = Ingestor().files(["report.docx", "presentation.pptx"]).extract()
+```
+
+#### Render as PDF
+
+The `render_as_pdf` method uses [LibreOffice](https://www.libreoffice.org/) to convert the document to a PDF before extraction.
+We recommend this approach when preserving the visual layout is critical, or when you need to extract visual elements, such as tables and charts, that are better detected by using computer vision on a rendered page.
+
+```python
+ingestor = Ingestor().files(["report.docx", "presentation.pptx"])
+
+ingestor = ingestor.extract(
+    extract_text=True,
+    extract_tables=True,
+    extract_charts=True,
+    extract_infographics=True,
+    extract_method="render_as_pdf"  # Convert to PDF first for improved visual extraction
+)
+```
+
+
+
+### PDF Extraction Strategies
+
+NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
+You can select the strategy by using the following values for the `extract_method` parameter.
+
+- **pdfium** – Uses PDFium to extract native text. This is the default. This is the fastest method but does not capture text from scanned images/pages.
+- **pdfium_hybrid** – A hybrid approach that uses PDFium for pages with native text and automatically switches to OCR for scanned pages. This offers a robust balance of speed and coverage for mixed documents.
+- **ocr** – Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt.
+
+```python
+ingestor = Ingestor().files("mixed_content.pdf")
+
+# Use hybrid mode for mixed digital/scanned PDFs
+ingestor = ingestor.extract(
+    document_type="pdf",
+    extract_method="pdfium_hybrid",
+)
+results = ingestor.ingest()
+```
+
+
+
 ## Work with Large Datasets: Save to Disk
 
 By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
@@ -303,6 +385,95 @@ ingestor = ingestor.embed(
 )
 ```
 
+## Store Extracted Images
+
+The `store` method exports decoded images (unstructured images as well as structured renderings such as tables and charts) to any fsspec-compatible URI so you can inspect or serve the generated visuals.
+
+```python
+ingestor = ingestor.store(
+    structured=True,   # persist table/chart renderings
+    images=True,       # persist unstructured images
+    storage_uri="file:///workspace/data/artifacts/store/images",  # Supports file://, s3://, etc.
+    public_base_url="https://assets.example.com/images"  # Optional CDN/base URL for download links
+)
+```
+
+### Store Method Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `structured` | bool | Persist table and chart renderings. Default: `False` |
+| `images` | bool | Persist unstructured images extracted from documents. Default: `False` |
+| `storage_uri` | str | fsspec-compatible URI (`file://`, `s3://`, `gs://`, etc.). Defaults to server-side `IMAGE_STORAGE_URI` environment variable. |
+| `public_base_url` | str | Optional HTTP(S) base URL for serving stored images. When set, metadata includes public download links. |
+
+### Supported Storage Backends
+
+The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for storage, supporting multiple backends:
+
+| Backend | URI Format | Example |
+|---------|------------|---------|
+| Local filesystem | `file://` | `file:///workspace/data/images` |
+| Amazon S3 | `s3://` | `s3://my-bucket/extracted-images` |
+| Google Cloud Storage | `gs://` | `gs://my-bucket/images` |
+| Azure Blob Storage | `abfs://` | `abfs://container@account.dfs.core.windows.net/images` |
+| MinIO (S3-compatible) | `s3://` | `s3://nv-ingest/artifacts/store/images` (default) |
+
+!!! tip
+
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the nv-ingest runtime so the container picks up the new value.
+
+When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
+
+### Docker Volume Mounts for Local Storage
+
+When running nv-ingest via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+
+By default, the `docker-compose.yaml` mounts a single volume:
+
+```yaml
+volumes:
+  - ${DATASET_ROOT:-./data}:/workspace/data
+```
+
+This means:
+
+| Container Path | Host Path | Works with `file://`? |
+|----------------|-----------|----------------------|
+| `/workspace/data/...` | `${DATASET_ROOT}/...` (default: `./data/...`) | ✅ Yes |
+| `/tmp/...` | (container only) | ❌ No - files lost on restart |
+| `/raid/custom/path` | (container only) | ❌ No - path not mounted |
+
+**Example: Save to host filesystem**
+
+```python
+# Files save to ./data/artifacts/images on the host
+ingestor = ingestor.store(
+    structured=True,
+    images=True,
+    storage_uri="file:///workspace/data/artifacts/images"
+)
+```
+
+**Example: Use a custom host directory**
+
+```bash
+# Set DATASET_ROOT before starting services
+export DATASET_ROOT=/raid/my-project/nv-ingest-data
+docker compose up -d
+```
+
+```python
+# Now /workspace/data maps to /raid/my-project/nv-ingest-data
+ingestor = ingestor.store(
+    structured=True,
+    images=True,
+    storage_uri="file:///workspace/data/extracted-images"
+)
+# Files save to /raid/my-project/nv-ingest-data/extracted-images on host
+```
+
+For more information on environment variables, refer to [Environment Variables](environment-config.md).
 
 
 ## Extract Audio
@@ -337,6 +508,6 @@ results = ingestor.ingest()
 
 - [Split Documents](chunking.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md)
-- [Use NeMo Retriever Extraction with Riva for Audio Processing](nemoretriever-parse.md)
+- [Advanced Visual Parsing](nemoretriever-parse.md)
+- [Use NeMo Retriever Extraction with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)

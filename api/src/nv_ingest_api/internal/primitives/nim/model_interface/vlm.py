@@ -82,6 +82,7 @@ class VLMModelInterface(ModelInterface):
 
         images = data.get("base64_images", [])
         prompt = data["prompt"]
+        system_prompt = data.get("system_prompt")
 
         # Helper function to chunk the list into batches.
         def chunk_list(lst, chunk_size):
@@ -91,17 +92,31 @@ class VLMModelInterface(ModelInterface):
         payloads = []
         batch_data_list = []
         for batch in batches:
+            messages = []
+
+            if system_prompt:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    }
+                )
+            else:
+                logger.debug("VLM: No system prompt provided, using default")
+
             # Create one message per image in the batch.
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": f"{prompt}"},
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
-                    ],
-                }
-                for img in batch
-            ]
+            messages.extend(
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"{prompt}"},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
+                        ],
+                    }
+                    for img in batch
+                ]
+            )
             payload = {
                 "model": kwargs.get("model_name"),
                 "messages": messages,
@@ -111,7 +126,10 @@ class VLMModelInterface(ModelInterface):
                 "stream": kwargs.get("stream", False),
             }
             payloads.append(payload)
-            batch_data_list.append({"base64_images": batch, "prompt": prompt})
+            batch_data = {"base64_images": batch, "prompt": prompt}
+            if system_prompt:
+                batch_data["system_prompt"] = system_prompt
+            batch_data_list.append(batch_data)
         return payloads, batch_data_list
 
     def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:

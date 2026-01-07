@@ -145,3 +145,26 @@ def extract_file_content(path: str) -> Tuple[str, DocumentTypeEnum]:
 
     logger.debug(f"Content extracted from '{path}'")
     return content, DocumentTypeEnum(document_type)
+
+
+def extract_content_from_buffer(buffer: Tuple[str, BytesIO]) -> Tuple[str, str]:
+    """
+    Extracts the content and type from a buffer.
+    """
+    document_type = get_or_infer_file_type(buffer[0])
+    try:
+        if document_type in [
+            DocumentTypeEnum.TXT,
+            DocumentTypeEnum.MD,
+            DocumentTypeEnum.HTML,
+        ]:
+            content = detect_encoding_and_read_text_file(buffer[1])
+        else:
+            content = serialize_to_base64(buffer[1])
+    except Exception as e:
+        logger.error(f"Error processing buffer {buffer[0]}: {e}")
+
+        raise ValueError(f"Failed to extract content from buffer {buffer[0]}") from e
+
+    logger.debug(f"Content extracted from '{buffer[0]}'")
+    return content, DocumentTypeEnum(document_type)

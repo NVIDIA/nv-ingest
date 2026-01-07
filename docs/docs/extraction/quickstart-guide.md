@@ -45,7 +45,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     ```
 
 
-5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container instead of the default PaddleOCR. Currently, the NemoRetriever OCR v1 container is in early access preview. [Configure Helm](https://github.com/nkmcalli/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
+5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container. [Configure Helm](https://github.com/nvidia/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
 
     ```
     OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
@@ -69,7 +69,10 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     !!! tip
 
-    	For optimal performance on specific hardware, you can use `docker-compose` override files. Override files adjust settings, such as memory allocation, for different GPU architectures. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+        The default configuration may not fit on a single GPU for some hardware targets. If you are running on any of the following GPUs, use a `docker compose` override file to reduce VRAM usage:
+        - A100-SXM4-40GB
+        - A10G
+        Override files typically lower per-service memory allocation, batch sizes, or concurrency. This trades peak throughput for making the full pipeline runnable on the available GPU. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
 
     The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
     ```shell
@@ -101,20 +104,19 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
-    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  3 minutes ago   Up 3 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
-    62c6b999c413  zilliz/attu:...                                  "docker-entrypoint.s…"  13 minutes ago  Up 3 minutes            0.0.0.0:3001...  milvus-attu
-    14ef31ed7f49  milvusdb/milvus:...                              "/tini -- milvus run…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
-    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  13 minutes ago  Up 3 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
-    fb252020e4d2  nvcr.io/nvidia/nim/nemoretriever-graphic-ele...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
-    c944a9d76831  nvcr.io/nvidia/nim/paddleocr:...                 "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8009...  nv-ingest-paddle-1
-    5bea344526a2  nvcr.io/nvidia/nim/nemoretriever-page-elements   "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
-    16dc2311a6cc  nvcr.io/nvidia/nim/llama-3.2-nv-embedqa...       "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
-    cea3ce001888  nvcr.io/nvidia/nim/nemoretriever-table-struc...  "/opt/nim/start_serv…"  13 minutes ago  Up 3 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
-    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          13 minutes ago  Up 3 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
-    b73bbe0c202d  minio/minio:RELEASE...                           "/usr/bin/docker-ent…"  13 minutes ago  Up 3 minutes (healthy)  0.0.0.0:9000...  minio
-    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  13 minutes ago  Up 3 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
-    f17cb556b086  grafana/grafana                                  "/run.sh"               13 minutes ago  Up 3 minutes            0.0.0.0:3000...  grafana-service
-    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        13 minutes ago  Up 3 minutes            0.0.0.0:6379...  nv-ingest-redis-1
+    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
+    14ef31ed7f49  milvusdb/milvus:v2.5.3-gpu                       "/tini -- bash -c 's…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
+    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  7 minutes ago   Up 7 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
+    5bd0b48eb71b  nvcr.io/nim/nvidia/nemoretriever-graphic-ele...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
+    daf878669036  nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1    "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8009...  nv-ingest-ocr-1
+    216bdf11c566  nvcr.io/nim/nvidia/nemoretriever-page-elements-v3:1.7.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8000...  nv-ingest-page-elements-1
+    aee9580b0b9a  nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8012...  nv-ingest-embedding-1
+    178a92bf6f7f  nvcr.io/nim/nvidia/nemoretriever-table-struc...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8006...  nv-ingest-table-structure-1
+    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          7 minutes ago   Up 7 minutes (healthy)  9410/tcp...      nv-ingest-zipkin-1
+    b73bbe0c202d  minio/minio:RELEASE.2023-03-20T20-16-18Z         "/usr/bin/docker-ent…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9000...  minio
+    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  7 minutes ago   Up 7 minutes            0.0.0.0:9090...  nv-ingest-prometheus-1
+    f17cb556b086  grafana/grafana                                  "/run.sh"               7 minutes ago   Up 7 minutes            0.0.0.0:3000...  grafana-service
+    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        7 minutes ago   Up 7 minutes            0.0.0.0:6379...  nv-ingest-redis-1
     ```
 
 
@@ -138,7 +140,8 @@ pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L265). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the [nv-ingest-cli](#ingest_cli_example) and [Python](#ingest_python_example) examples described below.
+    Because various service URIs default to `localhost`, running within the NV-Ingest container will also require URIs to be manually specified in order for services to be accessed between containers on the internal Docker network. See the [code below](#ingest_python_example) for an example specifying `milvus_uri`.
 
 
 ## Step 3: Ingesting Documents
@@ -149,7 +152,7 @@ In the following examples, we do text, chart, table, and image extraction.
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and either [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) or NemoRetriever OCR for table extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and NemoRetriever OCR for table extraction.
 - **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
@@ -159,7 +162,7 @@ In the following examples, we do text, chart, table, and image extraction.
 
     For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
-
+<a id="ingest_python_example"></a>
 ```python
 import logging, os, time
 from nv_ingest_client.client import Ingestor, NvIngestClient
@@ -179,14 +182,15 @@ ingestor = (
         extract_images=True,
         table_output_format="markdown",
         extract_infographics=True,
-        # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+        # extract_method="nemotron_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
     ).embed()
     .vdb_upload(
         collection_name="test",
         sparse=False,
         # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048
+        dense_dim=2048,
+        # milvus_uri="http://milvus:19530"  # When running from within a container, the URI to the Milvus service is specified using the internal Docker network.
     )
 )
 
@@ -212,7 +216,7 @@ if failures:
 
 !!! note
 
-    To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+    For advanced visual parsing in self-hosted mode, uncomment `extract_method="nemotron_parse"` in the previous code. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
 
 
 The output looks similar to the following.
@@ -299,6 +303,7 @@ image_caption:[]
 
     There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
+<a id="ingest_cli_example"></a>
 ```shell
 nv-ingest-cli \
   --doc ./data/multimodal_test.pdf \
@@ -428,8 +433,8 @@ You can specify multiple `--profile` options.
 |-----------------------|----------|-------------------------------------------------------------------| 
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | 
-| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | 
-| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
+| `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
 

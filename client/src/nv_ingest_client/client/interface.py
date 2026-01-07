@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import threading
+from io import BytesIO
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -52,6 +53,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
+from nv_ingest_client.util.file_processing.extract import EXTENSION_TO_DOCUMENT_TYPE
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs, apply_pdf_split_config_to_job_specs
@@ -224,6 +226,7 @@ class Ingestor:
         **kwargs,
     ):
         self._documents = documents or []
+        self._buffers = []
         self._client = client
         self._job_queue_id = job_queue_id
         self._vdb_bulk_upload = None
@@ -352,6 +355,28 @@ class Ingestor:
 
         return self
 
+    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "Ingestor":
+        """
+        Add buffers for processing.
+
+        Parameters
+        ----------
+        buffers : List[Tuple[str, BytesIO]]
+            List of tuples containing the name of the buffer and the BytesIO object.
+        """
+        if (
+            isinstance(buffers, tuple)
+            and len(buffers) == 2
+            and isinstance(buffers[0], str)
+            and isinstance(buffers[1], BytesIO)
+        ):
+            buffers = [buffers]
+        self._buffers.extend(buffers)
+        self._job_specs = BatchJobSpec(self._buffers)
+        self._all_local = True
+
+        return self
+
     def load(self, **kwargs) -> "Ingestor":
         """
         Ensure all document files are accessible locally, downloading if necessary.
@@ -396,6 +421,92 @@ class Ingestor:
         self._all_local = True
 
         return self
+
+    def _resolve_source_name(self, job_id: str, results_data: Optional[Union[List, Dict]] = None) -> str:
+        """
+        Resolves the source name for a given job ID using available metadata or fallback options.
+
+        Parameters
+        ----------
+        job_id : str
+            The job identifier.
+        results_data : Any, optional
+            The data associated with the job result, which might contain metadata.
+
+        Returns
+        -------
+        str
+            The resolved source name.
+        """
+        source_name = "unknown_source"
+        job_spec = self._client._job_index_to_job_spec.get(job_id)
+
+        if job_spec:
+            source_name = job_spec.source_name
+        else:
+            try:
+                if results_data:
+                    first_item = results_data[0] if isinstance(results_data, list) and results_data else results_data
+                    if isinstance(first_item, dict):
+                        source_name = first_item.get("metadata", {}).get("source_metadata", {}).get("source_id", "")
+                        if not source_name:
+                            source_name = f"{job_id}"
+            except (IndexError, KeyError, TypeError):
+                source_name = f"{job_id}"
+
+        return source_name
+
+    def _write_results_to_disk(self, doc_data: Any, source_name: str, job_id: str) -> Optional[LazyLoadedList]:
+        """
+        Writes the results for a single job to a JSONL file and returns a LazyLoadedList.
+
+        Parameters
+        ----------
+        doc_data : Any
+            The result data to save.
+        source_name : str
+            The name of the source document.
+        job_id : str
+            The job identifier.
+
+        Returns
+        -------
+        Optional[LazyLoadedList]
+            A proxy object to the saved file, or None if the save failed.
+        """
+        if not self._output_config:
+            logger.warning("Attempted to write results to disk without output configuration.")
+            return None
+
+        try:
+            output_dir = self._output_config["output_directory"]
+            clean_source_basename = get_valid_filename(os.path.basename(source_name))
+            file_name, file_ext = os.path.splitext(clean_source_basename)
+            file_suffix = f".{file_ext.strip('.')}.results.jsonl"
+            if self._output_config["compression"] == "gzip":
+                file_suffix += ".gz"
+            jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
+
+            data_to_save = doc_data if isinstance(doc_data, list) else [doc_data]
+
+            num_items_saved = save_document_results_to_jsonl(
+                data_to_save,
+                jsonl_filepath,
+                source_name,
+                ensure_parent_dir_exists=False,
+                compression=self._output_config["compression"],
+            )
+
+            if num_items_saved > 0:
+                return LazyLoadedList(
+                    jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
+                )
+        except Exception as e_save:
+            logger.error(
+                f"Disk save I/O task error for job {job_id} (source: {source_name}): {e_save}",
+                exc_info=True,
+            )
+        return None
 
     def ingest(
         self,
@@ -464,52 +575,19 @@ class Ingestor:
 
         def _perform_save_task(doc_data, job_id, source_name):
             # This function runs in the io_executor
-            try:
-                output_dir = self._output_config["output_directory"]
-                clean_source_basename = get_valid_filename(os.path.basename(source_name))
-                file_name, file_ext = os.path.splitext(clean_source_basename)
-                file_suffix = f".{file_ext.strip('.')}.results.jsonl"
-                if self._output_config["compression"] == "gzip":
-                    file_suffix += ".gz"
-                jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
-
-                num_items_saved = save_document_results_to_jsonl(
-                    doc_data,
-                    jsonl_filepath,
-                    source_name,
-                    ensure_parent_dir_exists=False,
-                    compression=self._output_config["compression"],
-                )
-
-                if num_items_saved > 0:
-                    results = LazyLoadedList(
-                        jsonl_filepath, expected_len=num_items_saved, compression=self._output_config["compression"]
-                    )
-                    if results_lock:
-                        with results_lock:
-                            final_results_payload_list.append(results)
-                    else:  # Should not happen if io_executor is used
+            results = self._write_results_to_disk(doc_data, source_name, job_id)
+            if results:
+                if results_lock:
+                    with results_lock:
                         final_results_payload_list.append(results)
-            except Exception as e_save:
-                logger.error(
-                    f"Disk save I/O task error for job {job_id} (source: {source_name}): {e_save}",
-                    exc_info=True,
-                )
+                else:  # Should not happen if io_executor is used
+                    final_results_payload_list.append(results)
 
         def _disk_save_callback(
             results_data: Dict[str, Any],
             job_id: str,
         ):
-            source_name = "unknown_source_in_callback"
-            job_spec = self._client._job_index_to_job_spec.get(job_id)
-            if job_spec:
-                source_name = job_spec.source_name
-            else:
-                try:
-                    if results_data:
-                        source_name = results_data[0]["metadata"]["source_metadata"]["source_id"]
-                except (IndexError, KeyError, TypeError):
-                    source_name = f"{job_id}"
+            source_name = self._resolve_source_name(job_id, results_data)
 
             if not results_data:
                 logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
@@ -669,57 +747,191 @@ class Ingestor:
 
         return tuple(returns) if len(returns) > 1 else results
 
-    def ingest_async(self, **kwargs: Any) -> Future:
+    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **kwargs: Any) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
+        The return type of the future's result is dynamic and mirrors the behavior of the synchronous
+        `ingest()` method, controlled by the `return_failures` and `return_traces` flags. If a VDB
+        upload is configured, the future will complete *after* the VDB upload finishes.
+
         Parameters
         ----------
+        return_failures : bool, optional
+            If True, return a tuple containing failures; otherwise, only return results. Default is False.
+        return_traces : bool, optional
+            If True, return trace metrics alongside results. Default is False.
         kwargs : dict
-            Additional parameters for the `submit_job_async` method.
+            Additional parameters passed to the concurrent processor.
+            Optional flags include `include_parent_trace_ids=True` to also return
+            parent job trace identifiers (V2 API only).
 
         Returns
         -------
-        Future
-            A future that completes when all submitted jobs have reached a terminal state.
+        Future[Union[List[Any], Tuple[Any, ...]]]
+            A future that completes when all jobs and any subsequent VDB upload
+            have finished. Its result will be one of the following:
+            - Default: list of results
+            - return_failures=True: (results, failures)
+            - return_traces=True: (results, traces)
+            - return_failures=True, return_traces=True: (results, failures, traces)
+
         """
-        self._prepare_ingest_run()
+        try:
+            self._prepare_ingest_run()
 
-        self._job_ids = self._client.add_job(self._job_specs)
+            # Add jobs locally first
+            if self._job_specs is None:
+                raise RuntimeError("Job specs missing for ingest_async.")
+            self._job_ids = self._client.add_job(self._job_specs)
+            self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
-        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
-        self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
+            proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently_async, **kwargs)
 
-        combined_future = Future()
-        submitted_futures = set(future_to_job_id.keys())
-        completed_futures = set()
-        future_results = []
-        vdb_future = None
+            stream_to_callback_only = False
+            completion_callback = None
+            async_results_map = {}
 
-        def _done_callback(future):
-            job_id = future_to_job_id[future]
-            job_state = self._job_states[job_id]
-            try:
-                result = self._client.fetch_job_result(job_id)
-                if job_state.state != JobStateEnum.COMPLETED:
-                    job_state.state = JobStateEnum.COMPLETED
-            except Exception:
-                result = None
-                if job_state.state != JobStateEnum.FAILED:
-                    job_state.state = JobStateEnum.FAILED
-            completed_futures.add(future)
-            future_results.extend(result)
-            if completed_futures == submitted_futures:
-                combined_future.set_result(future_results)
+            io_executor = None
+            io_futures = []
 
-        for future in future_to_job_id:
-            future.add_done_callback(_done_callback)
+            if self._output_config:
+                stream_to_callback_only = True
+                output_dir = self._output_config["output_directory"]
 
-        if self._vdb_bulk_upload:
-            executor = ThreadPoolExecutor(max_workers=1)
-            vdb_future = executor.submit(self._vdb_bulk_upload.run_async, combined_future)
+                os.makedirs(output_dir, exist_ok=True)
 
-        return combined_future if not vdb_future else vdb_future
+                io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="IngestAsyncIO")
+
+                def _io_task(data: Dict[str, Any], job_id: str):
+                    try:
+                        source_name = self._resolve_source_name(job_id, data)
+                        result = self._write_results_to_disk(data, source_name, job_id)
+                        if result:
+                            # Store the LazyLoadedList in our map using job_id as key
+                            async_results_map[job_id] = result
+                    except Exception as e:
+                        logger.error(f"Error in async I/O task for job {job_id}: {e}", exc_info=True)
+
+                def _composite_callback(data: Dict[str, Any], job_id: str):
+                    """Callback executed by worker threads to save data to disk."""
+                    try:
+                        future = io_executor.submit(_io_task, data, job_id)
+                        io_futures.append(future)
+                    except Exception as e:
+                        logger.error(f"Error in async callback for job {job_id}: {e}", exc_info=True)
+
+                completion_callback = _composite_callback
+
+            final_future: Future = Future()
+
+            processor_future = self._client.process_jobs_concurrently_async(
+                job_indices=self._job_ids,
+                job_queue_id=self._job_queue_id,
+                return_traces=return_traces,
+                completion_callback=completion_callback,
+                stream_to_callback_only=stream_to_callback_only,
+                **proc_kwargs,
+            )
+
+            include_parent_trace_ids = bool(kwargs.get("include_parent_trace_ids", False))
+
+            def _processor_done_callback(proc_future: Future):
+                """Callback to handle completion, VDB upload, and final result setting."""
+                try:
+                    if proc_future.cancelled():
+                        if not final_future.done():
+                            final_future.cancel()
+                        return
+                    if proc_future.exception():
+                        if not final_future.done():
+                            final_future.set_exception(proc_future.exception())
+                        return
+
+                    results, failures, traces_list = proc_future.result()
+
+                    if io_executor:
+                        for f in as_completed(io_futures):
+                            if f.exception():
+                                logger.error(f"Async I/O task failed: {f.exception()}")
+                        io_executor.shutdown(wait=True)
+
+                    final_results_list = []
+                    if self._output_config:
+                        for item in results:
+                            if isinstance(item, str) and item in async_results_map:
+                                final_results_list.append(async_results_map[item])
+                    else:
+                        final_results_list = results
+
+                    failed_job_ids = set()
+                    for job_id_with_source, error_msg in failures:
+                        job_id = job_id_with_source.split(":", 1)[0]
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.FAILED:
+                                self._job_states[job_id].state = JobStateEnum.FAILED
+                            failed_job_ids.add(job_id)
+
+                    all_submitted_job_ids = set(self._job_ids)
+                    successful_job_ids = all_submitted_job_ids - failed_job_ids
+
+                    for job_id in successful_job_ids:
+                        if job_id in self._job_states:
+                            if self._job_states[job_id].state != JobStateEnum.COMPLETED:
+                                self._job_states[job_id].state = JobStateEnum.COMPLETED
+
+                    if self._vdb_bulk_upload and final_results_list:
+                        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
+                            results_future = Future()
+                            results_future.set_result(final_results_list)
+                            vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
+                            vdb_future.result()
+
+                            if self._purge_results_after_vdb_upload and self._output_config:
+                                logger.info("Purging saved results from disk after successful VDB upload.")
+                                self._purge_saved_results(final_results_list)
+
+                    parent_trace_ids = (
+                        self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
+                    )
+
+                    returns = [final_results_list]
+                    if return_failures:
+                        returns.append(failures)
+                    if return_traces:
+                        returns.append(traces_list)
+                    if include_parent_trace_ids:
+                        returns.append(parent_trace_ids)
+
+                    final_result = tuple(returns) if len(returns) > 1 else final_results_list
+
+                    if not final_future.done():
+                        final_future.set_result(final_result)
+
+                except Exception as e:
+                    logger.exception("Error in ingest_async processor callback")
+                    if not final_future.done():
+                        final_future.set_exception(e)
+                finally:
+                    final_state = JobStateEnum.CANCELLED if proc_future.cancelled() else JobStateEnum.FAILED
+                    for job_state in self._job_states.values():
+                        if (
+                            job_state.state not in [JobStateEnum.COMPLETED, JobStateEnum.FAILED]
+                            and job_state.state != final_state
+                        ):
+                            job_state.state = final_state
+
+                    if io_executor:
+                        io_executor.shutdown(wait=False)
+
+            processor_future.add_done_callback(_processor_done_callback)
+            return final_future
+
+        except Exception as setup_err:
+            logger.exception("Failed during synchronous setup of ingest_async")
+            error_future: Future[Tuple[List[Any], List[Tuple[str, str]], List[Optional[Dict[str, Any]]]]] = Future()
+            error_future.set_exception(setup_err)
+            return error_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):
@@ -863,11 +1075,18 @@ class Ingestor:
                 **kwargs,
             )
 
+            api_document_type = EXTENSION_TO_DOCUMENT_TYPE.get(document_type.lower(), document_type)
+
             # Extract method from task_options for API schema
             method = task_options.pop("extract_method", None)
             if method is None:
                 # Let ExtractTask constructor handle default method selection
-                method = "pdfium"  # Default fallback
+                if api_document_type == "docx":
+                    method = "python_docx"
+                elif api_document_type == "pptx":
+                    method = "python_pptx"
+                else:
+                    method = "pdfium"  # Default fallback
 
             # Build params dict for API schema
             params = {k: v for k, v in task_options.items() if k != "document_type"}
@@ -988,13 +1207,9 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        # Handle parameter name mapping: store_method -> method for API schema
-        if "store_method" in kwargs:
-            kwargs["method"] = kwargs.pop("store_method")
-
-        # Provide default method if not specified (matching client StoreTask behavior)
-        if "method" not in kwargs:
-            kwargs["method"] = "minio"
+        deprecated_method = kwargs.pop("store_method", None)
+        if deprecated_method is not None:
+            logger.warning("`store_method` is deprecated and no longer used. Configure storage_uri instead.")
 
         task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
 
@@ -1002,7 +1217,9 @@ class Ingestor:
         store_params = {
             "structured": task_options.structured,
             "images": task_options.images,
-            "store_method": task_options.method,  # Map method back to store_method
+            "storage_uri": task_options.storage_uri,
+            "storage_options": task_options.storage_options,
+            "public_base_url": task_options.public_base_url,
             "params": task_options.params,
         }
         store_task = StoreTask(**store_params)
@@ -1247,6 +1464,7 @@ class Ingestor:
             "api_key": task_options.api_key,
             "endpoint_url": task_options.endpoint_url,
             "prompt": task_options.prompt,
+            "system_prompt": task_options.system_prompt,
             "model_name": task_options.model_name,
         }
         caption_task = CaptionTask(**caption_params)

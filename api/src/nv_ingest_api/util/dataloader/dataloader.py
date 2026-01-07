@@ -94,7 +94,7 @@ else:
             logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
             return None
 
-    def strip_audio_from_video_files(input_path: str, output_dir: str, cache_path: str = None):
+    def strip_audio_from_video_files(input_path: str, output_dir: str, cache_path: str = None, file_type=".mp4"):
         """
         Strip the audio from a series of video files and return the paths to the new files.
         input_path: str, path to the video file
@@ -106,7 +106,7 @@ else:
         futures = []
         results = None
         path = Path(input_path)
-        files = [path] if path.is_file() else glob.glob(os.path.join(path, "*.mp4"))
+        files = [path] if path.is_file() else glob.glob(os.path.join(path, f"*{file_type}"))
         files = [Path(file) for file in files]
         with ThreadPoolExecutor(max_workers=15) as executor:
             futures = [executor.submit(_get_audio_from_video, file, output_path / f"{file.stem}.mp3") for file in files]
@@ -234,7 +234,7 @@ else:
             for to_remove in files_to_remove:
                 to_remove = Path(to_remove)
                 if to_remove.is_file():
-                    logger.error(f"Removing file {to_remove}")
+                    logger.debug(f"Removing file {to_remove}")
                     to_remove.unlink()
             return files
 

@@ -63,7 +63,7 @@ Ingestor link to see descriptions of the available tasks)
             extract_images=True,
             paddle_output_format="markdown",
             extract_infographics=True,
-            # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            # extract_method="nemotron_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
             text_depth="page"
         ).embed()
         .vdb_upload(

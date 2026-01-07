@@ -122,11 +122,16 @@ def get_pdf_split_page_count(client_override: Optional[int] = None) -> int:
         )
         return DEFAULT_PDF_SPLIT_PAGE_COUNT
 
-    if parsed <= 0:
-        logger.warning("PDF_SPLIT_PAGE_COUNT must be >= 1; received %s. Using 1.", parsed)
-        return 1
-
-    return parsed
+    clamped = max(MIN_PAGES, min(parsed, MAX_PAGES))
+    if clamped != parsed:
+        logger.warning(
+            "Env PDF_SPLIT_PAGE_COUNT=%s clamped to %s (min=%s, max=%s)",
+            parsed,
+            clamped,
+            MIN_PAGES,
+            MAX_PAGES,
+        )
+    return clamped
 
 
 def split_pdf_to_chunks(pdf_content: bytes, pages_per_chunk: int) -> List[Dict[str, Any]]:
@@ -955,7 +960,7 @@ async def submit_job_v2(
                         "subjob_order": subjob_ids,
                     }
                 )
-        elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav"]:
+        elif document_types and payloads and document_types[0].lower() in ["mp4", "mov", "avi", "mp3", "wav", "mkv"]:
             document_type = document_types[0]
             upload_path = f"./{Path(original_source_id).name}"
             # dump the payload to a file, just came from client
@@ -1003,7 +1008,7 @@ async def submit_job_v2(
                         "page_count": chunk.get("page_count", 0),
                     }
                 )
-            logger.error(f"Removing uploaded file {upload_path}")
+            logger.debug(f"Removing uploaded file {upload_path}")
             os.remove(upload_path)
 
         if submission_items:

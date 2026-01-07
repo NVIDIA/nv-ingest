@@ -22,6 +22,8 @@ You can specify these in your .env file or directly in your environment.
 | `NIM_NGC_API_KEY`                | —                                                          | The key that NIM microservices inside docker containers use to access NGC resources. This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` is used to access NGC resources. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`    | `http://otel-collector:4317` <br/>                       | The endpoint for the OpenTelemetry exporter, used for sending telemetry data. |
 | `REDIS_INGEST_TASK_QUEUE`        | `ingest_task_queue` <br/>                              | The name of the task queue in Redis where tasks are stored and processed. |
+| `IMAGE_STORAGE_URI`              | `s3://nv-ingest/artifacts/store/images` <br/>          | Default fsspec-compatible URI for the `store` task. Supports `s3://`, `file://`, `gs://`, etc. See [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images). |
+| `IMAGE_STORAGE_PUBLIC_BASE_URL`  | `https://assets.example.com/images` <br/>              | Optional HTTP(S) base URL for serving stored images. |
 
 
 ## Library Mode Environment Variables
