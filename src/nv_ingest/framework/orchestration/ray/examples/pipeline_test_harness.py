@@ -150,13 +150,13 @@ if __name__ == "__main__":
     os.environ["OCR_GRPC_ENDPOINT"] = "localhost:8010"
     os.environ["OCR_INFER_PROTOCOL"] = "grpc"
     os.environ["OCR_MODEL_NAME"] = "paddle"
-    os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
+    os.environ["NEMOTRON_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
-    os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/nemotron-nano-12b-v2-vl"
     logger.info("Environment variables set.")
 
     image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    model_name = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    model_name = "nvidia/nemotron-nano-12b-v2-vl"
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     (
         yolox_table_structure_grpc,
@@ -170,23 +170,23 @@ if __name__ == "__main__":
         yolox_graphic_elements_auth,
         yolox_graphic_elements_protocol,
     ) = get_nim_service("yolox_graphic_elements")
-    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
-        get_nim_service("nemoretriever_parse")
+    nemotron_parse_grpc, nemotron_parse_http, nemotron_parse_auth, nemotron_parse_protocol = get_nim_service(
+        "nemotron_parse"
     )
     ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
-    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    model_name = os.environ.get("NEMOTRON_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
     pdf_extractor_config = {
         "pdfium_config": {
             "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
         },
-        "nemoretriever_parse_config": {
-            "auth_token": nemoretriever_parse_auth,
-            "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
-            "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
-            "nemoretriever_parse_model_name": model_name,
+        "nemotron_parse_config": {
+            "auth_token": nemotron_parse_auth,
+            "nemotron_parse_endpoints": (nemotron_parse_grpc, nemotron_parse_http),
+            "nemotron_parse_infer_protocol": nemotron_parse_protocol,
+            "nemotron_parse_model_name": model_name,
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
         },

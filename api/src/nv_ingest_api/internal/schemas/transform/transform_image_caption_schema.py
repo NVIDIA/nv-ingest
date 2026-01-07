@@ -10,7 +10,8 @@ class ImageCaptionExtractionSchema(BaseModel):
     api_key: str = Field(default="", repr=False)
     endpoint_url: str = "https://integrate.api.nvidia.com/v1/chat/completions"
     prompt: str = "Caption the content of this image:"
-    model_name: str = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    system_prompt: str = "/no_think"
+    model_name: str = "nvidia/nemotron-nano-12b-v2-vl"
     raise_on_failure: bool = False
     model_config = ConfigDict(extra="forbid")
 
@@ -21,13 +22,15 @@ class ImageCaptionExtractionSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _coerce_none_to_empty(cls, values):
-        """Allow None for string fields where empty string is acceptable.
+    def _coerce_none_to_defaults(cls, values):
+        """Normalize None inputs so validation keeps existing defaults."""
+        if not isinstance(values, dict):
+            return values
 
-        Specifically, convert api_key=None to api_key="" so validation passes
-        when no API key is supplied.
-        """
-        if isinstance(values, dict):
-            if values.get("api_key") is None:
-                values["api_key"] = ""
+        if values.get("api_key") is None:
+            values["api_key"] = ""
+        if values.get("prompt") is None:
+            values["prompt"] = cls.model_fields["prompt"].default
+        if values.get("system_prompt") is None:
+            values["system_prompt"] = cls.model_fields["system_prompt"].default
         return values

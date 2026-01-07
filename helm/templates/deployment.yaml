@@ -39,18 +39,6 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
 
-      initContainers:
-        - name: verify-tmpdir-permissions
-          image: busybox
-          command:
-            - "sh"
-            - "-c"
-            - "mkdir -p /scratch/.cache /scratch/tmp && chown -R {{ .Values.nemo.userID }}:{{ .Values.nemo.groupID }} /scratch"
-          volumeMounts:
-            - name: ephemeral
-              subPath: scratch
-              mountPath: /scratch
-
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -81,30 +69,31 @@ spec:
             - name: TMPDIR
               value: /scratch/tmp
 
-            {{- if .Values.envVars.INGEST_LOG_LEVEL }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.envVars.INGEST_LOG_LEVEL }}"
-            {{- else }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            {{- end }}
             - name: CONSOLE_LOG_LEVEL
               value: "{{ .Values.logLevel }}"
             - name: LOG_LEVEL
               value: "{{ .Values.logLevel }}"
-            {{- if index .Values "nim-vlm-image-captioning" "deployed" }}
-            - name: VLM_CAPTION_ENDPOINT
-              value: {{ index .Values "nim-vlm-image-captioning" "fullnameOverride" }}:8000/v1/chat/completions
-            {{- else }}
-            - name: VLM_CAPTION_ENDPOINT
-              value: "https://integrate.api.nvidia.com/v1/chat/completions"
-            {{- end }}
 
             {{- if .Values.envVars }}
             {{- range $k, $v := .Values.envVars }}
             - name: "{{ $k }}"
               value: "{{ $v }}"
             {{- end }}
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_nano_12b_v2_vl") (eq .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled true) }}
+            - name: VLM_CAPTION_ENDPOINT
+              value: "http://nemotron-nano-12b-v2-vl:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_parse") (eq .Values.nimOperator.nemotron_parse.enabled true) }}
+            - name: NEMOTRON_PARSE_HTTP_ENDPOINT
+              value: "http://nemotron-parse:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "audio") (eq .Values.nimOperator.audio.enabled true) }}
+            - name: AUDIO_GRPC_ENDPOINT
+              value: "audio:50051"
             {{- end }}
 
             # OpenTelemetry
@@ -150,11 +139,11 @@ spec:
               protocol: TCP
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
-            - toYaml .Values.livenessProbe | nindent 12
+            {{- toYaml (omit .Values.livenessProbe "enabled") | nindent 12 }}
           {{- end }}
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
-            - toYaml .Values.readinessProbe | nindent 12
+            {{- toYaml (omit .Values.readinessProbe "enabled") | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

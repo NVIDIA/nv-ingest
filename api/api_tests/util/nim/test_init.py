@@ -27,7 +27,7 @@ def test_create_inference_client_defaults_to_grpc_when_grpc_endpoint_present():
             endpoints=("grpc://localhost:50051", "http://localhost:8000"),
             auth_token=None,
             timeout=120.0,
-            max_retries=5,
+            max_retries=10,
         )
         assert result == final_client_instance
 
@@ -52,7 +52,7 @@ def test_create_inference_client_defaults_to_http_when_no_grpc_endpoint():
             endpoints=("", "http://localhost:8000"),
             auth_token=None,
             timeout=120.0,
-            max_retries=5,
+            max_retries=10,
         )
         assert result == final_client_instance
 
@@ -78,7 +78,7 @@ def test_create_inference_client_honors_explicit_protocol_grpc():
             endpoints=("grpc://localhost:50051", "http://localhost:8000"),
             auth_token=None,
             timeout=120.0,
-            max_retries=5,
+            max_retries=10,
         )
         assert result == final_client_instance
 

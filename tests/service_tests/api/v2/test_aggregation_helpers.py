@@ -21,6 +21,7 @@ from nv_ingest.api.v2.ingest import (
     _check_all_subjob_states,
     _fetch_all_subjob_results,
     _build_aggregated_response,
+    _aggregate_parent_traces,
     get_pdf_split_page_count,
     DEFAULT_PDF_SPLIT_PAGE_COUNT,
     split_pdf_to_chunks,
@@ -102,6 +103,22 @@ class TestGetPdfSplitPageCount:
 
         assert pages_per_chunk == DEFAULT_PDF_SPLIT_PAGE_COUNT
 
+    def test_env_var_above_max_clamped(self, monkeypatch):
+        """Environment variable above 128 should be clamped to maximum."""
+        monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "256")
+
+        pages_per_chunk = get_pdf_split_page_count()
+
+        assert pages_per_chunk == 128
+
+    def test_env_var_below_min_clamped(self, monkeypatch):
+        """Environment variable below 1 should be clamped to minimum."""
+        monkeypatch.setenv("PDF_SPLIT_PAGE_COUNT", "0")
+
+        pages_per_chunk = get_pdf_split_page_count()
+
+        assert pages_per_chunk == 1
+
 
 class TestSplitPdfToChunks:
     """Tests for splitting a PDF into chunk descriptors."""
@@ -170,16 +187,17 @@ class TestPrepareChunkSubmission:
             parent_uuid=parent_uuid,
             parent_job_id=parent_job_id,
             current_trace_id=current_trace_id,
-            original_source_id=original_source_id,
-            original_source_name=original_source_name,
+            source_id=original_source_id,
+            source_name=original_source_name,
+            document_type=["pdf"],
         )
 
         spec = json.loads(wrapper.payload)
 
         assert spec["job_id"] == subjob_id
         assert spec["job_payload"]["content"] == [base64.b64encode(b"chunk-bytes").decode("utf-8")]
-        assert spec["job_payload"]["source_id"] == ["doc-123#pages_1-2"]
-        assert spec["job_payload"]["source_name"] == ["document.pdf#pages_1-2"]
+        assert spec["job_payload"]["source_id"] == ["doc-123"]
+        assert spec["job_payload"]["source_name"] == ["document.pdf"]
         assert spec["tracing_options"]["trace_id"] == str(current_trace_id)
         assert spec["tracing_options"]["parent_job_id"] == parent_job_id
         assert spec["tracing_options"]["page_num"] == 1
@@ -215,16 +233,21 @@ class TestPrepareChunkSubmission:
             parent_uuid=parent_uuid,
             parent_job_id=parent_job_id,
             current_trace_id=123,
-            original_source_id="doc-123",
-            original_source_name="document.pdf",
+            source_id="doc-123",
+            source_name="document.pdf",
+            document_type="pdf",
         )
 
         spec = json.loads(wrapper.payload)
 
         assert subjob_id == str(expected_uuid)
-        assert spec["job_payload"]["source_id"] == ["doc-123#page_3"]
-        assert spec["job_payload"]["source_name"] == ["document.pdf#page_3"]
+        assert spec["job_payload"]["source_id"] == ["doc-123"]
+        assert spec["job_payload"]["document_type"] == ["pdf"]
+        assert spec["job_payload"]["source_name"] == ["document.pdf"]
         assert spec["job_payload"]["content"] == [base64.b64encode(b"solo-page").decode("utf-8")]
+
+        assert spec["tracing_options"]["parent_job_id"] == parent_job_id
+        assert spec["tracing_options"]["page_num"] == 3
 
 
 class TestSubmitJobV2Splitting:
@@ -544,6 +567,55 @@ class TestBuildAggregatedResponse:
         assert aggregated["metadata"]["trace_segments"] == []
         assert aggregated["metadata"]["annotation_segments"] == []
 
+    def test_normalizes_chunk_metadata_to_parent_context(self, sample_subjob_descriptors, sample_parent_metadata):
+        """Chunk-local metadata should be remapped to original source identifiers and absolute pages."""
+
+        chunk_record = {
+            "metadata": {
+                "source_metadata": {
+                    "source_id": "test.pdf#pages_9-16",
+                    "source_name": "test.pdf#pages_9-16",
+                },
+                "content_metadata": {
+                    "page_number": 2,
+                    "hierarchy": {
+                        "page": 2,
+                        "page_count": 8,
+                    },
+                },
+            }
+        }
+
+        subjob_results = [
+            None,
+            {"data": [chunk_record]},
+            None,
+        ]
+
+        aggregated = _build_aggregated_response(
+            "parent-id",
+            subjob_results,
+            [],
+            sample_subjob_descriptors,
+            sample_parent_metadata,
+        )
+
+        assert len(aggregated["data"]) == 1
+        normalized_record = aggregated["data"][0]
+
+        source_meta = normalized_record["metadata"]["source_metadata"]
+        assert source_meta["source_id"] == sample_parent_metadata["original_source_id"]
+        assert source_meta["source_name"] == sample_parent_metadata["original_source_name"]
+
+        content_meta = normalized_record["metadata"]["content_metadata"]
+        expected_page = sample_subjob_descriptors[1]["start_page"] - 1 + 2
+        assert content_meta["page_number"] == expected_page
+        assert content_meta["hierarchy"]["page"] == expected_page
+        assert content_meta["hierarchy"]["page_count"] == sample_parent_metadata["total_pages"]
+
+        # Ensure the original chunk payload remains untouched for debugging workflows
+        assert subjob_results[1]["data"][0]["metadata"]["source_metadata"]["source_id"].endswith("#pages_9-16")
+
 
 class TestUpdateJobStateAfterFetch:
     """Tests for updating the parent job state based on fetch mode."""
@@ -618,3 +690,147 @@ class TestFetchJobV2Aggregation:
         assert payload["metadata"]["chunks"][1]["job_id"] == "subjob-2"
 
         mock_ingest_service.set_job_state.assert_called_with("parent-job", STATE_RETRIEVED_NON_DESTRUCTIVE)
+
+
+class TestAggregateParentTraces:
+    """Tests for parent-level trace aggregation from chunk traces."""
+
+    def test_aggregates_complete_stage_pairs(self):
+        """Verify parent metrics are computed from chunk entry/exit pairs."""
+        chunk_traces = {
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+            "chunk_2::trace::entry::pdf_extractor": 2000.0,
+            "chunk_2::trace::exit::pdf_extractor": 2150.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        assert result["trace::entry::pdf_extractor"] == 1000.0  # min
+        assert result["trace::exit::pdf_extractor"] == 2150.0  # max
+        assert result["trace::resident_time::pdf_extractor"] == 250.0  # sum(100, 150)
+
+    def test_handles_multiple_stages(self):
+        """Ensure each stage is aggregated independently."""
+        chunk_traces = {
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+            "chunk_1::trace::entry::table_extractor": 1200.0,
+            "chunk_1::trace::exit::table_extractor": 1350.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        assert "trace::entry::pdf_extractor" in result
+        assert "trace::entry::table_extractor" in result
+        assert result["trace::resident_time::table_extractor"] == 150.0
+
+    def test_aggregates_across_multiple_chunks(self):
+        """Verify aggregation works correctly with multiple chunks per stage."""
+        chunk_traces = {
+            "chunk_1::trace::entry::text_embedder": 1000.0,
+            "chunk_1::trace::exit::text_embedder": 1100.0,
+            "chunk_2::trace::entry::text_embedder": 1500.0,
+            "chunk_2::trace::exit::text_embedder": 1650.0,
+            "chunk_3::trace::entry::text_embedder": 2000.0,
+            "chunk_3::trace::exit::text_embedder": 2200.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        assert result["trace::entry::text_embedder"] == 1000.0  # earliest
+        assert result["trace::exit::text_embedder"] == 2200.0  # latest
+        assert result["trace::resident_time::text_embedder"] == 450.0  # sum(100, 150, 200)
+
+    def test_ignores_non_chunk_prefixed_keys(self):
+        """Existing parent traces should be skipped during aggregation."""
+        chunk_traces = {
+            "trace::entry::some_stage": 500.0,  # Should be ignored
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        # Should only have aggregated chunk data, not modify existing parent traces
+        assert result["trace::entry::pdf_extractor"] == 1000.0
+        assert "trace::entry::some_stage" not in result  # Not re-added
+
+    def test_handles_empty_input(self):
+        """Empty trace dict should return empty parent traces."""
+        result = _aggregate_parent_traces({})
+        assert result == {}
+
+    def test_ignores_malformed_keys(self):
+        """Keys that don't match expected pattern should be skipped."""
+        chunk_traces = {
+            "chunk_::trace::entry::stage": 100.0,  # Missing chunk number
+            "chunk_1::entry::stage": 200.0,  # Missing trace keyword
+            "chunk_1::trace::start::stage": 300.0,  # Not entry/exit
+            "chunk_abc::trace::entry::stage": 400.0,  # Non-numeric chunk
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        # Only the valid pair should be aggregated
+        assert len(result) == 3  # entry, exit, resident_time
+        assert result["trace::entry::pdf_extractor"] == 1000.0
+
+    def test_handles_incomplete_pairs(self):
+        """Stages with only entry or only exit should not be aggregated."""
+        chunk_traces = {
+            "chunk_1::trace::entry::incomplete_stage": 1000.0,
+            # Missing exit for incomplete_stage
+            "chunk_1::trace::entry::complete_stage": 2000.0,
+            "chunk_1::trace::exit::complete_stage": 2100.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        # Only complete_stage should be aggregated
+        assert "trace::entry::incomplete_stage" not in result
+        assert "trace::entry::complete_stage" in result
+        assert result["trace::resident_time::complete_stage"] == 100.0
+
+    def test_preserves_numeric_precision(self):
+        """Ensure float precision is maintained in calculations."""
+        chunk_traces = {
+            "chunk_1::trace::entry::stage": 1.759765563106849e18,
+            "chunk_1::trace::exit::stage": 1.759765563108137e18,
+            "chunk_2::trace::entry::stage": 1.7597655630976282e18,
+            "chunk_2::trace::exit::stage": 1.759765563106266e18,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        assert isinstance(result["trace::entry::stage"], float)
+        assert isinstance(result["trace::exit::stage"], float)
+        assert isinstance(result["trace::resident_time::stage"], float)
+
+    def test_handles_nested_stage_names(self):
+        """Verify aggregation works with arbitrary depth nested traces."""
+        chunk_traces = {
+            # Simple stage (4 parts)
+            "chunk_1::trace::entry::pdf_extractor": 1000.0,
+            "chunk_1::trace::exit::pdf_extractor": 1100.0,
+            # Nested stage (7 parts)
+            "chunk_1::trace::entry::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 1010.0,
+            "chunk_1::trace::exit::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 1020.0,
+            "chunk_2::trace::entry::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 2010.0,
+            "chunk_2::trace::exit::pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0": 2025.0,
+        }
+
+        result = _aggregate_parent_traces(chunk_traces)
+
+        # Simple stage aggregated
+        assert result["trace::entry::pdf_extractor"] == 1000.0
+        assert result["trace::exit::pdf_extractor"] == 1100.0
+        assert result["trace::resident_time::pdf_extractor"] == 100.0
+
+        # Nested stage aggregated with full name preserved
+        nested_stage = "pdf_extractor::pdf_extraction::pdfium_pages_to_numpy_0"
+        assert result[f"trace::entry::{nested_stage}"] == 1010.0
+        assert result[f"trace::exit::{nested_stage}"] == 2025.0
+        assert result[f"trace::resident_time::{nested_stage}"] == 25.0  # sum(10, 15)

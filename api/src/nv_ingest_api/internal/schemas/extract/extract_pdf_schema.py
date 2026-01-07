@@ -9,10 +9,12 @@ from typing import Tuple
 
 from pydantic import model_validator, ConfigDict, BaseModel, Field
 
+from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
+
 logger = logging.getLogger(__name__)
 
 
-class PDFiumConfigSchema(BaseModel):
+class PDFiumConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for PDFium endpoints and options.
 
@@ -82,11 +84,11 @@ class PDFiumConfigSchema(BaseModel):
 
             values[endpoint_name] = (grpc_service, http_service)
 
+            # Auto-infer protocol from endpoints if not specified
             protocol_name = f"{model_name}_infer_protocol"
             protocol_value = values.get(protocol_name)
             if not protocol_value:
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
-            protocol_value = protocol_value.lower()
             values[protocol_name] = protocol_value
 
         return values
@@ -94,17 +96,17 @@ class PDFiumConfigSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class NemoRetrieverParseConfigSchema(BaseModel):
+class NemotronParseConfigSchema(LowercaseProtocolMixin):
     """
-    Configuration schema for NemoRetrieverParse endpoints and options.
+    Configuration schema for Nemotron Parse endpoints and options.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    nemoretriever_parse_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the nemoretriever_parse endpoint.
+    nemotron_parse_endpoints : Tuple[str, str]
+        A tuple containing the gRPC and HTTP services for the nemotron_parse endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -128,10 +130,10 @@ class NemoRetrieverParseConfigSchema(BaseModel):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    nemoretriever_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    nemoretriever_parse_infer_protocol: str = ""
+    nemotron_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    nemotron_parse_infer_protocol: str = ""
 
-    nemoretriever_parse_model_name: str = "nvidia/nemoretriever-parse"
+    nemotron_parse_model_name: str = "nvidia/nemotron-parse"
 
     timeout: float = 300.0
 
@@ -159,7 +161,7 @@ class NemoRetrieverParseConfigSchema(BaseModel):
             If both gRPC and HTTP services are empty for any endpoint.
         """
 
-        for model_name in ["nemoretriever_parse"]:
+        for model_name in ["nemotron_parse"]:
             endpoint_name = f"{model_name}_endpoints"
             grpc_service, http_service = values.get(endpoint_name, ("", ""))
             grpc_service = _clean_service(grpc_service)
@@ -170,11 +172,11 @@ class NemoRetrieverParseConfigSchema(BaseModel):
 
             values[endpoint_name] = (grpc_service, http_service)
 
+            # Auto-infer protocol from endpoints if not specified
             protocol_name = f"{model_name}_infer_protocol"
             protocol_value = values.get(protocol_name)
             if not protocol_value:
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
-            protocol_value = protocol_value.lower()
             values[protocol_name] = protocol_value
 
         return values
@@ -206,7 +208,7 @@ class PDFExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     pdfium_config: Optional[PDFiumConfigSchema] = None
-    nemoretriever_parse_config: Optional[NemoRetrieverParseConfigSchema] = None
+    nemotron_parse_config: Optional[NemotronParseConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
 

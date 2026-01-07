@@ -70,14 +70,14 @@ stages:
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
-      nemoretriever_parse_config:
+      nemotron_parse_config:
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
-        nemoretriever_parse_endpoints: [
-          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions",
+        nemotron_parse_endpoints: [
+          $NEMOTRON_PARSE_GRPC_ENDPOINT|"",
+          $NEMOTRON_PARSE_HTTP_ENDPOINT|"http://nemotron-parse:8000/v1/chat/completions",
         ]
-        nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
-        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
+        nemotron_parse_infer_protocol: $NEMOTRON_PARSE_INFER_PROTOCOL|http
+        nemotron_parse_model_name: $NEMOTRON_PARSE_MODEL_NAME|"nvidia/nemotron-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
@@ -123,7 +123,14 @@ stages:
       docx_extraction_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
@@ -142,6 +149,13 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+      pdfium_config:
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
           $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
@@ -191,6 +205,27 @@ stages:
       static_replicas:
         strategy: "static"
         value: 1
+
+  - name: "ocr_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor:OCRExtractorStage"
+    config:
+      endpoint_config:
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|"http://ocr:8000/v1/infer",
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|$NVIDIA_API_KEY
+    replicas:
+      min_replicas: 0
+      max_replicas:
+        strategy: "static"
+        value: 4
+      static_replicas:
+        strategy: "static"
+        value: 3
 
   - name: "infographic_extractor"
     type: "stage"
@@ -317,8 +352,10 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|$NVIDIA_API_KEY
-      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
-      prompt: "Caption the content of this image:"
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/nemotron-nano-12b-v2-vl"
+      endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
+      prompt: $VLM_CAPTION_PROMPT|"Caption the content of this image:"
+      system_prompt: $VLM_CAPTION_SYSTEM_PROMPT|"/no_think"
     replicas:
       min_replicas: 0
       max_replicas:
@@ -350,6 +387,9 @@ stages:
     type: "stage"
     phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
+    config:
+      storage_uri: $IMAGE_STORAGE_URI|"s3://nv-ingest/artifacts/store/images"
+      public_base_url: $IMAGE_STORAGE_PUBLIC_BASE_URL|""
     replicas:
       min_replicas: 0
       max_replicas:
@@ -427,76 +467,79 @@ edges:
   # Intake
   - from: "source_stage"
     to: "metadata_injector"
-    queue_size: 32
+    queue_size: 4
 
   # Document Extractors
   - from: "metadata_injector"
     to: "pdf_extractor"
-    queue_size: 32
+    queue_size: 8
   - from: "pdf_extractor"
     to: "audio_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "audio_extractor"
     to: "docx_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "docx_extractor"
     to: "pptx_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "pptx_extractor"
     to: "image_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "image_extractor"
     to: "html_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "html_extractor"
     to: "infographic_extractor"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Extractors
   - from: "infographic_extractor"
     to: "table_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "table_extractor"
     to: "chart_extractor"
-    queue_size: 32
+    queue_size: 4
   - from: "chart_extractor"
+    to: "ocr_extractor"
+    queue_size: 8
+  - from: "ocr_extractor"
     to: "image_filter"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Mutators
   - from: "image_filter"
     to: "image_dedup"
-    queue_size: 32
+    queue_size: 4
   - from: "image_dedup"
     to: "text_splitter"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Transforms
   - from: "text_splitter"
     to: "image_caption"
-    queue_size: 32
+    queue_size: 4
   - from: "image_caption"
     to: "text_embedder"
-    queue_size: 32
+    queue_size: 4
   - from: "text_embedder"
     to: "image_storage"
-    queue_size: 32
+    queue_size: 4
 
   # Primitive Storage
   - from: "image_storage"
     to: "embedding_storage"
-    queue_size: 32
+    queue_size: 4
   - from: "embedding_storage"
     to: "broker_response"
-    queue_size: 32
+    queue_size: 4
 
   # Response and Telemetry
   - from: "broker_response"
     to: "otel_tracer"
-    queue_size: 32
+    queue_size: 4
   - from: "otel_tracer"
     to: "default_drain"
-    queue_size: 32
+    queue_size: 4
 
 # Pipeline Runtime Configuration
 pipeline:

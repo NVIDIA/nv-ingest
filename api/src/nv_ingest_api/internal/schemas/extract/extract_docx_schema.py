@@ -9,10 +9,13 @@ from typing import Tuple
 
 from pydantic import model_validator, ConfigDict, BaseModel, Field
 
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
+from nv_ingest_api.internal.schemas.mixins import LowercaseProtocolMixin
+
 logger = logging.getLogger(__name__)
 
 
-class DocxConfigSchema(BaseModel):
+class DocxConfigSchema(LowercaseProtocolMixin):
     """
     Configuration schema for docx extraction endpoints and options.
 
@@ -85,11 +88,11 @@ class DocxConfigSchema(BaseModel):
 
             values[endpoint_name] = (grpc_service, http_service)
 
+            # Auto-infer protocol from endpoints if not specified
             protocol_name = f"{model_name}_infer_protocol"
             protocol_value = values.get(protocol_name)
             if not protocol_value:
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
-            protocol_value = protocol_value.lower()
             values[protocol_name] = protocol_value
 
         return values
@@ -121,4 +124,6 @@ class DocxExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     docx_extraction_config: Optional[DocxConfigSchema] = None
+    pdfium_config: Optional[PDFiumConfigSchema] = None
+
     model_config = ConfigDict(extra="forbid")

@@ -29,8 +29,9 @@ The following diagram shows the Nemo Retriever extraction pipeline.
 1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#library-mode-quickstart)
-4. [GitHub Repository Structure](#nv-ingest-repository-structure)
-5. [Notices](#notices)
+4. [Benchmarking](#benchmarking)
+5. [GitHub Repository Structure](#nv-ingest-repository-structure)
+6. [Notices](#notices)
 
 
 ## What NeMo Retriever Extraction Is
@@ -39,7 +40,7 @@ NeMo Retriever Extraction is a library and microservice service that does the fo
 
 - Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of before and after processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 
@@ -81,7 +82,7 @@ For small-scale workloads, such as workloads of fewer than 100 PDFs, you can use
 
 Library mode deployment of nv-ingest requires:
 
-- Linux operating systems (Ubuntu 22.04 or later recommended)
+- Linux operating systems (Ubuntu 22.04 or later recommended) or MacOS
 - Python 3.12
 - We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
 
@@ -128,65 +129,69 @@ from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-# Start the pipeline subprocess for library mode
-run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
+def main():
+    # Start the pipeline subprocess for library mode
+    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
-client = NvIngestClient(
-    message_client_allocator=SimpleClient,
-    message_client_port=7671,
-    message_client_hostname="localhost",
-)
-
-# gpu_cagra accelerated indexing is not available in milvus-lite
-# Provide a filename for milvus_uri to use milvus-lite
-milvus_uri = "milvus.db"
-collection_name = "test"
-sparse = False
-
-# do content extraction from files
-ingestor = (
-    Ingestor(client=client)
-    .files("data/multimodal_test.pdf")
-    .extract(
-        extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
-        extract_images=True,
-        table_output_format="markdown",
-        extract_infographics=True,
-        # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        text_depth="page",
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost",
     )
-    .embed()
-    .vdb_upload(
-        collection_name=collection_name,
-        milvus_uri=milvus_uri,
-        sparse=sparse,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048,
+
+    # gpu_cagra accelerated indexing is not available in milvus-lite
+    # Provide a filename for milvus_uri to use milvus-lite
+    milvus_uri = "milvus.db"
+    collection_name = "test"
+    sparse = False
+
+    # do content extraction from files
+    ingestor = (
+        Ingestor(client=client)
+        .files("data/multimodal_test.pdf")
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            table_output_format="markdown",
+            extract_infographics=True,
+            # extract_method="nemotron_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+            text_depth="page",
+        )
+        .embed()
+        .vdb_upload(
+            collection_name=collection_name,
+            milvus_uri=milvus_uri,
+            sparse=sparse,
+            # for llama-3.2 embedder, use 1024 for e5-v5
+            dense_dim=2048,
+        )
     )
-)
 
-print("Starting ingestion..")
-t0 = time.time()
+    print("Starting ingestion..")
+    t0 = time.time()
 
-# Return both successes and failures
-# Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
-results, failures = ingestor.ingest(show_progress=True, return_failures=True)
+    # Return both successes and failures
+    # Use for large batches where you want successful chunks/pages to be committed, while collecting detailed diagnostics for failures.
+    results, failures = ingestor.ingest(show_progress=True, return_failures=True)
 
-# Return only successes
-# results = ingestor.ingest(show_progress=True)
+    # Return only successes
+    # results = ingestor.ingest(show_progress=True)
 
-t1 = time.time()
-print(f"Total time: {t1 - t0} seconds")
+    t1 = time.time()
+    print(f"Total time: {t1 - t0} seconds")
 
-# results blob is directly inspectable
-if results:
-    print(ingest_json_results_to_blob(results[0]))
+    # results blob is directly inspectable
+    if results:
+        print(ingest_json_results_to_blob(results[0]))
 
-# (optional) Review any failures that were returned
-if failures:
-    print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+    # (optional) Review any failures that were returned
+    if failures:
+        print(f"There were {len(failures)} failures. Sample: {failures[0]}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 You can see the extracted text that represents the content of the ingested test document.
@@ -248,7 +253,7 @@ client = OpenAI(
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-    model="nvidia/llama-3.1-nemotron-70b-instruct",
+    model="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     messages=[{"role": "user", "content": prompt}],
 )
 response = completion.choices[0].message.content
@@ -292,6 +297,46 @@ Please keep in mind that this response is purely humorous and interpretative, as
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 
+## Benchmarking
+
+nv-ingest includes a comprehensive testing framework for benchmarking performance and evaluating retrieval accuracy.
+
+### Quick Start
+
+```bash
+cd tools/harness
+
+uv sync
+
+# Run end-to-end benchmark
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767
+
+# Evaluate retrieval accuracy
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=bo767
+```
+
+### Available Benchmarks
+
+- **End-to-End Performance** - Measure ingestion throughput, latency, and resource utilization
+- **Retrieval Accuracy** - Evaluate recall@k metrics against ground truth datasets
+- **MIG Benchmarking** - Test performance with NVIDIA Multi-Instance GPU (MIG) configurations
+
+### Documentation
+
+- **[Testing Framework Guide](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/)** - Complete guide to benchmarking and testing nv-ingest (same as `tools/harness/README.md`)
+- **[MIG Benchmarking](https://docs.nvidia.com/nemo/retriever/extraction/mig-benchmarking/)** - GPU partitioning for multi-tenant deployments on Kubernetes/Helm
+
+### Benchmark Datasets
+
+- **bo767** - 767 PDF documents with ground truth for recall evaluation
+- **bo20** - 20 PDF documents for quick validation
+- **single** - singular multimodal pdf for quick validation
+- **earnings** - earnings reports ppt and pdf dataset
+-- **financebench** - financial data
+- **Custom datasets** - Use your own datasets with the testing framework
+
+For more information, see the [benchmarking documentation](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/).
+
 
 ## GitHub Repository Structure
 
@@ -330,12 +375,15 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
-- **`DOWNLOAD_LLAMA_TOKENIZER` (Built With Llama):**:
-  - **Description**: The Split task uses the `meta-llama/Llama-3.2-1B` tokenizer, which will be downloaded
-    from HuggingFace at build time if `DOWNLOAD_LLAMA_TOKENIZER` is set to `True`. Please review the
-    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this.
-    This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and
-    set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to use it.
+- **Built With Llama**:
+  - **Description**: The NV-Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded so 
+    that the split task can use it for token-based splitting without making a network request. Please review the 
+    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials.
+    
+    If you're building the container yourself and want to pre-download this model, you'll first need to set 
+    `DOWNLOAD_LLAMA_TOKENIZER` to `True`. Because this is a gated model, you'll also need to 
+    [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and set `HF_ACCESS_TOKEN` to your HuggingFace 
+    access token in order to use it.
 
 
 ### Contributing

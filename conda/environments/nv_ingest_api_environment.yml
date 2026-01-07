@@ -14,4 +14,6 @@ dependencies:
   - python>=3.12
   - python-build>=1.2.2
   - setuptools>=58.2.0
+  - s3fs>=2024.10.0
+  - universal-pathlib
   - pip

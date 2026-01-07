@@ -22,6 +22,10 @@ def dummy_df():
                 "metadata": {
                     "content": "Example text content",
                     "content_metadata": {"type": "text"},
+                    "custom_content": {
+                        "custom_content_field_1": "custom_text",
+                        "custom_content_field_2": {"nested_content_field": "custom_text_2"},
+                    },
                 },
                 "document_type": "TEXT",
             },
@@ -43,6 +47,26 @@ def dummy_task_config():
         "api_key": "dummy_key",
         "endpoint_url": "http://dummy-endpoint",
         "model_name": "dummy_model",
+    }
+
+
+@pytest.fixture
+def dummy_task_config_custom_embedding():
+    return {
+        "api_key": "dummy_key",
+        "endpoint_url": "http://dummy-endpoint",
+        "model_name": "dummy_model",
+        "custom_content_field": "custom_content_field_1",
+    }
+
+
+@pytest.fixture
+def dummy_task_config_custom_embedding_nested():
+    return {
+        "api_key": "dummy_key",
+        "endpoint_url": "http://dummy-endpoint",
+        "model_name": "dummy_model",
+        "custom_content_field": "custom_content_field_2.nested_content_field",
     }
 
 
@@ -75,6 +99,63 @@ def test_transform_create_text_embeddings_internal_happy_path(mock_async_runner,
 
     # Validate trace structure
     assert "trace_info" in trace
+
+
+@patch(f"{MODULE_UNDER_TEST}._async_runner")
+def test_transform_create_text_embeddings_internal_custom_embedding(
+    mock_async_runner, dummy_df, dummy_task_config_custom_embedding
+):
+    # Mock embeddings response
+    mock_async_runner.side_effect = lambda *args, **kwargs: {
+        "embeddings": [[0.1, 0.2, 0.3]] * len(args[0]),
+        "info_msgs": [None] * len(args[0]),
+    }
+
+    result_df, trace = module_under_test.transform_create_text_embeddings_internal(
+        dummy_df.copy(),
+        dummy_task_config_custom_embedding,
+    )
+
+    # Validate async_runner call
+    mock_async_runner.assert_called()
+
+    # Validate TEXT row has expected embedding
+    assert result_df.iloc[0]["metadata"]["embedding"] == [0.1, 0.2, 0.3]
+    assert bool(result_df.iloc[0]["_contains_embeddings"])
+
+    # Validate STRUCTURED row also has expected embedding (since it's supported)
+    assert result_df.iloc[1]["metadata"]["embedding"] == [0.1, 0.2, 0.3]
+    assert bool(result_df.iloc[1]["_contains_embeddings"])
+
+    # Validate trace structure
+    assert "trace_info" in trace
+
+    # Validate custom embedding in custom content
+    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_1_embedding"] == [0.1, 0.2, 0.3]
+
+
+@patch(f"{MODULE_UNDER_TEST}._async_runner")
+def test_transform_create_text_embeddings_internal_custom_embedding_nested(
+    mock_async_runner, dummy_df, dummy_task_config_custom_embedding_nested
+):
+    # Mock embeddings response
+    mock_async_runner.side_effect = lambda *args, **kwargs: {
+        "embeddings": [[0.1, 0.2, 0.3]] * len(args[0]),
+        "info_msgs": [None] * len(args[0]),
+    }
+
+    result_df, trace = module_under_test.transform_create_text_embeddings_internal(
+        dummy_df.copy(),
+        dummy_task_config_custom_embedding_nested,
+    )
+
+    # Validate async_runner call
+    mock_async_runner.assert_called()
+
+    # Validate nested custom embedding in custom content
+    assert result_df.iloc[0]["metadata"]["custom_content"]["custom_content_field_2"][
+        "nested_content_field_embedding"
+    ] == [0.1, 0.2, 0.3]
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_runner")
@@ -134,6 +215,7 @@ def test_async_runner_happy_path(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -147,6 +229,7 @@ def test_async_runner_happy_path(mock_handler):
         "END",
         False,
         modalities=None,
+        dimensions=None,
     )
     assert result["embeddings"] == [[1, 2, 3], [4, 5, 6]]
     assert result["info_msgs"] == [None, {"msg": "partial success"}]
@@ -171,6 +254,7 @@ def test_async_runner_handles_none_embeddings(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -200,6 +284,7 @@ def test_async_runner_handles_embedding_object(mock_handler):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -227,6 +312,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert: called once per batch
@@ -241,6 +327,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         truncate="END",
         filter_errors=False,
         modalities=None,
+        dimensions=None,
     )
     mock_make_async_request.assert_any_call(
         prompts=["batch2_prompt"],
@@ -252,6 +339,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         truncate="END",
         filter_errors=False,
         modalities=None,
+        dimensions=None,
     )
 
     # And we get both results combined in order
@@ -273,6 +361,7 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
 
     # Assert
@@ -280,12 +369,10 @@ def test_async_request_handler_empty_prompts_list(mock_make_async_request):
     assert result == []
 
 
-@patch(f"{MODULE_UNDER_TEST}.OpenAI")
-def test_make_async_request_happy_path(mock_openai):
-    # Arrange
-    mock_client = mock_openai.return_value
-    mock_client.embeddings.create.return_value = MagicMock(data=[[0.1, 0.2, 0.3]])
-
+@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
+def test_make_async_request_happy_path(im_mock):
+    # Assign
+    im_mock.return_value = [[0.1, 0.2, 0.3]]
     # Act
     result = module_under_test._make_async_request(
         prompts=["Hello world"],
@@ -296,28 +383,30 @@ def test_make_async_request_happy_path(mock_openai):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        dimensions=None,
     )
-
     # Assert: client called as expected
-    mock_openai.assert_called_once_with(api_key="dummy_key", base_url="http://dummy-endpoint")
-    mock_client.embeddings.create.assert_called_once_with(
-        input=["Hello world"],
-        model="dummy_model",
-        encoding_format="float",
-        extra_body={"input_type": "passage", "truncate": "END"},
+    im_mock.assert_called_once_with(
+        ["Hello world"],
+        "dummy_model",
+        embedding_endpoint="http://dummy-endpoint",
+        nvidia_api_key="dummy_key",
+        input_type="passage",
+        truncate="END",
+        batch_size=8191,
+        grpc=False,
+        input_names=["text"],
+        output_names=["embeddings"],
+        dtypes=["BYTES"],
     )
 
-    assert result == {
-        "embedding": [[0.1, 0.2, 0.3]],
-        "info_msg": None,
-    }
+    assert result == {"embedding": [[0.1, 0.2, 0.3]], "info_msg": None}
 
 
-@patch(f"{MODULE_UNDER_TEST}.OpenAI")
-def test_make_async_request_failure_returns_none_embedding_and_info_message(mock_openai):
+@patch("nv_ingest_api.internal.transform.embed_text.infer_microservice")
+def test_make_async_request_failure_returns_none_embedding_and_info_message(im_mock):
     # Arrange
-    mock_client = mock_openai.return_value
-    mock_client.embeddings.create.side_effect = RuntimeError("Simulated client failure")
+    im_mock.side_effect = RuntimeError("Simulated client failure")
 
     # Act & Assert
     with pytest.raises(RuntimeError) as excinfo:
@@ -330,6 +419,7 @@ def test_make_async_request_failure_returns_none_embedding_and_info_message(mock
             input_type="passage",
             truncate="END",
             filter_errors=True,
+            dimensions=None,
         )
 
     # The raised error should have our validated info message attached in text

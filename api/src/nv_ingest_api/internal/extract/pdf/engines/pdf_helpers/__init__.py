@@ -16,7 +16,7 @@ from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
 import pandas as pd
 from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
 from nv_ingest_api.internal.extract.pdf.engines import llama_parse_extractor
-from nv_ingest_api.internal.extract.pdf.engines import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import nemotron_parse_extractor
 from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
 from nv_ingest_api.internal.extract.pdf.engines import tika_extractor
 from nv_ingest_api.internal.extract.pdf.engines import unstructured_io_extractor
@@ -30,10 +30,17 @@ logger = logging.getLogger(__name__)
 EXTRACTOR_LOOKUP = {
     "adobe": adobe_extractor,
     "llama": llama_parse_extractor,
-    "nemoretriever_parse": nemoretriever_parse_extractor,
+    "nemotron_parse": nemotron_parse_extractor,
     "pdfium": pdfium_extractor,
+    "pdfium_hybrid": pdfium_extractor,  # Uses pdfium for native text and switches to OCR pipeline only for scanned pages.  # noqa: E501
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
+    "ocr": pdfium_extractor,  # Ignores pdfium's text entirely and processes every single page through the full OCR pipline.  # noqa: E501
+}
+
+METHOD_TO_CONFIG_KEY_MAP = {
+    "pdfium_hybrid": "pdfium_config",
+    "ocr": "pdfium_config",
 }
 
 
@@ -121,7 +128,7 @@ def _orchestrate_row_extraction(
     params["extract_method"] = extract_method
 
     # Construct the config key based on the extraction method
-    config_key = f"{extract_method}_config"
+    config_key = METHOD_TO_CONFIG_KEY_MAP.get(extract_method, f"{extract_method}_config")
 
     # Handle both object and dictionary cases for extractor_config
     if hasattr(extractor_config, config_key):

@@ -17,7 +17,6 @@
 
 # pylint: disable=too-many-locals
 
-
 import logging
 from typing import IO, Optional, List
 
@@ -116,7 +115,13 @@ def python_docx(
     # Extract data from the document using python-docx
     doc = DocxReader(docx_stream, source_metadata, extraction_config=docx_extractor_config)
     extracted_data = doc.extract_data(
-        base_unified_metadata, text_depth, extract_text, extract_charts, extract_tables, extract_images
+        base_unified_metadata,
+        text_depth=text_depth,
+        extract_text=extract_text,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
+        extract_images=extract_images,
     )
 
     return extracted_data

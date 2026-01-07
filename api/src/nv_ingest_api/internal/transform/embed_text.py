@@ -6,17 +6,19 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Dict, Tuple, Optional, Iterable, List
+from urllib.parse import urlparse
 
+import glom
 import pandas as pd
-from openai import OpenAI
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.util.nim import infer_microservice
+
 
 logger = logging.getLogger(__name__)
 
 # Reduce SDK HTTP logging verbosity so request/response logs are not emitted
-logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
@@ -39,6 +41,7 @@ def _make_async_request(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> list:
     """
     Interacts directly with the NIM embedding service to calculate embeddings for a batch of prompts.
@@ -78,26 +81,22 @@ def _make_async_request(
         # Normalize API key to avoid sending an empty bearer token via SDK internals
         _token = (api_key or "").strip()
         _api_key = _token if _token else "<no key provided>"
-        client = OpenAI(
-            api_key=_api_key,
-            base_url=embedding_nim_endpoint,
+
+        resp = infer_microservice(
+            prompts,
+            embedding_model,
+            embedding_endpoint=embedding_nim_endpoint,
+            nvidia_api_key=_api_key,
+            input_type=input_type,
+            truncate=truncate,
+            batch_size=8191,
+            grpc="http" not in urlparse(embedding_nim_endpoint).scheme,
+            input_names=["text"],
+            output_names=["embeddings"],
+            dtypes=["BYTES"],
         )
 
-        extra_body = {
-            "input_type": input_type,
-            "truncate": truncate,
-        }
-        if modalities:
-            extra_body["modality"] = modalities
-
-        resp = client.embeddings.create(
-            input=prompts,
-            model=embedding_model,
-            encoding_format=encoding_format,
-            extra_body=extra_body,
-        )
-
-        response["embedding"] = resp.data
+        response["embedding"] = resp
         response["info_msg"] = None
 
     except Exception as err:
@@ -123,6 +122,7 @@ def _async_request_handler(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> List[dict]:
     """
     Gathers calculated embedding results from the NIM embedding service concurrently.
@@ -167,6 +167,7 @@ def _async_request_handler(
                 truncate=truncate,
                 filter_errors=filter_errors,
                 modalities=modality_batch,
+                dimensions=dimensions,
             )
             for prompt_batch, modality_batch in zip(prompts, modalities)
         ]
@@ -185,6 +186,7 @@ def _async_runner(
     truncate: str,
     filter_errors: bool,
     modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> dict:
     """
     Concurrently launches all NIM embedding requests and flattens the results.
@@ -223,6 +225,7 @@ def _async_runner(
         truncate,
         filter_errors,
         modalities=modalities,
+        dimensions=dimensions,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -278,6 +281,33 @@ def _add_embeddings(row, embeddings, info_msgs):
         row["_contains_embeddings"] = False
     else:
         row["_contains_embeddings"] = embedding is not None
+
+    return row
+
+
+def _add_custom_embeddings(row, embeddings, result_target_field):
+    """
+    Updates a DataFrame row with embedding data and associated error info
+    based on a user supplied custom content field.
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A row of the DataFrame.
+    embeddings : dict
+        Dictionary mapping row indices to embeddings.
+    result_target_field: str
+        The field in custom_content to output the embeddings to
+
+    Returns
+    -------
+    pandas.Series
+        The updated row
+    """
+    embedding = embeddings.get(row.name, None)
+
+    if embedding is not None:
+        row["metadata"] = glom.assign(row["metadata"], "custom_content." + result_target_field, embedding, missing=dict)
 
     return row
 
@@ -379,6 +409,20 @@ def _get_pandas_audio_content(row, modality="text"):
     A pandas UDF used to select extracted audio transcription to be used to create embeddings.
     """
     return row.get("audio_metadata", {}).get("audio_transcript")
+
+
+def _get_pandas_custom_content(row, custom_content_field):
+    custom_content = row.get("custom_content", {})
+    content = glom.glom(custom_content, custom_content_field, default=None)
+    if content is None:
+        logger.warning(f"Custom content field: {custom_content_field} not found")
+        return None
+
+    try:
+        return str(content)
+    except (TypeError, ValueError):
+        logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
+        return None
 
 
 # ------------------------------------------------------------------------------
@@ -519,6 +563,8 @@ def transform_create_text_embeddings_internal(
     api_key = task_config.get("api_key") or transform_config.api_key
     endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
     model_name = task_config.get("model_name") or transform_config.embedding_model
+    custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
+    dimensions = task_config.get("dimensions") or transform_config.dimensions
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -593,6 +639,7 @@ def transform_create_text_embeddings_internal(
                 transform_config.truncate,
                 False,
                 modalities=modality_batches,
+                dimensions=dimensions,
             )
             # Build a simple row index -> embedding map
             embeddings_dict = dict(
@@ -612,4 +659,44 @@ def transform_create_text_embeddings_internal(
         content_masks.append(content_mask)
 
     combined_df = _concatenate_extractions_pandas(df_transform_ledger, embedding_dataframes, content_masks)
+
+    # Embed custom content
+    if custom_content_field is not None:
+        result_target_field = task_config.get("result_target_field") or custom_content_field + "_embedding"
+
+        extracted_custom_content = (
+            combined_df["metadata"]
+            .apply(partial(_get_pandas_custom_content, custom_content_field=custom_content_field))
+            .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
+        )
+
+        valid_custom_content_mask = extracted_custom_content.notna()
+        if valid_custom_content_mask.any():
+            custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
+            custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
+
+            custom_content_embeddings = _async_runner(
+                custom_content_batches,
+                api_key,
+                endpoint_url,
+                model_name,
+                transform_config.encoding_format,
+                transform_config.input_type,
+                transform_config.truncate,
+                False,
+                dimensions=dimensions,
+            )
+            custom_embeddings_dict = dict(
+                zip(
+                    extracted_custom_content.loc[valid_custom_content_mask].index,
+                    custom_content_embeddings.get("embeddings", []),
+                )
+            )
+        else:
+            custom_embeddings_dict = {}
+
+        combined_df = combined_df.apply(
+            _add_custom_embeddings, embeddings=custom_embeddings_dict, result_target_field=result_target_field, axis=1
+        )
+
     return combined_df, {"trace_info": execution_trace_log}

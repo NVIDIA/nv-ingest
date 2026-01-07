@@ -43,6 +43,24 @@ class PdfConfigSchema(BaseModelNoExt):
     split_page_count: Annotated[int, Field(ge=1)] = 32
 
 
+class RoutingOptionsSchema(BaseModelNoExt):
+    # Queue routing hint for QoS scheduler
+    queue_hint: Optional[str] = None
+
+    @field_validator("queue_hint")
+    @classmethod
+    def validate_queue_hint(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("queue_hint must be a string")
+        s = v.lower()
+        allowed = {"default", "immediate", "micro", "small", "medium", "large"}
+        if s not in allowed:
+            raise ValueError("queue_hint must be one of: default, immediate, micro, small, medium, large")
+        return s
+
+
 # Ingest Task Schemas
 
 
@@ -82,7 +100,9 @@ class IngestTaskStoreEmbedSchema(BaseModelNoExt):
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
-    method: str
+    storage_uri: Optional[str] = None
+    storage_options: dict = Field(default_factory=dict)
+    public_base_url: Optional[str] = None
     params: dict = Field(default_factory=dict)
 
 
@@ -91,6 +111,7 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     api_key: Optional[str] = Field(default=None, repr=False)
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
+    system_prompt: Optional[str] = None
     model_name: Optional[str] = None
 
 
@@ -126,6 +147,9 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
     image_elements_modality: Optional[str] = None
     structured_elements_modality: Optional[str] = None
     audio_elements_modality: Optional[str] = None
+    custom_content_field: Optional[str] = None
+    result_target_field: Optional[str] = None
+    dimensions: Optional[int] = None
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
@@ -155,6 +179,10 @@ class IngestTaskChartExtraction(BaseModelNoExt):
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
+    params: dict = Field(default_factory=dict)
+
+
+class IngestTaskOCRExtraction(BaseModelNoExt):
     params: dict = Field(default_factory=dict)
 
 
@@ -208,6 +236,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
+        IngestTaskOCRExtraction,
         IngestTaskUDFSchema,
     ]
     raise_on_failure: bool = False
@@ -240,6 +269,7 @@ class IngestTaskSchema(BaseModelNoExt):
             TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
             TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
             TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            TaskTypeEnum.OCR_DATA_EXTRACT: IngestTaskOCRExtraction,
             TaskTypeEnum.UDF: IngestTaskUDFSchema,
         }
 
@@ -281,7 +311,26 @@ class IngestJobSchema(BaseModelNoExt):
     job_id: Union[str, int]
     tasks: List[IngestTaskSchema]
     tracing_options: Optional[TracingOptionsSchema] = None
+    routing_options: Optional[RoutingOptionsSchema] = None
     pdf_config: Optional[PdfConfigSchema] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_queue_hint(cls, values):
+        """
+        Backward-compatibility shim: if a legacy client sends
+        tracing_options.queue_hint, move it into routing_options.queue_hint.
+        """
+        try:
+            topt = values.get("tracing_options") or {}
+            ropt = values.get("routing_options") or {}
+            if isinstance(topt, dict) and "queue_hint" in topt and "queue_hint" not in ropt:
+                ropt["queue_hint"] = topt.pop("queue_hint")
+                values["routing_options"] = ropt
+                values["tracing_options"] = topt
+        except Exception:
+            pass
+        return values
 
 
 # ------------------------------------------------------------------------------
