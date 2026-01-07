@@ -415,7 +415,7 @@ def create_nvingest_collection(
     graph_degree: int = 100,
     m: int = 64,
     ef_construction: int = 512,
-    collection_alias: str = None,
+    collection_alias: str = "default",
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -1033,7 +1033,7 @@ def write_to_nvingest_collection(
     elif local_index and sparse:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(bm25_save_path)
-    client = MilvusClient(milvus_uri, token=f"{username}:{password}", alias=kwargs.get("alias", None))
+    client = MilvusClient(milvus_uri, token=f"{username}:{password}", alias=kwargs.get("alias", "default"))
     schema = Collection(collection_name).schema
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
@@ -1988,7 +1988,7 @@ class Milvus(VDB):
         username: str = None,
         password: str = None,
         no_wait_index: bool = False,
-        alias: str = None,
+        alias: str = "default",
         **kwargs,
     ):
         """
@@ -2024,7 +2024,7 @@ class Milvus(VDB):
             password (str, optional): The password for Milvus authentication. Defaults to None.
             no_wait_index (bool, optional): When true, the index creation will not wait for completion.
                 Defaults to False.
-            alias (str, optional): The alias for the Milvus connection. Defaults to None.
+            alias (str, optional): The alias for the Milvus connection. Defaults to default.
             **kwargs: Additional keyword arguments for customization.
         """
         kwargs = locals().copy()
@@ -2063,7 +2063,7 @@ class Milvus(VDB):
             "dense_dim": self.__dict__.get("dense_dim", 2048),
             "username": self.__dict__.get("username", None),
             "password": self.__dict__.get("password", None),
-            "alias": self.__dict__.get("alias", None),
+            "alias": self.__dict__.get("alias", "default"),
         }
         return (self.collection_name, conn_dict)
 
