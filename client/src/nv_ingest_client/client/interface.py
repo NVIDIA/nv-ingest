@@ -1069,6 +1069,8 @@ class Ingestor:
 
             task_options = dict(
                 document_type=document_type,
+                extract_text=extract_text,
+                extract_images=extract_images,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
