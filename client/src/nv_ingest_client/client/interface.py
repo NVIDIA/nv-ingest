@@ -1045,6 +1045,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
+        extract_text = kwargs.pop("extract_text", True)
+        extract_images = kwargs.pop("extract_images", True)
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
