@@ -287,3 +287,10 @@ The  following example adds user-defined stages to your NeMo Retriever extractio
         max_replicas=2,
         )
         ```
+
+
+
+## Related Topics
+
+- [User-Defined Functions for NeMo Retriever Extraction](user-defined-functions.md)
+- [NimClient Usage](nimclient.md)

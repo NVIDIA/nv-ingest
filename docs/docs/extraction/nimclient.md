@@ -1,13 +1,19 @@
-# NimClient Usage Guide
+# NimClient Usage Guide for NeMo Retriever Extraction
 
-The `NimClient` class provides a unified interface for connecting to and interacting with NVIDIA Inference Microservices (NIMs). This guide demonstrates how to create custom NIM integrations for use in NV-Ingest pipelines and User Defined Functions (UDFs).
+The `NimClient` class provides a unified interface for connecting to and interacting with NVIDIA NIM Microservices. 
+This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever extraction](overview.md) pipelines and User Defined Functions (UDFs).
 
-## Overview
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 The NimClient architecture consists of two main components:
 
 1. **NimClient**: The client class that handles communication with NIM endpoints via gRPC or HTTP protocols
 2. **ModelInterface**: An abstract base class that defines how to format input data, parse output responses, and process inference results for specific models
+
+For advanced usage patterns, see the existing model interfaces in `api/src/nv_ingest_api/internal/primitives/nim/model_interface/`.
+
 
 ## Quick Start
 
@@ -573,11 +579,7 @@ formatted, batch_data = model_interface.format_input(prepared, "http", 1)
 print(f"Formatted input: {formatted}")
 ```
 
-## Additional Resources
+## Related Topics
 
-- [NV-Ingest UDF Documentation](user_defined_functions.md)
-- [NVIDIA NIM Documentation](https://docs.nvidia.com/nim/)
-- [Pipeline Configuration Guide](../configuration/pipeline_config.md)
-
-For more examples and advanced usage patterns, see the existing model interfaces in:
-`api/src/nv_ingest_api/internal/primitives/nim/model_interface/`
+- [User-Defined Functions for NeMo Retriever Extraction](user-defined-functions.md)
+- [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)

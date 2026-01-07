@@ -80,7 +80,10 @@ nav:
         - Use Multimodal Embedding: extraction/vlm-embed.md
         - Configure Ray Logging: extraction/ray-logging.md
       - Customize Your Pipeline:
+        - Add User-defined Functions: extraction/user-defined-functions.md
         - Add User-defined Stages: extraction/user-defined-stages.md
+        - NimClient Usage: extraction/nimclient.md
+        - Resource Scaling Modes: extraction/resource-scaling-modes.md
       - Performance:
         - Benchmarking: extraction/benchmarking.md
         - Telemetry: extraction/telemetry.md
