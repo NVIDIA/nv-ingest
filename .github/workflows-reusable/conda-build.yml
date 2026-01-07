@@ -1,0 +1,61 @@
+name: Reusable Conda Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: false
+        type: string
+        default: ''
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+      runner:
+        description: 'GitHub runner to use'
+        required: false
+        type: string
+        default: 'linux-large-disk'
+      upload-artifacts:
+        description: 'Upload build artifacts'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      package-path:
+        description: 'Path to built conda packages'
+        value: ${{ jobs.build.outputs.package-path }}
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
+    outputs:
+      package-path: './conda/output_conda_channel/linux-64/*.conda'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Build Conda Packages
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "Building conda package for version ${{ inputs.version }}"
+            RELEASE_VERSION="${{ inputs.version }}" ./conda/build_conda_packages.sh
+          else
+            echo "Building conda package with auto-generated version"
+            ./conda/build_conda_packages.sh
+          fi
+
+      - name: Upload artifacts
+        if: ${{ inputs.upload-artifacts }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: conda-packages
+          path: ./conda/output_conda_channel
+          retention-days: 7
