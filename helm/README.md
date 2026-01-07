@@ -307,7 +307,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
 | envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
-| envVars.AUDIO_GRPC_ENDPOINT | string | `"nv-ingest-riva-nim:50051"` |  |
+| envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://llama-32-nv-embedqa-1b-v2:8000/v1"` |  |
@@ -329,7 +329,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MINIO_PUBLIC_ADDRESS | string | `"http://localhost:9000"` |  |
 | envVars.MINIO_SECRET_KEY | string | `"minioadmin"` |  |
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
-| envVars.NEMOTRON_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"` |  |
+| envVars.NEMOTRON_PARSE_HTTP_ENDPOINT | string | `"http://nemotron-parse:8000/v1/chat/completions"` |  |
 | envVars.NEMOTRON_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NEMOTRON_PARSE_MODEL_NAME | string | `"nvidia/nemotron-parse"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
