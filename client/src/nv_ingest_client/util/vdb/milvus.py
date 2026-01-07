@@ -415,6 +415,7 @@ def create_nvingest_collection(
     graph_degree: int = 100,
     m: int = 64,
     ef_construction: int = 512,
+    collection_alias: str = None,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -447,9 +448,10 @@ def create_nvingest_collection(
         Returns a milvus collection schema, that represents the fields in the created
         collection.
     """
+
     local_index = False
     if urlparse(milvus_uri).scheme:
-        connections.connect(uri=milvus_uri, token=f"{username}:{password}")
+        connections.connect(collection_alias, uri=milvus_uri, token=f"{username}:{password}")
         server_version = utility.get_server_version()
         if "lite" in server_version:
             gpu_index = False
@@ -458,7 +460,7 @@ def create_nvingest_collection(
         if milvus_uri.endswith(".db"):
             local_index = True
 
-    client = MilvusClient(milvus_uri, token=f"{username}:{password}")
+    client = MilvusClient(alias=collection_alias, uri=milvus_uri, token=f"{username}:{password}")
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse, local_index=local_index)
     index_params = create_nvingest_index_params(
         sparse=sparse,
@@ -1031,7 +1033,7 @@ def write_to_nvingest_collection(
     elif local_index and sparse:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(bm25_save_path)
-    client = MilvusClient(milvus_uri, token=f"{username}:{password}")
+    client = MilvusClient(milvus_uri, token=f"{username}:{password}", alias=kwargs.get("alias", None))
     schema = Collection(collection_name).schema
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
@@ -1986,6 +1988,7 @@ class Milvus(VDB):
         username: str = None,
         password: str = None,
         no_wait_index: bool = False,
+        alias: str = None,
         **kwargs,
     ):
         """
@@ -2019,6 +2022,9 @@ class Milvus(VDB):
                 insert method.
             username (str, optional): The username for Milvus authentication. Defaults to None.
             password (str, optional): The password for Milvus authentication. Defaults to None.
+            no_wait_index (bool, optional): When true, the index creation will not wait for completion.
+                Defaults to False.
+            alias (str, optional): The alias for the Milvus connection. Defaults to None.
             **kwargs: Additional keyword arguments for customization.
         """
         kwargs = locals().copy()
@@ -2057,6 +2063,7 @@ class Milvus(VDB):
             "dense_dim": self.__dict__.get("dense_dim", 2048),
             "username": self.__dict__.get("username", None),
             "password": self.__dict__.get("password", None),
+            "alias": self.__dict__.get("alias", None),
         }
         return (self.collection_name, conn_dict)
 
@@ -2066,7 +2073,6 @@ class Milvus(VDB):
         write_params.pop("gpu_index", True)
         write_params.pop("gpu_search", True)
         write_params.pop("dense_dim", 2048)
-
         return (self.collection_name, write_params)
 
     def run(self, records):

@@ -119,7 +119,7 @@ tmpDirSize: 50Gi
 ## @param envVars.MINIO_SECRET_KEY [default: "minioadmin"] MinIO secret key for authentication
 ## @param envVars.IMAGE_STORAGE_URI [default: "s3://nv-ingest/artifacts/store/images"] fsspec-compatible destination for stored images
 ## @param envVars.IMAGE_STORAGE_PUBLIC_BASE_URL [default: ""] Optional HTTP base URL for serving stored images when using object storage
-## @param envVars.NEMOTRON_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"] HTTP endpoint for Nemotron Parse service
+## @param envVars.NEMOTRON_PARSE_HTTP_ENDPOINT [default: "http://nemotron-parse:8000/v1/chat/completions"] HTTP endpoint for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_INFER_PROTOCOL [default: "http"] Protocol for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_MODEL_NAME [default: "nvidia/nemotron-parse"] Model name for Nemotron Parse
 ## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
@@ -138,7 +138,7 @@ tmpDirSize: 50Gi
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/nemotron-nano-12b-v2-vl"] Model name for VLM caption service
 ## @param envVars.VLM_CAPTION_PROMPT [default: "Caption the content of this image:"] Override caption prompt sent as the user message
 ## @param envVars.VLM_CAPTION_SYSTEM_PROMPT [default: "/no_think"] Override system prompt for reasoning toggle (/think or /no_think)
-## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
+## @param envVars.AUDIO_GRPC_ENDPOINT [default: "audio:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
@@ -166,13 +166,13 @@ envVars:
   # Optional public base URL for rendering object storage assets
   IMAGE_STORAGE_PUBLIC_BASE_URL: ""
 
-  AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
+  AUDIO_GRPC_ENDPOINT: "audio:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
   EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
 
-  NEMOTRON_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions
+  NEMOTRON_PARSE_HTTP_ENDPOINT: http://nemotron-parse:8000/v1/chat/completions
   NEMOTRON_PARSE_INFER_PROTOCOL: http
   NEMOTRON_PARSE_MODEL_NAME: nvidia/nemotron-parse
 
