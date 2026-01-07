@@ -1,15 +1,6 @@
 # MIG Values for NV-Ingest 26.x (NIM Operator format)
 # For NV-Ingest 25.9.0 and earlier, use nv-ingest-mig-values-25x.yaml
 
-# Main NV-Ingest service resources - Using MIG
-resources:
-  limits:
-    nvidia.com/gpu: 0              # Set GPU to 0 when using MIG
-    nvidia.com/mig-1g.10gb: 1      # Use MIG instance
-  requests:
-    nvidia.com/gpu: 0              # Set GPU to 0 when using MIG
-    nvidia.com/mig-1g.10gb: 1      # Use MIG instance
-
 # Configure NIM Operator components to use MIG
 nimOperator:
   page_elements:
@@ -52,10 +43,10 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-1g.20gb: 1
       requests:
         nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
+        nvidia.com/mig-1g.20gb: 1
 
   paddleocr:
     resources:
@@ -68,6 +59,7 @@ nimOperator:
 
   # If you want to deploy llama-32-nv-rerankqa-1b-v2
   llama_3_2_nv_rerankqa_1b_v2:
+    enabled: true
     resources:
       limits:
         nvidia.com/gpu: "0"
@@ -77,6 +69,7 @@ nimOperator:
         nvidia.com/mig-1g.10gb: 1
 
   nemotron_nano_12b_v2_vl:
+    enabled: true
     resources:
       limits:
         nvidia.com/gpu: "0"
@@ -84,6 +77,26 @@ nimOperator:
       requests:
         nvidia.com/gpu: "0"
         nvidia.com/mig-7g.80gb: 1
+
+  nemotron_parse:
+    enabled: true
+    resources:
+      limits:
+        nvidia.com/gpu: "0"
+        nvidia.com/mig-7g.80gb: 1
+      requests:
+        nvidia.com/gpu: "0"
+        nvidia.com/mig-7g.80gb: 1
+
+  audio:
+    enabled: true
+    resources:
+      limits:
+        nvidia.com/gpu: "0"
+        nvidia.com/mig-1g.10gb: 1
+      requests:
+        nvidia.com/gpu: "0"
+        nvidia.com/mig-1g.10gb: 1
 
 # Configure Milvus to use MIG
 milvus:
