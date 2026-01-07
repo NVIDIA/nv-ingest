@@ -48,15 +48,6 @@ nimOperator:
         nvidia.com/gpu: "0"
         nvidia.com/mig-1g.20gb: 1
 
-  paddleocr:
-    resources:
-      limits:
-        nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
-      requests:
-        nvidia.com/gpu: "0"
-        nvidia.com/mig-1g.10gb: 1
-
   # If you want to deploy llama-32-nv-rerankqa-1b-v2
   llama_3_2_nv_rerankqa_1b_v2:
     enabled: true
