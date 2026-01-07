@@ -59,7 +59,7 @@ For production deployments processing large volumes of documents, consider:
 - Additional CPU cores for improved parallel processing
 - Multiple GPUs for distributed processing workloads
 
-For guidance on choosing between static and dynamic scaling modes, and how to configure them in `docker-compose.yaml`, see [Scaling Modes](./scaling_modes.md).
+For guidance on choosing between static and dynamic scaling modes, and how to configure them in `docker-compose.yaml`, see [Scaling Modes](scaling-modes.md).
 
 
 
