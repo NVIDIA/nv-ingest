@@ -51,7 +51,7 @@ active:
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
-  profiles: [retrieval, table-structure]
+  profiles: [retrieval]
   
   # Runtime
   sparse: true

@@ -15,7 +15,7 @@
 #!/bin/bash
 set -xeuo pipefail # Exit immediately if a command exits with a non-zero status
 
-FFMPEG_VERSION=7.0.1
+FFMPEG_VERSION=7.1.2
 
 for i in "$@"; do
     case $i in
