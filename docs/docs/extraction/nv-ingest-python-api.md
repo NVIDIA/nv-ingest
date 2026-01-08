@@ -53,6 +53,33 @@ The following table describes the `extract_method` options.
 | `unstructured_local` | Deprecated   | Local Unstructured extraction.                   |
 
 
+### Caption images and control reasoning
+
+The caption task can call a VLM with optional prompt and reasoning controls:
+
+- `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
+- `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
+
+!!! note
+    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` per the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
+
+Example:
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/doc-with-images.pdf")
+    .extract(extract_images=True)
+    .caption(
+        prompt="Caption the content of this image:",
+        reasoning=True,  # Enable reasoning
+    )
+    .ingest()
+)
+```
+
+
 
 ## Track Job Progress
 
