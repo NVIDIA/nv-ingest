@@ -132,13 +132,15 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 
 **Dataset Extraction Settings:**
 
-| Dataset | Text | Tables | Charts | Images | Infographics | Recall |
-|---------|------|--------|--------|--------|--------------|--------|
-| `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Dataset | Text | Tables | Charts | Images | Infographics | Audio | Recall |
+|---------|------|--------|--------|--------|--------------|-------|--------|
+| `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `video` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `audio` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ### Configuration Precedence
 

@@ -1,8 +1,10 @@
+import glob as glob_module
 import json
 import logging
 import os
 import shutil
 import time
+from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -85,18 +87,24 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"VDB Backend: {config.vdb_backend}")
 
     # Extraction config
-    extractions = []
-    if extract_text:
-        extractions.append("text")
-    if extract_tables:
-        extractions.append("tables")
-    if extract_charts:
-        extractions.append("charts")
-    if extract_images:
-        extractions.append("images")
-    if extract_infographics:
-        extractions.append("infographics")
-    print(f"Extract: {', '.join(extractions)}")
+    is_audio_video_dataset = config.file_pattern and (
+        config.file_pattern.endswith(".mp3") or config.file_pattern.endswith(".mp4")
+    )
+    if is_audio_video_dataset:
+        extractions = ["audio (segment_audio=True)"]
+    else:
+        extractions = []
+        if extract_text:
+            extractions.append("text")
+        if extract_tables:
+            extractions.append("tables")
+        if extract_charts:
+            extractions.append("charts")
+        if extract_images:
+            extractions.append("images")
+        if extract_infographics:
+            extractions.append("infographics")
+    print(f"Extract: {', '.join(extractions) if extractions else 'none'}")
 
     # Pipeline options
     pipeline_opts = []
@@ -135,30 +143,52 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2":
         ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
 
-    # Convert directory to recursive glob pattern to handle nested directories
-    if os.path.isdir(data_dir):
-        # Use **/*.pdf to recursively match PDF files in subdirectories
-        file_pattern = os.path.join(data_dir, "**", "*.pdf")
-    else:
-        # Already a file or glob pattern
-        file_pattern = data_dir
+    is_video_dataset = config.file_pattern and config.file_pattern.endswith(".mp4")
+    is_audio_dataset = config.file_pattern and config.file_pattern.endswith(".mp3")
 
-    ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
+    if is_video_dataset or is_audio_dataset:
+        # Video/Audio: glob files with optional size/count filters
+        file_pattern = os.path.join(data_dir, "**", config.file_pattern)
+        all_files = glob_module.glob(file_pattern, recursive=True)
+        if config.max_file_size_gb:
+            max_size = config.max_file_size_gb * 1e9
+            all_files = [f for f in all_files if Path(f).stat().st_size < max_size]
+        if config.max_files:
+            all_files = all_files[: config.max_files]
+        media_type = "Audio" if is_audio_dataset else "Video"
+        print(f"{media_type} files: {len(all_files)}")
+        ingestor = Ingestor(**ingestor_kwargs).files(all_files)
+    else:
+        if os.path.isdir(data_dir):
+            file_pattern = os.path.join(data_dir, "**", "*.pdf")
+        else:
+            file_pattern = data_dir
+        ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
 
     # V2-only: Configure PDF splitting (server-side page splitting)
     if api_version == "v2" and pdf_split_page_count:
         ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
 
-    # Extraction step
-    ingestor = ingestor.extract(
-        extract_text=extract_text,
-        extract_tables=extract_tables,
-        extract_charts=extract_charts,
-        extract_images=extract_images,
-        text_depth=text_depth,
-        table_output_format=table_output_format,
-        extract_infographics=extract_infographics,
-    )
+    # Extraction step - audio/video use specific extraction params with segmentation
+    if is_audio_dataset or is_video_dataset:
+        ingestor = ingestor.extract(
+            extract_audio_params={"segment_audio": True},
+            extract_text=False,
+            extract_tables=False,
+            extract_charts=False,
+            extract_images=False,
+            extract_infographics=False,
+        )
+    else:
+        ingestor = ingestor.extract(
+            extract_text=extract_text,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            extract_images=extract_images,
+            text_depth=text_depth,
+            table_output_format=table_output_format,
+            extract_infographics=extract_infographics,
+        )
 
     # Optional pipeline steps
     if enable_caption:
@@ -225,11 +255,24 @@ def main(config=None, log_path: str = "test_results") -> int:
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
-    total_pages = pdf_page_count(data_dir)
+    # Calculate throughput metrics
+    total_pages = None
     pages_per_second = None
-    if total_pages > 0 and ingestion_time > 0:
-        pages_per_second = total_pages / ingestion_time
-        kv_event_log("pages_per_second", pages_per_second, log_path)
+    total_size_mb = None
+    mb_per_second = None
+
+    if (is_video_dataset or is_audio_dataset) and config.total_size_mb:
+        # Video/Audio: MB/s metric using preconfigured dataset size
+        total_size_mb = config.total_size_mb
+        mb_per_second = total_size_mb / ingestion_time if ingestion_time > 0 else None
+        kv_event_log("total_size_mb", total_size_mb, log_path)
+        kv_event_log("mb_per_second", mb_per_second, log_path)
+    elif not is_video_dataset and not is_audio_dataset:
+        # PDF: pages/second metric
+        total_pages = pdf_page_count(data_dir)
+        if total_pages > 0 and ingestion_time > 0:
+            pages_per_second = total_pages / ingestion_time
+            kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
     if vdb_backend != "lancedb":
@@ -301,6 +344,9 @@ def main(config=None, log_path: str = "test_results") -> int:
             "test_name": test_name,
             "api_version": api_version,
             "dataset_dir": data_dir,
+            "file_pattern": config.file_pattern,
+            "max_file_size_gb": config.max_file_size_gb,
+            "max_files": config.max_files,
             "collection_name": collection_name,
             "hostname": hostname,
             "model_name": model_name,
@@ -324,6 +370,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             "ingestion_time_s": ingestion_time,
             "total_pages": total_pages,
             "pages_per_second": pages_per_second,
+            "total_size_mb": total_size_mb,
+            "mb_per_second": mb_per_second,
             "text_chunks": sum(len(x) for x in text_results),
             "table_chunks": sum(len(x) for x in table_results),
             "chart_chunks": sum(len(x) for x in chart_results),

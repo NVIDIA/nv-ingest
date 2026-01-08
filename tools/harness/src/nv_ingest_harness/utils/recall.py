@@ -609,7 +609,396 @@ def earnings_recall(
     )
 
 
+def audio_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
+    """
+    Load audio retrieval ground truth from video_retrieval_eval_gt.csv.
+
+    Filters for audio-only questions (answer_modality == 'Audio only').
+
+    Args:
+        ground_truth_dir: Directory containing video_retrieval_eval_gt.csv.
+                         Defaults to repo data/ directory if None.
+
+    Returns:
+        DataFrame with columns: query, expected_video, start_time, end_time
+        (filtered for audio-only questions)
+    """
+    if ground_truth_dir is None:
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
+
+    csv_path = os.path.join(ground_truth_dir, "video_retrieval_eval_gt.csv")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"video_retrieval_eval_gt.csv not found at {csv_path}")
+
+    df = pd.read_csv(csv_path)
+
+    # Filter for audio-only questions
+    df = df.query("answer_modality == 'Audio only'").reset_index(drop=True)
+
+    if len(df) == 0:
+        raise ValueError("No 'Audio only' questions found in video_retrieval_eval_gt.csv")
+
+    # Rename columns to match expected format
+    df = df.rename(columns={"name": "expected_video", "question": "query"})
+
+    # Keep relevant columns
+    return df[["query", "expected_video", "start_time", "end_time"]].copy().reset_index(drop=True)
+
+
+def get_recall_scores_audio(
+    query_df: pd.DataFrame,
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = False,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    ground_truth_dir: Optional[str] = None,
+    tolerance: float = 2.0,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+) -> Dict[int, float]:
+    """
+    Calculate recall@k scores for audio dataset using segment-level matching.
+
+    Uses chunk midpoint matching with time tolerance (aligned with audio_recall.py).
+    A segment-level hit requires both audio file match AND midpoint within ground truth time range.
+
+    Args:
+        query_df: DataFrame with columns 'query', 'expected_video', 'start_time', 'end_time'.
+        collection_name: Milvus collection name to query.
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True.
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
+        ground_truth_dir: Unused parameter (kept for API compatibility).
+        tolerance: Time tolerance in seconds for segment matching (default 2.0).
+
+    Returns:
+        Dictionary mapping k values (1, 5, 10) to segment-level recall scores.
+    """
+    hits = defaultdict(list)
+
+    # Prepare reranker kwargs - match original audio_recall.py defaults
+    reranker_kwargs = {}
+    if nv_ranker:
+        # Use provided endpoint/model or fall back to defaults from original script
+        reranker_kwargs["nv_ranker_endpoint"] = nv_ranker_endpoint or f"http://{hostname}:8020/v1/ranking"
+        reranker_kwargs["nv_ranker_model_name"] = nv_ranker_model_name or "nvidia/llama-3.2-nv-rerankqa-1b-v2"
+        # Fetch 50 results before reranking to top_k (matches original audio_recall.py)
+        reranker_kwargs["nv_ranker_top_k"] = 50
+
+    all_answers = nvingest_retrieval(
+        query_df["query"].to_list(),
+        collection_name,
+        hybrid=sparse,
+        embedding_endpoint=f"http://{hostname}:8012/v1",
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        **reranker_kwargs,
+    )
+
+    for i in range(len(query_df)):
+        expected_audio = query_df["expected_video"].iloc[i]
+        gt_start = query_df["start_time"].iloc[i]
+        gt_end = query_df["end_time"].iloc[i]
+        retrieved_answers = all_answers[i]
+
+        # Extract audio file names and time info from retrieved chunks
+        retrieved_audios = []
+        retrieved_midpoints = []
+        for result in retrieved_answers:
+            source_id = result.get("entity", {}).get("source", {}).get("source_id", "")
+            content_metadata = result.get("entity", {}).get("content_metadata", {})
+
+            # Extract audio name (remove path and extension)
+            audio_name = os.path.basename(source_id).split(".")[0]
+            retrieved_audios.append(audio_name)
+
+            # Extract time range and calculate midpoint
+            # Milvus stores time in milliseconds, convert to seconds
+            start_time_ms = float(content_metadata.get("start_time", 0))
+            end_time_ms = float(content_metadata.get("end_time", 0))
+            start_time_sec = start_time_ms / 1000
+            end_time_sec = end_time_ms / 1000
+            midpoint = (start_time_sec + end_time_sec) / 2
+            retrieved_midpoints.append(midpoint)
+
+        # Segment-level matching: audio + time overlap with tolerance
+        for k in [1, 5, 10]:
+            if k <= top_k:
+                in_topk = False
+                for j in range(min(k, len(retrieved_audios))):
+                    audio_matches = retrieved_audios[j] == expected_audio
+                    time_matches = (gt_start - tolerance) <= retrieved_midpoints[j] <= (gt_end + tolerance)
+                    if audio_matches and time_matches:
+                        in_topk = True
+                        break
+                hits[k].append(in_topk)
+
+    recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
+    return recall_scores
+
+
 def audio_recall(
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = False,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+) -> Dict[int, float]:
+    """
+    Evaluate recall@k for audio dataset.
+
+    Loads ground truth from video_retrieval_eval_gt.csv filtered for 'Audio only' modality
+    and evaluates recall using segment-level matching (audio file name + time overlap with 2s tolerance).
+
+    Args:
+        collection_name: Milvus collection name to query.
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True.
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        ground_truth_dir: Directory containing video_retrieval_eval_gt.csv (optional).
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
+
+    Returns:
+        Dictionary mapping k values (1, 5, 10) to segment-level recall scores.
+    """
+    # Load ground truth (filtered for audio-only)
+    query_df = audio_load_ground_truth(ground_truth_dir)
+
+    print(f"Audio recall: {len(query_df)} audio-only questions loaded")
+
+    # Calculate recall scores
+    return get_recall_scores_audio(
+        query_df,
+        collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
+    )
+
+
+def video_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
+    """
+    Load video retrieval ground truth from CSV.
+
+    Args:
+        ground_truth_dir: Directory containing video_retrieval_eval_gt.csv.
+                         Defaults to repo data/ directory if None.
+
+    Returns:
+        DataFrame with columns: query, expected_video, start_time, end_time
+    """
+    if ground_truth_dir is None:
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
+
+    csv_path = os.path.join(ground_truth_dir, "video_retrieval_eval_gt.csv")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"video_retrieval_eval_gt.csv not found at {csv_path}")
+
+    df = pd.read_csv(csv_path)
+
+    # Rename columns to match expected format
+    df = df.rename(columns={"name": "expected_video", "question": "query"})
+
+    # Keep relevant columns
+    return df[["query", "expected_video", "start_time", "end_time"]].copy().reset_index(drop=True)
+
+
+def get_recall_scores_video(
+    query_df: pd.DataFrame,
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = True,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    ground_truth_dir: Optional[str] = None,
+    tolerance: float = 2.0,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+) -> Dict[int, float]:
+    """
+    Calculate recall@k scores for video dataset using segment-level matching.
+
+    Uses chunk midpoint matching with time tolerance (aligned with historical evaluation.py).
+    A segment-level hit requires both video match AND midpoint within ground truth time range.
+    Video-level recall (informational) is printed but segment-level is returned as primary.
+
+    Automatically filters ground truth to only include queries for videos in the collection,
+    enabling meaningful recall evaluation with partial datasets.
+
+    Args:
+        query_df: DataFrame with columns 'query', 'expected_video', 'start_time', 'end_time'.
+        collection_name: Milvus collection name to query.
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True.
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        ground_truth_dir: Unused parameter (kept for API compatibility).
+        tolerance: Time tolerance in seconds for segment matching (default 2.0).
+
+    Returns:
+        Dictionary mapping k values (1, 5, 10) to segment-level recall scores.
+        Video-level scores are printed separately as informational.
+    """
+    # First, discover which videos are actually in the collection
+    # by running a simple query to get all unique source_ids
+    from pymilvus import Collection, connections
+
+    milvus_uri = f"http://{hostname}:19530"
+    connections.connect(alias="default", uri=milvus_uri)
+    collection = Collection(collection_name)
+
+    # Query to get unique video names in collection
+    results = collection.query(
+        expr="",
+        output_fields=["source"],
+        limit=16384,  # Get all chunks
+    )
+    videos_in_collection = set()
+    for r in results:
+        source_id = r.get("source", {}).get("source_id", "")
+        video_name = os.path.basename(source_id).split(".")[0]
+        if video_name:
+            videos_in_collection.add(video_name)
+
+    print(f"\nVideos in collection: {len(videos_in_collection)}")
+
+    # Filter query_df to only include queries for videos in the collection
+    original_count = len(query_df)
+    query_df_filtered = query_df[query_df["expected_video"].isin(videos_in_collection)].reset_index(drop=True)
+    filtered_count = len(query_df_filtered)
+
+    print(f"Ground truth queries: {original_count} total, {filtered_count} matching videos in collection")
+
+    if filtered_count == 0:
+        print("WARNING: No ground truth queries match videos in collection!")
+        print(f"  Sample GT videos: {list(query_df['expected_video'].unique()[:5])}")
+        print(f"  Sample collection videos: {list(videos_in_collection)[:5]}")
+        return {1: 0.0, 5: 0.0, 10: 0.0}
+
+    # Use filtered dataframe for evaluation
+    query_df = query_df_filtered
+
+    segment_hits = defaultdict(list)
+    video_hits = defaultdict(list)
+
+    all_answers = nvingest_retrieval(
+        query_df["query"].to_list(),
+        collection_name,
+        hybrid=sparse,
+        embedding_endpoint=f"http://{hostname}:8012/v1",
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+    )
+
+    # Debug: print first few queries to verify time values
+    debug_limit = 3
+
+    for i in range(len(query_df)):
+        expected_video = query_df["expected_video"].iloc[i]
+        gt_start = query_df["start_time"].iloc[i]
+        gt_end = query_df["end_time"].iloc[i]
+        retrieved_answers = all_answers[i]
+
+        # Extract video names and time info from retrieved chunks
+        retrieved_videos = []
+        retrieved_midpoints = []
+        for result in retrieved_answers:
+            source_id = result.get("entity", {}).get("source", {}).get("source_id", "")
+            content_metadata = result.get("entity", {}).get("content_metadata", {})
+
+            # Extract video name (remove path and extension)
+            video_name = os.path.basename(source_id).split(".")[0]
+            retrieved_videos.append(video_name)
+
+            # Extract time range and calculate midpoint
+            # Milvus stores time in milliseconds, convert to seconds
+            start_time_ms = float(content_metadata.get("start_time", 0))
+            end_time_ms = float(content_metadata.get("end_time", 0))
+            start_time_sec = start_time_ms / 1000
+            end_time_sec = end_time_ms / 1000
+            midpoint = (start_time_sec + end_time_sec) / 2
+            retrieved_midpoints.append(midpoint)
+
+        # Debug: print sample time values to verify conversion
+        if i < debug_limit and len(retrieved_videos) > 0:
+            print(f"\n[DEBUG] Query {i}: expected={expected_video}, gt_time=[{gt_start:.2f}, {gt_end:.2f}]s")
+            for j in range(min(3, len(retrieved_videos))):
+                print(f"  Result {j}: video={retrieved_videos[j]}, midpoint={retrieved_midpoints[j]:.2f}s")
+
+        # Segment-level matching: video + time overlap with tolerance
+        for k in [1, 5, 10]:
+            if k <= top_k:
+                in_topk = False
+                for j in range(min(k, len(retrieved_videos))):
+                    video_matches = retrieved_videos[j] == expected_video
+                    time_matches = (gt_start - tolerance) <= retrieved_midpoints[j] <= (gt_end + tolerance)
+                    if video_matches and time_matches:
+                        in_topk = True
+                        break
+                segment_hits[k].append(in_topk)
+
+        # Video-level matching: deduplicate by video, check if expected video in top-k
+        seen_videos = []
+        for video in retrieved_videos:
+            if video not in seen_videos:
+                seen_videos.append(video)
+
+        for k in [1, 5, 10]:
+            if k <= top_k:
+                video_hits[k].append(expected_video in seen_videos[:k])
+
+    segment_scores = {k: np.mean(segment_hits[k]) for k in segment_hits if len(segment_hits[k]) > 0}
+    video_scores = {k: np.mean(video_hits[k]) for k in video_hits if len(video_hits[k]) > 0}
+
+    # Print video-level recall as informational metric
+    print("\nVideo-level Recall (informational):")
+    for k in sorted(video_scores.keys()):
+        print(f"  - Video Recall @{k}: {video_scores[k]:.3f}")
+
+    # Return segment-level as primary metric (matches recall case expectations)
+    return segment_scores
+
+
+def video_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
@@ -618,13 +1007,51 @@ def audio_recall(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
-    Audio dataset recall evaluator (stub, multimodal-only).
+    Evaluate recall@k for video dataset.
 
-    TODO: Implement audio-specific ground truth loading and evaluation.
+    Loads ground truth from video_retrieval_eval_gt.csv and evaluates recall using:
+    - Segment-level matching (primary, returned): video name + time overlap with 2s tolerance
+    - Video-level matching (informational, printed): video name only (deduplicated)
+
+    Args:
+        collection_name: Milvus collection name to query.
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True.
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        ground_truth_dir: Directory containing video_retrieval_eval_gt.csv (optional).
+
+    Returns:
+        Dictionary mapping k values (1, 5, 10) to segment-level recall scores.
+        Video-level scores are printed as informational during evaluation.
     """
-    raise NotImplementedError("audio_recall not yet implemented")
+    # Load ground truth
+    query_df = video_load_ground_truth(ground_truth_dir)
+
+    # Calculate recall scores
+    return get_recall_scores_video(
+        query_df,
+        collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        ground_truth_dir=ground_truth_dir,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
+    )
 
 
 def bo10k_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
@@ -715,6 +1142,7 @@ def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
         "finance_bench": finance_bench_recall,
         "earnings": earnings_recall,
         "audio": audio_recall,
+        "video": video_recall,
         "bo10k": bo10k_recall,
     }
 
