@@ -415,7 +415,7 @@ def create_nvingest_collection(
     graph_degree: int = 100,
     m: int = 64,
     ef_construction: int = 512,
-    collection_alias: str = None,
+    alias: str = None,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -454,8 +454,8 @@ def create_nvingest_collection(
         "uri": milvus_uri,
         "token": f"{username}:{password}",
     }
-    if collection_alias is not None:
-        connection_details["alias"] = collection_alias
+    if alias is not None:
+        connection_details["alias"] = alias
     if urlparse(milvus_uri).scheme:
         connections.connect(**connection_details)
         server_version = utility.get_server_version()
