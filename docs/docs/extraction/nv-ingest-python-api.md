@@ -388,6 +388,29 @@ ingestor = ingestor.caption(
 )
 ```
 
+### Caption Images and Control Reasoning
+
+The caption task can call a VLM with optional prompt and system prompt overrides:
+
+- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
+- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+
+Example:
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/doc-with-images.pdf")
+    .extract(extract_images=True)
+    .caption(
+        prompt="Caption the content of this image:",
+        system_prompt="/think",  # or "/no_think"
+    )
+    .ingest()
+)
+```
+
 
 
 ## Extract Embeddings
@@ -501,6 +524,7 @@ ingestor = ingestor.store(
 ```
 
 For more information on environment variables, refer to [Environment Variables](environment-config.md).
+
 
 
 ## Extract Audio
