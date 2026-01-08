@@ -35,7 +35,7 @@ active:
   # Optional pipeline steps
   enable_caption: false  # Enable image captioning (ensure vlm profile is enabled)
   caption_prompt: null  # Override caption user prompt (null = service default)
-  caption_system_prompt: null  # Set "/think" or "/no_think" to control reasoning (null = service default)
+  caption_reasoning: null  # Enable reasoning: true = enable, false = disable, null = service default (default is false)
 
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting

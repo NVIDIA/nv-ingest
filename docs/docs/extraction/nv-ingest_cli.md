@@ -103,18 +103,18 @@ nv-ingest-cli \
 
 ### Example: Caption images with reasoning control
 
-To invoke image captioning and control reasoning with the VLM system prompt:
+To invoke image captioning and control reasoning:
 
 ```bash
 nv-ingest-cli \
   --doc ./data/test.pdf \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_images": "true"}' \
-  --task='caption:{"prompt": "Caption the content of this image:", "system_prompt": "/think"}' \
+  --task='caption:{"prompt": "Caption the content of this image:", "reasoning": true}' \
   --client_host=localhost \
   --client_port=7670
 ```
 
-- `system_prompt` defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+- `reasoning` (boolean): Set to `true` to enable reasoning, `false` to disable it. Defaults to service default (typically disabled).
 - Ensure the VLM caption profile/service is running or pointing to the public build endpoint; otherwise the caption task will be skipped.
 
 Alternatively, you can use an environment variable to set the API version:

@@ -40,7 +40,7 @@ The following table describes the `extract_method` options.
 
 | Value                | Status       | Description                                      |
 |----------------------|--------------|--------------------------------------------------|
-| `audio`              | Early access | Extract information from audio files.            |
+| `audio`              | Current      | Extract information from audio files.            |
 | `nemotron_parse`     | Current      | NVIDIA Nemotron Parse extraction.                |
 | `ocr`                | Current      | Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt. |
 | `pdfium`             | Current      | Uses PDFium to extract native text. This is the default. This is the fastest method but does not capture text from scanned images/pages. |
@@ -55,10 +55,13 @@ The following table describes the `extract_method` options.
 
 ### Caption images and control reasoning
 
-The caption task can call a VLM with optional prompt and system prompt overrides:
+The caption task can call a VLM with optional prompt and reasoning controls:
 
-- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
-- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+- `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
+- `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
+
+!!! note
+    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` per the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
 
 Example:
 ```python
@@ -70,7 +73,7 @@ ingestor = (
     .extract(extract_images=True)
     .caption(
         prompt="Caption the content of this image:",
-        system_prompt="/think",  # or "/no_think"
+        reasoning=True,  # Enable reasoning
     )
     .ingest()
 )
@@ -385,6 +388,29 @@ ingestor = ingestor.caption(
 )
 ```
 
+### Caption Images and Control Reasoning
+
+The caption task can call a VLM with optional prompt and system prompt overrides:
+
+- `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
+- `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+
+Example:
+```python
+from nv_ingest_client.client.interface import Ingestor
+
+ingestor = (
+    Ingestor()
+    .files("path/to/doc-with-images.pdf")
+    .extract(extract_images=True)
+    .caption(
+        prompt="Caption the content of this image:",
+        system_prompt="/think",  # or "/no_think"
+    )
+    .ingest()
+)
+```
+
 
 
 ## Extract Embeddings
@@ -498,6 +524,7 @@ ingestor = ingestor.store(
 ```
 
 For more information on environment variables, refer to [Environment Variables](environment-config.md).
+
 
 
 ## Extract Audio
