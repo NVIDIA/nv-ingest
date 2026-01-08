@@ -1,7 +1,8 @@
-# Use NeMo Retriever Extraction with Riva for Audio Processing
+# Extract Speech with NeMo Retriever Extraction
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
-with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
+with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
+to extract speech from audio files.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
@@ -10,7 +11,7 @@ with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/u
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-Currently, you can process the following audio file types:
+Currently, you can extract speech from the following file types:
 
 - `mp3`
 - `wav`
@@ -19,16 +20,16 @@ Currently, you can process the following audio file types:
 
 ## Overview
 
-[NeMo Retriever extraction](overview.md) now supports the processing and retrieval of audio files for Retrieval Augmented Generation (RAG) applications. 
+[NeMo Retriever extraction](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
 Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
 NeMo Retriever leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
-to transcribe audio files to text, which is then embedded by using the NeMo Retriever embedding NIM. 
+to transcribe speech to text, which is then embedded by using the NeMo Retriever embedding NIM. 
 
 !!! important
 
-    Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements to run RIVA NIM, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
+    Due to limitations in available VRAM controls in the current release, the RIVA ASR NIM microservice must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
 
-This pipeline enables users to now retrieve audio files at the segment level. 
+This pipeline enables users to retrieve speech files at the segment level.
 
 
 
@@ -42,7 +43,7 @@ Use the following procedure to run the NIM locally.
 
 !!! important
 
-    RIVA NIM must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the audio service's device_id to a dedicated GPU: device_ids: ["1"] or higher.
+    The RIVA ASR NIM microservice must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the device_id to a dedicated GPU: device_ids: ["1"] or higher.
 
 1. To access the required container images, log in to the NVIDIA Container Registry (nvcr.io). Use [your NGC key](ngc-api-key.md) as the password. Run the following command in your terminal.
 
@@ -55,20 +56,13 @@ Use the following procedure to run the NIM locally.
     Password: <your-ngc-key>
     ```
 
-2. Store [your NGC key](ngc-api-key.md) in an environment variable file.
+2. For convenience and security, store [your NGC key](ngc-api-key.md) in an environment variable file (`.env`). This enables services to access it without needing to enter the key manually each time. Create a .env file in your working directory and add the following line. Replace `<your-ngc-key>` with your actual NGC key.
 
-For convenience and security, store your NGC key in a .env file.
-This enables services to access it without needing to enter the key manually each time.
+    ```ini
+    NGC_API_KEY=<your-ngc-key>
+    ```
 
-Create a .env file in your working directory and add the following line:
-```ini
-NGC_API_KEY=<your-ngc-key>
-```
-Again, replace <your-ngc-key> with your actual NGC key.
-
-3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
-
-    - The `--profile audio` flag ensures that audio-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
+3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command. The `--profile audio` flag ensures that speech-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
     ```shell
     docker compose --profile retrieval --profile audio up
