@@ -21,8 +21,14 @@ This release contains the following key changes:
 
 - Add functional support for [H200 NVL](https://www.nvidia.com/en-us/data-center/h200/). For details, refer to [Support Matrix](support-matrix.md).
 - Add support for the [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse/modelcard) model which replaces the [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse/modelcard) model. For details, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
+- Support is now deprecated for [paddleocr](https://build.nvidia.com/baidu/paddleocr/modelcard).
+- In the `Ingestor.extract` method, the defaults for `extract_text` and `extract_images` are now set to `true` for consistency with `extract_tables` and `extract_charts`. For details, refer to [Use the Python API](nv-ingest-python-api.md).
+- The `table-structure` profile is no longer available. The table-structure profile is now part of the default profile. For details, refer to [Profile Information](quickstart-guide.md#profile-information).
 - New documentation [Why Throughput Is Dataset-Dependent](throughput-is-dataset-dependent.md).
 - New documentation [Add User-defined Stages](user-defined-stages.md).
+- New documentation [Add User-defined Functions](user-defined-functions.md).
+- New documentation [Resource Scaling Modes](scaling-modes.md).
+- New documentation [NimClient Usage](nimclient.md).
 - New documentation [Use the API (V2)](v2-api-guide.md).
 
 

@@ -247,7 +247,7 @@ def join_yolox_table_structure_and_ocr_output(yolox_cell_preds, ocr_boxes, ocr_t
     df_table = df_assign[df_assign["is_table"]].reset_index(drop=True)
     if len(df_table):
         mat = build_markdown(df_table)
-        markdown_table = display_markdown(mat, use_header=False)
+        markdown_table = display_markdown(mat, use_header=True)
 
         all_boxes = np.stack(df_table.ocr_box.values)
         table_box = np.concatenate([all_boxes[:, [0, 1]].min(0), all_boxes[:, [2, 3]].max(0)])
