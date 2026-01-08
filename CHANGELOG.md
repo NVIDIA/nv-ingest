@@ -1,4 +1,4 @@
-# NVIDIA Ingest 24.08.0
+# NVIDIA Ingest 26.1.0
 
 ## New Features
 
