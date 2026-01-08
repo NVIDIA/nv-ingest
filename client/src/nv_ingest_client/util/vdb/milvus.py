@@ -2077,7 +2077,7 @@ class Milvus(VDB):
             "dense_dim": self.__dict__.get("dense_dim", 2048),
             "username": self.__dict__.get("username", None),
             "password": self.__dict__.get("password", None),
-            "alias": self.__dict__.get("alias", None),
+            "collection_alias": self.__dict__.get("alias", None),
         }
         return (self.collection_name, conn_dict)
 
