@@ -2038,7 +2038,7 @@ class Milvus(VDB):
             password (str, optional): The password for Milvus authentication. Defaults to None.
             no_wait_index (bool, optional): When true, the index creation will not wait for completion.
                 Defaults to False.
-            alias (str, optional): The alias for the Milvus connection. Defaults to default.
+            alias (str, optional): The alias for the Milvus connection. Defaults to None.
             **kwargs: Additional keyword arguments for customization.
         """
         kwargs = locals().copy()
