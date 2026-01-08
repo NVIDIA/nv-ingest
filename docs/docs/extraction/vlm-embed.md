@@ -28,7 +28,7 @@ Use the following procedure to configure and run the multimodal embedding NIM lo
 2. Start the NeMo Retriever extraction services. The multimodal embedding service is included by default.
 
     ```
-    docker compose --profile retrieval --profile table-structure up
+    docker compose --profile retrieval up
     ```
 
 

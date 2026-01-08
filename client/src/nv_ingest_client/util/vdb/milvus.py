@@ -450,8 +450,14 @@ def create_nvingest_collection(
     """
 
     local_index = False
+    connection_details = {
+        "uri": milvus_uri,
+        "token": f"{username}:{password}",
+    }
+    if collection_alias is not None:
+        connection_details["alias"] = collection_alias
     if urlparse(milvus_uri).scheme:
-        connections.connect(collection_alias, uri=milvus_uri, token=f"{username}:{password}")
+        connections.connect(**connection_details)
         server_version = utility.get_server_version()
         if "lite" in server_version:
             gpu_index = False
@@ -460,7 +466,7 @@ def create_nvingest_collection(
         if milvus_uri.endswith(".db"):
             local_index = True
 
-    client = MilvusClient(alias=collection_alias, uri=milvus_uri, token=f"{username}:{password}")
+    client = MilvusClient(**connection_details)
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse, local_index=local_index)
     index_params = create_nvingest_index_params(
         sparse=sparse,
@@ -1010,7 +1016,14 @@ def write_to_nvingest_collection(
         Milvus password.
     """
     local_index = False
-    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
+    connection_details = {
+        "uri": milvus_uri,
+        "token": f"{username}:{password}",
+    }
+    alias = kwargs.get("alias", None)
+    if alias is not None:
+        connection_details["alias"] = alias
+    connections.connect(**connection_details)
     if urlparse(milvus_uri).scheme:
         server_version = utility.get_server_version()
         if "lite" in server_version:
@@ -1033,7 +1046,8 @@ def write_to_nvingest_collection(
     elif local_index and sparse:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(bm25_save_path)
-    client = MilvusClient(milvus_uri, token=f"{username}:{password}", alias=kwargs.get("alias", None))
+
+    client = MilvusClient(**connection_details)
     schema = Collection(collection_name).schema
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
