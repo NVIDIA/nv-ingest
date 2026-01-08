@@ -97,6 +97,8 @@ By default, the NV Ingest container comes with the `meta-llama/Llama-3.2-1B` tok
 so that it doesn't have to download a tokenizer at runtime.
 If you are building the container yourself and want to pre-download this model, do the following:
 
+- Review the [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B).
+- [Request access](https://huggingface.co/meta-llama/Llama-3.2-1B).
 - Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`
 - Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
 
