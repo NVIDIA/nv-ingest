@@ -93,13 +93,12 @@ The following table contains the `split` parameters.
 
 ### Pre-download the Tokenizer
 
-When the NV Ingest container is built, it pre-downloads tokenizers,  
-so that it doesn't have to download a tokenizer at runtime. 
+By default, the NV Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded 
+so that it doesn't have to download a tokenizer at runtime.
+If you are building the container yourself and want to pre-download this model, do the following:
 
-By default, the NV Ingest container downloads the following tokenizers:
-
-- `intfloat/e5-large-unsupervised`
-- `meta-llama/Llama-3.2-1B`
+- Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`
+- Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
 
 
 
@@ -107,3 +106,4 @@ By default, the NV Ingest container downloads the following tokenizers:
 
 - [Use the Python API](nv-ingest-python-api.md)
 - [NeMo Retriever Extraction V2 API Guide](v2-api-guide.md)
+- [Environment Variables](environment-variables.md)

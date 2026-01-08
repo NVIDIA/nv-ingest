@@ -12,7 +12,7 @@ You can specify these in your .env file or directly in your environment.
 
 | Name                             | Example                        | Description                                                           |
 |----------------------------------|--------------------------------|-----------------------------------------------------------------------|
-| `DOWNLOAD_LLAMA_TOKENIZER`       | -                                                        | No longer used. The Llama tokenizer is now pre-downloaded at build time. For details, refer to [Token-Based Splitting](chunking.md#token-based-splitting). |
+| `DOWNLOAD_LLAMA_TOKENIZER`       | -                                                        | The Llama tokenizer is now pre-downloaded at build time. For details, refer to [Token-Based Splitting](chunking.md#token-based-splitting). |
 | `HF_ACCESS_TOKEN`                | -                                                         | A token to access HuggingFace models. For details, refer to [Token-Based Splitting](chunking.md#token-based-splitting). |
 | `INGEST_LOG_LEVEL`               | - `DEBUG` <br/> - `INFO` <br/> - `WARNING` <br/> - `ERROR` <br/> - `CRITICAL` <br/> | The log level for the ingest service, which controls the verbosity of the logging output. |
 | `MESSAGE_CLIENT_HOST`            | - `redis` <br/> - `localhost` <br/> - `192.168.1.10` <br/> | Specifies the hostname or IP address of the message broker used for communication between services. |
