@@ -2,7 +2,7 @@
 
 ## New Features
 
-- **Parallel PDF Processing (V2 API):** Large PDFs are now automatically split into chunks and processed in parallel, delivering 2–9x faster ingestion for long documents depending on content. The V2 API also resolves historical processing issues with very large files while maintaining extraction quality. The response format remains backwards-compatible and can be enablde with `message_client_kwargs={"api_version": "v2"}`. V2 is now the default processing pipeline. See the [V2 API Guide](docs/docs/extraction/v2-api-guide.md).
+- **Parallel PDF Processing (V2 API):** Large PDFs are now automatically split into chunks and processed in parallel, delivering 2–9x faster ingestion for long documents depending on content. The V2 API also resolves historical processing issues with very large files while maintaining extraction quality. The response format remains backwards-compatible and can be enabled with `message_client_kwargs={"api_version": "v2"}`. V2 is now the default processing pipeline. See the [V2 API Guide](docs/docs/extraction/v2-api-guide.md).
 
 ## Improvements
 
