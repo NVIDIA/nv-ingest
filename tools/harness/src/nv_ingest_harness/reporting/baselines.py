@@ -55,6 +55,25 @@ DATASET_BASELINES: dict[str, dict[str, dict[str, Any]]] = {
             "min": 0.80,  # observed @10: 0.940, @5 likely lower
         },
     },
+    "bo10k": {
+        "result_count": {
+            "expected": 10000,
+            "required": True,
+        },
+        "failure_count": {
+            "expected": 0,
+            "required": True,
+        },
+        "pages_per_second": {
+            "min": 10.0,
+        },
+        "recall_multimodal_@5_no_reranker": {
+            "min": 0.70,  # observed: 0.786
+        },
+        "recall_multimodal_@5_reranker": {
+            "min": 0.80,
+        },
+    },
     "_default": {
         "failure_count": {"expected": 0, "required": True},
     },

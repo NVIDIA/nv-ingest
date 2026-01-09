@@ -109,6 +109,10 @@ def run_datasets(
                 results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
                 continue
 
+            # Default to local reranker if not explicitly configured
+            if not os.environ.get("RERANKER_NIM_ENDPOINT"):
+                os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8020/v1/ranking"
+
             # Set collection_name from dataset if not set
             if case == "recall" and not config.collection_name:
                 from nv_ingest_harness.utils.recall import get_recall_collection_name

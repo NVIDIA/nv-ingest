@@ -21,10 +21,12 @@ runs:
     - bo767        # Throughput + recall (767 docs)
     - earnings     # Earnings consulting dataset
     - financebench # Financebench full dataset
+    # - bo10k        # Large scale benchmark (10k docs)
 
 # Recall configuration (applies to all e2e_recall runs)
 recall:
   reranker_mode: both  # Options: "none", "with", "both"
+  reranker_endpoint: http://localhost:8020/v1/ranking  # Local container
   top_k: 10
 
 # Sinks configuration
@@ -42,3 +44,7 @@ sinks:
 infrastructure:
   fresh_start: true  # Run nv-clean && nv-start before benchmarks
   readiness_timeout: 600  # Seconds to wait for services to be ready
+  profiles:  # Docker compose profiles to start
+    - retrieval
+    - table-structure
+    - reranker  # Required for recall evaluation

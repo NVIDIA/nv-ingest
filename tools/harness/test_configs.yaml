@@ -70,7 +70,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: bo767  # Evaluator for recall testing
+    recall_dataset: bo767
 
   earnings:
     path: /path/to/earnings_consulting
@@ -79,7 +79,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: earnings  # Evaluator for recall testing
+    recall_dataset: earnings
 
   bo20:
     path: /path/to/bo20
@@ -88,7 +88,7 @@ datasets:
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: null  # bo20 does not have recall
+    recall_dataset: null
 
   financebench:
     path: /path/to/financebench
@@ -97,7 +97,7 @@ datasets:
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: finance_bench  # Evaluator for recall testing
+    recall_dataset: finance_bench
 
   # Single file example
   single:
@@ -118,3 +118,12 @@ datasets:
     extract_images: true
     extract_infographics: true
     recall_dataset: null  # No recall evaluator for single file
+
+  bo10k:
+    path: /path/to/bo10k
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: bo10k

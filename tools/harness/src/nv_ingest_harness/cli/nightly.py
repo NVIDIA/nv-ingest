@@ -147,7 +147,7 @@ def main(
     os.environ["RERANKER_MODE"] = reranker_mode
     # Use local reranker container instead of build API
     reranker_endpoint = recall_config.get("reranker_endpoint", "http://localhost:8020/v1/ranking")
-    os.environ["NV_RANKER_NIM_ENDPOINT"] = reranker_endpoint
+    os.environ["RERANKER_NIM_ENDPOINT"] = reranker_endpoint
 
     env_data = get_environment_data()
     print("Environment:")
