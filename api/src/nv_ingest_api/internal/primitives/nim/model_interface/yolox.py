@@ -496,6 +496,8 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
         )
 
+        self._grpc_uses_bls = True
+
     def name(
         self,
     ) -> str:
@@ -550,6 +552,8 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             min_score=YOLOX_TABLE_MIN_SCORE,
             class_labels=YOLOX_TABLE_CLASS_LABELS,
         )
+
+        self._grpc_uses_bls = True
 
     def name(
         self,
