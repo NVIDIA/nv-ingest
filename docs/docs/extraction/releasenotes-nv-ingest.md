@@ -52,7 +52,7 @@ The following are the known issues that are fixed in this version:
 - A10G support is restored. To use A10G hardware, use release 26.1.0 or later. For details, refer to [Support Matrix](support-matrix.md).
 - L40S support is restored. To use L40S hardware, use release 26.1.0 or later. For details, refer to [Support Matrix](support-matrix.md).
 - The page number field in the content metadata now starts at 1 instead of 0 so each page number is no longer off by one from what you would expect. For details, refer to [Content Metadata](content-metadata.md).
-- Support for audio files greater than approximately 400MB is restored.
+- Support for batches that include individual files greater than approximately 400MB is restored. This includes audio files and pdfs.
 
 
 
@@ -61,7 +61,6 @@ The following are the known issues that are fixed in this version:
 The following are the known issues for NeMo Retriever extraction:
 
 - Advanced visual parsing is not supported on RTX Pro 6000, B200, or H200 NVL. For details, refer to [Advanced Visual Parsing](advanced-visual-parsing.md) and [Support Matrix](support-matrix.md).
-- The NeMo Retriever extraction pipeline does not support ingestion of batches that include individual files greater than approximately 400MB. Audio files are not affected by this limit.
 
 
 
