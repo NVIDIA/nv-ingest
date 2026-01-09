@@ -235,3 +235,4 @@ artifacts/
 
 # Ignore cursor rules
 .cursor
+tools/private_local/*
