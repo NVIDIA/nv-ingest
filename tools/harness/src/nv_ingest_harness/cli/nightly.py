@@ -92,14 +92,25 @@ def load_results(artifact_dir: Path) -> dict:
     is_flag=True,
     help="Print what would be done without running benchmarks",
 )
+@click.option(
+    "--replay",
+    "replay_dirs",
+    multiple=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Replay results from artifact directories to Slack (can specify multiple)",
+)
 def main(
     config_path: Path | None,
     skip_slack: bool,
     skip_history: bool,
     skip_fresh_start: bool,
     dry_run: bool,
+    replay_dirs: tuple[Path, ...],
 ):
     """Run nightly benchmarks and post results."""
+    if replay_dirs:
+        return _replay_results(replay_dirs)
+
     config_file = config_path or DEFAULT_CONFIG_PATH
     try:
         config = load_nightly_config(config_file)
@@ -134,6 +145,9 @@ def main(
         return 0
 
     os.environ["RERANKER_MODE"] = reranker_mode
+    # Use local reranker container instead of build API
+    reranker_endpoint = recall_config.get("reranker_endpoint", "http://localhost:8020/v1/ranking")
+    os.environ["NV_RANKER_NIM_ENDPOINT"] = reranker_endpoint
 
     env_data = get_environment_data()
     print("Environment:")
@@ -154,7 +168,8 @@ def main(
 
     if fresh_start:
         timeout = infra_config.get("readiness_timeout", 600)
-        rc = restart_services(timeout=timeout, build=False, clean=True)
+        profiles = infra_config.get("profiles")  # None uses DEFAULT_PROFILES
+        rc = restart_services(profiles=profiles, timeout=timeout, build=False, clean=True)
         if rc != 0:
             print(f"Warning: Service restart returned {rc}")
 
@@ -231,6 +246,61 @@ def _process_result(dataset: str, rc: int, artifact_dir: Path | None, case: str)
         "expected_result_count": expected.get("result_count"),
         "expected_total_pages": expected.get("total_pages"),
     }
+
+
+def _replay_results(artifact_dirs: tuple[Path, ...]) -> int:
+    """Replay results from artifact directories to Slack."""
+    print("\n" + "=" * 60)
+    print("Replaying Results to Slack")
+    print("=" * 60)
+
+    if not os.environ.get("SLACK_WEBHOOK_URL"):
+        print("ERROR: SLACK_WEBHOOK_URL not set")
+        return 1
+
+    all_results = []
+    env_data = get_environment_data()
+
+    for artifact_dir in artifact_dirs:
+        artifact_path = Path(artifact_dir)
+        results_file = artifact_path / "results.json"
+
+        if not results_file.exists():
+            print(f"Warning: No results.json in {artifact_path}, skipping")
+            continue
+
+        print(f"Loading: {artifact_path.name}")
+        raw_results = load_results(artifact_path)
+
+        dataset = raw_results.get("test_config", {}).get("test_name")
+        if not dataset:
+            dir_name = artifact_path.name
+            dataset = dir_name.rsplit("_", 3)[0] if "_" in dir_name else dir_name
+
+        case = raw_results.get("case", "e2e")
+        rc = raw_results.get("return_code", 0)
+
+        result = _process_result(dataset, rc, artifact_path, case)
+        all_results.append(result)
+        print(f"  {result['dataset']}: {'✓ PASS' if result['success'] else '✗ FAIL'}")
+
+    if not all_results:
+        print("ERROR: No valid results found to replay")
+        return 1
+
+    slack_sink = SlackSink({"enabled": True})
+    session_name = f"replay_{now_timestr()}"
+    slack_sink.initialize(session_name, env_data)
+
+    for result in all_results:
+        slack_sink.process_result(result)
+
+    slack_sink.finalize()
+
+    print("\n" + "=" * 60)
+    print("Replay Complete")
+    print("=" * 60)
+    return 0
 
 
 if __name__ == "__main__":

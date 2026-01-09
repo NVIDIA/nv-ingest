@@ -163,6 +163,17 @@ CREATE TABLE runs (
 | `--skip-history` | Disable SQLite storage |
 | `--skip-fresh-start` | Use running services instead of restarting |
 | `--dry-run` | Show configuration without executing |
+| `--replay PATH` | Replay results from artifact dir(s) to Slack (can specify multiple) |
+
+## Replay
+
+If Slack posting fails (e.g., expired webhook), replay results after fixing:
+
+```bash
+uv run nv-ingest-harness-nightly \
+  --replay artifacts/bo20_20260109_053712_UTC \
+  --replay artifacts/bo767_20260109_053814_UTC
+```
 
 ## CI/CD
 
