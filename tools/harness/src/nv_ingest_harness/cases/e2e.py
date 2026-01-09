@@ -86,24 +86,20 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Embed: {model_name} (dim={dense_dim}, sparse={sparse})")
     print(f"VDB Backend: {config.vdb_backend}")
 
-    # Extraction config
-    is_audio_video_dataset = config.file_pattern and (
-        config.file_pattern.endswith(".mp3") or config.file_pattern.endswith(".mp4")
-    )
-    if is_audio_video_dataset:
-        extractions = ["audio (segment_audio=True)"]
-    else:
-        extractions = []
-        if extract_text:
-            extractions.append("text")
-        if extract_tables:
-            extractions.append("tables")
-        if extract_charts:
-            extractions.append("charts")
-        if extract_images:
-            extractions.append("images")
-        if extract_infographics:
-            extractions.append("infographics")
+    extractions = []
+    if extract_text:
+        extractions.append("text")
+    if extract_tables:
+        extractions.append("tables")
+    if extract_charts:
+        extractions.append("charts")
+    if extract_images:
+        extractions.append("images")
+    if extract_infographics:
+        extractions.append("infographics")
+    needs_audio_segmentation = config.file_pattern and config.file_pattern.endswith((".mp3", ".mp4"))
+    if needs_audio_segmentation:
+        extractions.append("audio (segment_audio=True)")
     print(f"Extract: {', '.join(extractions) if extractions else 'none'}")
 
     # Pipeline options
@@ -143,20 +139,13 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2":
         ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
 
-    is_video_dataset = config.file_pattern and config.file_pattern.endswith(".mp4")
-    is_audio_dataset = config.file_pattern and config.file_pattern.endswith(".mp3")
-
-    if is_video_dataset or is_audio_dataset:
-        # Video/Audio: glob files with optional size/count filters
+    if config.file_pattern:
         file_pattern = os.path.join(data_dir, "**", config.file_pattern)
         all_files = glob_module.glob(file_pattern, recursive=True)
         if config.max_file_size_gb:
             max_size = config.max_file_size_gb * 1e9
             all_files = [f for f in all_files if Path(f).stat().st_size < max_size]
-        if config.max_files:
-            all_files = all_files[: config.max_files]
-        media_type = "Audio" if is_audio_dataset else "Video"
-        print(f"{media_type} files: {len(all_files)}")
+        print(f"Files: {len(all_files)}")
         ingestor = Ingestor(**ingestor_kwargs).files(all_files)
     else:
         if os.path.isdir(data_dir):
@@ -169,26 +158,18 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2" and pdf_split_page_count:
         ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
 
-    # Extraction step - audio/video use specific extraction params with segmentation
-    if is_audio_dataset or is_video_dataset:
-        ingestor = ingestor.extract(
-            extract_audio_params={"segment_audio": True},
-            extract_text=False,
-            extract_tables=False,
-            extract_charts=False,
-            extract_images=False,
-            extract_infographics=False,
-        )
-    else:
-        ingestor = ingestor.extract(
-            extract_text=extract_text,
-            extract_tables=extract_tables,
-            extract_charts=extract_charts,
-            extract_images=extract_images,
-            text_depth=text_depth,
-            table_output_format=table_output_format,
-            extract_infographics=extract_infographics,
-        )
+    extract_kwargs = {
+        "extract_text": extract_text,
+        "extract_tables": extract_tables,
+        "extract_charts": extract_charts,
+        "extract_images": extract_images,
+        "text_depth": text_depth,
+        "table_output_format": table_output_format,
+        "extract_infographics": extract_infographics,
+    }
+    if needs_audio_segmentation:
+        extract_kwargs["extract_audio_params"] = {"segment_audio": True}
+    ingestor = ingestor.extract(**extract_kwargs)
 
     # Optional pipeline steps
     if enable_caption:
@@ -255,20 +236,17 @@ def main(config=None, log_path: str = "test_results") -> int:
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
-    # Calculate throughput metrics
     total_pages = None
     pages_per_second = None
     total_size_mb = None
     mb_per_second = None
 
-    if (is_video_dataset or is_audio_dataset) and config.total_size_mb:
-        # Video/Audio: MB/s metric using preconfigured dataset size
+    if config.total_size_mb:
         total_size_mb = config.total_size_mb
         mb_per_second = total_size_mb / ingestion_time if ingestion_time > 0 else None
         kv_event_log("total_size_mb", total_size_mb, log_path)
         kv_event_log("mb_per_second", mb_per_second, log_path)
-    elif not is_video_dataset and not is_audio_dataset:
-        # PDF: pages/second metric
+    else:
         total_pages = pdf_page_count(data_dir)
         if total_pages > 0 and ingestion_time > 0:
             pages_per_second = total_pages / ingestion_time
@@ -346,7 +324,6 @@ def main(config=None, log_path: str = "test_results") -> int:
             "dataset_dir": data_dir,
             "file_pattern": config.file_pattern,
             "max_file_size_gb": config.max_file_size_gb,
-            "max_files": config.max_files,
             "collection_name": collection_name,
             "hostname": hostname,
             "model_name": model_name,

@@ -396,7 +396,7 @@ services:
     volumes:
       - ./config/prometheus.yaml:/etc/prometheus/prometheus-config.yaml
     ports:
-      - "9099:9090"
+      - "9090:9090"
 
   grafana:
     container_name: grafana-service

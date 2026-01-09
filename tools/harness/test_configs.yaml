@@ -81,7 +81,7 @@ active:
   enable_image_storage: false  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
   # Storage configuration
-  spill_dir: /raid/jioffe/tmp/spill
+  spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (tools/harness/artifacts)
   collection_name: null  # null = auto-generated
 
@@ -122,7 +122,7 @@ datasets:
     recall_dataset: earnings
 
   bo20:
-    path: /raid/jioffe/bo20
+    path: /path/to/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -170,11 +170,9 @@ datasets:
 
   # Video dataset (96 files, ~54 GB)
   video:
-    path: /raid/jioffe/video_retrieval_data
+    path: /path/to/video_retrieval_data
     profiles: [retrieval, audio]
     file_pattern: "*.mp4"
-    max_file_size_gb: 20
-    max_files: null  # Start with 10 for faster iteration (set to null for full dataset)
     total_size_mb: 55263
     extract_text: true
     extract_tables: false
@@ -185,7 +183,7 @@ datasets:
 
   # Audio dataset (MP3 files for audio retrieval)
   audio:
-    path: /raid/jioffe/audio_retrieval_data_mp3
+    path: /path/to/audio_retrieval_data_mp3
     profiles: [retrieval, audio, reranker]
     file_pattern: "*.mp3"
     total_size_mb: 2859
