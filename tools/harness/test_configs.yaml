@@ -14,9 +14,23 @@ active:
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
+  
+  # Deployment configuration
+  deployment_type: docker-compose  # Options: docker-compose, helm
+  
+  # Docker Compose specific
   profiles:
     - retrieval
     - table-structure
+  
+  # Helm specific (only used when deployment_type: helm)
+  helm_release: nv-ingest
+  helm_namespace: default
+  helm_values_file: .helm-overrides.yaml  # Optional: path to values file
+  service_port: 7670  # Port for accessing services (for Helm deployments)
+  # helm_values:  # Optional: inline Helm values
+  #   api.enabled: true
+  #   redis.enabled: true
 
   # Runtime configuration
   sparse: false  # Use sparse embeddings
