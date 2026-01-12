@@ -7,6 +7,7 @@ import click
 from pathlib import Path
 
 from nv_ingest_harness.config import load_config
+from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
 
 
@@ -18,25 +19,6 @@ CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 def run_cmd(cmd: list[str]) -> int:
     print("$", " ".join(cmd))
     return subprocess.call(cmd)
-
-
-def stop_services() -> int:
-    """Simple cleanup of Docker services"""
-    print("Performing service cleanup...")
-
-    # Stop all services with all profiles
-    down_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "down"]
-    rc = run_cmd(down_cmd)
-    if rc != 0:
-        print(f"Warning: docker compose down returned {rc}")
-
-    # Remove containers forcefully
-    rm_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile", "*", "rm", "--force"]
-    rc = run_cmd(rm_cmd)
-    if rc != 0:
-        print(f"Warning: docker compose rm returned {rc}")
-
-    return 0
 
 
 def readiness_wait(timeout_s: int) -> bool:
@@ -80,6 +62,7 @@ def run_datasets(
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
+    service_manager = None
 
     # Start services once if managed mode
     if managed:
@@ -89,29 +72,18 @@ def run_datasets(
             dataset=dataset_list[0],
         )
 
+        # Create appropriate service manager based on config
+        service_manager = create_service_manager(first_config, REPO_ROOT)
+
         # Start services
-        compose_cmd = ["docker", "compose", "-f", COMPOSE_FILE, "--profile"]
-        profile_list = first_config.profiles
-        if not profile_list:
-            print("No profiles specified")
-            return 1
-        cmd = compose_cmd + [profile_list[0]]
-        for p in profile_list[1:]:
-            cmd += ["--profile", p]
-
-        if not no_build:
-            cmd += ["up", "--build", "-d"]
-        else:
-            cmd += ["up", "-d"]
-
-        if run_cmd(cmd) != 0:
+        if service_manager.start(no_build=no_build) != 0:
             print("Failed to start services")
             return 1
 
         # Wait for readiness
-        if not readiness_wait(first_config.readiness_timeout):
+        if not service_manager.check_readiness(first_config.readiness_timeout):
             print("Services failed to become ready")
-            stop_services()
+            service_manager.stop()
             return 1
 
     # Run each dataset
@@ -212,8 +184,8 @@ def run_datasets(
         )
 
     # Stop services if managed mode and not keeping up
-    if managed and not keep_up:
-        stop_services()
+    if service_manager and not keep_up:
+        service_manager.stop()
 
     # Print summary
     print("\n" + "=" * 60)
