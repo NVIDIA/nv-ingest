@@ -383,8 +383,7 @@ https://pypi.org/project/pdfservices-sdk/
     pdfservices-sdk before enabling this option.
 - **Built With Llama**:
   - **Description**: The NV-Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded so 
-    that the split task can use it for token-based splitting without making a network request. Please review the 
-    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials.
+    that the split task can use it for token-based splitting without making a network request. The [Llama 3.2 Community License Agreement](https://huggingface.co/meta-llama/Llama-3.2-1B/blob/main/LICENSE.txt) governs your use of these Llama materials..
     
     If you're building the container yourself and want to pre-download this model, you'll first need to set 
     `DOWNLOAD_LLAMA_TOKENIZER` to `True`. Because this is a gated model, you'll also need to 
