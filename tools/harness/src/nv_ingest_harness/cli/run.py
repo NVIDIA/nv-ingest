@@ -3,7 +3,6 @@ import os
 import sys
 
 import click
-from pathlib import Path
 
 from nv_ingest_harness.config import load_config
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
@@ -12,23 +11,13 @@ from nv_ingest_harness.utils.docker import (
     start_services,
     readiness_wait,
 )
+from nv_ingest_harness.utils.session import (
+    create_session_dir,
+    get_artifact_path,
+    write_session_summary,
+)
 
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
-
-
-def create_artifacts_dir(base: str | None, dataset_name: str | None = None) -> str:
-    root = base or Path(__file__).resolve().parents[3] / "artifacts"
-
-    # Create directory name with dataset info if available
-    timestamp = now_timestr()
-    if dataset_name:
-        dirname = f"{dataset_name}_{timestamp}"
-    else:
-        dirname = timestamp
-
-    path = os.path.join(root, dirname)
-    os.makedirs(path, exist_ok=True)
-    return path
 
 
 def run_datasets(
@@ -38,9 +27,11 @@ def run_datasets(
     no_build,
     keep_up,
     doc_analysis,
+    session_dir: str | None = None,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
+    session_summary_path = None
 
     # Start services once if managed mode
     if managed:
@@ -89,7 +80,7 @@ def run_datasets(
         if not artifact_name:
             artifact_name = os.path.basename(config.dataset_dir.rstrip("/"))
 
-        out_dir = create_artifacts_dir(config.artifacts_dir, artifact_name)
+        out_dir = get_artifact_path(session_dir, artifact_name, base_dir=config.artifacts_dir)
         stdout_path = os.path.join(out_dir, "stdout.txt")
 
         print(f"Dataset: {config.dataset_dir}")
@@ -165,12 +156,30 @@ def run_datasets(
 
         # Collect results
         results.append(
-            {"dataset": dataset_name, "artifact_dir": out_dir, "rc": rc, "status": "success" if rc == 0 else "failed"}
+            {
+                "dataset": dataset_name,
+                "artifact_dir": str(out_dir),
+                "rc": rc,
+                "status": "success" if rc == 0 else "failed",
+            }
         )
 
     # Stop services if managed mode and not keeping up
     if managed and not keep_up:
         stop_services()
+
+    # Write session summary if using a session
+    if session_dir:
+        session_name = os.path.basename(session_dir)
+        session_summary_path = write_session_summary(
+            session_dir=session_dir,
+            session_name=session_name,
+            results=results,
+            # run.py-specific extensions
+            case=case,
+            infrastructure="managed" if managed else "attach",
+            datasets=dataset_list,
+        )
 
     # Print summary
     print("\n" + "=" * 60)
@@ -180,6 +189,8 @@ def run_datasets(
         status_icon = "✓" if result["rc"] == 0 else "✗"
         artifact_info = f" (artifacts: {result['artifact_dir']})" if result.get("artifact_dir") != "N/A" else ""
         print(f"{status_icon} {result['dataset']}: {result['status']}{artifact_info}")
+    if session_summary_path:
+        print(f"\nSession summary: {session_summary_path}")
     print("=" * 60)
 
     # Return non-zero if any test failed
@@ -260,6 +271,18 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 @click.option("--no-build", is_flag=True, help="Skip building Docker images (managed mode only)")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test (managed mode only)")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
+@click.option(
+    "--session-dir",
+    type=click.Path(),
+    default=None,
+    help="Parent session directory for artifacts (used by nightly runner)",
+)
+@click.option(
+    "--session-name",
+    type=str,
+    default=None,
+    help="Name for session directory (auto-created when multiple datasets or this option provided)",
+)
 def main(
     case,
     managed,
@@ -267,6 +290,8 @@ def main(
     no_build,
     keep_up,
     doc_analysis,
+    session_dir,
+    session_name,
 ):
 
     if not dataset:
@@ -279,6 +304,16 @@ def main(
         print("Error: No valid datasets found", file=sys.stderr)
         return 1
 
+    # Create session directory if needed
+    if not session_dir:
+        if session_name or len(dataset_list) > 1:
+            # Auto-create session for multiple datasets or when session-name is provided
+            if not session_name:
+                session_name = f"run_{now_timestr()}"
+            session_dir = create_session_dir(session_name)
+            print(f"Session: {session_name}")
+            print(f"Session Dir: {session_dir}")
+
     # Use run_datasets() for both single and multiple datasets
     return run_datasets(
         case=case,
@@ -287,6 +322,7 @@ def main(
         no_build=no_build,
         keep_up=keep_up,
         doc_analysis=doc_analysis,
+        session_dir=str(session_dir) if session_dir else None,
     )
 
 

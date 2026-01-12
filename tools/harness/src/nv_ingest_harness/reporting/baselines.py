@@ -32,6 +32,8 @@ DATASET_BASELINES: dict[str, dict[str, dict[str, Any]]] = {
         },
     },
     "earnings": {
+        "result_count": {"expected": 514, "required": True},
+        "total_pages": {"expected": 12988, "required": True},
         "failure_count": {
             "expected": 0,
             "required": True,
@@ -40,7 +42,7 @@ DATASET_BASELINES: dict[str, dict[str, dict[str, Any]]] = {
             "min": 0.50,  # observed: 0.616
         },
         "recall_multimodal_@5_reranker": {
-            "min": 0.65,  # observed: 0.742
+            "min": 0.65,  # observed: 0.745
         },
     },
     "financebench": {

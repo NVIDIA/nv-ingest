@@ -17,6 +17,7 @@ from nv_ingest_harness.reporting.environment import get_environment_data
 from nv_ingest_harness.sinks import SlackSink, HistorySink
 from nv_ingest_harness.utils.cases import now_timestr
 from nv_ingest_harness.utils.docker import restart_services
+from nv_ingest_harness.utils.session import create_session_dir, write_session_summary
 
 DEFAULT_CONFIG_PATH = Path(__file__).parents[3] / "nightly_config.yaml"
 
@@ -28,7 +29,8 @@ def load_nightly_config(config_path: Path) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def run_harness(dataset: str, case: str = "e2e") -> tuple[int, Path | None]:
+def run_harness(dataset: str, case: str = "e2e", session_dir: Path | None = None) -> tuple[int, Path | None]:
+    """Run a single harness test."""
     cmd = [
         sys.executable,
         "-m",
@@ -37,21 +39,33 @@ def run_harness(dataset: str, case: str = "e2e") -> tuple[int, Path | None]:
         f"--dataset={dataset}",
     ]
 
+    if session_dir:
+        cmd.append(f"--session-dir={str(session_dir)}")
+
     print(f"\n{'='*60}")
     print(f"Running: {' '.join(cmd)}")
     print(f"{'='*60}\n")
 
     result = subprocess.run(cmd, capture_output=False)
 
-    artifacts_root = Path(__file__).parents[3] / "artifacts"
-    if artifacts_root.exists():
-        matching_dirs = sorted(
-            [d for d in artifacts_root.iterdir() if d.is_dir() and d.name.startswith(dataset)],
-            key=lambda x: x.stat().st_mtime,
-            reverse=True,
-        )
-        if matching_dirs:
-            return result.returncode, matching_dirs[0]
+    if session_dir:
+        artifact_dir = session_dir / dataset
+        if artifact_dir.exists() and (artifact_dir / "results.json").exists():
+            return result.returncode, artifact_dir
+    else:
+        artifacts_root = Path(__file__).parents[3] / "artifacts"
+        if artifacts_root.exists():
+            matching_dirs = sorted(
+                [
+                    d
+                    for d in artifacts_root.iterdir()
+                    if d.is_dir() and d.name.startswith(dataset) and (d / "results.json").exists()
+                ],
+                key=lambda x: x.stat().st_mtime,
+                reverse=True,
+            )
+            if matching_dirs:
+                return result.returncode, matching_dirs[0]
 
     return result.returncode, None
 
@@ -128,10 +142,12 @@ def main(
     reranker_mode = recall_config.get("reranker_mode", "both")
     fresh_start = infra_config.get("fresh_start", True) and not skip_fresh_start
     session_name = f"nightly_{now_timestr()}"
+    session_dir = create_session_dir(session_name)
 
     print("\n" + "=" * 60)
     print("nv-ingest Nightly Benchmark")
     print(f"Session: {session_name}")
+    print(f"Session Dir: {session_dir}")
     print(f"Config: {config_file}")
     print("=" * 60)
     print(f"E2E datasets: {e2e_datasets}")
@@ -142,6 +158,7 @@ def main(
 
     if dry_run:
         print("DRY RUN - not executing benchmarks")
+        print(f"Would create session dir: {session_dir}")
         return 0
 
     os.environ["RERANKER_MODE"] = reranker_mode
@@ -177,7 +194,7 @@ def main(
 
     for dataset in e2e_datasets:
         print(f"\n--- Running e2e for {dataset} ---")
-        rc, artifact_dir = run_harness(dataset, case="e2e")
+        rc, artifact_dir = run_harness(dataset, case="e2e", session_dir=session_dir)
         result = _process_result(dataset, rc, artifact_dir, case="e2e")
         all_results.append(result)
 
@@ -186,7 +203,7 @@ def main(
 
     for dataset in recall_datasets:
         print(f"\n--- Running e2e_recall for {dataset} ---")
-        rc, artifact_dir = run_harness(dataset, case="e2e_recall")
+        rc, artifact_dir = run_harness(dataset, case="e2e_recall", session_dir=session_dir)
         result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
         all_results.append(result)
 
@@ -196,12 +213,28 @@ def main(
     for sink in sinks:
         sink.finalize()
 
+    # Write session summary
+    summary_path = write_session_summary(
+        session_dir=session_dir,
+        session_name=session_name,
+        results=all_results,
+        # nightly-specific extensions
+        config_file=str(config_file),
+        environment=env_data,
+        datasets={
+            "e2e": e2e_datasets,
+            "e2e_recall": recall_datasets,
+        },
+    )
+
     print("\n" + "=" * 60)
     print("Nightly Benchmark Complete")
+    print(f"Session: {session_dir}")
     print("=" * 60)
     for result in all_results:
         status = "✓ PASS" if result["success"] else "✗ FAIL"
         print(f"  {result['dataset']}: {status}")
+    print(f"\nSession summary: {summary_path}")
     print("=" * 60)
 
     return 0 if all(r["success"] for r in all_results) else 1
