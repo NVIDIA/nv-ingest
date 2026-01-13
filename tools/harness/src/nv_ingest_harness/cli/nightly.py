@@ -165,6 +165,9 @@ def main(
     # Use local reranker container instead of build API
     reranker_endpoint = recall_config.get("reranker_endpoint", "http://localhost:8020/v1/ranking")
     os.environ["RERANKER_NIM_ENDPOINT"] = reranker_endpoint
+    # Pass recall_top_k from nightly config to harness
+    recall_top_k = recall_config.get("top_k", 10)
+    os.environ["RECALL_TOP_K"] = str(recall_top_k)
 
     env_data = get_environment_data()
     print("Environment:")
