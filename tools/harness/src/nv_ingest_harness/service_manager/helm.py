@@ -4,6 +4,7 @@ import subprocess
 import time
 import urllib.request
 from pathlib import Path
+from typing import Optional
 
 from .base import ServiceManager
 
@@ -39,6 +40,19 @@ class HelmManager(ServiceManager):
         self.release_name = getattr(config, "helm_release", "nv-ingest")
         self.namespace = getattr(config, "helm_namespace", "nv-ingest")
         self.values_file = getattr(config, "helm_values_file", None)
+        self.service_port = getattr(config, "service_port", 7670)
+        
+        # Port forwarding process
+        self.port_forward_process: Optional[subprocess.Popen] = None
+        
+        # kubectl command (for port forwarding)
+        kubectl_bin = getattr(config, "kubectl_bin", "kubectl")
+        kubectl_sudo = getattr(config, "kubectl_sudo") or helm_sudo # Default to same as helm_sudo
+
+        if kubectl_sudo:
+            self.kubectl_cmd = ["sudo"] + kubectl_bin.split()
+        else:
+            self.kubectl_cmd = kubectl_bin.split()
 
     def start(self, no_build: bool = False) -> int:
         """
@@ -78,7 +92,97 @@ class HelmManager(ServiceManager):
                 cmd += ["--set", f"{key}={value}"]
 
         print("$", " ".join(cmd))
-        return subprocess.call(cmd)
+        rc = subprocess.call(cmd)
+        
+        if rc == 0:
+            # Start port forwarding
+            self._start_port_forward()
+        
+        return rc
+    
+    def _start_port_forward(self, timeout: int = 120, retry_interval: int = 5) -> None:
+        """
+        Start kubectl port-forward in the background with retry logic.
+        
+        Args:
+            timeout: Maximum time to wait for port-forward to succeed (seconds)
+            retry_interval: Time between retry attempts (seconds)
+        """
+        # Build port-forward command
+        # Format: kubectl port-forward -n namespace service/name local_port:remote_port
+        cmd = self.kubectl_cmd + [
+            "port-forward",
+            "-n", self.namespace,
+            f"service/{self.release_name}",
+            f"{self.service_port}:{self.service_port}",
+        ]
+        
+        print("$", " ".join(cmd), "(background)")
+        print(f"Waiting for pod to be ready (timeout: {timeout}s)...")
+        
+        start_time = time.time()
+        attempt = 1
+        
+        while time.time() - start_time < timeout:
+            try:
+                # Start port-forward in background
+                self.port_forward_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                
+                # Give it a moment to establish
+                time.sleep(2)
+                
+                # Check if process is still running (didn't exit with error)
+                poll_result = self.port_forward_process.poll()
+                if poll_result is not None:
+                    # Process exited, read error output
+                    _, stderr = self.port_forward_process.communicate()
+                    error_msg = stderr.decode('utf-8').strip() if stderr else f"exit code {poll_result}"
+                    
+                    # Check if it's a "pod not running" error that we should retry
+                    if "pod is not running" in error_msg or "Pending" in error_msg:
+                        elapsed = int(time.time() - start_time)
+                        print(f"  Attempt {attempt}: Pod not ready yet (elapsed: {elapsed}s)")
+                        self.port_forward_process = None
+                        time.sleep(retry_interval)
+                        attempt += 1
+                        continue
+                    else:
+                        # Different error, don't retry
+                        print(f"Error: Port forwarding failed: {error_msg}")
+                        self.port_forward_process = None
+                        return
+                else:
+                    # Success! Process is still running
+                    print(f"Port forwarding started (PID: {self.port_forward_process.pid})")
+                    return
+                    
+            except Exception as e:
+                print(f"Error: Failed to start port forwarding: {e}")
+                self.port_forward_process = None
+                return
+        
+        # Timeout reached
+        print(f"Error: Port forwarding failed to establish after {timeout}s (pod may not be ready)")
+        self.port_forward_process = None
+    
+    def _stop_port_forward(self) -> None:
+        """Stop the port-forward process if running."""
+        if self.port_forward_process:
+            print(f"Stopping port forwarding (PID: {self.port_forward_process.pid})...")
+            try:
+                self.port_forward_process.terminate()
+                self.port_forward_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("Port forward didn't terminate, killing...")
+                self.port_forward_process.kill()
+            except Exception as e:
+                print(f"Warning: Error stopping port forward: {e}")
+            finally:
+                self.port_forward_process = None
 
     def stop(self) -> int:
         """
@@ -87,6 +191,9 @@ class HelmManager(ServiceManager):
         Returns:
             0 on success, non-zero on failure
         """
+        # Stop port forwarding first
+        self._stop_port_forward()
+        
         print(f"Uninstalling Helm release {self.release_name}...")
 
         cmd = self.helm_cmd + ["uninstall", self.release_name, "--namespace", self.namespace]

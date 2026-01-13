@@ -41,6 +41,8 @@ class TestConfig:
     # Helm-specific configuration
     helm_bin: str = "helm"  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
     helm_sudo: bool = False  # Prepend sudo to helm commands (useful for microk8s, k3s)
+    kubectl_bin: str = "kubectl"  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
+    kubectl_sudo: Optional[bool] = None  # Prepend sudo to kubectl commands (defaults to helm_sudo if not set)
     helm_chart: Optional[str] = None  # Remote chart reference (e.g., "nim-nvstaging/nv-ingest"), None = use local chart
     helm_chart_version: Optional[str] = None  # Chart version (e.g., "26.1.0-RC7")
     helm_release: str = "nv-ingest"
@@ -279,6 +281,8 @@ def _load_env_overrides() -> dict:
         "DEPLOYMENT_TYPE": ("deployment_type", str),
         "HELM_BIN": ("helm_bin", str),
         "HELM_SUDO": ("helm_sudo", parse_bool),
+        "KUBECTL_BIN": ("kubectl_bin", str),
+        "KUBECTL_SUDO": ("kubectl_sudo", parse_bool),
         "HELM_CHART": ("helm_chart", str),
         "HELM_CHART_VERSION": ("helm_chart_version", str),
         "HELM_RELEASE": ("helm_release", str),

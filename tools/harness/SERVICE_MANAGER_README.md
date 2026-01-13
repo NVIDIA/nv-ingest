@@ -33,7 +33,9 @@ tools/harness/src/nv_ingest_harness/service_manager/
    - Installs/upgrades Helm releases
    - Supports both remote charts (from Helm repos) and local charts
    - Supports custom values files and inline values
+   - Automatically sets up kubectl port-forward for local access
    - Waits for deployment readiness
+   - Cleans up port-forward and releases on stop
    - Note: Docker Compose "profiles" are not used in Helm deployments
 
 4. **create_service_manager()**: Factory function that creates the appropriate manager based on config
@@ -215,6 +217,55 @@ helm_values_file: .helm-overrides.yaml
 ```
 
 For Helm deployments, configure services through your values file or inline `helm_values` according to your Helm chart's schema.
+
+## Port Forwarding for Helm Deployments
+
+The Helm manager automatically sets up `kubectl port-forward` to make services accessible on localhost. This happens after the Helm release is installed and runs in the background.
+
+### Configuration
+
+```yaml
+kubectl_bin: kubectl  # or "microk8s kubectl", "k3s kubectl"
+kubectl_sudo: null  # Defaults to same as helm_sudo if not set
+service_port: 7670  # Port to forward (local:remote)
+```
+
+### What Happens
+
+1. **After Helm install**: Automatically runs port-forward in background
+   ```bash
+   sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670
+   ```
+
+2. **Retry logic**: If pods are not ready yet (Pending status), retries every 5 seconds for up to 120 seconds
+
+3. **During tests**: Services are accessible at `http://localhost:7670`
+
+4. **On cleanup**: Port-forward process is automatically terminated
+
+### Retry Behavior
+
+The port-forward will automatically retry if:
+- Pods are in `Pending` state
+- Error message contains "pod is not running"
+
+Example output:
+```
+Waiting for pod to be ready (timeout: 120s)...
+  Attempt 1: Pod not ready yet (elapsed: 7s)
+  Attempt 2: Pod not ready yet (elapsed: 12s)
+  Attempt 3: Pod not ready yet (elapsed: 17s)
+Port forwarding started (PID: 12345)
+```
+
+### Troubleshooting
+
+If port forwarding fails after timeout, you can manually set it up:
+```bash
+sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670
+```
+
+The harness will continue and attempt to connect to the port.
 
 ## Future Enhancements
 
