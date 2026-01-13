@@ -33,18 +33,24 @@ NeMo Retriever extraction is a microservice service that does the following:
 
 NeMo Retriever extraction supports the following file types:
 
+- `avi` (early access)
 - `bmp`
 - `docx`
 - `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
+- `mkv` (early access)
+- `mov` (early access)
+- `mp3`
+- `mp4` (early access)
 - `pdf`
 - `png`
 - `pptx`
 - `sh` (treated as text)
 - `tiff`
 - `txt`
+- `wav`
 
 
 ## What NeMo Retriever Extraction Isn't ✖️
