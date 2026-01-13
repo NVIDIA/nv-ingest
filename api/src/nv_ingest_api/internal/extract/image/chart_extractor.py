@@ -63,6 +63,7 @@ def _filter_valid_chart_images(
 
 def _run_chart_inference(
     yolox_client: Any,
+    yolox_model_name: str,
     ocr_client: Any,
     ocr_model_name: str,
     valid_arrays: List[np.ndarray],
@@ -79,7 +80,7 @@ def _run_chart_inference(
 
     future_yolox_kwargs = dict(
         data=data_yolox,
-        model_name="pipeline",
+        model_name=yolox_model_name,
         stage_name="chart_extraction",
         input_names=["INPUT_IMAGES", "THRESHOLDS"],
         dtypes=["BYTES", "FP32"],
@@ -175,6 +176,7 @@ def _merge_chart_results(
 def _update_chart_metadata(
     base64_images: List[str],
     yolox_client: Any,
+    yolox_model_name: str,
     ocr_client: Any,
     ocr_model_name: str,
     trace_info: Dict,
@@ -197,6 +199,7 @@ def _update_chart_metadata(
     # Run concurrent inference only for valid images.
     yolox_results, ocr_results = _run_chart_inference(
         yolox_client=yolox_client,
+        yolox_model_name=yolox_model_name,
         ocr_client=ocr_client,
         ocr_model_name=ocr_model_name,
         valid_arrays=valid_arrays,
@@ -218,7 +221,7 @@ def _create_yolox_client(
     yolox_protocol: str,
     auth_token: str,
 ) -> NimClient:
-    yolox_model_interface = YoloxGraphicElementsModelInterface()
+    yolox_model_interface = YoloxGraphicElementsModelInterface(endpoints=yolox_endpoints)
 
     yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
@@ -354,6 +357,7 @@ def extract_chart_data_from_image_internal(
         bulk_results = _update_chart_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
+            yolox_model_name=yolox_client.model_interface.model_name,
             ocr_client=ocr_client,
             ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,

@@ -117,6 +117,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         iou_threshold: Optional[float] = None,
         min_score: Optional[float] = None,
         class_labels: Optional[List[str]] = None,
+        endpoints: Optional[Tuple[str, str]] = None,
     ):
         """
         Initialize the YOLOX model interface.
@@ -128,6 +129,12 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.iou_threshold = iou_threshold
         self.min_score = min_score
         self.class_labels = class_labels
+
+        if endpoints:
+            self.model_name = get_yolox_model_name(endpoints[0], default_model_name="yolox_ensemble")
+            self._grpc_uses_bls = self.model_name == "pipeline"
+        else:
+            self._grpc_uses_bls = False
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -217,7 +224,7 @@ class YoloxModelInterfaceBase(ModelInterface):
             for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
                 input_array = np.array(b64_chunk, dtype=np.object_)
 
-                if getattr(self, "_grpc_uses_bls", False):
+                if self._grpc_uses_bls:
                     # For BLS with dynamic batching (max_batch_size > 0), we need to add explicit batch dimension
                     # Shape [N] becomes [1, N] to indicate: batch of 1, containing N images
                     input_array = input_array.reshape(1, -1)
@@ -385,25 +392,19 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, version: str = YOLOX_PAGE_DEFAULT_VERSION):
+    def __init__(self, version: str = YOLOX_PAGE_DEFAULT_VERSION, endpoints: Optional[Tuple[str, str]] = None):
         """
         Initialize the yolox-page-elements model interface.
         """
         self.version = version
-
-        if self.version.endswith("-v3"):
-            class_labels = YOLOX_PAGE_V3_CLASS_LABELS
-            self._grpc_uses_bls = True
-        else:
-            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
-            self._grpc_uses_bls = False
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
-            class_labels=class_labels,
+            class_labels=YOLOX_PAGE_V3_CLASS_LABELS if self.version.endswith("-v3") else YOLOX_PAGE_V2_CLASS_LABELS,
+            endpoints=endpoints,
         )
 
     def name(
@@ -484,7 +485,7 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, endpoints: Optional[Tuple[str, str]] = None):
         """
         Initialize the yolox-graphic-elements model interface.
         """
@@ -494,9 +495,8 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
             min_score=YOLOX_GRAPHIC_MIN_SCORE,
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
+            endpoints=endpoints,
         )
-
-        self._grpc_uses_bls = True
 
     def name(
         self,
@@ -541,7 +541,7 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, endpoints: Optional[Tuple[str, str]] = None):
         """
         Initialize the yolox-graphic-elements model interface.
         """
@@ -551,9 +551,8 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
             min_score=YOLOX_TABLE_MIN_SCORE,
             class_labels=YOLOX_TABLE_CLASS_LABELS,
+            endpoints=endpoints,
         )
-
-        self._grpc_uses_bls = True
 
     def name(
         self,

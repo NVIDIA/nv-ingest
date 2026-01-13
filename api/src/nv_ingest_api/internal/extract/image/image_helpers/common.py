@@ -221,7 +221,7 @@ def extract_page_elements_from_images(
             logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
     try:
-        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version, endpoints=config.yolox_endpoints)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,

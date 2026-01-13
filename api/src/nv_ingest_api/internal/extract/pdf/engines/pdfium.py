@@ -339,7 +339,7 @@ def _extract_page_elements(
                 logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
         # Create the model interface
-        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version, endpoints=yolox_endpoints)
         # Create the inference client
         yolox_client = create_inference_client(
             yolox_endpoints,
