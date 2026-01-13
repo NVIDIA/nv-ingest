@@ -34,7 +34,7 @@ dependencies = [
     "isodate>=0.7.2",
     "langdetect>=1.0.9",
     "minio>=7.2.12",
-    "librosa>=0.10.2",
+    "librosa==0.10.2",
     "opentelemetry-api>=1.27.0",
     "opentelemetry-exporter-otlp>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
@@ -61,7 +61,6 @@ dependencies = [
     "tqdm>=4.67.1",
     "uvicorn",
     "pip",
-    "llama-index-embeddings-nvidia",
     "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
     "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",

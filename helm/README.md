@@ -9,8 +9,20 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-The [Nvidia nim-operator](https://docs.nvidia.com/nim-operator/latest/install.html) must also be installed and configured in your cluster to ensure that
-the Nvidia NIMs are properly deployed.
+> Starting with version 26.1.0, the [NVIDIA NIM Operator](https://docs.nvidia.com/nim-operator/latest/install.html) is required. All NIM services are now deployed by using NIM Operator CRDs (NIMCache and NIMService), not Helm subcharts.
+>
+> **Upgrading from 25.9.0:**
+> 1. Install NIM Operator before upgrading
+> 2. Update your values file with the new configuration keys:
+>
+> | 25.9.0 | 26.x |
+> |--------|------|
+> | `nim-vlm-image-captioning.deployed=true` | `nimOperator.nemotron_nano_12b_v2_vl.enabled=true` |
+> | `paddleocr-nim.deployed=true` | `nimOperator.nemoretriever_ocr_v1.enabled=true` |
+> | `riva-nim.deployed=true` | `nimOperator.audio.enabled=true` |
+> | `nim-vlm-text-extraction.deployed=true` | `nimOperator.nemotron_parse.enabled=true` |
+
+The [Nvidia GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html) must also be installed and configured in your cluster.
 
 ## Initial Environment Setup
 
@@ -343,7 +355,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
 | envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
-| envVars.AUDIO_GRPC_ENDPOINT | string | `"nv-ingest-riva-nim:50051"` |  |
+| envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://llama-32-nv-embedqa-1b-v2:8000/v1"` |  |
@@ -365,7 +377,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MINIO_PUBLIC_ADDRESS | string | `"http://localhost:9000"` |  |
 | envVars.MINIO_SECRET_KEY | string | `"minioadmin"` |  |
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
-| envVars.NEMOTRON_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemotron-parse:8000/v1/chat/completions"` |  |
+| envVars.NEMOTRON_PARSE_HTTP_ENDPOINT | string | `"http://nemotron-parse:8000/v1/chat/completions"` |  |
 | envVars.NEMOTRON_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NEMOTRON_PARSE_MODEL_NAME | string | `"nvidia/nemotron-parse"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
@@ -374,11 +386,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.OCR_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.OCR_MODEL_NAME | string | `"scene_text_ensemble"` |  |
 | envVars.OMP_NUM_THREADS | int | `1` |  |
-| envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
-| envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
-| envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.RAY_num_grpc_threads | int | `1` |  |
-| envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/nemotron-nano-12b-v2-vl"` |  |
 | envVars.VLM_CAPTION_PROMPT | string | `"Caption the content of this image:"` |  |
 | envVars.VLM_CAPTION_SYSTEM_PROMPT | string | `"/no_think"` |  |
@@ -451,6 +459,24 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | ngcImagePullSecret.password | string | `""` |  |
 | ngcImagePullSecret.registry | string | `"nvcr.io"` |  |
 | ngcImagePullSecret.username | string | `"$oauthtoken"` |  |
+| nimOperator.audio.authSecret | string | `"ngc-api"` |  |
+| nimOperator.audio.enabled | bool | `false` |  |
+| nimOperator.audio.env[0].name | string | `"NIM_TAGS_SELECTOR"` |  |
+| nimOperator.audio.env[0].value | string | `"name=parakeet-1-1b-ctc-en-us,mode=ofl"` |  |
+| nimOperator.audio.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.audio.env[1].value | string | `"1"` |  |
+| nimOperator.audio.expose.service.grpcPort | int | `50051` |  |
+| nimOperator.audio.expose.service.port | int | `9000` |  |
+| nimOperator.audio.expose.service.type | string | `"ClusterIP"` |  |
+| nimOperator.audio.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nimOperator.audio.image.pullSecrets[0] | string | `"ngc-secret"` |  |
+| nimOperator.audio.image.repository | string | `"nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us"` |  |
+| nimOperator.audio.image.tag | string | `"1.4.0"` |  |
+| nimOperator.audio.replicas | int | `1` |  |
+| nimOperator.audio.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| nimOperator.audio.storage.pvc.create | bool | `true` |  |
+| nimOperator.audio.storage.pvc.size | string | `"25Gi"` |  |
+| nimOperator.audio.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.embedqa.authSecret | string | `"ngc-api"` |  |
 | nimOperator.embedqa.enabled | bool | `true` |  |
 | nimOperator.embedqa.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -556,40 +582,30 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.create | bool | `true` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.size | string | `"300Gi"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nemotron_parse.authSecret | string | `"ngc-api"` |  |
+| nimOperator.nemotron_parse.enabled | bool | `false` |  |
+| nimOperator.nemotron_parse.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nimOperator.nemotron_parse.env[0].value | string | `"8000"` |  |
+| nimOperator.nemotron_parse.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.nemotron_parse.env[1].value | string | `"1"` |  |
+| nimOperator.nemotron_parse.expose.service.grpcPort | int | `8001` |  |
+| nimOperator.nemotron_parse.expose.service.port | int | `8000` |  |
+| nimOperator.nemotron_parse.expose.service.type | string | `"ClusterIP"` |  |
+| nimOperator.nemotron_parse.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nimOperator.nemotron_parse.image.pullSecrets[0] | string | `"ngc-secret"` |  |
+| nimOperator.nemotron_parse.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-parse"` |  |
+| nimOperator.nemotron_parse.image.tag | string | `"1.5.0"` |  |
+| nimOperator.nemotron_parse.replicas | int | `1` |  |
+| nimOperator.nemotron_parse.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| nimOperator.nemotron_parse.storage.pvc.create | bool | `true` |  |
+| nimOperator.nemotron_parse.storage.pvc.size | string | `"100Gi"` |  |
+| nimOperator.nemotron_parse.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.nimCache.pvc.create | bool | `true` |  |
 | nimOperator.nimCache.pvc.size | string | `"25Gi"` |  |
 | nimOperator.nimCache.pvc.storageClass | string | `"default"` |  |
 | nimOperator.nimCache.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.nimService.namespaces | list | `[]` |  |
 | nimOperator.nimService.resources | object | `{}` |  |
-| nimOperator.paddleocr.authSecret | string | `"ngc-api"` |  |
-| nimOperator.paddleocr.enabled | bool | `false` |  |
-| nimOperator.paddleocr.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
-| nimOperator.paddleocr.env[0].value | string | `"8000"` |  |
-| nimOperator.paddleocr.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
-| nimOperator.paddleocr.env[1].value | string | `"1"` |  |
-| nimOperator.paddleocr.env[2].name | string | `"NIM_TRITON_RATE_LIMIT"` |  |
-| nimOperator.paddleocr.env[2].value | string | `"3"` |  |
-| nimOperator.paddleocr.env[3].name | string | `"NIM_TRITON_CUDA_MEMORY_POOL_MB"` |  |
-| nimOperator.paddleocr.env[3].value | string | `"3072"` |  |
-| nimOperator.paddleocr.env[4].name | string | `"NIM_TRITON_CPU_THREADS_PRE_PROCESSOR"` |  |
-| nimOperator.paddleocr.env[4].value | string | `"2"` |  |
-| nimOperator.paddleocr.env[5].name | string | `"OMP_NUM_THREADS"` |  |
-| nimOperator.paddleocr.env[5].value | string | `"8"` |  |
-| nimOperator.paddleocr.env[6].name | string | `"NIM_TRITON_CPU_THREADS_POST_PROCESSOR"` |  |
-| nimOperator.paddleocr.env[6].value | string | `"1"` |  |
-| nimOperator.paddleocr.expose.service.grpcPort | int | `8001` |  |
-| nimOperator.paddleocr.expose.service.port | int | `8000` |  |
-| nimOperator.paddleocr.expose.service.type | string | `"ClusterIP"` |  |
-| nimOperator.paddleocr.image.pullPolicy | string | `"IfNotPresent"` |  |
-| nimOperator.paddleocr.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.paddleocr.image.repository | string | `"nvcr.io/nim/baidu/paddleocr"` |  |
-| nimOperator.paddleocr.image.tag | string | `"1.5.0"` |  |
-| nimOperator.paddleocr.replicas | int | `1` |  |
-| nimOperator.paddleocr.resources.limits."nvidia.com/gpu" | int | `1` |  |
-| nimOperator.paddleocr.storage.pvc.create | bool | `true` |  |
-| nimOperator.paddleocr.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.paddleocr.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
 | nimOperator.page_elements.authSecret | string | `"ngc-api"` |  |
 | nimOperator.page_elements.enabled | bool | `true` |  |
 | nimOperator.page_elements.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -751,8 +767,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | serviceAccount.name | string | `""` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
-| zipkin.image.repository | string | `"ghcr.io/openzipkin/alpine"` |  |
-| zipkin.image.tag | string | `"3.21.3"` |  |
+| zipkin.image.repository | string | `"openzipkin/zipkin"` |  |
+| zipkin.image.tag | string | `"3.5.0"` |  |
 | zipkin.resources.limits.cpu | string | `"500m"` |  |
 | zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
 | zipkin.resources.requests.cpu | string | `"100m"` |  |

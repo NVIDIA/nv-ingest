@@ -1045,6 +1045,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
+        extract_text = kwargs.pop("extract_text", True)
+        extract_images = kwargs.pop("extract_images", True)
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
         extract_page_as_image = kwargs.pop("extract_page_as_image", False)
@@ -1067,6 +1069,8 @@ class Ingestor:
 
             task_options = dict(
                 document_type=document_type,
+                extract_text=extract_text,
+                extract_images=extract_images,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
@@ -1450,13 +1454,22 @@ class Ingestor:
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the CaptionTask.
+            Parameters specific to the CaptionTask. Supports `reasoning` (bool),
+            `prompt` (str), `api_key` (str), `endpoint_url` (str), and `model_name` (str).
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
         """
+        if "reasoning" in kwargs:
+            reasoning = kwargs.pop("reasoning")
+            if not isinstance(reasoning, bool):
+                raise ValueError("'reasoning' parameter must be a boolean (True or False)")
+            kwargs["system_prompt"] = "/think" if reasoning else "/no_think"
+        elif "system_prompt" in kwargs:
+            raise ValueError("'system_prompt' parameter is not supported. Use 'reasoning' (bool) instead.")
+
         task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
 
         # Extract individual parameters from API schema for CaptionTask constructor

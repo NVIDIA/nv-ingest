@@ -1,6 +1,13 @@
-# User-Defined Functions (UDFs) Guide
+# Add User-Defined Functions to NeMo Retriever Extraction
 
-User-Defined Functions (UDFs) allow you to inject custom processing logic into the NV-Ingest pipeline at specific stages. This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
+User-Defined Functions (UDFs) allow you to inject custom processing logic into the [NeMo Retriever extraction](overview.md) pipeline at specific stages. 
+This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
+
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
+
 
 ## Quickstart
 
@@ -931,3 +938,9 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
         # Return original message on failure
         return control_message
 ```
+
+## Related Topics
+
+- [NV-Ingest UDF Examples](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.0/examples/udfs/README.md)
+- [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)
+- [NimClient Usage](nimclient.md)

@@ -1,4 +1,4 @@
-# V2 API Complete Guide: PDF Pre Splitting
+# NeMo Retriever Extraction V2 API Guide: PDF Pre Splitting
 
 > **TL;DR:** V2 API automatically splits large PDFs into chunks for faster parallel processing.
 > 
@@ -24,7 +24,7 @@ The V2 API automatically splits large PDFs into smaller chunks before processing
 
 - **Higher throughput** - 1.3-1.5x faster for large documents
 - **Better parallelization** - Distribute work across Ray workers
-- **Configurable chunk sizes** - Tune to your infrastructure (1-512 pages)
+- **Configurable chunk sizes** - Tune to your infrastructure (1-128 pages)
 
 ### Minimal Example
 
@@ -172,7 +172,7 @@ ingestor = Ingestor(
 - ❌ Limited parallel benefits
 - **Best for:** Testing or when splitting overhead is problematic
 
-**Valid range:** 1-512 pages (server enforces with clamping)
+**Valid range:** 1-128 pages (server enforces with clamping)
 
 ---
 
@@ -432,14 +432,14 @@ ingestor = ingestor.extract(...).ingest()
 
 **Symptom:** Requested chunk size not used
 
-**Cause:** Server clamps to valid range (1-512)
+**Cause:** Server clamps to valid range (1-128)
 
 **Check server logs for:**
 ```
-WARNING: Client requested split_page_count=1000; clamped to 512
+WARNING: Client requested split_page_count=1000; clamped to 128
 ```
 
-**Solution:** Use values within 1-512 range
+**Solution:** Use values within 1-128 range
 
 ### Response Fields
 

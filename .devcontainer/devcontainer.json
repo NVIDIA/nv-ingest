@@ -42,11 +42,11 @@
       "MINIO_BUCKET": "${MINIO_BUCKET:-nv-ingest}",
       "NGC_API_KEY": "${NGC_API_KEY:-ngcapikey}",
       "NVIDIA_API_KEY": "${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
-      "PADDLE_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr",
-      "PADDLE_INFER_PROTOCOL": "http",
-      "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1",
+      "OCR_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1",
+      "OCR_INFER_PROTOCOL": "http",
+      "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3",
       "YOLOX_INFER_PROTOCOL": "http",
-      "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+      "VLM_CAPTION_ENDPOINT": "https://integrate.api.nvidia.com/v1/chat/completions"
     },
     "workspaceFolder": "/workspace",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=consistent",

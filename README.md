@@ -46,18 +46,24 @@ NeMo Retriever Extraction is a library and microservice service that does the fo
 
 NeMo Retriever Extraction supports the following file types:
 
+- `avi` (early access)
 - `bmp`
 - `docx`
 - `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
+- `mkv` (early access)
+- `mov` (early access)
+- `mp3`
+- `mp4` (early access)
 - `pdf`
 - `png`
 - `pptx`
 - `sh` (treated as text)
 - `tiff`
 - `txt`
+- `wav`
 
 
 ### What NeMo Retriever Extraction Isn't
@@ -253,7 +259,7 @@ client = OpenAI(
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-    model="nvidia/llama-3.1-nemotron-70b-instruct",
+    model="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     messages=[{"role": "user", "content": prompt}],
 )
 response = completion.choices[0].message.content
@@ -375,12 +381,14 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
-- **`DOWNLOAD_LLAMA_TOKENIZER` (Built With Llama):**:
-  - **Description**: The Split task uses the `meta-llama/Llama-3.2-1B` tokenizer, which will be downloaded
-    from HuggingFace at build time if `DOWNLOAD_LLAMA_TOKENIZER` is set to `True`. Please review the
-    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this.
-    This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and
-    set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to use it.
+- **Built With Llama**:
+  - **Description**: The NV-Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded so 
+    that the split task can use it for token-based splitting without making a network request. The [Llama 3.2 Community License Agreement](https://huggingface.co/meta-llama/Llama-3.2-1B/blob/main/LICENSE.txt) governs your use of these Llama materials.
+    
+    If you're building the container yourself and want to pre-download this model, you'll first need to set 
+    `DOWNLOAD_LLAMA_TOKENIZER` to `True`. Because this is a gated model, you'll also need to 
+    [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and set `HF_ACCESS_TOKEN` to your HuggingFace 
+    access token in order to use it.
 
 
 ### Contributing

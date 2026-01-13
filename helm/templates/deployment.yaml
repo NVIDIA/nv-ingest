@@ -81,6 +81,21 @@ spec:
             {{- end }}
             {{- end }}
 
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_nano_12b_v2_vl") (eq .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled true) }}
+            - name: VLM_CAPTION_ENDPOINT
+              value: "http://nemotron-nano-12b-v2-vl:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_parse") (eq .Values.nimOperator.nemotron_parse.enabled true) }}
+            - name: NEMOTRON_PARSE_HTTP_ENDPOINT
+              value: "http://nemotron-parse:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "audio") (eq .Values.nimOperator.audio.enabled true) }}
+            - name: AUDIO_GRPC_ENDPOINT
+              value: "audio:50051"
+            {{- end }}
+
             # OpenTelemetry
             {{- if .Values.otelEnabled }}
             {{- range $k, $v := .Values.otelEnvVars }}
