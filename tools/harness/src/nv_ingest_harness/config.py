@@ -33,7 +33,21 @@ class TestConfig:
     # Infrastructure
     hostname: str = "localhost"
     readiness_timeout: int = 600
-    profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])
+    profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])  # Docker Compose only
+    
+    # Deployment configuration
+    deployment_type: str = "docker-compose"  # Options: docker-compose, helm
+    
+    # Helm-specific configuration
+    helm_bin: str = "helm"  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
+    helm_sudo: bool = False  # Prepend sudo to helm commands (useful for microk8s, k3s)
+    helm_chart: Optional[str] = None  # Remote chart reference (e.g., "nim-nvstaging/nv-ingest"), None = use local chart
+    helm_chart_version: Optional[str] = None  # Chart version (e.g., "26.1.0-RC7")
+    helm_release: str = "nv-ingest"
+    helm_namespace: str = "nv-ingest"
+    helm_values_file: Optional[str] = None
+    service_port: int = 7670
+    helm_values: Optional[dict] = None
 
     # Runtime configuration
     sparse: bool = True
@@ -104,6 +118,10 @@ class TestConfig:
         # Check api_version is valid
         if self.api_version not in ["v1", "v2"]:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
+
+        # Check deployment_type is valid
+        if self.deployment_type not in ["docker-compose", "helm"]:
+            errors.append(f"deployment_type must be 'docker-compose' or 'helm', got '{self.deployment_type}'")
 
         # Check reranker_mode is valid
         if self.reranker_mode not in ["none", "with", "both"]:
@@ -258,6 +276,15 @@ def _load_env_overrides() -> dict:
         "HOSTNAME": ("hostname", str),
         "READINESS_TIMEOUT": ("readiness_timeout", parse_int),
         "PROFILES": ("profiles", parse_list),
+        "DEPLOYMENT_TYPE": ("deployment_type", str),
+        "HELM_BIN": ("helm_bin", str),
+        "HELM_SUDO": ("helm_sudo", parse_bool),
+        "HELM_CHART": ("helm_chart", str),
+        "HELM_CHART_VERSION": ("helm_chart_version", str),
+        "HELM_RELEASE": ("helm_release", str),
+        "HELM_NAMESPACE": ("helm_namespace", str),
+        "HELM_VALUES_FILE": ("helm_values_file", str),
+        "SERVICE_PORT": ("service_port", parse_int),
         "SPARSE": ("sparse", parse_bool),
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),

@@ -20,9 +20,24 @@ class HelmManager(ServiceManager):
             repo_root: Path to the repository root
         """
         super().__init__(config, repo_root)
-        self.chart_path = str(repo_root / "helm")
+        # Helm binary command (supports "helm", "microk8s helm", "k3s helm", etc.)
+        helm_bin = getattr(config, "helm_bin", "helm")
+        helm_sudo = getattr(config, "helm_sudo", False)
+        
+        # Build base command with optional sudo prefix
+        if helm_sudo:
+            self.helm_cmd = ["sudo"] + helm_bin.split()
+        else:
+            self.helm_cmd = helm_bin.split()  # Split to support multi-word commands
+        
+        # Use remote chart if specified, otherwise fall back to local chart
+        self.chart_ref = getattr(config, "helm_chart", None)
+        if not self.chart_ref:
+            # Default to local chart path if no remote chart specified
+            self.chart_ref = str(repo_root / "helm")
+        self.chart_version = getattr(config, "helm_chart_version", None)
         self.release_name = getattr(config, "helm_release", "nv-ingest")
-        self.namespace = getattr(config, "helm_namespace", "default")
+        self.namespace = getattr(config, "helm_namespace", "nv-ingest")
         self.values_file = getattr(config, "helm_values_file", None)
 
     def start(self, no_build: bool = False) -> int:
@@ -35,19 +50,19 @@ class HelmManager(ServiceManager):
         Returns:
             0 on success, non-zero on failure
         """
-        cmd = [
-            "helm",
+        cmd = self.helm_cmd + [
             "upgrade",
             "--install",
             self.release_name,
-            self.chart_path,
+            self.chart_ref,
             "--namespace",
             self.namespace,
             "--create-namespace",
-            "--wait",
-            "--timeout",
-            f"{self.config.readiness_timeout}s",
         ]
+        
+        # Add version if specified (only valid for remote charts)
+        if self.chart_version:
+            cmd += ["--version", self.chart_version]
 
         # Add values file if specified
         if self.values_file:
@@ -57,16 +72,10 @@ class HelmManager(ServiceManager):
             else:
                 print(f"Warning: Values file {values_path} not found, skipping")
 
-        # Add inline values from config (e.g., profiles mapped to enabled flags)
+        # Add inline values from config
         if hasattr(self.config, "helm_values") and self.config.helm_values:
             for key, value in self.config.helm_values.items():
                 cmd += ["--set", f"{key}={value}"]
-
-        # Map profiles to Helm values if available
-        if hasattr(self.config, "profiles") and self.config.profiles:
-            for profile in self.config.profiles:
-                # Enable corresponding services based on profile names
-                cmd += ["--set", f"{profile}.enabled=true"]
 
         print("$", " ".join(cmd))
         return subprocess.call(cmd)
@@ -80,7 +89,7 @@ class HelmManager(ServiceManager):
         """
         print(f"Uninstalling Helm release {self.release_name}...")
 
-        cmd = ["helm", "uninstall", self.release_name, "--namespace", self.namespace]
+        cmd = self.helm_cmd + ["uninstall", self.release_name, "--namespace", self.namespace]
 
         print("$", " ".join(cmd))
         rc = subprocess.call(cmd)
