@@ -6,7 +6,7 @@ import time
 import click
 from pathlib import Path
 
-from nv_ingest_harness.config import load_config
+from nv_ingest_harness.config import load_config, get_sweep_config
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
 
 
@@ -77,6 +77,7 @@ def run_datasets(
     no_build,
     keep_up,
     doc_analysis,
+    sweep_config: dict = None,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
@@ -181,6 +182,10 @@ def run_datasets(
             "pdf_split_page_count": config.pdf_split_page_count,
             "return_code": rc,
         }
+
+        # Inject sweep configuration if available
+        if sweep_config:
+            consolidated["sweep_config"] = sweep_config
 
         if managed:
             consolidated["profiles"] = config.profiles
@@ -303,6 +308,7 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 @click.option("--no-build", is_flag=True, help="Skip building Docker images (managed mode only)")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test (managed mode only)")
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
+@click.option("--sweep", help="Name of sweep configuration to run (from test_configs.yaml)")
 def main(
     case,
     managed,
@@ -310,6 +316,7 @@ def main(
     no_build,
     keep_up,
     doc_analysis,
+    sweep,
 ):
 
     if not dataset:
@@ -322,7 +329,53 @@ def main(
         print("Error: No valid datasets found", file=sys.stderr)
         return 1
 
-    # Use run_datasets() for both single and multiple datasets
+    # Handle sweep mode
+    if sweep:
+        try:
+            sweep_config = get_sweep_config(sweep)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+        print(f"Running sweep: {sweep} with {len(sweep_config)} iterations")
+
+        # Sweeps typically require managed mode to restart services
+        if not managed:
+            print("Note: Enabling --managed mode for sweep to support service restarts")
+            managed = True
+
+        overall_rc = 0
+
+        for i, env_vars in enumerate(sweep_config):
+            print(f"\n{'#'*60}")
+            print(f"Sweep Iteration {i+1}/{len(sweep_config)}")
+            print("Environment overrides:")
+            for k, v in env_vars.items():
+                print(f"  {k}={v}")
+                os.environ[str(k)] = str(v)
+            print(f"{'#'*60}\n")
+
+            # Run datasets for this configuration
+            # Only keep up services if it's the last iteration AND user requested keep_up
+            # Intermediate iterations must stop services to ensure clean restart for next params
+            current_keep_up = keep_up if (i == len(sweep_config) - 1) else False
+
+            rc = run_datasets(
+                case=case,
+                dataset_list=dataset_list,
+                managed=managed,
+                no_build=no_build,
+                keep_up=current_keep_up,
+                doc_analysis=doc_analysis,
+                sweep_config=env_vars,
+            )
+
+            if rc != 0:
+                overall_rc = 1
+
+        return overall_rc
+
+    # Standard run (no sweep)
     return run_datasets(
         case=case,
         dataset_list=dataset_list,
