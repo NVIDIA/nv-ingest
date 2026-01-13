@@ -34,10 +34,10 @@ class TestConfig:
     hostname: str = "localhost"
     readiness_timeout: int = 600
     profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])  # Docker Compose only
-    
+
     # Deployment configuration
     deployment_type: str = "docker-compose"  # Options: docker-compose, helm
-    
+
     # Helm-specific configuration
     helm_bin: str = "helm"  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
     helm_sudo: bool = False  # Prepend sudo to helm commands (useful for microk8s, k3s)
@@ -48,8 +48,9 @@ class TestConfig:
     helm_release: str = "nv-ingest"
     helm_namespace: str = "nv-ingest"
     helm_values_file: Optional[str] = None
-    service_port: int = 7670
+    service_port: int = 7670  # Legacy: used if helm_port_forwards not specified
     helm_values: Optional[dict] = None
+    helm_port_forwards: Optional[List[dict]] = None  # List of {service, local_port, remote_port}
 
     # Runtime configuration
     sparse: bool = True

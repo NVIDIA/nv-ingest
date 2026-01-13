@@ -1,5 +1,3 @@
-import docker
-
 import glob
 import inspect
 import json
@@ -7,6 +5,8 @@ import os
 import shutil
 import time
 import zipfile
+import urllib.request
+import urllib.error
 
 from pathlib import Path
 
@@ -18,44 +18,43 @@ import datetime
 import socket
 
 
-def check_container_running(container_name):
-    """Check if a container with the specified name is currently running.
-
-    Args:
-        container_name (str): The name or partial name to search for in container image tags.
-
-    Returns:
-        bool: True if a container with the specified name is running, False otherwise.
-    """
-    client = docker.from_env()
-    containers = client.containers.list()
-
-    for container in containers:
-        if container.image.tags and container_name in container.image.tags[0]:
-            return True
-
-    return False
-
-
 def embed_info():
-    """Get embedding model information based on currently running containers.
+    """Get embedding model information from the embedding service or running containers.
 
-    This function checks for specific embedding model containers and returns
-    the appropriate model name and embedding dimension based on which container
-    is currently running.
+    This function first attempts to query the embedding service API at localhost:8012
+    to get the model name. If that fails (e.g., in Docker Compose deployments or when
+    service is unavailable), it falls back to checking running Docker containers.
 
     Returns:
         tuple: A tuple containing (model_name: str, embedding_dimension: int).
-               Returns a default model if no specific containers are found.
+               Returns a default model if no specific service or container is found.
     """
-    if check_container_running("llama-3.2-nemoretriever-1b-vlm-embed-v1"):
-        return "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1", 2048
-    elif check_container_running("llama-3.2-nv-embedqa-1b-v2"):
-        return "nvidia/llama-3.2-nv-embedqa-1b-v2", 2048
-    elif check_container_running("llama-3.2-nemoretriever-300m-embed-v1"):
-        return "nvidia/llama-3.2-nemoretriever-300m-embed-v1", 2048
-    else:
-        return "nvidia/nv-embedqa-e5-v5", 1024
+    # Model name to embedding dimension mapping
+    MODEL_DIMENSIONS = {
+        "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1": 2048,
+        "nvidia/llama-3.2-nv-embedqa-1b-v2": 2048,
+        "nvidia/llama-3.2-nemoretriever-300m-embed-v1": 2048,
+        "nvidia/nv-embedqa-e5-v5": 1024,
+    }
+
+    # Default model
+    DEFAULT_MODEL = "nvidia/nv-embedqa-e5-v5"
+    DEFAULT_DIMENSION = 1024
+
+    # Try to fetch model info from embedding service API (Helm/Kubernetes deployments)
+    try:
+        url = "http://localhost:8012/v1/models"
+        with urllib.request.urlopen(url, timeout=2) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                if data.get("data") and len(data["data"]) > 0:
+                    model_name = data["data"][0].get("id")
+                    if model_name:
+                        dimension = MODEL_DIMENSIONS.get(model_name, DEFAULT_DIMENSION)
+                        return model_name, dimension
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, socket.timeout, Exception):
+        # API not available, fall back to default values
+        return DEFAULT_MODEL, DEFAULT_DIMENSION
 
 
 def clean_spill(path: str):

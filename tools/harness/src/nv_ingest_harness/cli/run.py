@@ -183,9 +183,22 @@ def run_datasets(
             {"dataset": dataset_name, "artifact_dir": out_dir, "rc": rc, "status": "success" if rc == 0 else "failed"}
         )
 
-    # Stop services if managed mode and not keeping up
-    if service_manager and not keep_up:
-        service_manager.stop()
+    # Cleanup managed services
+    if managed and service_manager:
+        # Always cleanup port forwards (prevents orphaned processes)
+        if hasattr(service_manager, "_stop_port_forwards"):
+            service_manager._stop_port_forwards()
+
+        # Only uninstall services if not keeping up
+        if not keep_up:
+            service_manager.stop()
+        else:
+            print("\n" + "=" * 60)
+            print("Services are kept running (--keep-up enabled)")
+            print("Port forwards have been cleaned up to prevent orphaned processes.")
+            if hasattr(service_manager, "print_port_forward_commands"):
+                service_manager.print_port_forward_commands()
+            print("=" * 60)
 
     # Print summary
     print("\n" + "=" * 60)

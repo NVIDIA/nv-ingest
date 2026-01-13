@@ -220,52 +220,144 @@ For Helm deployments, configure services through your values file or inline `hel
 
 ## Port Forwarding for Helm Deployments
 
-The Helm manager automatically sets up `kubectl port-forward` to make services accessible on localhost. This happens after the Helm release is installed and runs in the background.
+The Helm manager automatically sets up `kubectl port-forward` for multiple services to make them accessible on localhost. This happens after the Helm release is installed and runs in the background.
 
 ### Configuration
 
 ```yaml
 kubectl_bin: kubectl  # or "microk8s kubectl", "k3s kubectl"
 kubectl_sudo: null  # Defaults to same as helm_sudo if not set
-service_port: 7670  # Port to forward (local:remote)
+
+# Multiple port forwards (supports wildcards)
+helm_port_forwards:
+  - service: nv-ingest
+    local_port: 7670
+    remote_port: 7670
+  - service: nv-ingest-milvus
+    local_port: 19530
+    remote_port: 19530
+  - service: "*embed*"  # Wildcard pattern
+    local_port: 8012
+    remote_port: 8000
 ```
+
+### Wildcard Service Matching
+
+You can use wildcards (`*`) in service names to match dynamic service names:
+
+- `"*embed*"` - Matches any service with "embed" in the name (e.g., `nv-ingest-embed-nim`, `embed-service`)
+- `"nv-ingest-*"` - Matches services starting with "nv-ingest-"
+- `"*-milvus"` - Matches services ending with "-milvus"
+
+The manager queries `kubectl get services` to find matches and starts port-forward for each.
 
 ### What Happens
 
-1. **After Helm install**: Automatically runs port-forward in background
+1. **After Helm install**: Automatically starts port-forward for all configured services
    ```bash
-   sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670
+   sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670 (background)
+   sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-milvus 19530:19530 (background)
+   sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-embed-nim 8012:8000 (background)
    ```
 
-2. **Retry logic**: If pods are not ready yet (Pending status), retries every 5 seconds for up to 120 seconds
+2. **Retry logic**: If pods are not ready yet (Pending status), retries every 5 seconds for up to 120 seconds per service
 
-3. **During tests**: Services are accessible at `http://localhost:7670`
+3. **During tests**: Services are accessible at their configured local ports
+   - Main API: `http://localhost:7670`
+   - Milvus: `localhost:19530`
+   - Embedding: `http://localhost:8012`
 
-4. **On cleanup**: Port-forward process is automatically terminated
+4. **On cleanup**: All port-forward processes are automatically terminated (always, regardless of `--keep-up`)
 
 ### Retry Behavior
 
-The port-forward will automatically retry if:
+Each port-forward will automatically retry if:
 - Pods are in `Pending` state
 - Error message contains "pod is not running"
 
 Example output:
 ```
-Waiting for pod to be ready (timeout: 120s)...
+$ sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670 (background)
+Waiting for nv-ingest pod to be ready (timeout: 120s)...
   Attempt 1: Pod not ready yet (elapsed: 7s)
   Attempt 2: Pod not ready yet (elapsed: 12s)
-  Attempt 3: Pod not ready yet (elapsed: 17s)
-Port forwarding started (PID: 12345)
+Port forwarding started for nv-ingest (7670:7670) (PID: 12345)
+
+$ sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-milvus 19530:19530 (background)
+Waiting for nv-ingest-milvus pod to be ready (timeout: 120s)...
+Port forwarding started for nv-ingest-milvus (19530:19530) (PID: 12346)
+
+$ sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-embed-nim 8012:8000 (background)
+Waiting for nv-ingest-embed-nim pod to be ready (timeout: 120s)...
+Port forwarding started for nv-ingest-embed-nim (8012:8000) (PID: 12347)
+```
+
+### Legacy Configuration
+
+If `helm_port_forwards` is not specified, the manager defaults to forwarding only the main service:
+```yaml
+service_port: 7670  # Used as fallback if helm_port_forwards not specified
+```
+
+This is equivalent to:
+```yaml
+helm_port_forwards:
+  - service: nv-ingest  # Uses helm_release value
+    local_port: 7670
+    remote_port: 7670
 ```
 
 ### Troubleshooting
 
 If port forwarding fails after timeout, you can manually set it up:
 ```bash
-sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670
+sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670 &
+sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-milvus 19530:19530 &
+sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-embed-nim 8012:8000 &
 ```
 
-The harness will continue and attempt to connect to the port.
+The harness will continue and attempt to connect to the ports.
+
+## Port Forwards and `--keep-up`
+
+**Important**: Port-forward processes are **always** cleaned up at the end, even when using `--keep-up`:
+
+- `--keep-up` keeps the **Helm release** installed
+- Port-forwards are **always terminated** to prevent orphaned processes
+- Helpful commands are printed to manually recreate port-forwards if needed
+
+### Example with `--keep-up`:
+
+```bash
+uv run nv-ingest-harness-run --case=e2e --dataset=bo20 --managed --keep-up
+```
+
+Output at the end:
+```
+Stopping 3 port forward(s)...
+  Stopping nv-ingest (7670:7670) (PID: 12345)...
+  Stopping nv-ingest-milvus (19530:19530) (PID: 12346)...
+  Stopping nv-ingest-embed-nim (8012:8000) (PID: 12347)...
+
+============================================================
+Services are kept running (--keep-up enabled)
+Port forwards have been cleaned up to prevent orphaned processes.
+
+To manually recreate port forwards, run:
+============================================================
+  sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest 7670:7670 &
+  sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-milvus 19530:19530 &
+  # For pattern: *embed*
+  sudo microk8s kubectl port-forward -n nv-ingest service/nv-ingest-embed-nim 8012:8000 &
+============================================================
+```
+
+### Why Clean Up Port Forwards?
+
+1. **Prevents port conflicts** - Next run can bind to the same ports
+2. **No orphaned processes** - Avoids accumulating background processes
+3. **Clean state** - Each run starts fresh with its own port-forwards
+4. **Easy to recreate** - Commands are provided if manual access is needed
 
 ## Future Enhancements
 
