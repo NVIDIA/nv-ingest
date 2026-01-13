@@ -8,11 +8,11 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 
 
-## Release 26.01 (26.1.0)
+## Release 26.01 (26.1.1)
 
 The NeMo Retriever extraction 26.01 release adds new hardware and software support, and other improvements.
 
-To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.0/helm/README.md).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.1/helm/README.md).
 
 
 ### Highlights 
@@ -49,8 +49,8 @@ This release contains the following key changes:
 
 The following are the known issues that are fixed in this version:
 
-- A10G support is restored. To use A10G hardware, use release 26.1.0 or later. For details, refer to [Support Matrix](support-matrix.md).
-- L40S support is restored. To use L40S hardware, use release 26.1.0 or later. For details, refer to [Support Matrix](support-matrix.md).
+- A10G support is restored. To use A10G hardware, use release 26.1.1 or later. For details, refer to [Support Matrix](support-matrix.md).
+- L40S support is restored. To use L40S hardware, use release 26.1.1 or later. For details, refer to [Support Matrix](support-matrix.md).
 - The page number field in the content metadata now starts at 1 instead of 0 so each page number is no longer off by one from what you would expect. For details, refer to [Content Metadata](content-metadata.md).
 - Support for batches that include individual files greater than approximately 400MB is restored. This includes audio files and pdfs.
 
