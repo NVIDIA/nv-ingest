@@ -1,0 +1,1243 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_client.primitives package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-client/nv_ingest_client.primitives';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_client.primitives.jobs package" href="nv_ingest_client.primitives.jobs.html" />
+    <link rel="prev" title="nv_ingest_client.client package" href="nv_ingest_client.client.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_client</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_client.html">nv_ingest_client package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 current active has-children"><a class="current reference internal" href="#">nv_ingest_client.primitives package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_client</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_client.html" class="nav-link">nv_ingest_client package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_client.primitives package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-client-primitives-package">
+<h1>nv_ingest_client.primitives package<a class="headerlink" href="#nv-ingest-client-primitives-package" title="Link to this heading">#</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#module-nv_ingest_client.primitives.jobs.job_spec">nv_ingest_client.primitives.jobs.job_spec module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec"><code class="docutils literal notranslate"><span class="pre">BatchJobSpec</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec._file_type_to_job_spec"><code class="docutils literal notranslate"><span class="pre">_file_type_to_job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.add_job_spec"><code class="docutils literal notranslate"><span class="pre">add_job_spec()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.file_types"><code class="docutils literal notranslate"><span class="pre">file_types</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.from_buffers"><code class="docutils literal notranslate"><span class="pre">from_buffers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.from_dataset"><code class="docutils literal notranslate"><span class="pre">from_dataset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.from_files"><code class="docutils literal notranslate"><span class="pre">from_files()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.from_job_specs"><code class="docutils literal notranslate"><span class="pre">from_job_specs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.job_specs"><code class="docutils literal notranslate"><span class="pre">job_specs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.tasks"><code class="docutils literal notranslate"><span class="pre">tasks</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.BatchJobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec"><code class="docutils literal notranslate"><span class="pre">JobSpec</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec._payload"><code class="docutils literal notranslate"><span class="pre">_payload</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec._tasks"><code class="docutils literal notranslate"><span class="pre">_tasks</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec._source_id"><code class="docutils literal notranslate"><span class="pre">_source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec._job_id"><code class="docutils literal notranslate"><span class="pre">_job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec._extended_options"><code class="docutils literal notranslate"><span class="pre">_extended_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.payload"><code class="docutils literal notranslate"><span class="pre">payload</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec.source_name"><code class="docutils literal notranslate"><span class="pre">source_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id0"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#module-nv_ingest_client.primitives.jobs.job_state">nv_ingest_client.primitives.jobs.job_state module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState"><code class="docutils literal notranslate"><span class="pre">JobState</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.job_spec"><code class="docutils literal notranslate"><span class="pre">job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.state"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.future"><code class="docutils literal notranslate"><span class="pre">future</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.response"><code class="docutils literal notranslate"><span class="pre">response</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.response_channel"><code class="docutils literal notranslate"><span class="pre">response_channel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id1"><code class="docutils literal notranslate"><span class="pre">future</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id2"><code class="docutils literal notranslate"><span class="pre">job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id3"><code class="docutils literal notranslate"><span class="pre">response</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id4"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobState.trace_id"><code class="docutils literal notranslate"><span class="pre">trace_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum"><code class="docutils literal notranslate"><span class="pre">JobStateEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.CANCELLED"><code class="docutils literal notranslate"><span class="pre">CANCELLED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.COMPLETED"><code class="docutils literal notranslate"><span class="pre">COMPLETED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.FAILED"><code class="docutils literal notranslate"><span class="pre">FAILED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.PENDING"><code class="docutils literal notranslate"><span class="pre">PENDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.PROCESSING"><code class="docutils literal notranslate"><span class="pre">PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.SUBMITTED"><code class="docutils literal notranslate"><span class="pre">SUBMITTED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_state.JobStateEnum.SUBMITTED_ASYNC"><code class="docutils literal notranslate"><span class="pre">SUBMITTED_ASYNC</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#module-nv_ingest_client.primitives.jobs">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec"><code class="docutils literal notranslate"><span class="pre">BatchJobSpec</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec._file_type_to_job_spec"><code class="docutils literal notranslate"><span class="pre">_file_type_to_job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.add_job_spec"><code class="docutils literal notranslate"><span class="pre">add_job_spec()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.file_types"><code class="docutils literal notranslate"><span class="pre">file_types</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.from_buffers"><code class="docutils literal notranslate"><span class="pre">from_buffers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.from_dataset"><code class="docutils literal notranslate"><span class="pre">from_dataset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.from_files"><code class="docutils literal notranslate"><span class="pre">from_files()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.from_job_specs"><code class="docutils literal notranslate"><span class="pre">from_job_specs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.job_specs"><code class="docutils literal notranslate"><span class="pre">job_specs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.tasks"><code class="docutils literal notranslate"><span class="pre">tasks</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.BatchJobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec"><code class="docutils literal notranslate"><span class="pre">JobSpec</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec._payload"><code class="docutils literal notranslate"><span class="pre">_payload</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec._tasks"><code class="docutils literal notranslate"><span class="pre">_tasks</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec._source_id"><code class="docutils literal notranslate"><span class="pre">_source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec._job_id"><code class="docutils literal notranslate"><span class="pre">_job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec._extended_options"><code class="docutils literal notranslate"><span class="pre">_extended_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.payload"><code class="docutils literal notranslate"><span class="pre">payload</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobSpec.source_name"><code class="docutils literal notranslate"><span class="pre">source_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id5"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState"><code class="docutils literal notranslate"><span class="pre">JobState</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.job_spec"><code class="docutils literal notranslate"><span class="pre">job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.state"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.future"><code class="docutils literal notranslate"><span class="pre">future</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.response"><code class="docutils literal notranslate"><span class="pre">response</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.response_channel"><code class="docutils literal notranslate"><span class="pre">response_channel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id6"><code class="docutils literal notranslate"><span class="pre">future</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id7"><code class="docutils literal notranslate"><span class="pre">job_spec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id8"><code class="docutils literal notranslate"><span class="pre">response</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#id9"><code class="docutils literal notranslate"><span class="pre">state</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobState.trace_id"><code class="docutils literal notranslate"><span class="pre">trace_id</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum"><code class="docutils literal notranslate"><span class="pre">JobStateEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.CANCELLED"><code class="docutils literal notranslate"><span class="pre">CANCELLED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.COMPLETED"><code class="docutils literal notranslate"><span class="pre">COMPLETED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.FAILED"><code class="docutils literal notranslate"><span class="pre">FAILED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.PENDING"><code class="docutils literal notranslate"><span class="pre">PENDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.PROCESSING"><code class="docutils literal notranslate"><span class="pre">PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.SUBMITTED"><code class="docutils literal notranslate"><span class="pre">SUBMITTED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.JobStateEnum.SUBMITTED_ASYNC"><code class="docutils literal notranslate"><span class="pre">SUBMITTED_ASYNC</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.audio_extraction">nv_ingest_client.primitives.tasks.audio_extraction module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.audio_extraction.AudioExtractionTask"><code class="docutils literal notranslate"><span class="pre">AudioExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.audio_extraction.AudioExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.caption">nv_ingest_client.primitives.tasks.caption module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.caption.CaptionTask"><code class="docutils literal notranslate"><span class="pre">CaptionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.caption.CaptionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.chart_extraction">nv_ingest_client.primitives.tasks.chart_extraction module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.chart_extraction.ChartExtractionTask"><code class="docutils literal notranslate"><span class="pre">ChartExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.chart_extraction.ChartExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.dedup">nv_ingest_client.primitives.tasks.dedup module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.dedup.DedupTask"><code class="docutils literal notranslate"><span class="pre">DedupTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.dedup.DedupTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.embed">nv_ingest_client.primitives.tasks.embed module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.embed.EmbedTask"><code class="docutils literal notranslate"><span class="pre">EmbedTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.embed.EmbedTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.extract">nv_ingest_client.primitives.tasks.extract module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.extract.ExtractTask"><code class="docutils literal notranslate"><span class="pre">ExtractTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.extract.ExtractTask.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.extract.ExtractTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.filter">nv_ingest_client.primitives.tasks.filter module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.filter.FilterTask"><code class="docutils literal notranslate"><span class="pre">FilterTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.filter.FilterTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.infographic_extraction">nv_ingest_client.primitives.tasks.infographic_extraction module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.infographic_extraction.InfographicExtractionTask"><code class="docutils literal notranslate"><span class="pre">InfographicExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.infographic_extraction.InfographicExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.split">nv_ingest_client.primitives.tasks.split module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.split.SplitTask"><code class="docutils literal notranslate"><span class="pre">SplitTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.split.SplitTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.store">nv_ingest_client.primitives.tasks.store module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.store.StoreEmbedTask"><code class="docutils literal notranslate"><span class="pre">StoreEmbedTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.store.StoreEmbedTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.store.StoreTask"><code class="docutils literal notranslate"><span class="pre">StoreTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.store.StoreTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.table_extraction">nv_ingest_client.primitives.tasks.table_extraction module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.table_extraction.TableExtractionSchema"><code class="docutils literal notranslate"><span class="pre">TableExtractionSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.table_extraction.TableExtractionSchema.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.table_extraction.TableExtractionTask"><code class="docutils literal notranslate"><span class="pre">TableExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.table_extraction.TableExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.task_base">nv_ingest_client.primitives.tasks.task_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.Task.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType"><code class="docutils literal notranslate"><span class="pre">TaskType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.CAPTION"><code class="docutils literal notranslate"><span class="pre">CAPTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.CHART_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">CHART_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.DEDUP"><code class="docutils literal notranslate"><span class="pre">DEDUP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.EMBED"><code class="docutils literal notranslate"><span class="pre">EMBED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.EXTRACT"><code class="docutils literal notranslate"><span class="pre">EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.FILTER"><code class="docutils literal notranslate"><span class="pre">FILTER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.INFOGRAPHIC_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">INFOGRAPHIC_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.SPLIT"><code class="docutils literal notranslate"><span class="pre">SPLIT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.STORE"><code class="docutils literal notranslate"><span class="pre">STORE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.STORE_EMBEDDING"><code class="docutils literal notranslate"><span class="pre">STORE_EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.TABLE_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">TABLE_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.TRANSFORM"><code class="docutils literal notranslate"><span class="pre">TRANSFORM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.UDF"><code class="docutils literal notranslate"><span class="pre">UDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.TaskType.VDB_UPLOAD"><code class="docutils literal notranslate"><span class="pre">VDB_UPLOAD</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.is_valid_task_type"><code class="docutils literal notranslate"><span class="pre">is_valid_task_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.task_factory">nv_ingest_client.primitives.tasks.task_factory module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_factory.TaskUnimplemented"><code class="docutils literal notranslate"><span class="pre">TaskUnimplemented</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_factory.task_factory"><code class="docutils literal notranslate"><span class="pre">task_factory()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv-ingest-client-primitives-tasks-transform-module">nv_ingest_client.primitives.tasks.transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks.vdb_upload">nv_ingest_client.primitives.tasks.vdb_upload module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTask"><code class="docutils literal notranslate"><span class="pre">VdbUploadTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema"><code class="docutils literal notranslate"><span class="pre">VdbUploadTaskSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema.bulk_ingest"><code class="docutils literal notranslate"><span class="pre">bulk_ingest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema.bulk_ingest_path"><code class="docutils literal notranslate"><span class="pre">bulk_ingest_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema.filter_errors"><code class="docutils literal notranslate"><span class="pre">filter_errors</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.vdb_upload.VdbUploadTaskSchema.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#module-nv_ingest_client.primitives.tasks">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.AudioExtractionTask"><code class="docutils literal notranslate"><span class="pre">AudioExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.AudioExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.CaptionTask"><code class="docutils literal notranslate"><span class="pre">CaptionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.CaptionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.ChartExtractionTask"><code class="docutils literal notranslate"><span class="pre">ChartExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.ChartExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.DedupTask"><code class="docutils literal notranslate"><span class="pre">DedupTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.DedupTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.EmbedTask"><code class="docutils literal notranslate"><span class="pre">EmbedTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.EmbedTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.ExtractTask"><code class="docutils literal notranslate"><span class="pre">ExtractTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.ExtractTask.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.ExtractTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.FilterTask"><code class="docutils literal notranslate"><span class="pre">FilterTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.FilterTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.InfographicExtractionTask"><code class="docutils literal notranslate"><span class="pre">InfographicExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.InfographicExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.SplitTask"><code class="docutils literal notranslate"><span class="pre">SplitTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.SplitTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.StoreEmbedTask"><code class="docutils literal notranslate"><span class="pre">StoreEmbedTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.StoreEmbedTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.StoreTask"><code class="docutils literal notranslate"><span class="pre">StoreTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.StoreTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TableExtractionTask"><code class="docutils literal notranslate"><span class="pre">TableExtractionTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TableExtractionTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.Task.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType"><code class="docutils literal notranslate"><span class="pre">TaskType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.CAPTION"><code class="docutils literal notranslate"><span class="pre">CAPTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.CHART_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">CHART_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.DEDUP"><code class="docutils literal notranslate"><span class="pre">DEDUP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.EMBED"><code class="docutils literal notranslate"><span class="pre">EMBED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.EXTRACT"><code class="docutils literal notranslate"><span class="pre">EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.FILTER"><code class="docutils literal notranslate"><span class="pre">FILTER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.INFOGRAPHIC_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">INFOGRAPHIC_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.SPLIT"><code class="docutils literal notranslate"><span class="pre">SPLIT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.STORE"><code class="docutils literal notranslate"><span class="pre">STORE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.STORE_EMBEDDING"><code class="docutils literal notranslate"><span class="pre">STORE_EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.TABLE_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">TABLE_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.TRANSFORM"><code class="docutils literal notranslate"><span class="pre">TRANSFORM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.UDF"><code class="docutils literal notranslate"><span class="pre">UDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.TaskType.VDB_UPLOAD"><code class="docutils literal notranslate"><span class="pre">VDB_UPLOAD</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.UDFTask"><code class="docutils literal notranslate"><span class="pre">UDFTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.UDFTask.phase"><code class="docutils literal notranslate"><span class="pre">phase</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.UDFTask.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.UDFTask.udf_function"><code class="docutils literal notranslate"><span class="pre">udf_function</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.UDFTask.udf_function_name"><code class="docutils literal notranslate"><span class="pre">udf_function_name</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.is_valid_task_type"><code class="docutils literal notranslate"><span class="pre">is_valid_task_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_factory"><code class="docutils literal notranslate"><span class="pre">task_factory()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="nv-ingest-client-primitives-exceptions-module">
+<h2>nv_ingest_client.primitives.exceptions module<a class="headerlink" href="#nv-ingest-client-primitives-exceptions-module" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_client.primitives">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_client.primitives" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_client.primitives.</span></span><span class="sig-name descname"><span class="pre">BatchJobSpec</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">job_specs_or_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec" title="nv_ingest_client.primitives.jobs.job_spec.JobSpec"><span class="pre">JobSpec</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BytesIO</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class used to represent a batch of job specifications (JobSpecs).</p>
+<p>This class allows for batch processing of multiple jobs, either from a list of
+<cite>JobSpec</cite> instances or from file paths. It provides methods for adding job
+specifications, associating tasks with those specifications, and serializing the
+batch to a dictionary format.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec._file_type_to_job_spec">
+<span class="sig-name descname"><span class="pre">_file_type_to_job_spec</span></span><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec._file_type_to_job_spec" title="Link to this definition">#</a></dt>
+<dd><p>A dictionary that maps document types to a list of <cite>JobSpec</cite> instances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>defaultdict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.add_job_spec">
+<span class="sig-name descname"><span class="pre">add_job_spec</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">job_spec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec" title="nv_ingest_client.primitives.jobs.job_spec.JobSpec"><span class="pre">JobSpec</span></a></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.add_job_spec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.add_job_spec" title="Link to this definition">#</a></dt>
+<dd><p>Adds a <cite>JobSpec</cite> to the batch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>job_spec</strong> (<a class="reference internal" href="#nv_ingest_client.primitives.JobSpec" title="nv_ingest_client.primitives.JobSpec"><em>JobSpec</em></a>) – The job specification to add.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.add_task">
+<span class="sig-name descname"><span class="pre">add_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">document_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.add_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.add_task" title="Link to this definition">#</a></dt>
+<dd><p>Adds a task to the relevant job specifications in the batch.</p>
+<p>If a <cite>document_type</cite> is provided, the task will be added to all job specifications
+matching that document type. If no <cite>document_type</cite> is provided, the task will be added
+to all job specifications in the batch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> (<a class="reference internal" href="#nv_ingest_client.primitives.Task" title="nv_ingest_client.primitives.Task"><em>Task</em></a>) – The task to add. Must derive from the <cite>nv_ingest_client.primitives.Task</cite> class.</p></li>
+<li><p><strong>document_type</strong> (<em>str</em><em>, </em><em>optional</em>) – The document type used to filter job specifications. If not provided, the
+<cite>document_type</cite> is inferred from the task, or the task is applied to all job specifications.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.file_types">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">file_types</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.file_types" title="Link to this definition">#</a></dt>
+<dd><p>Returns the list of unique file types present in the batch.</p>
+<p>This property retrieves the document types currently stored in the batch’s
+job specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of document types for the jobs in the batch.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.from_buffers">
+<span class="sig-name descname"><span class="pre">from_buffers</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">buffers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BytesIO</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.from_buffers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.from_buffers" title="Link to this definition">#</a></dt>
+<dd><p>Initializes the batch from a list of buffers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>buffers</strong> (<em>List</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>BytesIO</em><em>]</em><em>]</em>) – A list of tuples containing the name of the buffer and the BytesIO object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.from_dataset">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle_dataset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.from_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.from_dataset" title="Link to this definition">#</a></dt>
+<dd><p>Class method to create a <cite>BatchJobSpec</cite> instance from a dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>str</em>) – The path to the dataset file.</p></li>
+<li><p><strong>shuffle_dataset</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to shuffle the dataset files before adding them to the batch, by default True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new instance of <cite>BatchJobSpec</cite> initialized with the dataset files.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#nv_ingest_client.primitives.BatchJobSpec" title="nv_ingest_client.primitives.BatchJobSpec">BatchJobSpec</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.from_files">
+<span class="sig-name descname"><span class="pre">from_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.from_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.from_files" title="Link to this definition">#</a></dt>
+<dd><p>Initializes the batch by generating job specifications from file paths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>files</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em>) – A single file path or a list of file paths to create job specifications from.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.from_job_specs">
+<span class="sig-name descname"><span class="pre">from_job_specs</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">job_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec" title="nv_ingest_client.primitives.jobs.job_spec.JobSpec"><span class="pre">JobSpec</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nv_ingest_client.primitives.jobs.html#nv_ingest_client.primitives.jobs.job_spec.JobSpec" title="nv_ingest_client.primitives.jobs.job_spec.JobSpec"><span class="pre">JobSpec</span></a><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.from_job_specs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.from_job_specs" title="Link to this definition">#</a></dt>
+<dd><p>Initializes the batch with a list of <cite>JobSpec</cite> instances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>job_specs</strong> (<em>Union</em><em>[</em><a class="reference internal" href="#nv_ingest_client.primitives.JobSpec" title="nv_ingest_client.primitives.JobSpec"><em>JobSpec</em></a><em>, </em><em>List</em><em>[</em><a class="reference internal" href="#nv_ingest_client.primitives.JobSpec" title="nv_ingest_client.primitives.JobSpec"><em>JobSpec</em></a><em>]</em><em>]</em>) – A single <cite>JobSpec</cite> or a list of <cite>JobSpec</cite> instances to add to the batch.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.job_specs">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">job_specs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.job_specs" title="Link to this definition">#</a></dt>
+<dd><p>A property that returns a dictionary of job specs categorized by document type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary mapping document types to job specifications.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, List[str]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.tasks">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">tasks</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nv_ingest_client.primitives.tasks.html#nv_ingest_client.primitives.tasks.task_base.Task" title="nv_ingest_client.primitives.tasks.task_base.Task"><span class="pre">Task</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.tasks" title="Link to this definition">#</a></dt>
+<dd><p>Adds a task to the relevant job specifications in the batch.</p>
+<p>If a <cite>document_type</cite> is provided, the task will be added to all job specifications
+matching that document type. If no <cite>document_type</cite> is provided, the task will be added
+to all job specifications in the batch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> (<a class="reference internal" href="#nv_ingest_client.primitives.Task" title="nv_ingest_client.primitives.Task"><em>Task</em></a>) – The task to add. Must derive from the <cite>nv_ingest_client.primitives.Task</cite> class.</p></li>
+<li><p><strong>document_type</strong> (<em>str</em><em>, </em><em>optional</em>) – The document type used to filter job specifications. If not provided, the
+<cite>document_type</cite> is inferred from the task, or the task is applied to all job specifications.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.BatchJobSpec.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#BatchJobSpec.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.BatchJobSpec.to_dict" title="Link to this definition">#</a></dt>
+<dd><p>Serializes the batch of job specifications into a list of dictionaries.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of dictionaries representing the job specifications in the batch.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[Dict]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_client.primitives.</span></span><span class="sig-name descname"><span class="pre">JobSpec</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">payload</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">document_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extended_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#JobSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Specification for creating a job for submission to the nv-ingest microservice.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>payload</strong> (<em>Dict</em>) – The payload data for the job.</p></li>
+<li><p><strong>tasks</strong> (<em>Optional</em><em>[</em><em>List</em><em>]</em><em>, </em><em>optional</em>) – A list of tasks to be added to the job, by default None.</p></li>
+<li><p><strong>source_id</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – An identifier for the source of the job, by default None.</p></li>
+<li><p><strong>job_id</strong> (<em>Optional</em><em>[</em><em>UUID</em><em>]</em><em>, </em><em>optional</em>) – A unique identifier for the job, by default a new UUID is generated.</p></li>
+<li><p><strong>extended_options</strong> (<em>Optional</em><em>[</em><em>Dict</em><em>]</em><em>, </em><em>optional</em>) – Additional options for job processing, by default None.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec._payload">
+<span class="sig-name descname"><span class="pre">_payload</span></span><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec._payload" title="Link to this definition">#</a></dt>
+<dd><p>Storage for the payload data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec._tasks">
+<span class="sig-name descname"><span class="pre">_tasks</span></span><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec._tasks" title="Link to this definition">#</a></dt>
+<dd><p>Storage for the list of tasks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec._source_id">
+<span class="sig-name descname"><span class="pre">_source_id</span></span><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec._source_id" title="Link to this definition">#</a></dt>
+<dd><p>Storage for the source identifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec._job_id">
+<span class="sig-name descname"><span class="pre">_job_id</span></span><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec._job_id" title="Link to this definition">#</a></dt>
+<dd><p>Storage for the job’s unique identifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>UUID</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec._extended_options">
+<span class="sig-name descname"><span class="pre">_extended_options</span></span><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec._extended_options" title="Link to this definition">#</a></dt>
+<dd><p>Storage for the additional options.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict:</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#JobSpec.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.to_dict" title="Link to this definition">#</a></dt>
+<dd><p>Converts the job specification to a dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">add_task(task):</span></span></dt>
+<dd><p>Adds a task to the job specification.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.add_task">
+<span class="sig-name descname"><span class="pre">add_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#JobSpec.add_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.add_task" title="Link to this definition">#</a></dt>
+<dd><p>Adds a task or list of tasks to the job specification.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>task</strong> (<a class="reference internal" href="#nv_ingest_client.primitives.Task" title="nv_ingest_client.primitives.Task"><em>Task</em></a><em> or </em><em>list</em><em> of </em><a class="reference internal" href="#nv_ingest_client.primitives.Task" title="nv_ingest_client.primitives.Task"><em>Task</em></a>) – The task(s) to add to the job specification. Can be a single task or a list of tasks.
+Each task must derive from the Task class and have a to_dict method.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If any task does not derive from the Task class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.document_type">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">document_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.document_type" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.job_id">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">job_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">UUID</span></em><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.job_id" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.payload">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">payload</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span></em><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.payload" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.source_id">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">source_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.source_id" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.JobSpec.source_name">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">source_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#nv_ingest_client.primitives.JobSpec.source_name" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/jobs/job_spec.html#JobSpec.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Link to this definition">#</a></dt>
+<dd><p>Converts the job specification instance into a dictionary suitable for JSON serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary representation of the job specification.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.Task">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_client.primitives.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/tasks/task_base.html#Task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.Task" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Generic task Object</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_client.primitives.Task.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/primitives/tasks/task_base.html#Task.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.primitives.Task.to_dict" title="Link to this definition">#</a></dt>
+<dd><p>Returns a string with the task specification. This string is used for constructing
+tasks that are then submitted to the redis client</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_client.client.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_client.client package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_client.primitives.jobs.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_client.primitives.jobs package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nv-ingest-client-primitives-exceptions-module">nv_ingest_client.primitives.exceptions module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.primitives">Module contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec"><code class="docutils literal notranslate"><span class="pre">BatchJobSpec</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec._file_type_to_job_spec"><code class="docutils literal notranslate"><span class="pre">_file_type_to_job_spec</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.add_job_spec"><code class="docutils literal notranslate"><span class="pre">add_job_spec()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.file_types"><code class="docutils literal notranslate"><span class="pre">file_types</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.from_buffers"><code class="docutils literal notranslate"><span class="pre">from_buffers()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.from_dataset"><code class="docutils literal notranslate"><span class="pre">from_dataset()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.from_files"><code class="docutils literal notranslate"><span class="pre">from_files()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.from_job_specs"><code class="docutils literal notranslate"><span class="pre">from_job_specs()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.job_specs"><code class="docutils literal notranslate"><span class="pre">job_specs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.tasks"><code class="docutils literal notranslate"><span class="pre">tasks</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.BatchJobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec"><code class="docutils literal notranslate"><span class="pre">JobSpec</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec._payload"><code class="docutils literal notranslate"><span class="pre">_payload</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec._tasks"><code class="docutils literal notranslate"><span class="pre">_tasks</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec._source_id"><code class="docutils literal notranslate"><span class="pre">_source_id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec._job_id"><code class="docutils literal notranslate"><span class="pre">_job_id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec._extended_options"><code class="docutils literal notranslate"><span class="pre">_extended_options</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.payload"><code class="docutils literal notranslate"><span class="pre">payload</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.JobSpec.source_name"><code class="docutils literal notranslate"><span class="pre">source_name</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id0"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.primitives.Task.to_dict"><code class="docutils literal notranslate"><span class="pre">to_dict()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

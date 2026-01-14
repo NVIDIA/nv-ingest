@@ -1,0 +1,1162 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_api.internal.schemas package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-api/nv_ingest_api.internal.schemas';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_api.internal.schemas.extract package" href="nv_ingest_api.internal.schemas.extract.html" />
+    <link rel="prev" title="nv_ingest_api.internal.primitives.tracing package" href="nv_ingest_api.internal.primitives.tracing.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_api</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_api.html">nv_ingest_api package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_api</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.html" class="nav-link">nv_ingest_api package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.internal.html" class="nav-link">nv_ingest_api.internal package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal.schemas package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-api-internal-schemas-package">
+<h1>nv_ingest_api.internal.schemas package<a class="headerlink" href="#nv-ingest-api-internal-schemas-package" title="Link to this heading">#</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html">nv_ingest_api.internal.schemas.extract package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_audio_schema">nv_ingest_api.internal.schemas.extract.extract_audio_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema"><code class="docutils literal notranslate"><span class="pre">AudioConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.audio_endpoints"><code class="docutils literal notranslate"><span class="pre">audio_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.audio_infer_protocol"><code class="docutils literal notranslate"><span class="pre">audio_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.function_id"><code class="docutils literal notranslate"><span class="pre">function_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.segment_audio"><code class="docutils literal notranslate"><span class="pre">segment_audio</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.ssl_cert"><code class="docutils literal notranslate"><span class="pre">ssl_cert</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.use_ssl"><code class="docutils literal notranslate"><span class="pre">use_ssl</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioConfigSchema.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id0"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema"><code class="docutils literal notranslate"><span class="pre">AudioExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema.audio_extraction_config"><code class="docutils literal notranslate"><span class="pre">audio_extraction_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema.Config"><code class="docutils literal notranslate"><span class="pre">Config</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_chart_schema">nv_ingest_api.internal.schemas.extract.extract_chart_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema"><code class="docutils literal notranslate"><span class="pre">ChartExtractorConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.nim_batch_size"><code class="docutils literal notranslate"><span class="pre">nim_batch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.ocr_endpoints"><code class="docutils literal notranslate"><span class="pre">ocr_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.ocr_infer_protocol"><code class="docutils literal notranslate"><span class="pre">ocr_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.workers_per_progress_engine"><code class="docutils literal notranslate"><span class="pre">workers_per_progress_engine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id1"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema"><code class="docutils literal notranslate"><span class="pre">ChartExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema.endpoint_config"><code class="docutils literal notranslate"><span class="pre">endpoint_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema.check_positive"><code class="docutils literal notranslate"><span class="pre">check_positive</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_docx_schema">nv_ingest_api.internal.schemas.extract.extract_docx_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxConfigSchema"><code class="docutils literal notranslate"><span class="pre">DocxConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id2"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema"><code class="docutils literal notranslate"><span class="pre">DocxExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema.docx_extraction_config"><code class="docutils literal notranslate"><span class="pre">docx_extraction_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema.pdfium_config"><code class="docutils literal notranslate"><span class="pre">pdfium_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_docx_schema.DocxExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_html_schema">nv_ingest_api.internal.schemas.extract.extract_html_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_html_schema.HtmlExtractorSchema"><code class="docutils literal notranslate"><span class="pre">HtmlExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_html_schema.HtmlExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_html_schema.HtmlExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_html_schema.HtmlExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_image_schema">nv_ingest_api.internal.schemas.extract.extract_image_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageConfigSchema"><code class="docutils literal notranslate"><span class="pre">ImageConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id3"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageExtractorSchema"><code class="docutils literal notranslate"><span class="pre">ImageExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageExtractorSchema.image_extraction_config"><code class="docutils literal notranslate"><span class="pre">image_extraction_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_image_schema.ImageExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_infographic_schema">nv_ingest_api.internal.schemas.extract.extract_infographic_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema"><code class="docutils literal notranslate"><span class="pre">InfographicExtractorConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.nim_batch_size"><code class="docutils literal notranslate"><span class="pre">nim_batch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.ocr_endpoints"><code class="docutils literal notranslate"><span class="pre">ocr_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.ocr_infer_protocol"><code class="docutils literal notranslate"><span class="pre">ocr_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorConfigSchema.workers_per_progress_engine"><code class="docutils literal notranslate"><span class="pre">workers_per_progress_engine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id4"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema"><code class="docutils literal notranslate"><span class="pre">InfographicExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema.endpoint_config"><code class="docutils literal notranslate"><span class="pre">endpoint_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema.check_positive"><code class="docutils literal notranslate"><span class="pre">check_positive</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_pdf_schema">nv_ingest_api.internal.schemas.extract.extract_pdf_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema"><code class="docutils literal notranslate"><span class="pre">NemotronParseConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.nemotron_parse_endpoints"><code class="docutils literal notranslate"><span class="pre">nemotron_parse_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.nemotron_parse_infer_protocol"><code class="docutils literal notranslate"><span class="pre">nemotron_parse_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.nemotron_parse_model_name"><code class="docutils literal notranslate"><span class="pre">nemotron_parse_model_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.timeout"><code class="docutils literal notranslate"><span class="pre">timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.workers_per_progress_engine"><code class="docutils literal notranslate"><span class="pre">workers_per_progress_engine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.NemotronParseConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id5"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema"><code class="docutils literal notranslate"><span class="pre">PDFExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema.nemotron_parse_config"><code class="docutils literal notranslate"><span class="pre">nemotron_parse_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema.pdfium_config"><code class="docutils literal notranslate"><span class="pre">pdfium_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema"><code class="docutils literal notranslate"><span class="pre">PDFiumConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.nim_batch_size"><code class="docutils literal notranslate"><span class="pre">nim_batch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.workers_per_progress_engine"><code class="docutils literal notranslate"><span class="pre">workers_per_progress_engine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pdf_schema.PDFiumConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id6"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_pptx_schema">nv_ingest_api.internal.schemas.extract.extract_pptx_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXConfigSchema"><code class="docutils literal notranslate"><span class="pre">PPTXConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id7"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema"><code class="docutils literal notranslate"><span class="pre">PPTXExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema.pdfium_config"><code class="docutils literal notranslate"><span class="pre">pdfium_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema.pptx_extraction_config"><code class="docutils literal notranslate"><span class="pre">pptx_extraction_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_pptx_schema.PPTXExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_table_schema">nv_ingest_api.internal.schemas.extract.extract_table_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema"><code class="docutils literal notranslate"><span class="pre">TableExtractorConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.validate_endpoints"><code class="docutils literal notranslate"><span class="pre">validate_endpoints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.nim_batch_size"><code class="docutils literal notranslate"><span class="pre">nim_batch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.ocr_endpoints"><code class="docutils literal notranslate"><span class="pre">ocr_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.ocr_infer_protocol"><code class="docutils literal notranslate"><span class="pre">ocr_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.workers_per_progress_engine"><code class="docutils literal notranslate"><span class="pre">workers_per_progress_engine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.yolox_endpoints"><code class="docutils literal notranslate"><span class="pre">yolox_endpoints</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorConfigSchema.yolox_infer_protocol"><code class="docutils literal notranslate"><span class="pre">yolox_infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#id8"><code class="docutils literal notranslate"><span class="pre">validate_endpoints</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema"><code class="docutils literal notranslate"><span class="pre">TableExtractorSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema.endpoint_config"><code class="docutils literal notranslate"><span class="pre">endpoint_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema.max_queue_size"><code class="docutils literal notranslate"><span class="pre">max_queue_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema.n_workers"><code class="docutils literal notranslate"><span class="pre">n_workers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema.check_positive"><code class="docutils literal notranslate"><span class="pre">check_positive</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html">nv_ingest_api.internal.schemas.message_brokers package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema">nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema"><code class="docutils literal notranslate"><span class="pre">MessageBrokerClientSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.broker_params"><code class="docutils literal notranslate"><span class="pre">broker_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.client_type"><code class="docutils literal notranslate"><span class="pre">client_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.connection_timeout"><code class="docutils literal notranslate"><span class="pre">connection_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.host"><code class="docutils literal notranslate"><span class="pre">host</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.max_backoff"><code class="docutils literal notranslate"><span class="pre">max_backoff</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.max_retries"><code class="docutils literal notranslate"><span class="pre">max_retries</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema.MessageBrokerClientSchema.port"><code class="docutils literal notranslate"><span class="pre">port</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.request_schema">nv_ingest_api.internal.schemas.message_brokers.request_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PopRequestSchema"><code class="docutils literal notranslate"><span class="pre">PopRequestSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PopRequestSchema.command"><code class="docutils literal notranslate"><span class="pre">command</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PopRequestSchema.queue_name"><code class="docutils literal notranslate"><span class="pre">queue_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PopRequestSchema.timeout"><code class="docutils literal notranslate"><span class="pre">timeout</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PushRequestSchema"><code class="docutils literal notranslate"><span class="pre">PushRequestSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PushRequestSchema.command"><code class="docutils literal notranslate"><span class="pre">command</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PushRequestSchema.message"><code class="docutils literal notranslate"><span class="pre">message</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PushRequestSchema.queue_name"><code class="docutils literal notranslate"><span class="pre">queue_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.PushRequestSchema.timeout"><code class="docutils literal notranslate"><span class="pre">timeout</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.SizeRequestSchema"><code class="docutils literal notranslate"><span class="pre">SizeRequestSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.SizeRequestSchema.command"><code class="docutils literal notranslate"><span class="pre">command</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.request_schema.SizeRequestSchema.queue_name"><code class="docutils literal notranslate"><span class="pre">queue_name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.response_schema">nv_ingest_api.internal.schemas.message_brokers.response_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema"><code class="docutils literal notranslate"><span class="pre">ResponseSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema.response"><code class="docutils literal notranslate"><span class="pre">response</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema.response_code"><code class="docutils literal notranslate"><span class="pre">response_code</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema.response_reason"><code class="docutils literal notranslate"><span class="pre">response_reason</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema.trace_id"><code class="docutils literal notranslate"><span class="pre">trace_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#nv_ingest_api.internal.schemas.message_brokers.response_schema.ResponseSchema.transaction_id"><code class="docutils literal notranslate"><span class="pre">transaction_id</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html">nv_ingest_api.internal.schemas.meta package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.base_model_noext">nv_ingest_api.internal.schemas.meta.base_model_noext module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.base_model_noext.BaseModelNoExt"><code class="docutils literal notranslate"><span class="pre">BaseModelNoExt</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.ingest_job_schema">nv_ingest_api.internal.schemas.meta.ingest_job_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema"><code class="docutils literal notranslate"><span class="pre">IngestJobSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.job_id"><code class="docutils literal notranslate"><span class="pre">job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.job_payload"><code class="docutils literal notranslate"><span class="pre">job_payload</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.pdf_config"><code class="docutils literal notranslate"><span class="pre">pdf_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.routing_options"><code class="docutils literal notranslate"><span class="pre">routing_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.tasks"><code class="docutils literal notranslate"><span class="pre">tasks</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.tracing_options"><code class="docutils literal notranslate"><span class="pre">tracing_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestJobSchema.migrate_queue_hint"><code class="docutils literal notranslate"><span class="pre">migrate_queue_hint</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction"><code class="docutils literal notranslate"><span class="pre">IngestTaskAudioExtraction</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.auth_token"><code class="docutils literal notranslate"><span class="pre">auth_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.function_id"><code class="docutils literal notranslate"><span class="pre">function_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.grpc_endpoint"><code class="docutils literal notranslate"><span class="pre">grpc_endpoint</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.http_endpoint"><code class="docutils literal notranslate"><span class="pre">http_endpoint</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.infer_protocol"><code class="docutils literal notranslate"><span class="pre">infer_protocol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.segment_audio"><code class="docutils literal notranslate"><span class="pre">segment_audio</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.ssl_cert"><code class="docutils literal notranslate"><span class="pre">ssl_cert</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskAudioExtraction.use_ssl"><code class="docutils literal notranslate"><span class="pre">use_ssl</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskCaptionSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema.api_key"><code class="docutils literal notranslate"><span class="pre">api_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema.endpoint_url"><code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema.model_name"><code class="docutils literal notranslate"><span class="pre">model_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema.prompt"><code class="docutils literal notranslate"><span class="pre">prompt</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskCaptionSchema.system_prompt"><code class="docutils literal notranslate"><span class="pre">system_prompt</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskChartExtraction"><code class="docutils literal notranslate"><span class="pre">IngestTaskChartExtraction</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskChartExtraction.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskDedupParams"><code class="docutils literal notranslate"><span class="pre">IngestTaskDedupParams</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskDedupParams.filter"><code class="docutils literal notranslate"><span class="pre">filter</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskDedupSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskDedupSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskDedupSchema.content_type"><code class="docutils literal notranslate"><span class="pre">content_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskDedupSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskEmbedSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.api_key"><code class="docutils literal notranslate"><span class="pre">api_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.audio_elements_modality"><code class="docutils literal notranslate"><span class="pre">audio_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.custom_content_field"><code class="docutils literal notranslate"><span class="pre">custom_content_field</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.dimensions"><code class="docutils literal notranslate"><span class="pre">dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.endpoint_url"><code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.filter_errors"><code class="docutils literal notranslate"><span class="pre">filter_errors</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.image_elements_modality"><code class="docutils literal notranslate"><span class="pre">image_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.model_name"><code class="docutils literal notranslate"><span class="pre">model_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.result_target_field"><code class="docutils literal notranslate"><span class="pre">result_target_field</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.structured_elements_modality"><code class="docutils literal notranslate"><span class="pre">structured_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskEmbedSchema.text_elements_modality"><code class="docutils literal notranslate"><span class="pre">text_elements_modality</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskExtractSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskExtractSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskExtractSchema.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskExtractSchema.method"><code class="docutils literal notranslate"><span class="pre">method</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskExtractSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskExtractSchema.case_insensitive_document_type"><code class="docutils literal notranslate"><span class="pre">case_insensitive_document_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterParamsSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskFilterParamsSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterParamsSchema.filter"><code class="docutils literal notranslate"><span class="pre">filter</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterParamsSchema.max_aspect_ratio"><code class="docutils literal notranslate"><span class="pre">max_aspect_ratio</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterParamsSchema.min_aspect_ratio"><code class="docutils literal notranslate"><span class="pre">min_aspect_ratio</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterParamsSchema.min_size"><code class="docutils literal notranslate"><span class="pre">min_size</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskFilterSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterSchema.content_type"><code class="docutils literal notranslate"><span class="pre">content_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskFilterSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskInfographicExtraction"><code class="docutils literal notranslate"><span class="pre">IngestTaskInfographicExtraction</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskInfographicExtraction.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskOCRExtraction"><code class="docutils literal notranslate"><span class="pre">IngestTaskOCRExtraction</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskOCRExtraction.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema.task_properties"><code class="docutils literal notranslate"><span class="pre">task_properties</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema.type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema.case_insensitive_task_type"><code class="docutils literal notranslate"><span class="pre">case_insensitive_task_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSchema.check_task_properties_type"><code class="docutils literal notranslate"><span class="pre">check_task_properties_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskSplitSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema.chunk_overlap"><code class="docutils literal notranslate"><span class="pre">chunk_overlap</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema.chunk_size"><code class="docutils literal notranslate"><span class="pre">chunk_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema.tokenizer"><code class="docutils literal notranslate"><span class="pre">tokenizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskSplitSchema.check_chunk_overlap"><code class="docutils literal notranslate"><span class="pre">check_chunk_overlap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreEmbedSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskStoreEmbedSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreEmbedSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskStoreSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.images"><code class="docutils literal notranslate"><span class="pre">images</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.public_base_url"><code class="docutils literal notranslate"><span class="pre">public_base_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.storage_options"><code class="docutils literal notranslate"><span class="pre">storage_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.storage_uri"><code class="docutils literal notranslate"><span class="pre">storage_uri</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskStoreSchema.structured"><code class="docutils literal notranslate"><span class="pre">structured</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskTableExtraction"><code class="docutils literal notranslate"><span class="pre">IngestTaskTableExtraction</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskTableExtraction.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskUDFSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.phase"><code class="docutils literal notranslate"><span class="pre">phase</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.run_after"><code class="docutils literal notranslate"><span class="pre">run_after</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.run_before"><code class="docutils literal notranslate"><span class="pre">run_before</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.target_stage"><code class="docutils literal notranslate"><span class="pre">target_stage</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.udf_function"><code class="docutils literal notranslate"><span class="pre">udf_function</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.udf_function_name"><code class="docutils literal notranslate"><span class="pre">udf_function_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskUDFSchema.validate_stage_targeting"><code class="docutils literal notranslate"><span class="pre">validate_stage_targeting</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskVdbUploadSchema"><code class="docutils literal notranslate"><span class="pre">IngestTaskVdbUploadSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskVdbUploadSchema.bulk_ingest"><code class="docutils literal notranslate"><span class="pre">bulk_ingest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskVdbUploadSchema.bulk_ingest_path"><code class="docutils literal notranslate"><span class="pre">bulk_ingest_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskVdbUploadSchema.filter_errors"><code class="docutils literal notranslate"><span class="pre">filter_errors</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.IngestTaskVdbUploadSchema.params"><code class="docutils literal notranslate"><span class="pre">params</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.JobPayloadSchema"><code class="docutils literal notranslate"><span class="pre">JobPayloadSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.JobPayloadSchema.content"><code class="docutils literal notranslate"><span class="pre">content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.JobPayloadSchema.document_type"><code class="docutils literal notranslate"><span class="pre">document_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.JobPayloadSchema.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.JobPayloadSchema.source_name"><code class="docutils literal notranslate"><span class="pre">source_name</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.PdfConfigSchema"><code class="docutils literal notranslate"><span class="pre">PdfConfigSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.PdfConfigSchema.split_page_count"><code class="docutils literal notranslate"><span class="pre">split_page_count</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.RoutingOptionsSchema"><code class="docutils literal notranslate"><span class="pre">RoutingOptionsSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.RoutingOptionsSchema.queue_hint"><code class="docutils literal notranslate"><span class="pre">queue_hint</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.RoutingOptionsSchema.validate_queue_hint"><code class="docutils literal notranslate"><span class="pre">validate_queue_hint</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema"><code class="docutils literal notranslate"><span class="pre">TracingOptionsSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.page_num"><code class="docutils literal notranslate"><span class="pre">page_num</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.parent_job_id"><code class="docutils literal notranslate"><span class="pre">parent_job_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.total_pages"><code class="docutils literal notranslate"><span class="pre">total_pages</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.trace"><code class="docutils literal notranslate"><span class="pre">trace</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.trace_id"><code class="docutils literal notranslate"><span class="pre">trace_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.TracingOptionsSchema.ts_send"><code class="docutils literal notranslate"><span class="pre">ts_send</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.ingest_job_schema.validate_ingest_job"><code class="docutils literal notranslate"><span class="pre">validate_ingest_job()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.metadata_schema">nv_ingest_api.internal.schemas.meta.metadata_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.AudioMetadataSchema"><code class="docutils literal notranslate"><span class="pre">AudioMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.AudioMetadataSchema.audio_transcript"><code class="docutils literal notranslate"><span class="pre">audio_transcript</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.AudioMetadataSchema.audio_type"><code class="docutils literal notranslate"><span class="pre">audio_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.AudioMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema"><code class="docutils literal notranslate"><span class="pre">ChartMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.caption"><code class="docutils literal notranslate"><span class="pre">caption</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.table_content"><code class="docutils literal notranslate"><span class="pre">table_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.table_content_format"><code class="docutils literal notranslate"><span class="pre">table_content_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.table_format"><code class="docutils literal notranslate"><span class="pre">table_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.table_location"><code class="docutils literal notranslate"><span class="pre">table_location</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.table_location_max_dimensions"><code class="docutils literal notranslate"><span class="pre">table_location_max_dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ChartMetadataSchema.uploaded_image_uri"><code class="docutils literal notranslate"><span class="pre">uploaded_image_uri</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema"><code class="docutils literal notranslate"><span class="pre">ContentHierarchySchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.block"><code class="docutils literal notranslate"><span class="pre">block</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.line"><code class="docutils literal notranslate"><span class="pre">line</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.nearby_objects"><code class="docutils literal notranslate"><span class="pre">nearby_objects</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.page"><code class="docutils literal notranslate"><span class="pre">page</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.page_count"><code class="docutils literal notranslate"><span class="pre">page_count</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentHierarchySchema.span"><code class="docutils literal notranslate"><span class="pre">span</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema"><code class="docutils literal notranslate"><span class="pre">ContentMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.description"><code class="docutils literal notranslate"><span class="pre">description</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.end_time"><code class="docutils literal notranslate"><span class="pre">end_time</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.hierarchy"><code class="docutils literal notranslate"><span class="pre">hierarchy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.page_number"><code class="docutils literal notranslate"><span class="pre">page_number</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.start_time"><code class="docutils literal notranslate"><span class="pre">start_time</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.subtype"><code class="docutils literal notranslate"><span class="pre">subtype</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ContentMetadataSchema.type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema"><code class="docutils literal notranslate"><span class="pre">ErrorMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema.error_msg"><code class="docutils literal notranslate"><span class="pre">error_msg</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema.status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ErrorMetadataSchema.task"><code class="docutils literal notranslate"><span class="pre">task</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema"><code class="docutils literal notranslate"><span class="pre">ImageMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.caption"><code class="docutils literal notranslate"><span class="pre">caption</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.height"><code class="docutils literal notranslate"><span class="pre">height</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.image_location"><code class="docutils literal notranslate"><span class="pre">image_location</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.image_location_max_dimensions"><code class="docutils literal notranslate"><span class="pre">image_location_max_dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.image_type"><code class="docutils literal notranslate"><span class="pre">image_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.structured_image_type"><code class="docutils literal notranslate"><span class="pre">structured_image_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.text"><code class="docutils literal notranslate"><span class="pre">text</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.uploaded_image_url"><code class="docutils literal notranslate"><span class="pre">uploaded_image_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.width"><code class="docutils literal notranslate"><span class="pre">width</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.clamp_non_negative"><code class="docutils literal notranslate"><span class="pre">clamp_non_negative</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.ImageMetadataSchema.validate_image_type"><code class="docutils literal notranslate"><span class="pre">validate_image_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema"><code class="docutils literal notranslate"><span class="pre">InfoMessageMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema.filter"><code class="docutils literal notranslate"><span class="pre">filter</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema.message"><code class="docutils literal notranslate"><span class="pre">message</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema.status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.InfoMessageMetadataSchema.task"><code class="docutils literal notranslate"><span class="pre">task</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema"><code class="docutils literal notranslate"><span class="pre">MetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.audio_metadata"><code class="docutils literal notranslate"><span class="pre">audio_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.chart_metadata"><code class="docutils literal notranslate"><span class="pre">chart_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.content"><code class="docutils literal notranslate"><span class="pre">content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.content_metadata"><code class="docutils literal notranslate"><span class="pre">content_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.content_url"><code class="docutils literal notranslate"><span class="pre">content_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.debug_metadata"><code class="docutils literal notranslate"><span class="pre">debug_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.embedding"><code class="docutils literal notranslate"><span class="pre">embedding</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.error_metadata"><code class="docutils literal notranslate"><span class="pre">error_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.image_metadata"><code class="docutils literal notranslate"><span class="pre">image_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.info_message_metadata"><code class="docutils literal notranslate"><span class="pre">info_message_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.original_source_id"><code class="docutils literal notranslate"><span class="pre">original_source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.original_source_name"><code class="docutils literal notranslate"><span class="pre">original_source_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.source_metadata"><code class="docutils literal notranslate"><span class="pre">source_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.table_metadata"><code class="docutils literal notranslate"><span class="pre">table_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.text_metadata"><code class="docutils literal notranslate"><span class="pre">text_metadata</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.total_pages"><code class="docutils literal notranslate"><span class="pre">total_pages</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.MetadataSchema.check_metadata_type"><code class="docutils literal notranslate"><span class="pre">check_metadata_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSchema"><code class="docutils literal notranslate"><span class="pre">NearbyObjectsSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSchema.images"><code class="docutils literal notranslate"><span class="pre">images</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSchema.structured"><code class="docutils literal notranslate"><span class="pre">structured</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSchema.text"><code class="docutils literal notranslate"><span class="pre">text</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSubSchema"><code class="docutils literal notranslate"><span class="pre">NearbyObjectsSubSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSubSchema.bbox"><code class="docutils literal notranslate"><span class="pre">bbox</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSubSchema.content"><code class="docutils literal notranslate"><span class="pre">content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.NearbyObjectsSubSchema.type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema"><code class="docutils literal notranslate"><span class="pre">SourceMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.access_level"><code class="docutils literal notranslate"><span class="pre">access_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.collection_id"><code class="docutils literal notranslate"><span class="pre">collection_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.date_created"><code class="docutils literal notranslate"><span class="pre">date_created</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.last_modified"><code class="docutils literal notranslate"><span class="pre">last_modified</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.partition_id"><code class="docutils literal notranslate"><span class="pre">partition_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.source_id"><code class="docutils literal notranslate"><span class="pre">source_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.source_location"><code class="docutils literal notranslate"><span class="pre">source_location</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.source_name"><code class="docutils literal notranslate"><span class="pre">source_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.source_type"><code class="docutils literal notranslate"><span class="pre">source_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.summary"><code class="docutils literal notranslate"><span class="pre">summary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.SourceMetadataSchema.validate_fields"><code class="docutils literal notranslate"><span class="pre">validate_fields</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema"><code class="docutils literal notranslate"><span class="pre">TableMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.caption"><code class="docutils literal notranslate"><span class="pre">caption</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.table_content"><code class="docutils literal notranslate"><span class="pre">table_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.table_content_format"><code class="docutils literal notranslate"><span class="pre">table_content_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.table_format"><code class="docutils literal notranslate"><span class="pre">table_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.table_location"><code class="docutils literal notranslate"><span class="pre">table_location</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.table_location_max_dimensions"><code class="docutils literal notranslate"><span class="pre">table_location_max_dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TableMetadataSchema.uploaded_image_uri"><code class="docutils literal notranslate"><span class="pre">uploaded_image_uri</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema"><code class="docutils literal notranslate"><span class="pre">TextMetadataSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.custom_content"><code class="docutils literal notranslate"><span class="pre">custom_content</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.keywords"><code class="docutils literal notranslate"><span class="pre">keywords</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.language"><code class="docutils literal notranslate"><span class="pre">language</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.summary"><code class="docutils literal notranslate"><span class="pre">summary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.text_location"><code class="docutils literal notranslate"><span class="pre">text_location</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.text_location_max_dimensions"><code class="docutils literal notranslate"><span class="pre">text_location_max_dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.TextMetadataSchema.text_type"><code class="docutils literal notranslate"><span class="pre">text_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#nv_ingest_api.internal.schemas.meta.metadata_schema.validate_metadata"><code class="docutils literal notranslate"><span class="pre">validate_metadata()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html">nv_ingest_api.internal.schemas.mutate package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#module-nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema">nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema.ImageDedupSchema"><code class="docutils literal notranslate"><span class="pre">ImageDedupSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema.ImageDedupSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#module-nv_ingest_api.internal.schemas.mutate">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html">nv_ingest_api.internal.schemas.store package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store.store_embedding_schema">nv_ingest_api.internal.schemas.store.store_embedding_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_embedding_schema.EmbeddingStorageSchema"><code class="docutils literal notranslate"><span class="pre">EmbeddingStorageSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_embedding_schema.EmbeddingStorageSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store.store_image_schema">nv_ingest_api.internal.schemas.store.store_image_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema"><code class="docutils literal notranslate"><span class="pre">ImageStorageModuleSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.images"><code class="docutils literal notranslate"><span class="pre">images</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.public_base_url"><code class="docutils literal notranslate"><span class="pre">public_base_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.storage_options"><code class="docutils literal notranslate"><span class="pre">storage_options</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.storage_uri"><code class="docutils literal notranslate"><span class="pre">storage_uri</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.structured"><code class="docutils literal notranslate"><span class="pre">structured</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#nv_ingest_api.internal.schemas.store.store_image_schema.ImageStorageModuleSchema.validate_storage_uri"><code class="docutils literal notranslate"><span class="pre">validate_storage_uri</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html">nv_ingest_api.internal.schemas.transform package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_image_caption_schema">nv_ingest_api.internal.schemas.transform.transform_image_caption_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema"><code class="docutils literal notranslate"><span class="pre">ImageCaptionExtractionSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.api_key"><code class="docutils literal notranslate"><span class="pre">api_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.endpoint_url"><code class="docutils literal notranslate"><span class="pre">endpoint_url</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.model_name"><code class="docutils literal notranslate"><span class="pre">model_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.prompt"><code class="docutils literal notranslate"><span class="pre">prompt</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_caption_schema.ImageCaptionExtractionSchema.system_prompt"><code class="docutils literal notranslate"><span class="pre">system_prompt</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_image_filter_schema">nv_ingest_api.internal.schemas.transform.transform_image_filter_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema"><code class="docutils literal notranslate"><span class="pre">ImageFilterSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema.cpu_only"><code class="docutils literal notranslate"><span class="pre">cpu_only</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_image_filter_schema.ImageFilterSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema">nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema"><code class="docutils literal notranslate"><span class="pre">TextEmbeddingSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.api_key"><code class="docutils literal notranslate"><span class="pre">api_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.audio_elements_modality"><code class="docutils literal notranslate"><span class="pre">audio_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.batch_size"><code class="docutils literal notranslate"><span class="pre">batch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.custom_content_field"><code class="docutils literal notranslate"><span class="pre">custom_content_field</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.dimensions"><code class="docutils literal notranslate"><span class="pre">dimensions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.embedding_model"><code class="docutils literal notranslate"><span class="pre">embedding_model</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.embedding_nim_endpoint"><code class="docutils literal notranslate"><span class="pre">embedding_nim_endpoint</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.encoding_format"><code class="docutils literal notranslate"><span class="pre">encoding_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.httpx_log_level"><code class="docutils literal notranslate"><span class="pre">httpx_log_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.image_elements_modality"><code class="docutils literal notranslate"><span class="pre">image_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.input_type"><code class="docutils literal notranslate"><span class="pre">input_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.result_target_field"><code class="docutils literal notranslate"><span class="pre">result_target_field</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.structured_elements_modality"><code class="docutils literal notranslate"><span class="pre">structured_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.text_elements_modality"><code class="docutils literal notranslate"><span class="pre">text_elements_modality</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema.TextEmbeddingSchema.truncate"><code class="docutils literal notranslate"><span class="pre">truncate</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema">nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema"><code class="docutils literal notranslate"><span class="pre">TextSplitterSchema</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema.chunk_overlap"><code class="docutils literal notranslate"><span class="pre">chunk_overlap</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema.chunk_size"><code class="docutils literal notranslate"><span class="pre">chunk_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema.raise_on_failure"><code class="docutils literal notranslate"><span class="pre">raise_on_failure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema.tokenizer"><code class="docutils literal notranslate"><span class="pre">tokenizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema.TextSplitterSchema.check_chunk_overlap"><code class="docutils literal notranslate"><span class="pre">check_chunk_overlap</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-nv_ingest_api.internal.schemas">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_api.internal.schemas" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_api.internal.primitives.tracing.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_api.internal.primitives.tracing package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_api.internal.schemas.extract.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_api.internal.schemas.extract package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.schemas">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

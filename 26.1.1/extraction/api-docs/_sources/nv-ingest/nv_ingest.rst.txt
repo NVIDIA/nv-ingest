@@ -1,0 +1,30 @@
+nv\_ingest package
+==================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest.api
+   nv_ingest.framework
+
+Submodules
+----------
+
+nv\_ingest.version module
+-------------------------
+
+.. automodule:: nv_ingest.version
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest
+   :members:
+   :undoc-members:
+   :show-inheritance:

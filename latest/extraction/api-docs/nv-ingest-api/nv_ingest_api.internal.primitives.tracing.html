@@ -1,0 +1,799 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_api.internal.primitives.tracing package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-api/nv_ingest_api.internal.primitives.tracing';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_api.internal.schemas package" href="nv_ingest_api.internal.schemas.html" />
+    <link rel="prev" title="nv_ingest_api.internal.primitives.nim.model_interface package" href="nv_ingest_api.internal.primitives.nim.model_interface.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_api</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_api.html">nv_ingest_api package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4 current active"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_api</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.html" class="nav-link">nv_ingest_api package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.internal.html" class="nav-link">nv_ingest_api.internal package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.internal.primitives.html" class="nav-link">nv_ingest_api.internal.primitives package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal.primitives.tracing package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-api-internal-primitives-tracing-package">
+<h1>nv_ingest_api.internal.primitives.tracing package<a class="headerlink" href="#nv-ingest-api-internal-primitives-tracing-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_api.internal.primitives.tracing.latency">
+<span id="nv-ingest-api-internal-primitives-tracing-latency-module"></span><h2>nv_ingest_api.internal.primitives.tracing.latency module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.tracing.latency" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.latency.</span></span><span class="sig-name descname"><span class="pre">ColorCodes</span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/latency.html#ColorCodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.BLUE">
+<span class="sig-name descname"><span class="pre">BLUE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'\x1b[94m'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.BLUE" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.GREEN">
+<span class="sig-name descname"><span class="pre">GREEN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'\x1b[92m'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.GREEN" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RED">
+<span class="sig-name descname"><span class="pre">RED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'\x1b[91m'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RED" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RESET">
+<span class="sig-name descname"><span class="pre">RESET</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'\x1b[0m'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RESET" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.YELLOW">
+<span class="sig-name descname"><span class="pre">YELLOW</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'\x1b[93m'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.YELLOW" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.colorize">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.latency.</span></span><span class="sig-name descname"><span class="pre">colorize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color_code</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/latency.html#colorize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.colorize" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.latency.latency_logger">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.latency.</span></span><span class="sig-name descname"><span class="pre">latency_logger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/latency.html#latency_logger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.latency.latency_logger" title="Link to this definition">#</a></dt>
+<dd><p>A decorator to log the elapsed time of function execution. If available, it also logs
+the latency based on ‘latency::ts_send’ metadata in a IngestControlMessage object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Custom name to use in the log message. Defaults to the function’s name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.internal.primitives.tracing.logging">
+<span id="nv-ingest-api-internal-primitives-tracing-logging-module"></span><h2>nv_ingest_api.internal.primitives.tracing.logging module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.tracing.logging" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.logging.</span></span><span class="sig-name descname"><span class="pre">TaskResultStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/logging.html#TaskResultStatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.FAILURE">
+<span class="sig-name descname"><span class="pre">FAILURE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'FAILURE'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.FAILURE" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.SUCCESS">
+<span class="sig-name descname"><span class="pre">SUCCESS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'SUCCESS'</span></em><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.SUCCESS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.logging.annotate_cm">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.logging.</span></span><span class="sig-name descname"><span class="pre">annotate_cm</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">control_message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage" title="nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage"><span class="pre">IngestControlMessage</span></a></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/logging.html#annotate_cm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.logging.annotate_cm" title="Link to this definition">#</a></dt>
+<dd><p>Annotate a IngestControlMessage object with arbitrary metadata, a source ID, and a timestamp.
+Each annotation will be uniquely identified by a UUID.</p>
+<p>Parameters:
+- control_message: The IngestControlMessage object to be annotated.
+- source_id: A unique identifier for the source of the annotation. If None, uses the caller’s __name__.
+- <a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs: Arbitrary key-value pairs to be included in the annotation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.logging.annotate_task_result">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.logging.</span></span><span class="sig-name descname"><span class="pre">annotate_task_result</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">control_message</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">result</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_id</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/logging.html#annotate_task_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.logging.annotate_task_result" title="Link to this definition">#</a></dt>
+<dd><p>Annotate a IngestControlMessage object with the result of a task, identified by a task_id,
+and an arbitrary number of additional key-value pairs. The result can be a TaskResultStatus
+enum or a string that will be converted to the corresponding enum.</p>
+<p>Parameters:
+- control_message: The IngestControlMessage object to be annotated.
+- result: The result of the task, either SUCCESS or FAILURE, as an enum or string.
+- task_id: A unique identifier for the task.
+- <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs: Arbitrary additional key-value pairs to be included in the annotation.</p>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.internal.primitives.tracing.tagging">
+<span id="nv-ingest-api-internal-primitives-tracing-tagging-module"></span><h2>nv_ingest_api.internal.primitives.tracing.tagging module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.tracing.tagging" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.tagging.set_trace_timestamps_with_parent_context">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.tagging.</span></span><span class="sig-name descname"><span class="pre">set_trace_timestamps_with_parent_context</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">control_message</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">execution_trace_log</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">parent_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/tagging.html#set_trace_timestamps_with_parent_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.tagging.set_trace_timestamps_with_parent_context" title="Link to this definition">#</a></dt>
+<dd><p>Set trace timestamps on a control message with proper parent-child context.</p>
+<p>This utility function processes trace timestamps from an execution_trace_log and
+ensures that child traces are properly namespaced under their parent context.
+This resolves OpenTelemetry span hierarchy issues where child spans cannot
+find their expected parent contexts.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>control_message</strong> (<a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage" title="nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage"><em>IngestControlMessage</em></a>) – The control message to set timestamps on</p></li>
+<li><p><strong>execution_trace_log</strong> (<em>dict</em>) – Dictionary of trace keys to timestamp values from internal operations</p></li>
+<li><p><strong>parent_name</strong> (<em>str</em>) – The parent stage name to use as context for child traces</p></li>
+<li><p><strong>logger</strong> (<em>logging.Logger</em><em>, </em><em>optional</em>) – Logger for debug output of key transformations</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Basic usage in a stage:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">execution_trace_log</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;trace::entry::yolox_inference&quot;</span><span class="p">:</span> <span class="n">ts1</span><span class="p">,</span> <span class="s2">&quot;trace::exit::yolox_inference&quot;</span><span class="p">:</span> <span class="n">ts2</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">set_trace_timestamps_with_parent_context</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">control_message</span><span class="p">,</span> <span class="n">execution_trace_log</span><span class="p">,</span> <span class="s2">&quot;pdf_extractor&quot;</span><span class="p">,</span> <span class="n">logger</span>
+<span class="gp">... </span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This transforms:
+- trace::entry::yolox_inference -&gt; trace::entry::pdf_extractor::yolox_inference
+- trace::exit::yolox_inference  -&gt; trace::exit::pdf_extractor::yolox_inference</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.tagging.traceable">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.tagging.</span></span><span class="sig-name descname"><span class="pre">traceable</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trace_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/tagging.html#traceable"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.tagging.traceable" title="Link to this definition">#</a></dt>
+<dd><p>A decorator that adds entry and exit trace timestamps to a IngestControlMessage’s metadata
+based on the presence of a ‘config::add_trace_tagging’ flag.</p>
+<p>This decorator checks if the ‘config::add_trace_tagging’ flag is set to True in the
+message’s metadata. If so, it records the entry and exit timestamps of the function
+execution, using either a provided custom trace name, auto-detected stage name from
+self.stage_name, or the function’s name as fallback.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>trace_name</strong> (<em>str</em><em>, </em><em>optional</em>) – A custom name for the trace entries in the message metadata. If not provided,
+attempts to use self.stage_name from the decorated method’s instance,
+falling back to the function’s name if neither is available.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>decorator_trace_tagging</strong> – A wrapper function that decorates the target function to implement trace tagging.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Callable</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The decorated function must accept a IngestControlMessage object as one of its arguments.
+For a regular function, this is expected to be the first argument; for a class method,
+this is expected to be the second argument (after ‘self’). The IngestControlMessage object
+must implement <cite>has_metadata</cite>, <cite>get_metadata</cite>, and <cite>set_metadata</cite> methods used by the decorator
+to check for the trace tagging flag and to add trace metadata.</p>
+<p>The trace metadata added by the decorator includes two entries:
+- ‘trace::entry::&lt;trace_name&gt;’: The timestamp marking the function’s entry.
+- ‘trace::exit::&lt;trace_name&gt;’: The timestamp marking the function’s exit.</p>
+<p class="rubric">Examples</p>
+<p>Automatic stage name detection (recommended):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@traceable</span><span class="p">()</span>  <span class="c1"># Uses self.stage_name automatically</span>
+<span class="gp">... </span><span class="k">def</span><span class="w"> </span><span class="nf">process_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+</pre></div>
+</div>
+<p>Explicit trace name (override):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@traceable</span><span class="p">(</span><span class="s2">&quot;custom_trace&quot;</span><span class="p">)</span>
+<span class="gp">... </span><span class="k">def</span><span class="w"> </span><span class="nf">process_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+</pre></div>
+</div>
+<p>Function without instance (uses function name):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@traceable</span><span class="p">()</span>
+<span class="gp">... </span><span class="k">def</span><span class="w"> </span><span class="nf">process_message</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.tracing.tagging.traceable_func">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.tracing.tagging.</span></span><span class="sig-name descname"><span class="pre">traceable_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trace_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dedupe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/tracing/tagging.html#traceable_func"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.tracing.tagging.traceable_func" title="Link to this definition">#</a></dt>
+<dd><p>A decorator that injects trace information for tracking the execution of a function.
+It logs the entry and exit timestamps of the function in a <cite>trace_info</cite> dictionary,
+which can be used for performance monitoring or debugging purposes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>trace_name</strong> (<em>str</em><em>, </em><em>optional</em>) – An optional string used as the prefix for the trace log entries. If not provided,
+the decorated function’s name is used. The string can include placeholders (e.g.,
+“pdf_extractor::{model_name}”) that will be dynamically replaced with matching
+function argument values.</p></li>
+<li><p><strong>dedupe</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, ensures that the trace entry and exit keys are unique by appending an index
+(e.g., <cite>_0</cite>, <cite>_1</cite>) to the keys if duplicate entries are detected. Default is True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A wrapped function that injects trace information before and after the function’s
+execution.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>function</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>If <cite>trace_info</cite> is not provided in the keyword arguments, a new dictionary is created
+and used for storing trace entries.</p></li>
+<li><p>If <cite>trace_name</cite> contains format placeholders, the decorator attempts to populate them
+with matching argument values from the decorated function.</p></li>
+<li><dl class="simple">
+<dt>The trace information is logged in the format:</dt><dd><ul>
+<li><p><cite>trace::entry::{trace_name}</cite> for the entry timestamp.</p></li>
+<li><p><cite>trace::exit::{trace_name}</cite> for the exit timestamp.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>If <cite>dedupe</cite> is True, the trace keys will be appended with an index to avoid
+overwriting existing entries.</p></li>
+</ul>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@traceable_func</span><span class="p">(</span><span class="n">trace_name</span><span class="o">=</span><span class="s2">&quot;pdf_extractor::</span><span class="si">{model_name}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">extract_pdf</span><span class="p">(</span><span class="n">model_name</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trace_info</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">extract_pdf</span><span class="p">(</span><span class="s2">&quot;my_model&quot;</span><span class="p">,</span> <span class="n">trace_info</span><span class="o">=</span><span class="n">trace_info</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, <cite>model_name</cite> is dynamically replaced in the trace_name, and the
+trace information is logged with unique keys if deduplication is enabled.</p>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.internal.primitives.tracing">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.tracing" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_api.internal.primitives.nim.model_interface.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_api.internal.primitives.nim.model_interface package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_api.internal.schemas.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_api.internal.schemas package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.tracing.latency">nv_ingest_api.internal.primitives.tracing.latency module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes"><code class="docutils literal notranslate"><span class="pre">ColorCodes</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.BLUE"><code class="docutils literal notranslate"><span class="pre">BLUE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.GREEN"><code class="docutils literal notranslate"><span class="pre">GREEN</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RED"><code class="docutils literal notranslate"><span class="pre">RED</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.RESET"><code class="docutils literal notranslate"><span class="pre">RESET</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.ColorCodes.YELLOW"><code class="docutils literal notranslate"><span class="pre">YELLOW</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.colorize"><code class="docutils literal notranslate"><span class="pre">colorize()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.latency.latency_logger"><code class="docutils literal notranslate"><span class="pre">latency_logger()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.tracing.logging">nv_ingest_api.internal.primitives.tracing.logging module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus"><code class="docutils literal notranslate"><span class="pre">TaskResultStatus</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.FAILURE"><code class="docutils literal notranslate"><span class="pre">FAILURE</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.logging.TaskResultStatus.SUCCESS"><code class="docutils literal notranslate"><span class="pre">SUCCESS</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.logging.annotate_cm"><code class="docutils literal notranslate"><span class="pre">annotate_cm()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.logging.annotate_task_result"><code class="docutils literal notranslate"><span class="pre">annotate_task_result()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.tracing.tagging">nv_ingest_api.internal.primitives.tracing.tagging module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.tagging.set_trace_timestamps_with_parent_context"><code class="docutils literal notranslate"><span class="pre">set_trace_timestamps_with_parent_context()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.tagging.traceable"><code class="docutils literal notranslate"><span class="pre">traceable()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.tracing.tagging.traceable_func"><code class="docutils literal notranslate"><span class="pre">traceable_func()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.tracing">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

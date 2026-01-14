@@ -1,0 +1,1352 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_api.internal.primitives.nim package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-api/nv_ingest_api.internal.primitives.nim';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_api.internal.primitives.nim.model_interface package" href="nv_ingest_api.internal.primitives.nim.model_interface.html" />
+    <link rel="prev" title="nv_ingest_api.internal.primitives package" href="nv_ingest_api.internal.primitives.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_api</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_api.html">nv_ingest_api package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4 current active"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_api</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.html" class="nav-link">nv_ingest_api package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.internal.html" class="nav-link">nv_ingest_api.internal package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.internal.primitives.html" class="nav-link">nv_ingest_api.internal.primitives package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal.primitives.nim package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-api-internal-primitives-nim-package">
+<h1>nv_ingest_api.internal.primitives.nim package<a class="headerlink" href="#nv-ingest-api-internal-primitives-nim-package" title="Link to this heading">#</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html">nv_ingest_api.internal.primitives.nim.model_interface package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.cached">nv_ingest_api.internal.primitives.nim.model_interface.cached module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface"><code class="docutils literal notranslate"><span class="pre">CachedModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.cached.CachedModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.decorators">nv_ingest_api.internal.primitives.nim.model_interface.decorators module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.decorators.multiprocessing_cache"><code class="docutils literal notranslate"><span class="pre">multiprocessing_cache()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.deplot">nv_ingest_api.internal.primitives.nim.model_interface.deplot module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface"><code class="docutils literal notranslate"><span class="pre">DeplotModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.deplot.DeplotModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.helpers">nv_ingest_api.internal.primitives.nim.model_interface.helpers module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.helpers.get_model_name"><code class="docutils literal notranslate"><span class="pre">get_model_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.helpers.get_version"><code class="docutils literal notranslate"><span class="pre">get_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.helpers.is_ready"><code class="docutils literal notranslate"><span class="pre">is_ready()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.helpers.preprocess_image_for_ocr"><code class="docutils literal notranslate"><span class="pre">preprocess_image_for_ocr()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.helpers.preprocess_image_for_paddle"><code class="docutils literal notranslate"><span class="pre">preprocess_image_for_paddle()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv-ingest-api-internal-primitives-nim-model-interface-nemoretriever-parse-module">nv_ingest_api.internal.primitives.nim.model_interface.nemoretriever_parse module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.ocr">nv_ingest_api.internal.primitives.nim.model_interface.ocr module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.NemoRetrieverOCRModelInterface"><code class="docutils literal notranslate"><span class="pre">NemoRetrieverOCRModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.NemoRetrieverOCRModelInterface.coalesce_requests_to_batch"><code class="docutils literal notranslate"><span class="pre">coalesce_requests_to_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.NemoRetrieverOCRModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.NemoRetrieverOCRModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.NemoRetrieverOCRModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase"><code class="docutils literal notranslate"><span class="pre">OCRModelInterfaceBase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase.BYTES_PER_ELEMENT"><code class="docutils literal notranslate"><span class="pre">BYTES_PER_ELEMENT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase.NUM_CHANNELS"><code class="docutils literal notranslate"><span class="pre">NUM_CHANNELS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase.does_item_fit_in_batch"><code class="docutils literal notranslate"><span class="pre">does_item_fit_in_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.OCRModelInterfaceBase.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.PaddleOCRModelInterface"><code class="docutils literal notranslate"><span class="pre">PaddleOCRModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.PaddleOCRModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.PaddleOCRModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.PaddleOCRModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.ocr.get_ocr_model_name"><code class="docutils literal notranslate"><span class="pre">get_ocr_model_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.parakeet">nv_ingest_api.internal.primitives.nim.model_interface.parakeet module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.ParakeetClient"><code class="docutils literal notranslate"><span class="pre">ParakeetClient</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.ParakeetClient.infer"><code class="docutils literal notranslate"><span class="pre">infer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.ParakeetClient.transcribe"><code class="docutils literal notranslate"><span class="pre">transcribe()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.convert_to_mono_wav"><code class="docutils literal notranslate"><span class="pre">convert_to_mono_wav()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.create_audio_inference_client"><code class="docutils literal notranslate"><span class="pre">create_audio_inference_client()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.parakeet.process_transcription_response"><code class="docutils literal notranslate"><span class="pre">process_transcription_response()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.text_embedding">nv_ingest_api.internal.primitives.nim.model_interface.text_embedding module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface"><code class="docutils literal notranslate"><span class="pre">EmbeddingModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.text_embedding.EmbeddingModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.vlm">nv_ingest_api.internal.primitives.nim.model_interface.vlm module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface"><code class="docutils literal notranslate"><span class="pre">VLMModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.vlm.VLMModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface.yolox">nv_ingest_api.internal.primitives.nim.model_interface.yolox module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxGraphicElementsModelInterface"><code class="docutils literal notranslate"><span class="pre">YoloxGraphicElementsModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxGraphicElementsModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxGraphicElementsModelInterface.postprocess_annotations"><code class="docutils literal notranslate"><span class="pre">postprocess_annotations()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase"><code class="docutils literal notranslate"><span class="pre">YoloxModelInterfaceBase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.postprocess_annotations"><code class="docutils literal notranslate"><span class="pre">postprocess_annotations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxModelInterfaceBase.transform_normalized_coordinates_to_original"><code class="docutils literal notranslate"><span class="pre">transform_normalized_coordinates_to_original()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxPageElementsModelInterface"><code class="docutils literal notranslate"><span class="pre">YoloxPageElementsModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxPageElementsModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxPageElementsModelInterface.postprocess_annotations"><code class="docutils literal notranslate"><span class="pre">postprocess_annotations()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxTableStructureModelInterface"><code class="docutils literal notranslate"><span class="pre">YoloxTableStructureModelInterface</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxTableStructureModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.YoloxTableStructureModelInterface.postprocess_annotations"><code class="docutils literal notranslate"><span class="pre">postprocess_annotations()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.batched_overlaps"><code class="docutils literal notranslate"><span class="pre">batched_overlaps()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.bb_iou_array"><code class="docutils literal notranslate"><span class="pre">bb_iou_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.expand_boxes_v1"><code class="docutils literal notranslate"><span class="pre">expand_boxes_v1()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.expand_boxes_v3"><code class="docutils literal notranslate"><span class="pre">expand_boxes_v3()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.expand_chart_bboxes"><code class="docutils literal notranslate"><span class="pre">expand_chart_bboxes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.expand_table_bboxes"><code class="docutils literal notranslate"><span class="pre">expand_table_bboxes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.expand_tables_and_charts"><code class="docutils literal notranslate"><span class="pre">expand_tables_and_charts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.find_boxes_inside"><code class="docutils literal notranslate"><span class="pre">find_boxes_inside()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.find_matching_box_fast"><code class="docutils literal notranslate"><span class="pre">find_matching_box_fast()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_bbox_dict_yolox_graphic"><code class="docutils literal notranslate"><span class="pre">get_bbox_dict_yolox_graphic()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_bbox_dict_yolox_table"><code class="docutils literal notranslate"><span class="pre">get_bbox_dict_yolox_table()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_biggest_box"><code class="docutils literal notranslate"><span class="pre">get_biggest_box()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_overlaps"><code class="docutils literal notranslate"><span class="pre">get_overlaps()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_weighted_box"><code class="docutils literal notranslate"><span class="pre">get_weighted_box()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_yolox_model_name"><code class="docutils literal notranslate"><span class="pre">get_yolox_model_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.get_yolox_page_version"><code class="docutils literal notranslate"><span class="pre">get_yolox_page_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.match_boxes_with_title"><code class="docutils literal notranslate"><span class="pre">match_boxes_with_title()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.match_structured_boxes_with_title"><code class="docutils literal notranslate"><span class="pre">match_structured_boxes_with_title()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.match_with_title_v1"><code class="docutils literal notranslate"><span class="pre">match_with_title_v1()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.match_with_title_v3"><code class="docutils literal notranslate"><span class="pre">match_with_title_v3()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.merge_boxes"><code class="docutils literal notranslate"><span class="pre">merge_boxes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.merge_labels"><code class="docutils literal notranslate"><span class="pre">merge_labels()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.postprocess_included"><code class="docutils literal notranslate"><span class="pre">postprocess_included()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.postprocess_included_texts"><code class="docutils literal notranslate"><span class="pre">postprocess_included_texts()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.postprocess_page_elements_v3"><code class="docutils literal notranslate"><span class="pre">postprocess_page_elements_v3()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.prefilter_boxes"><code class="docutils literal notranslate"><span class="pre">prefilter_boxes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.remove_overlapping_boxes_using_wbf"><code class="docutils literal notranslate"><span class="pre">remove_overlapping_boxes_using_wbf()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#nv_ingest_api.internal.primitives.nim.model_interface.yolox.weighted_boxes_fusion"><code class="docutils literal notranslate"><span class="pre">weighted_boxes_fusion()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.model_interface.html#module-nv_ingest_api.internal.primitives.nim.model_interface">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_api.internal.primitives.nim.default_values">
+<span id="nv-ingest-api-internal-primitives-nim-default-values-module"></span><h2>nv_ingest_api.internal.primitives.nim.default_values module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.nim.default_values" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_api.internal.primitives.nim.nim_client">
+<span id="nv-ingest-api-internal-primitives-nim-nim-client-module"></span><h2>nv_ingest_api.internal.primitives.nim.nim_client module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.nim.nim_client" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_client.</span></span><span class="sig-name descname"><span class="pre">InferenceRequest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">future</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.data" title="Link to this definition">#</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.dims">
+<span class="sig-name descname"><span class="pre">dims</span></span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.dims" title="Link to this definition">#</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.future">
+<span class="sig-name descname"><span class="pre">future</span></span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.future" title="Link to this definition">#</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.kwargs">
+<span class="sig-name descname"><span class="pre">kwargs</span></span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.kwargs" title="Link to this definition">#</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.model_name">
+<span class="sig-name descname"><span class="pre">model_name</span></span><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.model_name" title="Link to this definition">#</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_client.</span></span><span class="sig-name descname"><span class="pre">NimClient</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">120.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_retries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_429_retries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">enable_dynamic_batching</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_batch_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_batch_memory_budget_mb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A client for interfacing with a model inference server using gRPC or HTTP protocols.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.close" title="Link to this definition">#</a></dt>
+<dd><p>Stops the dynamic batching worker and closes client connections.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient.infer">
+<span class="sig-name descname"><span class="pre">infer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.infer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.infer" title="Link to this definition">#</a></dt>
+<dd><p>Perform inference using the specified model and input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>dict</em>) – The input data for inference.</p></li>
+<li><p><strong>model_name</strong> (<em>str</em>) – The model name.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em>) – Additional parameters for inference.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The processed inference results, coalesced in the same order as the input images.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the dynamic batching worker thread if enabled.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient.submit">
+<span class="sig-name descname"><span class="pre">submit</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Future</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.submit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.submit" title="Link to this definition">#</a></dt>
+<dd><p>Submits a single inference request to the dynamic batcher.</p>
+<p>This method is non-blocking and returns a Future object that will
+eventually contain the inference result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>Any</em>) – The single data item for inference (e.g., one image, one text prompt).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A future that will be fulfilled with the inference result.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>concurrent.futures.Future</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClient.try_set_max_batch_size">
+<span class="sig-name descname"><span class="pre">try_set_max_batch_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_version</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.try_set_max_batch_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.try_set_max_batch_size" title="Link to this definition">#</a></dt>
+<dd><p>Attempt to set the max batch size for the model if it is not already set, ensuring thread safety.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_client.</span></span><span class="sig-name descname"><span class="pre">NimClientManager</span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClientManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A thread-safe, singleton manager for creating and sharing NimClient instances.</p>
+<p>This manager ensures that only one NimClient is created per unique configuration.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.get_client">
+<span class="sig-name descname"><span class="pre">get_client</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient" title="nv_ingest_api.internal.primitives.nim.nim_client.NimClient"><span class="pre">NimClient</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClientManager.get_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.get_client" title="Link to this definition">#</a></dt>
+<dd><p>Gets or creates a NimClient for the given configuration.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.shutdown">
+<span class="sig-name descname"><span class="pre">shutdown</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClientManager.shutdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.shutdown" title="Link to this definition">#</a></dt>
+<dd><p>Gracefully closes all managed NimClient instances.
+This is called automatically on application exit by <cite>atexit</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.get_nim_client_manager">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_client.</span></span><span class="sig-name descname"><span class="pre">get_nim_client_manager</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager" title="nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager"><span class="pre">NimClientManager</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#get_nim_client_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.get_nim_client_manager" title="Link to this definition">#</a></dt>
+<dd><p>Returns the singleton instance of the NimClientManager.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_client.reload_models">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_client.</span></span><span class="sig-name descname"><span class="pre">reload_models</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">InferenceServerClient</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">client_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">120</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#reload_models"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_client.reload_models" title="Link to this definition">#</a></dt>
+<dd><p>Reloads all models in the Triton server except for the models in the exclude list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>client</strong> (<em>grpcclient.InferenceServerClient</em>) – The gRPC client connected to the Triton server.</p></li>
+<li><p><strong>exclude</strong> (<em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – A list of model names to exclude from reloading.</p></li>
+<li><p><strong>client_timeout</strong> (<em>int</em><em>, </em><em>optional</em>) – Timeout for client operations in seconds (default: 120).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if all models were successfully reloaded, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.internal.primitives.nim.nim_model_interface">
+<span id="nv-ingest-api-internal-primitives-nim-nim-model-interface-module"></span><h2>nv_ingest_api.internal.primitives.nim.nim_model_interface module<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.nim.nim_model_interface" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.nim_model_interface.</span></span><span class="sig-name descname"><span class="pre">ModelInterface</span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base class for defining a model interface that supports preparing input data, formatting it for
+inference, parsing output, and processing inference results.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.coalesce_requests_to_batch">
+<span class="sig-name descname"><span class="pre">coalesce_requests_to_batch</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">requests</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.coalesce_requests_to_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.coalesce_requests_to_batch" title="Link to this definition">#</a></dt>
+<dd><p>Takes a list of InferenceRequest objects and combines them into a single
+formatted batch ready for inference.</p>
+<p>THIS METHOD IS REQUIRED FOR DYNAMIC BATCHING SUPPORT.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>requests</strong> (<em>List</em><em>[</em><a class="reference internal" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest" title="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest"><em>InferenceRequest</em></a><em>]</em>) – A list of InferenceRequest namedtuples collected for the batch.
+Each tuple contains the data, dimensions, and other context for a single item.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The inference protocol, either “grpc” or “http”.</p></li>
+<li><p><strong>**kwargs</strong> (<em>Any</em>) – Additional keyword arguments passed from the original request.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing the single formatted batch and its scratch-pad data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[Any, Dict[str, Any]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.does_item_fit_in_batch">
+<span class="sig-name descname"><span class="pre">does_item_fit_in_batch</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">current_batch</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">next_request</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">memory_budget_bytes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.does_item_fit_in_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.does_item_fit_in_batch" title="Link to this definition">#</a></dt>
+<dd><p>Checks if adding another request to the current batch would exceed the memory budget.</p>
+<p>This is a model-specific calculation. The default implementation always
+returns True, effectively ignoring the memory budget. Interfaces for models
+that require memory management (like padded image models) must override this.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if the item fits within the budget, False otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.format_input">
+<span class="sig-name descname"><span class="pre">format_input</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.format_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.format_input" title="Link to this definition">#</a></dt>
+<dd><p>Format the input data for the specified protocol.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>dict</em>) – The input data to format.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The protocol to format the data for.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.name" title="Link to this definition">#</a></dt>
+<dd><p>Get the name of the model interface.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The name of the model interface.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.parse_output">
+<span class="sig-name descname"><span class="pre">parse_output</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">response</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.parse_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.parse_output" title="Link to this definition">#</a></dt>
+<dd><p>Parse the output data from the model’s inference response.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>response</strong> (<em>Any</em>) – The response from the model inference.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The protocol used (“grpc” or “http”).</p></li>
+<li><p><strong>data</strong> (<em>dict</em><em>, </em><em>optional</em>) – Additional input data passed to the function.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.prepare_data_for_inference">
+<span class="sig-name descname"><span class="pre">prepare_data_for_inference</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.prepare_data_for_inference"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.prepare_data_for_inference" title="Link to this definition">#</a></dt>
+<dd><p>Prepare input data for inference by processing or transforming it as required.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>dict</em>) – The input data to prepare.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.process_inference_results">
+<span class="sig-name descname"><span class="pre">process_inference_results</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">output_array</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.process_inference_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.process_inference_results" title="Link to this definition">#</a></dt>
+<dd><p>Process the inference results from the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_array</strong> (<em>Any</em>) – The raw output from the model.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em>) – Additional parameters for processing.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.internal.primitives.nim">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_api.internal.primitives.nim" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.</span></span><span class="sig-name descname"><span class="pre">ModelInterface</span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base class for defining a model interface that supports preparing input data, formatting it for
+inference, parsing output, and processing inference results.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.coalesce_requests_to_batch">
+<span class="sig-name descname"><span class="pre">coalesce_requests_to_batch</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">requests</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.coalesce_requests_to_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.coalesce_requests_to_batch" title="Link to this definition">#</a></dt>
+<dd><p>Takes a list of InferenceRequest objects and combines them into a single
+formatted batch ready for inference.</p>
+<p>THIS METHOD IS REQUIRED FOR DYNAMIC BATCHING SUPPORT.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>requests</strong> (<em>List</em><em>[</em><a class="reference internal" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest" title="nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest"><em>InferenceRequest</em></a><em>]</em>) – A list of InferenceRequest namedtuples collected for the batch.
+Each tuple contains the data, dimensions, and other context for a single item.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The inference protocol, either “grpc” or “http”.</p></li>
+<li><p><strong>**kwargs</strong> (<em>Any</em>) – Additional keyword arguments passed from the original request.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing the single formatted batch and its scratch-pad data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[Any, Dict[str, Any]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.does_item_fit_in_batch">
+<span class="sig-name descname"><span class="pre">does_item_fit_in_batch</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">current_batch</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">next_request</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">memory_budget_bytes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.does_item_fit_in_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.does_item_fit_in_batch" title="Link to this definition">#</a></dt>
+<dd><p>Checks if adding another request to the current batch would exceed the memory budget.</p>
+<p>This is a model-specific calculation. The default implementation always
+returns True, effectively ignoring the memory budget. Interfaces for models
+that require memory management (like padded image models) must override this.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if the item fits within the budget, False otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.format_input">
+<span class="sig-name descname"><span class="pre">format_input</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.format_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.format_input" title="Link to this definition">#</a></dt>
+<dd><p>Format the input data for the specified protocol.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>dict</em>) – The input data to format.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The protocol to format the data for.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.name" title="Link to this definition">#</a></dt>
+<dd><p>Get the name of the model interface.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The name of the model interface.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.parse_output">
+<span class="sig-name descname"><span class="pre">parse_output</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">response</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.parse_output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.parse_output" title="Link to this definition">#</a></dt>
+<dd><p>Parse the output data from the model’s inference response.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>response</strong> (<em>Any</em>) – The response from the model inference.</p></li>
+<li><p><strong>protocol</strong> (<em>str</em>) – The protocol used (“grpc” or “http”).</p></li>
+<li><p><strong>data</strong> (<em>dict</em><em>, </em><em>optional</em>) – Additional input data passed to the function.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.prepare_data_for_inference">
+<span class="sig-name descname"><span class="pre">prepare_data_for_inference</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.prepare_data_for_inference"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.prepare_data_for_inference" title="Link to this definition">#</a></dt>
+<dd><p>Prepare input data for inference by processing or transforming it as required.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>dict</em>) – The input data to prepare.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.ModelInterface.process_inference_results">
+<span class="sig-name descname"><span class="pre">process_inference_results</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">output_array</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_model_interface.html#ModelInterface.process_inference_results"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.process_inference_results" title="Link to this definition">#</a></dt>
+<dd><p>Process the inference results from the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_array</strong> (<em>Any</em>) – The raw output from the model.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em>) – Additional parameters for processing.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.</span></span><span class="sig-name descname"><span class="pre">NimClient</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">model_interface</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">120.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_retries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_429_retries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">enable_dynamic_batching</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_batch_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_batch_memory_budget_mb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A client for interfacing with a model inference server using gRPC or HTTP protocols.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient.close" title="Link to this definition">#</a></dt>
+<dd><p>Stops the dynamic batching worker and closes client connections.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient.infer">
+<span class="sig-name descname"><span class="pre">infer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.infer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient.infer" title="Link to this definition">#</a></dt>
+<dd><p>Perform inference using the specified model and input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>dict</em>) – The input data for inference.</p></li>
+<li><p><strong>model_name</strong> (<em>str</em>) – The model name.</p></li>
+<li><p><strong>kwargs</strong> (<em>dict</em>) – Additional parameters for inference.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The processed inference results, coalesced in the same order as the input images.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the dynamic batching worker thread if enabled.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient.submit">
+<span class="sig-name descname"><span class="pre">submit</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Future</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.submit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient.submit" title="Link to this definition">#</a></dt>
+<dd><p>Submits a single inference request to the dynamic batcher.</p>
+<p>This method is non-blocking and returns a Future object that will
+eventually contain the inference result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>Any</em>) – The single data item for inference (e.g., one image, one text prompt).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A future that will be fulfilled with the inference result.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>concurrent.futures.Future</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.NimClient.try_set_max_batch_size">
+<span class="sig-name descname"><span class="pre">try_set_max_batch_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_version</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#NimClient.try_set_max_batch_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.NimClient.try_set_max_batch_size" title="Link to this definition">#</a></dt>
+<dd><p>Attempt to set the max batch size for the model if it is not already set, ensuring thread safety.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.internal.primitives.nim.get_nim_client_manager">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.internal.primitives.nim.</span></span><span class="sig-name descname"><span class="pre">get_nim_client_manager</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager" title="nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager"><span class="pre">NimClientManager</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest_api/internal/primitives/nim/nim_client.html#get_nim_client_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.internal.primitives.nim.get_nim_client_manager" title="Link to this definition">#</a></dt>
+<dd><p>Returns the singleton instance of the NimClientManager.</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_api.internal.primitives.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_api.internal.primitives package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_api.internal.primitives.nim.model_interface.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_api.internal.primitives.nim.model_interface package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.nim.default_values">nv_ingest_api.internal.primitives.nim.default_values module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.nim.nim_client">nv_ingest_api.internal.primitives.nim.nim_client module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest"><code class="docutils literal notranslate"><span class="pre">InferenceRequest</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.data"><code class="docutils literal notranslate"><span class="pre">data</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.dims"><code class="docutils literal notranslate"><span class="pre">dims</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.future"><code class="docutils literal notranslate"><span class="pre">future</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.kwargs"><code class="docutils literal notranslate"><span class="pre">kwargs</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.InferenceRequest.model_name"><code class="docutils literal notranslate"><span class="pre">model_name</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient"><code class="docutils literal notranslate"><span class="pre">NimClient</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.close"><code class="docutils literal notranslate"><span class="pre">close()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.infer"><code class="docutils literal notranslate"><span class="pre">infer()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.submit"><code class="docutils literal notranslate"><span class="pre">submit()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClient.try_set_max_batch_size"><code class="docutils literal notranslate"><span class="pre">try_set_max_batch_size()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager"><code class="docutils literal notranslate"><span class="pre">NimClientManager</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.get_client"><code class="docutils literal notranslate"><span class="pre">get_client()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.NimClientManager.shutdown"><code class="docutils literal notranslate"><span class="pre">shutdown()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.get_nim_client_manager"><code class="docutils literal notranslate"><span class="pre">get_nim_client_manager()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_client.reload_models"><code class="docutils literal notranslate"><span class="pre">reload_models()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.nim.nim_model_interface">nv_ingest_api.internal.primitives.nim.nim_model_interface module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface"><code class="docutils literal notranslate"><span class="pre">ModelInterface</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.coalesce_requests_to_batch"><code class="docutils literal notranslate"><span class="pre">coalesce_requests_to_batch()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.does_item_fit_in_batch"><code class="docutils literal notranslate"><span class="pre">does_item_fit_in_batch()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.nim_model_interface.ModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal.primitives.nim">Module contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface"><code class="docutils literal notranslate"><span class="pre">ModelInterface</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.coalesce_requests_to_batch"><code class="docutils literal notranslate"><span class="pre">coalesce_requests_to_batch()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.does_item_fit_in_batch"><code class="docutils literal notranslate"><span class="pre">does_item_fit_in_batch()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.format_input"><code class="docutils literal notranslate"><span class="pre">format_input()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.name"><code class="docutils literal notranslate"><span class="pre">name()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.parse_output"><code class="docutils literal notranslate"><span class="pre">parse_output()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.prepare_data_for_inference"><code class="docutils literal notranslate"><span class="pre">prepare_data_for_inference()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.ModelInterface.process_inference_results"><code class="docutils literal notranslate"><span class="pre">process_inference_results()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient"><code class="docutils literal notranslate"><span class="pre">NimClient</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient.close"><code class="docutils literal notranslate"><span class="pre">close()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient.infer"><code class="docutils literal notranslate"><span class="pre">infer()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient.submit"><code class="docutils literal notranslate"><span class="pre">submit()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.NimClient.try_set_max_batch_size"><code class="docutils literal notranslate"><span class="pre">try_set_max_batch_size()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.internal.primitives.nim.get_nim_client_manager"><code class="docutils literal notranslate"><span class="pre">get_nim_client_manager()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

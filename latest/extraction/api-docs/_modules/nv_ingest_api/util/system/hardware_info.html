@@ -1,0 +1,1052 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_api.util.system.hardware_info &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_api/util/system/hardware_info';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.util.system.hardware_info</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_api.util.system.hardware_info</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="c1"># Try importing psutil, but don&#39;t make it a hard requirement if only cgroups are needed</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">psutil</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">psutil</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- Cgroup Constants ---</span>
+<span class="n">CGROUP_V1_CPU_DIR</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/cpu&quot;</span>
+<span class="n">CGROUP_V1_CPUACCT_DIR</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/cpuacct&quot;</span>  <span class="c1"># Sometimes usage is here</span>
+<span class="n">CGROUP_V2_CPU_FILE</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/cpu.max&quot;</span>  <span class="c1"># Standard path in v2 unified hierarchy</span>
+
+<span class="c1"># Memory cgroup paths</span>
+<span class="n">CGROUP_V1_MEMORY_DIR</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/memory&quot;</span>
+<span class="n">CGROUP_V2_MEMORY_FILE</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/memory.max&quot;</span>  <span class="c1"># v2 unified hierarchy</span>
+<span class="n">CGROUP_V2_MEMORY_CURRENT</span> <span class="o">=</span> <span class="s2">&quot;/sys/fs/cgroup/memory.current&quot;</span>  <span class="c1"># Current usage in v2</span>
+
+
+<div class="viewcode-block" id="SystemResourceProbe">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html#nv_ingest_api.util.system.hardware_info.SystemResourceProbe">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SystemResourceProbe</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Detects the effective CPU core count available to the current process,</span>
+<span class="sd">    optionally applying a weighting factor for hyperthreads (SMT).</span>
+
+<span class="sd">    It attempts to reconcile information from:</span>
+<span class="sd">    1. Linux Cgroup v2 CPU limits (cpu.max)</span>
+<span class="sd">    2. Linux Cgroup v1 CPU limits (cpu.cfs_quota_us, cpu.cfs_period_us)</span>
+<span class="sd">    3. OS scheduler affinity (os.sched_getaffinity)</span>
+<span class="sd">    4. OS reported CPU counts (psutil.cpu_count for logical/physical)</span>
+
+<span class="sd">    Prioritizes Cgroup quota limits. If the limit is based on core count</span>
+<span class="sd">    (affinity/OS), it applies hyperthreading weight if psutil provides</span>
+<span class="sd">    physical/logical counts.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hyperthread_weight</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the detector and performs the detection.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        hyperthread_weight : float, optional</span>
+<span class="sd">            The performance weighting factor for hyperthreads (0.0 to 1.0).</span>
+<span class="sd">            A value of 1.0 treats hyperthreads the same as physical cores.</span>
+<span class="sd">            A value of 0.5 suggests a hyperthread adds 50% extra performance.</span>
+<span class="sd">            Requires psutil to be installed and report physical cores.</span>
+<span class="sd">            Defaults to 0.75.</span>
+
+<span class="sd">            Note: the default value of 0.75 is a heuristic and may not be optimal</span>
+<span class="sd">            for all situations. It is where parallel pdf decomposition efficiency</span>
+<span class="sd">            is observed to begin rolling off.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">hyperthread_weight</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;hyperthread_weight must be between 0.0 and 1.0&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">hyperthread_weight</span> <span class="k">if</span> <span class="n">psutil</span> <span class="k">else</span> <span class="mf">1.0</span>  <span class="c1"># Force 1.0 if psutil missing</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">psutil</span> <span class="ow">and</span> <span class="n">hyperthread_weight</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;psutil not found. Hyperthreading weight ignored (effectively 1.0).&quot;</span><span class="p">)</span>
+
+        <span class="c1"># OS Info</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_physical_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Cgroup Info</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_period_us</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_shares</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_percpu_us</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_total_us</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Memory Info</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_usage_bytes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory_detection_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+        <span class="c1"># --- Result ---</span>
+        <span class="c1"># Raw limit before potential weighting</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+        <span class="c1"># Final potentially weighted result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">detection_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>  <span class="c1"># Method for the final effective_cores</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_detect</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_file_int</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Safely reads an integer from a file.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">content</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">PermissionError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read or parse int from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_file_str</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Safely reads a string from a file.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">,</span> <span class="ne">PermissionError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read string from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_cgroup_v1</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attempts to read Cgroup v1 CPU limits.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 CPU dir not found: </span><span class="si">{</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Checking Cgroup v1 limits in </span><span class="si">{</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">quota_us</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="p">,</span> <span class="s2">&quot;cpu.cfs_quota_us&quot;</span><span class="p">))</span>
+        <span class="n">period_us</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="p">,</span> <span class="s2">&quot;cpu.cfs_period_us&quot;</span><span class="p">))</span>
+        <span class="n">shares</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_CPU_DIR</span><span class="p">,</span> <span class="s2">&quot;cpu.shares&quot;</span><span class="p">))</span>
+
+        <span class="c1"># Check cpuacct for usage stats if dir exists</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">CGROUP_V1_CPUACCT_DIR</span><span class="p">):</span>
+            <span class="n">usage_total</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_CPUACCT_DIR</span><span class="p">,</span> <span class="s2">&quot;cpuacct.usage&quot;</span><span class="p">))</span>
+            <span class="n">usage_percpu_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_str</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_CPUACCT_DIR</span><span class="p">,</span> <span class="s2">&quot;cpuacct.usage_percpu&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">usage_percpu_str</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_percpu_us</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">usage_percpu_str</span><span class="o">.</span><span class="n">split</span><span class="p">()]</span>
+                <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not parse cpuacct.usage_percpu&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">usage_total</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_total_us</span> <span class="o">=</span> <span class="n">usage_total</span>
+
+        <span class="k">if</span> <span class="n">quota_us</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">period_us</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span> <span class="o">=</span> <span class="s2">&quot;v1&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_period_us</span> <span class="o">=</span> <span class="n">period_us</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_shares</span> <span class="o">=</span> <span class="n">shares</span>  <span class="c1"># May be None if file doesn&#39;t exist/readable</span>
+
+            <span class="k">if</span> <span class="n">quota_us</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">period_us</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span> <span class="o">=</span> <span class="n">quota_us</span> <span class="o">/</span> <span class="n">period_us</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cgroup v1 quota detected: </span><span class="si">{</span><span class="n">quota_us</span><span class="si">}</span><span class="s2"> us / </span><span class="si">{</span><span class="n">period_us</span><span class="si">}</span><span class="s2"> us = </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot; effective cores&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">quota_us</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cgroup v1 quota detected: Unlimited (-1)&quot;</span><span class="p">)</span>
+                <span class="c1"># No quota limit, but we know it&#39;s cgroup v1</span>
+                <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># Return true because we identified the type</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 quota/period values invalid? Quota: </span><span class="si">{</span><span class="n">quota_us</span><span class="si">}</span><span class="s2">, Period: </span><span class="si">{</span><span class="n">period_us</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">shares</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># If only shares are readable, still note it&#39;s v1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span> <span class="o">=</span> <span class="s2">&quot;v1&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_shares</span> <span class="o">=</span> <span class="n">shares</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 shares detected: </span><span class="si">{</span><span class="n">shares</span><span class="si">}</span><span class="s2"> (no quota found)&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_cgroup_v2</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attempts to read Cgroup v2 CPU limits.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">CGROUP_V2_CPU_FILE</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v2 cpu.max file not found: </span><span class="si">{</span><span class="n">CGROUP_V2_CPU_FILE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Checking Cgroup v2 limits in </span><span class="si">{</span><span class="n">CGROUP_V2_CPU_FILE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_str</span><span class="p">(</span><span class="n">CGROUP_V2_CPU_FILE</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">content</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span> <span class="o">=</span> <span class="s2">&quot;v2&quot;</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">content</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">quota_str</span><span class="p">,</span> <span class="n">period_str</span> <span class="o">=</span> <span class="n">parts</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">period_us</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">period_str</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_period_us</span> <span class="o">=</span> <span class="n">period_us</span>
+                    <span class="k">if</span> <span class="n">quota_str</span> <span class="o">==</span> <span class="s2">&quot;max&quot;</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cgroup v2 quota detected: Unlimited (&#39;max&#39;)&quot;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># Identified type, no quota limit</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">quota_us</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">quota_str</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">quota_us</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">period_us</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span> <span class="o">=</span> <span class="n">quota_us</span> <span class="o">/</span> <span class="n">period_us</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;Cgroup v2 quota detected: </span><span class="si">{</span><span class="n">quota_us</span><span class="si">}</span><span class="s2"> us / </span><span class="si">{</span><span class="n">period_us</span><span class="si">}</span><span class="s2">&quot;</span>
+                                <span class="sa">f</span><span class="s2">&quot; us = </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> effective cores&quot;</span>
+                            <span class="p">)</span>
+                            <span class="k">return</span> <span class="kc">True</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;Cgroup v2 quota/period values invalid? Quota: </span><span class="si">{</span><span class="n">quota_us</span><span class="si">}</span><span class="s2">, Period: </span><span class="si">{</span><span class="n">period_us</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
+
+                <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse Cgroup v2 cpu.max content: &#39;</span><span class="si">{</span><span class="n">content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected format in Cgroup v2 cpu.max: &#39;</span><span class="si">{</span><span class="n">content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_os_affinity</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets CPU count via os.sched_getaffinity.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;os.sched_getaffinity is Linux-specific.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># sched_getaffinity exists on Linux</span>
+            <span class="n">affinity</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">sched_getaffinity</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># 0 for current process</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">affinity</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> cores via os.sched_getaffinity.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">count</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;os.sched_getaffinity(0) returned 0 or empty set.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;os.sched_getaffinity not available on this platform/Python version.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not get affinity: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_os_cpu_counts</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets logical and physical CPU counts using psutil or os.cpu_count.&quot;&quot;&quot;</span>
+        <span class="n">logical</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">physical</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+        <span class="k">if</span> <span class="n">psutil</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">logical</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">(</span><span class="n">logical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">physical</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">(</span><span class="n">logical</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;psutil&quot;</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">logical</span><span class="p">:</span>
+                    <span class="n">logical</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Ensure None if psutil returns 0/None</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">physical</span><span class="p">:</span>
+                    <span class="n">physical</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;psutil.cpu_count failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">. Falling back to os.cpu_count.&quot;</span><span class="p">)</span>
+                <span class="n">logical</span><span class="p">,</span> <span class="n">physical</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>  <span class="c1"># Reset before fallback</span>
+
+        <span class="k">if</span> <span class="n">logical</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># Fallback if psutil failed or not installed</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">logical</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;os.cpu_count&quot;</span>
+                <span class="c1"># os.cpu_count doesn&#39;t usually provide physical count, leave as None</span>
+            <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;os.cpu_count() is not implemented on this system.&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;os.cpu_count() failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">logical</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">logical</span><span class="si">}</span><span class="s2"> logical cores via </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">physical</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">physical</span><span class="si">}</span><span class="s2"> physical cores via </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">logical</span><span class="p">,</span> <span class="n">physical</span>
+
+    <span class="c1"># --- Weighting Function ---</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_hyperthread_weight</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logical_limit</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies hyperthreading weight to an integer logical core limit.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        logical_limit : int</span>
+<span class="sd">            The maximum number of logical cores allowed (e.g., from affinity or OS count).</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            The estimated effective core performance based on weighting.</span>
+<span class="sd">            Returns logical_limit if weighting cannot be applied.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_physical_cores</span>
+        <span class="c1"># Weighting requires knowing both physical and logical counts</span>
+        <span class="k">if</span> <span class="n">P</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">P</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Apply the heuristic: P physical cores + (N-P) hyperthreads * weight</span>
+            <span class="c1"># Ensure N is capped by the actual number of logical cores available</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">logical_limit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">)</span>
+
+            <span class="n">physical_part</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">P</span><span class="p">)</span>
+            <span class="n">hyperthread_part</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N</span> <span class="o">-</span> <span class="n">P</span><span class="p">)</span>
+
+            <span class="n">weighted_cores</span> <span class="o">=</span> <span class="p">(</span><span class="n">physical_part</span> <span class="o">*</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">hyperthread_part</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">weighted_cores</span> <span class="o">!=</span> <span class="n">N</span><span class="p">:</span>  <span class="c1"># Log only if weighting changes the value</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Applying hyperthread weight (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">) to &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;logical limit </span><span class="si">{</span><span class="n">logical_limit</span><span class="si">}</span><span class="s2"> (System: </span><span class="si">{</span><span class="n">P</span><span class="si">}</span><span class="s2">P/</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="si">}</span><span class="s2">L): &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Effective weighted cores = </span><span class="si">{</span><span class="n">weighted_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Hyperthread weighting (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">) applied to &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;logical limit </span><span class="si">{</span><span class="n">logical_limit</span><span class="si">}</span><span class="s2"> (System: </span><span class="si">{</span><span class="n">P</span><span class="si">}</span><span class="s2">P/</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="si">}</span><span class="s2">L), &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;but result is still </span><span class="si">{</span><span class="n">weighted_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> (e.g., limit &lt;= physical or weight=1.0)&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">weighted_cores</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Cannot apply weighting</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">:</span>  <span class="c1"># Only warn if weighting was requested</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">psutil</span><span class="p">:</span>
+                    <span class="c1"># Already warned about missing psutil during init</span>
+                    <span class="k">pass</span>
+                <span class="k">elif</span> <span class="n">P</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot apply hyperthread weight: Physical core count not available.&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>  <span class="c1"># L must be missing</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot apply hyperthread weight: Logical core count not available.&quot;</span><span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping hyperthread weight calculation for logical limit </span><span class="si">{</span><span class="n">logical_limit</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">logical_limit</span><span class="p">)</span>  <span class="c1"># Return the original limit as float</span>
+
+    <span class="c1"># --- Memory Detection Methods ---</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_os_memory</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gets total system memory in bytes using psutil or /proc/meminfo.&quot;&quot;&quot;</span>
+        <span class="c1"># Try psutil first</span>
+        <span class="k">if</span> <span class="n">psutil</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">memory</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">virtual_memory</span><span class="p">()</span>
+                <span class="n">total_bytes</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">total</span>
+                <span class="k">if</span> <span class="n">total_bytes</span> <span class="ow">and</span> <span class="n">total_bytes</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">total_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB system memory via psutil.&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">total_bytes</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;psutil.virtual_memory() failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">. Falling back to /proc/meminfo.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Fallback to /proc/meminfo</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;/proc/meminfo&quot;</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;/proc/meminfo&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;MemTotal:&quot;</span><span class="p">):</span>
+                            <span class="c1"># MemTotal is in KB</span>
+                            <span class="n">parts</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+                                <span class="n">total_kb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                                <span class="n">total_bytes</span> <span class="o">=</span> <span class="n">total_kb</span> <span class="o">*</span> <span class="mi">1024</span>
+                                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">&quot;Detected </span><span class="si">{</span><span class="n">total_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB system memory via /proc/meminfo.&quot;</span>
+                                <span class="p">)</span>
+                                <span class="k">return</span> <span class="n">total_bytes</span>
+                            <span class="k">break</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">PermissionError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read /proc/meminfo: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not determine system memory from any source.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_memory_cgroup_v2</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attempts to read Cgroup v2 memory limits.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">CGROUP_V2_MEMORY_FILE</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v2 memory.max file not found: </span><span class="si">{</span><span class="n">CGROUP_V2_MEMORY_FILE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Checking Cgroup v2 memory limits in </span><span class="si">{</span><span class="n">CGROUP_V2_MEMORY_FILE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_str</span><span class="p">(</span><span class="n">CGROUP_V2_MEMORY_FILE</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">content</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">content</span> <span class="o">==</span> <span class="s2">&quot;max&quot;</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cgroup v2 memory limit: unlimited&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">limit_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span> <span class="o">=</span> <span class="n">limit_bytes</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v2 memory limit: </span><span class="si">{</span><span class="n">limit_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+
+                    <span class="c1"># Also try to read current usage</span>
+                    <span class="n">usage_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_str</span><span class="p">(</span><span class="n">CGROUP_V2_MEMORY_CURRENT</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">usage_content</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">usage_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">usage_content</span><span class="p">)</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_usage_bytes</span> <span class="o">=</span> <span class="n">usage_bytes</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v2 memory usage: </span><span class="si">{</span><span class="n">usage_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse memory.current: &#39;</span><span class="si">{</span><span class="n">usage_content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+                    <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse Cgroup v2 memory.max content: &#39;</span><span class="si">{</span><span class="n">content</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_memory_cgroup_v1</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attempts to read Cgroup v1 memory limits.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">CGROUP_V1_MEMORY_DIR</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 memory dir not found: </span><span class="si">{</span><span class="n">CGROUP_V1_MEMORY_DIR</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Checking Cgroup v1 memory limits in </span><span class="si">{</span><span class="n">CGROUP_V1_MEMORY_DIR</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Try memory.limit_in_bytes</span>
+        <span class="n">limit_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_MEMORY_DIR</span><span class="p">,</span> <span class="s2">&quot;memory.limit_in_bytes&quot;</span><span class="p">))</span>
+        <span class="n">usage_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_file_int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CGROUP_V1_MEMORY_DIR</span><span class="p">,</span> <span class="s2">&quot;memory.usage_in_bytes&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">limit_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Cgroup v1 often shows very large values (like 9223372036854775807) for unlimited</span>
+            <span class="c1"># We consider values &gt;= 2^63-1 or &gt;= system memory * 100 as unlimited</span>
+            <span class="k">if</span> <span class="n">limit_bytes</span> <span class="o">&gt;=</span> <span class="mi">9223372036854775807</span> <span class="ow">or</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span> <span class="ow">and</span> <span class="n">limit_bytes</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span> <span class="o">*</span> <span class="mi">100</span>
+            <span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cgroup v1 memory limit: unlimited (very large value)&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span> <span class="o">=</span> <span class="n">limit_bytes</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 memory limit: </span><span class="si">{</span><span class="n">limit_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">usage_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_usage_bytes</span> <span class="o">=</span> <span class="n">usage_bytes</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cgroup v1 memory usage: </span><span class="si">{</span><span class="n">usage_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_detect_memory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Performs memory detection sequence.&quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Starting memory detection...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 1. Get OS level memory first</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_os_memory</span><span class="p">()</span>
+
+        <span class="c1"># 2. Try Cgroup v2 memory limits</span>
+        <span class="n">cgroup_memory_detected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_memory_cgroup_v2</span><span class="p">()</span>
+
+        <span class="c1"># 3. Try Cgroup v1 if v2 not found or didn&#39;t yield a limit</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cgroup_memory_detected</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cgroup_memory_detected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_memory_cgroup_v1</span><span class="p">()</span>
+
+        <span class="c1"># 4. Determine effective memory</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">memory_detection_method</span> <span class="o">=</span> <span class="s2">&quot;cgroup_limited&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Effective memory: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB (cgroup limited)&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># No cgroup limit, use system memory</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">memory_detection_method</span> <span class="o">=</span> <span class="s2">&quot;system_memory&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Effective memory: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB (system memory)&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not determine effective memory limit&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">memory_detection_method</span> <span class="o">=</span> <span class="s2">&quot;failed&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_detect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Performs the detection sequence and applies weighting.&quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Starting effective core count detection...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 1. Get OS level counts first</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_physical_cores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_os_cpu_counts</span><span class="p">()</span>
+
+        <span class="c1"># 2. Try Cgroup v2</span>
+        <span class="n">cgroup_detected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_cgroup_v2</span><span class="p">()</span>
+
+        <span class="c1"># 3. Try Cgroup v1 if v2 not found or didn&#39;t yield quota</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cgroup_detected</span> <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span> <span class="o">==</span> <span class="s2">&quot;v2&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">cgroup_detected</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_cgroup_v1</span><span class="p">()</span>
+
+        <span class="c1"># 4. Get OS Affinity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_os_affinity</span><span class="p">()</span>
+
+        <span class="c1"># 5. Detect Memory</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_detect_memory</span><span class="p">()</span>
+
+        <span class="c1"># --- 6. Determine the RAW Limit (before weighting) ---</span>
+        <span class="n">raw_limit</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+        <span class="n">raw_method</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+        <span class="c1"># Priority 1: Cgroup Quota</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">raw_limit</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">raw_limit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="p">)</span>
+            <span class="n">raw_method</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cgroup_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span><span class="si">}</span><span class="s2">_quota&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw limit set by Cgroup Quota: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Priority 2: Scheduler Affinity</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">affinity_limit</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">affinity_limit</span> <span class="o">&lt;</span> <span class="n">raw_limit</span><span class="p">:</span>
+                <span class="n">raw_limit</span> <span class="o">=</span> <span class="n">affinity_limit</span>
+                <span class="n">raw_method</span> <span class="o">=</span> <span class="s2">&quot;sched_affinity&quot;</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw limit updated by Sched Affinity: </span><span class="si">{</span><span class="n">affinity_limit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">raw_method</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cgroup&quot;</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Sched Affinity limit (</span><span class="si">{</span><span class="n">affinity_limit</span><span class="si">}</span><span class="s2">) not stricter than Cgroup Quota (</span><span class="si">{</span><span class="n">raw_limit</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">).&quot;</span>
+                <span class="p">)</span>
+
+        <span class="c1"># Priority 3: OS Logical Cores</span>
+        <span class="k">if</span> <span class="n">raw_limit</span> <span class="o">==</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">):</span>  <span class="c1"># If no cgroup quota or affinity was found/applied</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">raw_limit</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">)</span>
+                <span class="n">raw_method</span> <span class="o">=</span> <span class="s2">&quot;os_logical_count&quot;</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw limit set by OS Logical Core count: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Absolute fallback</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not determine any CPU core limit. Defaulting raw limit to 1.0.&quot;</span><span class="p">)</span>
+                <span class="n">raw_limit</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="n">raw_method</span> <span class="o">=</span> <span class="s2">&quot;fallback_default&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_value</span> <span class="o">=</span> <span class="n">raw_limit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_method</span> <span class="o">=</span> <span class="n">raw_method</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw CPU limit determined: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_value</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> (Method: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_method</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># --- 7. Apply Weighting (if applicable) ---</span>
+        <span class="n">final_effective_cores</span> <span class="o">=</span> <span class="n">raw_limit</span>
+        <span class="n">final_method</span> <span class="o">=</span> <span class="n">raw_method</span>
+
+        <span class="c1"># Apply weighting ONLY if the raw limit is NOT from a cgroup quota</span>
+        <span class="c1"># AND the limit is an integer (or effectively integer) core count</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">raw_method</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cgroup_&quot;</span><span class="p">):</span>
+            <span class="c1"># Check if raw_limit is effectively an integer</span>
+            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">raw_limit</span> <span class="o">-</span> <span class="nb">round</span><span class="p">(</span><span class="n">raw_limit</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mf">1e-9</span> <span class="ow">and</span> <span class="n">raw_limit</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logical_limit_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">raw_limit</span><span class="p">))</span>
+                <span class="n">weighted_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_hyperthread_weight</span><span class="p">(</span><span class="n">logical_limit_int</span><span class="p">)</span>
+                <span class="n">final_effective_cores</span> <span class="o">=</span> <span class="n">weighted_value</span>
+                <span class="c1"># Update method if weighting was actually applied and changed the value</span>
+                <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">weighted_value</span> <span class="o">-</span> <span class="n">raw_limit</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1e-9</span><span class="p">:</span>
+                    <span class="n">final_method</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">raw_method</span><span class="si">}</span><span class="s2">_weighted&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Keep original method name if weighting didn&#39;t change result</span>
+                    <span class="n">final_method</span> <span class="o">=</span> <span class="n">raw_method</span>
+
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># Raw limit was affinity/os count but not an integer? Should be rare.</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Raw limit method &#39;</span><span class="si">{</span><span class="n">raw_method</span><span class="si">}</span><span class="s2">&#39; is not cgroup quota, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;but value </span><span class="si">{</span><span class="n">raw_limit</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> is not integer. Skipping weighting.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">raw_method</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cgroup_&quot;</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Raw limit is from Cgroup quota. Using quota value directly (skipping SMT weighting).&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span> <span class="o">=</span> <span class="n">final_effective_cores</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">detection_method</span> <span class="o">=</span> <span class="n">final_method</span>  <span class="c1"># The method for the final value</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Effective CPU core limit determined: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> &quot;</span> <span class="sa">f</span><span class="s2">&quot;(Method: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">detection_method</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="SystemResourceProbe.get_effective_cores">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html#nv_ingest_api.util.system.hardware_info.SystemResourceProbe.get_effective_cores">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_effective_cores</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the primary result: the effective core limit, potentially weighted.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">total_memory_mb</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the effective memory limit in megabytes.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cpu_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the effective CPU count for compatibility.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span>
+
+<div class="viewcode-block" id="SystemResourceProbe.get_details">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html#nv_ingest_api.util.system.hardware_info.SystemResourceProbe.get_details">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_details</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dictionary with all detected information.&quot;&quot;&quot;</span>
+        <span class="c1"># Calculate full system weighted potential for info</span>
+        <span class="n">os_weighted_cores</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_physical_cores</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">:</span>
+            <span class="c1"># Use weighting func with the total logical cores as the limit</span>
+            <span class="n">os_weighted_cores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_hyperthread_weight</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;effective_cores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_cores</span><span class="p">,</span>
+            <span class="s2">&quot;detection_method&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_method</span><span class="p">,</span>
+            <span class="s2">&quot;raw_limit_value&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_value</span><span class="p">,</span>
+            <span class="s2">&quot;raw_limit_method&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw_limit_method</span><span class="p">,</span>
+            <span class="s2">&quot;hyperthread_weight_applied&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperthread_weight</span><span class="p">,</span>
+            <span class="s2">&quot;os_logical_cores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_logical_cores</span><span class="p">,</span>
+            <span class="s2">&quot;os_physical_cores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_physical_cores</span><span class="p">,</span>
+            <span class="s2">&quot;os_weighted_potential&quot;</span><span class="p">:</span> <span class="n">os_weighted_cores</span><span class="p">,</span>  <span class="c1"># Full system potential weighted</span>
+            <span class="s2">&quot;os_sched_affinity_cores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_sched_affinity_cores</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_type</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_quota_cores&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_quota_cores</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_period_us&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_period_us</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_shares&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_shares</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_usage_total_us&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_total_us</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_usage_percpu_us&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_usage_percpu_us</span><span class="p">,</span>
+            <span class="c1"># Memory information</span>
+            <span class="s2">&quot;effective_memory_bytes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_memory_bytes</span><span class="p">,</span>
+            <span class="s2">&quot;effective_memory_mb&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_memory_mb</span><span class="p">,</span>
+            <span class="s2">&quot;memory_detection_method&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_detection_method</span><span class="p">,</span>
+            <span class="s2">&quot;os_total_memory_bytes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">os_total_memory_bytes</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_memory_limit_bytes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_limit_bytes</span><span class="p">,</span>
+            <span class="s2">&quot;cgroup_memory_usage_bytes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">cgroup_memory_usage_bytes</span><span class="p">,</span>
+            <span class="s2">&quot;platform&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">(),</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
