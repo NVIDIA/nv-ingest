@@ -43,23 +43,12 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
-
-
-5. For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container. [Configure Helm](https://github.com/nvidia/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
-
-    ```
-    OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-    OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text_ensemble
-    ```
-        
-   Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
    
-6. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-7. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
+6. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval up`
 
@@ -82,7 +71,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
       --profile retrieval up
     ```
 
-8. When core services have fully started, `nvidia-smi` should show processes like the following:
+7. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -100,7 +89,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-9. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
+8. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
