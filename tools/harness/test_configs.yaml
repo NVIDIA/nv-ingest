@@ -42,6 +42,10 @@ active:
   split_chunk_overlap: 150  # Overlap for text splitting
   enable_image_storage: false  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
+  # Trace configuration
+  enable_traces: false
+  trace_output_dir: null  # Null => artifacts/<run>/traces
+
   # Storage configuration
   spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (tools/harness/artifacts)
@@ -53,7 +57,7 @@ active:
 # Recall configuration (only used when running recall or e2e_recall tests)
 recall:
   recall_dataset: null
-  reranker_mode: none  # Options: "none", "with", "both"
+  reranker_mode: both  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
