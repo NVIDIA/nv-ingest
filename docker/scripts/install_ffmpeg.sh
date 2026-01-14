@@ -15,7 +15,7 @@
 #!/bin/bash
 set -xeuo pipefail # Exit immediately if a command exits with a non-zero status
 
-FFMPEG_VERSION=7.0.1
+FFMPEG_VERSION=8.0.1
 
 for i in "$@"; do
     case $i in
@@ -45,6 +45,7 @@ apt-get install -y \
     libtool \
     libmp3lame-dev \
     libvpx-dev \
+    nasm \
     pkg-config \
     vainfo \
     yasm

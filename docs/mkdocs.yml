@@ -76,19 +76,22 @@ nav:
         - Upload Data: extraction/data-store.md
         - Filter Search Results: extraction/custom-metadata.md
         - Advanced Visual Parsing: extraction/nemoretriever-parse.md
-        - Use RIVA Audio Processing: extraction/audio.md
+        - Extract Speech: extraction/audio.md
         - Use Multimodal Embedding: extraction/vlm-embed.md
         - Configure Ray Logging: extraction/ray-logging.md
       - Customize Your Pipeline:
+        - Add User-defined Functions: extraction/user-defined-functions.md
         - Add User-defined Stages: extraction/user-defined-stages.md
+        - NimClient Usage: extraction/nimclient.md
+        - Resource Scaling Modes: extraction/scaling-modes.md
       - Performance:
         - Benchmarking: extraction/benchmarking.md
         - Telemetry: extraction/telemetry.md
         - Throughput Is Dataset-Dependent: extraction/throughput-is-dataset-dependent.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
-        - Content Metadata: extraction/content-metadata.md
         - Environment Variables: extraction/environment-config.md
+        - Metadata Reference: extraction/content-metadata.md
         - API Reference: extraction/api-docs
       - Troubleshoot: extraction/troubleshoot.md
       - FAQ: extraction/faq.md
