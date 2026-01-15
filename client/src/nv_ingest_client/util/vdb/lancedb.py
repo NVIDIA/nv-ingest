@@ -1,5 +1,4 @@
 import logging
-import os
 
 from datetime import timedelta
 from functools import partial
@@ -189,7 +188,7 @@ class LanceDB(VDB):
         return results
 
 
-def lancedb_retrieval(
+def retrieval(
     queries,
     table_path: str,
     table_name: str = "nv-ingest",
@@ -205,47 +204,42 @@ def lancedb_retrieval(
     nv_ranker_top_k: int = 100,
     **kwargs,
 ):
-    """Standalone LanceDB retrieval function for harness compatibility.
-
-    This function mirrors `nvingest_retrieval` from the Milvus module, providing
-    a simple interface for recall evaluation against a LanceDB table.
+    """
+    LanceDB retrieval function.
 
     Parameters
     ----------
     queries : list[str]
         Text queries to search for.
     table_path : str
-        Path to the LanceDB database directory (the `uri` used during ingestion).
+        Path to the LanceDB database directory.
     table_name : str, optional
-        Name of the table within the LanceDB database (default is "nv-ingest").
+        Name of the table within the LanceDB database.
     embedding_endpoint : str, optional
-        URL of the embedding microservice (default is "http://localhost:8012/v1").
+        URL of the embedding microservice.
     nvidia_api_key : str, optional
-        NVIDIA API key for authentication. If None, no auth is used.
+        NVIDIA API key for authentication.
     model_name : str, optional
-        Name of the embedding model (default is "nvidia/llama-3.2-nv-embedqa-1b-v2").
+        Name of the embedding model.
     top_k : int, optional
-        Number of results to return per query (default is 10).
+        Number of results to return per query.
     refine_factor : int, optional
-        LanceDB search refine factor for accuracy (default is 2).
+        LanceDB search refine factor for accuracy.
     n_probe : int, optional
-        Number of partitions to probe during search (default is 32).
+        Number of partitions to probe during search.
     nv_ranker : bool, optional
-        Whether to apply NV reranker after retrieval (default is False).
+        Whether to apply NV reranker after retrieval.
     nv_ranker_endpoint : str, optional
-        URL of the reranker microservice (e.g., "http://localhost:8020/v1/ranking").
+        URL of the reranker microservice.
     nv_ranker_model_name : str, optional
-        Name of the reranker model (e.g., "nvidia/llama-3.2-nv-rerankqa-1b-v2").
+        Name of the reranker model.
     nv_ranker_top_k : int, optional
-        Number of candidates to fetch before reranking (default is 50).
-    **kwargs
-        Additional keyword arguments (ignored, for API compatibility).
+        Number of candidates to fetch before reranking.
 
     Returns
     -------
     list[list[dict]]
-        For each query, a list of result dicts with keys: `source`, `metadata`, `text`.
-        Results are formatted to match Milvus output structure for recall scoring.
+        For each query, a list of result dicts formatted to match Milvus output structure.
     """
     db = lancedb.connect(uri=table_path)
     table = db.open_table(table_name)
@@ -260,7 +254,6 @@ def lancedb_retrieval(
         grpc=not ("http" in urlparse(embedding_endpoint).scheme),
     )
 
-    # When using reranker, fetch more candidates initially
     search_top_k = nv_ranker_top_k if nv_ranker else top_k
 
     results = []
@@ -268,16 +261,12 @@ def lancedb_retrieval(
     for query_embed in query_embeddings:
         search_results = (
             table.search([query_embed], vector_column_name="vector")
-            .disable_scoring_autoprojection()
             .select(["text", "metadata", "source", "_distance"])
             .limit(search_top_k)
             .refine_factor(refine_factor)
             .nprobes(n_probe)
             .to_list()
         )
-        # Format results to match Milvus structure for recall scoring compatibility
-        # Milvus returns: {"entity": {"source": {"source_id": ...}, "content_metadata": {"page_number": ...}}}
-        # LanceDB stores: {"source": "...", "metadata": "page_num", "text": "..."}
         formatted = []
         for r in search_results:
             formatted.append(
@@ -291,22 +280,9 @@ def lancedb_retrieval(
             )
         results.append(formatted)
 
-    # Apply reranking if enabled
     if nv_ranker:
-        debug_enabled = os.getenv("NV_INGEST_RERANK_DEBUG", "").lower() in {"1", "true", "yes"}
-        debug_limit = int(os.getenv("NV_INGEST_RERANK_DEBUG_LIMIT", "0"))
         rerank_results = []
-        for idx, (query, candidates) in enumerate(zip(queries, results)):
-            if debug_enabled and (debug_limit == 0 or idx < debug_limit):
-                print("=" * 60)
-                print(f"[rerank debug] query[{idx}]: {query}")
-                print(f"[rerank debug] candidates: {len(candidates)}")
-                for c_idx, cand in enumerate(candidates[:5]):
-                    text = cand.get("entity", {}).get("text", "")
-                    source_id = cand.get("entity", {}).get("source", {}).get("source_id", "")
-                    page_number = cand.get("entity", {}).get("content_metadata", {}).get("page_number", "")
-                    text_preview = text[:200].replace("\n", " ")
-                    print(f"  cand[{c_idx}] source={source_id} page={page_number} text='{text_preview}'")
+        for query, candidates in zip(queries, results):
             rerank_results.append(
                 nv_rerank(
                     query,

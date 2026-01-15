@@ -9,6 +9,7 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -63,7 +64,10 @@ def get_recall_scores(
     nv_ranker_endpoint: Optional[str] = None,
     nv_ranker_model_name: Optional[str] = None,
     ground_truth_dir: Optional[str] = None,
+<<<<<<< HEAD
     batch_size: int = 100,
+=======
+>>>>>>> 055d4d72 (feat: add LanceDB VDB operator with harness recall support)
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
 ) -> Dict[int, float]:
@@ -90,7 +94,6 @@ def get_recall_scores(
 
     Returns:
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
     queries = query_df["query"].to_list()
@@ -98,11 +101,35 @@ def get_recall_scores(
     num_queries = len(queries)
     num_batches = (num_queries + batch_size - 1) // batch_size
 
+<<<<<<< HEAD
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
         retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
+=======
+    if vdb_backend == "lancedb":
+        retrieval_func = _get_retrieval_func("lancedb", table_path)
+        all_answers = retrieval_func(
+            query_df["query"].to_list(),
+            table_name=collection_name,
+            embedding_endpoint=f"http://{hostname}:8012/v1",
+            model_name=model_name,
+            top_k=top_k,
+            nv_ranker=nv_ranker,
+        )
+    else:
+        all_answers = nvingest_retrieval(
+            query_df["query"].to_list(),
+            collection_name,
+            hybrid=sparse,
+            embedding_endpoint=f"http://{hostname}:8012/v1",
+            model_name=model_name,
+            top_k=top_k,
+            gpu_search=gpu_search,
+            nv_ranker=nv_ranker,
+        )
+>>>>>>> 055d4d72 (feat: add LanceDB VDB operator with harness recall support)
 
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
@@ -180,7 +207,7 @@ def get_recall_scores_pdf_only(
                   expected_pdf format: PDF filename without extension (e.g., '3M_2018_10K').
         collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Default False for finance_bench.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
@@ -194,11 +221,9 @@ def get_recall_scores_pdf_only(
 
     Returns:
         Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
 
-    # Prepare reranker kwargs if custom endpoint/model provided
     reranker_kwargs = {}
     if nv_ranker:
         if nv_ranker_endpoint:
@@ -279,39 +304,40 @@ def evaluate_recall_orchestrator(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
     **scorer_kwargs,
 ) -> Dict[int, float]:
     """
     Generic orchestrator for recall evaluation.
 
-    Centralizes the common pattern: load ground truth → score → return results.
-    All parameters are passed through to the scorer function, preserving config-driven behavior.
-
     Args:
-        loader_func: Function that loads ground truth DataFrame from optional directory.
-        scorer_func: Function that calculates recall scores (get_recall_scores or get_recall_scores_pdf_only).
-        collection_name: Milvus collection name to query.
+        loader_func: Function that loads ground truth DataFrame.
+        scorer_func: Function that calculates recall scores.
+        collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
-        model_name: Embedding model name for query encoding.
-        top_k: Maximum number of results to retrieve and evaluate.
-        gpu_search: Use GPU acceleration for Milvus search.
-        nv_ranker: Enable NVIDIA reranker for result reranking.
-        ground_truth_dir: Directory containing ground truth files (optional).
-        **scorer_kwargs: Additional kwargs to pass to scorer_func (e.g., nv_ranker_endpoint, nv_ranker_model_name).
+        sparse: Enable hybrid retrieval (Milvus only).
+        model_name: Embedding model name.
+        top_k: Maximum results to retrieve.
+        gpu_search: Use GPU for search (Milvus only).
+        nv_ranker: Enable reranker.
+        ground_truth_dir: Directory containing ground truth files.
+        vdb_backend: VDB backend ("milvus" or "lancedb").
+        table_path: Path to LanceDB database.
+        **scorer_kwargs: Additional kwargs for scorer_func.
 
     Returns:
-        Dictionary mapping k values to recall scores (float 0.0-1.0).
+        Dictionary mapping k values to recall scores.
     """
-    # 1. Load ground truth using dataset-specific loader
     query_df = loader_func(ground_truth_dir)
 
-    # 2. Calculate recall scores using dataset-specific scorer
     scores = scorer_func(
         query_df,
         collection_name,
         hostname=hostname,
         sparse=sparse,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -459,7 +485,7 @@ def finance_bench_load_ground_truth(ground_truth_dir: Optional[str] = None) -> p
 def finance_bench_recall(
     collection_name: str,
     hostname: str = "localhost",
-    sparse: bool = False,  # Default False (hybrid=False) for finance_bench
+    sparse: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
