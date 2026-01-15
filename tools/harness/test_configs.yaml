@@ -18,36 +18,37 @@ active:
   # Deployment configuration
   deployment_type: helm  # Options: docker-compose, helm
 
-  # Docker Compose specific (ignored when deployment_type: helm)
-  profiles:
-    - retrieval
-    - table-structure
+  # Docker Compose configuration
+  compose:
+    profiles:
+      - retrieval
+      - table-structure
 
-  # Helm specific (only used when deployment_type: helm)
-  helm_bin: microk8s helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm", "/usr/local/bin/helm")
-  helm_sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
-  kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl", "k3s kubectl")
-  kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
-  helm_chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
-  helm_chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
-  helm_release: nv-ingest
-  helm_namespace: nv-ingest
-  helm_values_file: .helm-overrides.yaml  # Optional: path to values file
-  service_port: 7670  # Port for accessing services (for Helm deployments)
-  # Multiple port forwards for Helm services
-  helm_port_forwards:
-    - service: nv-ingest
-      local_port: 7670
-      remote_port: 7670
-    - service: nv-ingest-milvus
-      local_port: 19530
-      remote_port: 19530
-    - service: "*embed*"  # Wildcard pattern to match embedding services
-      local_port: 8012
-      remote_port: 8000
-  # helm_values:  # Optional: inline Helm values
-  #   api.enabled: true
-  #   redis.enabled: true
+  # Helm configuration
+  helm:
+    bin: microk8s helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
+    sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
+    kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
+    kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
+    chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
+    chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
+    release: nv-ingest
+    namespace: nv-ingest
+    values_file: .helm-overrides.yaml  # Optional: path to values file
+    # Multiple port forwards for Helm services
+    port_forwards:
+      - service: nv-ingest
+        local_port: 7670
+        remote_port: 7670
+      - service: nv-ingest-milvus
+        local_port: 19530
+        remote_port: 19530
+      - service: "*embed*"  # Wildcard pattern to match embedding services
+        local_port: 8012
+        remote_port: 8000
+    # values:  # Optional: inline Helm values
+    #   api.enabled: true
+    #   redis.enabled: true
 
   # Runtime configuration
   sparse: false  # Use sparse embeddings
@@ -113,7 +114,7 @@ datasets:
     recall_dataset: earnings  # Evaluator for recall testing
 
   bo20:
-    path: /path/to/bo20
+    path: /localhome/charlesb/datasets/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true

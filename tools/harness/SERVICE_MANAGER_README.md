@@ -51,22 +51,23 @@ active:
   # Deployment configuration
   deployment_type: docker-compose  # Options: docker-compose, helm
   
-  # Docker Compose specific (ignored when deployment_type: helm)
-  profiles:
-    - retrieval
-    - table-structure
+  # Docker Compose configuration
+  compose:
+    profiles:
+      - retrieval
+      - table-structure
   
-  # Helm specific (only used when deployment_type: helm)
-  helm_bin: helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
-  helm_chart: nim-nvstaging/nv-ingest  # Remote chart (set to null for local ./helm chart)
-  helm_chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
-  helm_release: nv-ingest
-  helm_namespace: nv-ingest
-  helm_values_file: .helm-overrides.yaml  # Optional: path to values file
-  service_port: 7670  # Port for accessing services
-  # helm_values:  # Optional: inline Helm values
-  #   api.enabled: true
-  #   redis.enabled: true
+  # Helm configuration
+  helm:
+    bin: helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
+    chart: nim-nvstaging/nv-ingest  # Remote chart (set to null for local ./helm chart)
+    chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
+    release: nv-ingest
+    namespace: nv-ingest
+    values_file: .helm-overrides.yaml  # Optional: path to values file
+    # values:  # Optional: inline Helm values
+    #   api.enabled: true
+    #   redis.enabled: true
 ```
 
 ## Usage
@@ -84,12 +85,13 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
    ```yaml
    active:
      deployment_type: helm
-     helm_bin: helm  # Use "microk8s helm" for MicroK8s, "k3s helm" for K3s
-     helm_chart: nim-nvstaging/nv-ingest
-     helm_chart_version: 26.1.0-RC7
-     helm_release: nv-ingest
-     helm_namespace: nv-ingest
-     helm_values_file: .helm-overrides.yaml
+     helm:
+       bin: helm  # Use "microk8s helm" for MicroK8s, "k3s helm" for K3s
+       chart: nim-nvstaging/nv-ingest
+       chart_version: 26.1.0-RC7
+       release: nv-ingest
+       namespace: nv-ingest
+       values_file: .helm-overrides.yaml
    ```
 
 2. Run tests:
@@ -103,11 +105,12 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
    ```yaml
    active:
      deployment_type: helm
-     helm_bin: helm  # Use "microk8s helm" for MicroK8s, "k3s helm" for K3s
-     helm_chart: null  # Use local ./helm chart
-     helm_release: nv-ingest
-     helm_namespace: nv-ingest
-     helm_values_file: .helm-overrides.yaml
+     helm:
+       bin: helm  # Use "microk8s helm" for MicroK8s, "k3s helm" for K3s
+       chart: null  # Use local ./helm chart
+       release: nv-ingest
+       namespace: nv-ingest
+       values_file: .helm-overrides.yaml
    ```
 
 2. Run tests:
@@ -156,8 +159,9 @@ helm_sudo: false
 ### MicroK8s (with sudo)
 If you need root privileges for MicroK8s:
 ```yaml
-helm_bin: microk8s helm
-helm_sudo: true  # Runs: sudo microk8s helm ...
+helm:
+  bin: microk8s helm
+  sudo: true  # Runs: sudo microk8s helm ...
 ```
 
 **Note**: Using `helm_sudo: true` allows the main Python process to run as your user (with access to your venv), while only the Helm commands run with sudo. This avoids the need to run the entire harness as root.
@@ -171,14 +175,16 @@ Then set `helm_sudo: false`.
 
 ### K3s
 ```yaml
-helm_bin: k3s helm
-helm_sudo: true  # If needed
+helm:
+  bin: k3s helm
+  sudo: true  # If needed
 ```
 
 ### Custom Path
 ```yaml
-helm_bin: /usr/local/bin/helm
-helm_sudo: false
+helm:
+  bin: /usr/local/bin/helm
+  sudo: false
 ```
 
 ### Environment Variables
@@ -225,20 +231,21 @@ The Helm manager automatically sets up `kubectl port-forward` for multiple servi
 ### Configuration
 
 ```yaml
-kubectl_bin: kubectl  # or "microk8s kubectl", "k3s kubectl"
-kubectl_sudo: null  # Defaults to same as helm_sudo if not set
+helm:
+  kubectl_bin: kubectl  # or "microk8s kubectl", "k3s kubectl"
+  kubectl_sudo: null  # Defaults to same as helm_sudo if not set
 
-# Multiple port forwards (supports wildcards)
-helm_port_forwards:
-  - service: nv-ingest
-    local_port: 7670
-    remote_port: 7670
-  - service: nv-ingest-milvus
-    local_port: 19530
-    remote_port: 19530
-  - service: "*embed*"  # Wildcard pattern
-    local_port: 8012
-    remote_port: 8000
+  # Multiple port forwards (supports wildcards)
+  port_forwards:
+    - service: nv-ingest
+      local_port: 7670
+      remote_port: 7670
+    - service: nv-ingest-milvus
+      local_port: 19530
+      remote_port: 19530
+    - service: "*embed*"  # Wildcard pattern
+      local_port: 8012
+      remote_port: 8000
 ```
 
 ### Wildcard Service Matching
@@ -292,19 +299,15 @@ Waiting for nv-ingest-embed-nim pod to be ready (timeout: 120s)...
 Port forwarding started for nv-ingest-embed-nim (8012:8000) (PID: 12347)
 ```
 
-### Legacy Configuration
+### Default Configuration
 
-If `helm_port_forwards` is not specified, the manager defaults to forwarding only the main service:
+If `helm.port_forwards` is not specified, the manager defaults to forwarding only the main service on port 7670:
 ```yaml
-service_port: 7670  # Used as fallback if helm_port_forwards not specified
-```
-
-This is equivalent to:
-```yaml
-helm_port_forwards:
-  - service: nv-ingest  # Uses helm_release value
-    local_port: 7670
-    remote_port: 7670
+helm:
+  port_forwards:
+    - service: nv-ingest  # Uses helm.release value
+      local_port: 7670
+      remote_port: 7670
 ```
 
 ### Troubleshooting

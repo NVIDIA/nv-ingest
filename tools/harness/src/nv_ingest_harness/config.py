@@ -48,7 +48,6 @@ class TestConfig:
     helm_release: str = "nv-ingest"
     helm_namespace: str = "nv-ingest"
     helm_values_file: Optional[str] = None
-    service_port: int = 7670  # Legacy: used if helm_port_forwards not specified
     helm_values: Optional[dict] = None
     helm_port_forwards: Optional[List[dict]] = None  # List of {service, local_port, remote_port}
 
@@ -203,6 +202,27 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
     if not config_dict:
         raise ValueError("Config file must have 'active' section")
 
+    # Flatten nested deployment configurations (compose and helm)
+    # This allows cleaner YAML organization while keeping flat config structure
+    if "compose" in config_dict:
+        compose_config = config_dict.pop("compose")
+        if isinstance(compose_config, dict):
+            # Keys from compose section are used as-is (e.g., profiles)
+            for key, value in compose_config.items():
+                config_dict[key] = value
+
+    if "helm" in config_dict:
+        helm_config = config_dict.pop("helm")
+        if isinstance(helm_config, dict):
+            # Map helm section keys to their config field names
+            for key, value in helm_config.items():
+                # Keys that already have a prefix (kubectl_*) don't need helm_ prefix
+                if key.startswith("kubectl_"):
+                    config_dict[key] = value
+                else:
+                    # Other keys get helm_ prefix
+                    config_dict[f"helm_{key}"] = value
+
     # Merge recall section when running recall test cases
     # The recall section provides additional configuration for recall evaluation
     if case in ("recall", "e2e_recall"):
@@ -289,7 +309,6 @@ def _load_env_overrides() -> dict:
         "HELM_RELEASE": ("helm_release", str),
         "HELM_NAMESPACE": ("helm_namespace", str),
         "HELM_VALUES_FILE": ("helm_values_file", str),
-        "SERVICE_PORT": ("service_port", parse_int),
         "SPARSE": ("sparse", parse_bool),
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),

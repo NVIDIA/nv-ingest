@@ -39,7 +39,6 @@ class HelmManager(ServiceManager):
         self.release_name = getattr(config, "helm_release", "nv-ingest")
         self.namespace = getattr(config, "helm_namespace", "nv-ingest")
         self.values_file = getattr(config, "helm_values_file", None)
-        self.service_port = getattr(config, "service_port", 7670)
 
         # Port forwarding processes (list of tuples: (process, description))
         self.port_forward_processes: list[tuple[subprocess.Popen, str]] = []
@@ -142,12 +141,12 @@ class HelmManager(ServiceManager):
         port_forwards = getattr(self.config, "helm_port_forwards", None)
 
         if not port_forwards:
-            # Default: forward main service only
+            # Default: forward main service only (port 7670)
             port_forwards = [
                 {
                     "service": self.release_name,
-                    "local_port": self.service_port,
-                    "remote_port": self.service_port,
+                    "local_port": 7670,
+                    "remote_port": 7670,
                 }
             ]
 
@@ -276,8 +275,8 @@ class HelmManager(ServiceManager):
             port_forwards = [
                 {
                     "service": self.release_name,
-                    "local_port": self.service_port,
-                    "remote_port": self.service_port,
+                    "local_port": 7670,
+                    "remote_port": 7670,
                 }
             ]
 
@@ -358,11 +357,10 @@ class HelmManager(ServiceManager):
         Returns:
             URL string
         """
-        # Use hostname and port from config
-        # For Helm deployments, this might be a LoadBalancer IP, NodePort, or port-forwarded localhost
+        # Use hostname from config
+        # For Helm deployments, this is the port-forwarded localhost
         hostname = getattr(self.config, "hostname", "localhost")
-        port = getattr(self.config, "service_port", 7670)
 
         if service == "health":
-            return f"http://{hostname}:{port}/v1/health/ready"
-        return f"http://{hostname}:{port}"
+            return f"http://{hostname}:7670/v1/health/ready"
+        return f"http://{hostname}:7670"
