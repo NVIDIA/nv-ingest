@@ -221,7 +221,7 @@ def extract_page_elements_from_images(
             logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
     try:
-        model_interface = YoloxPageElementsModelInterface(version=yolox_version)
+        model_interface = YoloxPageElementsModelInterface(version=yolox_version, endpoints=config.yolox_endpoints)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -235,7 +235,7 @@ def extract_page_elements_from_images(
         # Perform inference in a single call. The NimClient handles batching internally.
         inference_results = yolox_client.infer(
             data,
-            model_name="pipeline" if yolox_version.endswith("-v3") else "yolox_ensemble",
+            model_name=model_interface.model_name,
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],
             dtypes=["BYTES", "FP32"],
