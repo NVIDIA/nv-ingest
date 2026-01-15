@@ -64,6 +64,7 @@ def _filter_valid_images(
 def _run_inference(
     enable_yolox: bool,
     yolox_client: Any,
+    yolox_model_name: str,
     ocr_client: Any,
     ocr_model_name: str,
     valid_arrays: List[np.ndarray],
@@ -80,7 +81,7 @@ def _run_inference(
         data_yolox = {"images": valid_arrays}
         future_yolox_kwargs = dict(
             data=data_yolox,
-            model_name="yolox_ensemble",
+            model_name=yolox_model_name,
             stage_name="table_extraction",
             max_batch_size=8,
             input_names=["INPUT_IMAGES", "THRESHOLDS"],
@@ -167,6 +168,7 @@ def _validate_inference_results(
 def _update_table_metadata(
     base64_images: List[str],
     yolox_client: Any,
+    yolox_model_name: str,
     ocr_client: Any,
     ocr_model_name: str,
     worker_pool_size: int = 8,  # Not currently used
@@ -199,6 +201,7 @@ def _update_table_metadata(
     yolox_results, ocr_results = _run_inference(
         enable_yolox=enable_yolox,
         yolox_client=yolox_client,
+        yolox_model_name=yolox_model_name,
         ocr_client=ocr_client,
         ocr_model_name=ocr_model_name,
         valid_arrays=valid_arrays,
@@ -227,7 +230,7 @@ def _create_yolox_client(
     yolox_protocol: str,
     auth_token: str,
 ) -> NimClient:
-    yolox_model_interface = YoloxTableStructureModelInterface()
+    yolox_model_interface = YoloxTableStructureModelInterface(endpoints=yolox_endpoints)
 
     yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
@@ -358,6 +361,7 @@ def extract_table_data_from_image_internal(
         bulk_results = _update_table_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
+            yolox_model_name=yolox_client.model_interface.model_name,
             ocr_client=ocr_client,
             ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
