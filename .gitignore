@@ -131,6 +131,7 @@ celerybeat-schedule
 
 # Environments
 .env
+.helm-env
 .venv
 env/
 venv/

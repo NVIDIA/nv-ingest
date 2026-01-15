@@ -282,9 +282,7 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
 @click.command()
 @click.option("--case", default="e2e", help="Test case name to run")
-@click.option(
-    "--managed", is_flag=True, help="Manage services (start/stop). Default: attach to existing services"
-)
+@click.option("--managed", is_flag=True, help="Manage services (start/stop). Default: attach to existing services")
 @click.option(
     "--deployment-type",
     type=click.Choice(["compose", "helm"], case_sensitive=False),

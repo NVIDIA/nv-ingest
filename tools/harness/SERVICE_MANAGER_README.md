@@ -61,7 +61,7 @@ active:
     chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
     release: nv-ingest
     namespace: nv-ingest
-    values_file: .helm-overrides.yaml  # Optional: path to values file
+    values_file: .helm-env  # Optional: path to values file
     # values:  # Optional: inline Helm values
     #   api.enabled: true
     #   redis.enabled: true
@@ -90,7 +90,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-t
        chart_version: 26.1.0-RC7
        release: nv-ingest
        namespace: nv-ingest
-       values_file: .helm-overrides.yaml
+       values_file: .helm-env
    ```
 
 2. Run tests with `--deployment-type=helm`:
@@ -109,7 +109,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-t
        chart: null  # Use local ./helm chart
        release: nv-ingest
        namespace: nv-ingest
-       values_file: .helm-overrides.yaml
+       values_file: .helm-env
    ```
 
 2. Run tests with `--deployment-type=helm`:
@@ -213,7 +213,7 @@ compose:
 Use `helm.values_file` or `helm.values` to configure which services to enable:
 ```yaml
 helm:
-  values_file: .helm-overrides.yaml
+  values_file: .helm-env
   # Or use inline values:
   # values:
   #   api.enabled: true

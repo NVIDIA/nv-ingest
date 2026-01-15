@@ -14,7 +14,7 @@ active:
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
-  
+
   # Docker Compose configuration
   compose:
     profiles:
@@ -31,7 +31,7 @@ active:
     chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
     release: nv-ingest
     namespace: nv-ingest
-    values_file: .helm-overrides.yaml  # Optional: path to values file
+    values_file: .helm-env  # Optional: path to values file
     # Multiple port forwards for Helm services
     port_forwards:
       - service: nv-ingest
