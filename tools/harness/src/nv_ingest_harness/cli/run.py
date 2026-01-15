@@ -56,6 +56,7 @@ def run_datasets(
     case,
     dataset_list,
     managed,
+    deployment_type,
     no_build,
     keep_up,
     doc_analysis,
@@ -70,6 +71,7 @@ def run_datasets(
         first_config = load_config(
             case=case,
             dataset=dataset_list[0],
+            deployment_type=deployment_type,
         )
 
         # Create appropriate service manager based on config
@@ -97,6 +99,7 @@ def run_datasets(
             config = load_config(
                 case=case,
                 dataset=dataset_name,
+                deployment_type=deployment_type,
             )
         except (FileNotFoundError, ValueError) as e:
             print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
@@ -280,7 +283,13 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 @click.command()
 @click.option("--case", default="e2e", help="Test case name to run")
 @click.option(
-    "--managed", is_flag=True, help="Manage Docker services (start/stop). Default: attach to existing services"
+    "--managed", is_flag=True, help="Manage services (start/stop). Default: attach to existing services"
+)
+@click.option(
+    "--deployment-type",
+    type=click.Choice(["compose", "helm"], case_sensitive=False),
+    default="compose",
+    help="Deployment type for managed services (managed mode only)",
 )
 @click.option(
     "--dataset", help="Dataset name(s) - single name, comma-separated list, or path (e.g., bo767 or bo767,earnings)"
@@ -291,6 +300,7 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 def main(
     case,
     managed,
+    deployment_type,
     dataset,
     no_build,
     keep_up,
@@ -312,6 +322,7 @@ def main(
         case=case,
         dataset_list=dataset_list,
         managed=managed,
+        deployment_type=deployment_type,
         no_build=no_build,
         keep_up=keep_up,
         doc_analysis=doc_analysis,

@@ -14,10 +14,7 @@ active:
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
-
-  # Deployment configuration
-  deployment_type: helm  # Options: docker-compose, helm
-
+  
   # Docker Compose configuration
   compose:
     profiles:
@@ -114,7 +111,7 @@ datasets:
     recall_dataset: earnings  # Evaluator for recall testing
 
   bo20:
-    path: /localhome/charlesb/datasets/bo20
+    path: /path/to/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true

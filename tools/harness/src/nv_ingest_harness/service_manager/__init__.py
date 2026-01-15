@@ -21,14 +21,14 @@ def create_service_manager(config, repo_root: Path) -> ServiceManager:
     Raises:
         ValueError: If deployment_type is unknown
     """
-    deployment_type = getattr(config, "deployment_type", "docker-compose")
+    deployment_type = getattr(config, "deployment_type", "compose")
 
-    if deployment_type == "docker-compose":
+    if deployment_type == "compose":
         return DockerComposeManager(config, repo_root)
     elif deployment_type == "helm":
         return HelmManager(config, repo_root)
     else:
-        raise ValueError(f"Unknown deployment_type: {deployment_type}. Must be 'docker-compose' or 'helm'")
+        raise ValueError(f"Unknown deployment_type: {deployment_type}. Must be 'compose' or 'helm'")
 
 
 __all__ = ["ServiceManager", "create_service_manager", "DockerComposeManager", "HelmManager"]

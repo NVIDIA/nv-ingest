@@ -36,7 +36,7 @@ class TestConfig:
     profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])  # Docker Compose only
 
     # Deployment configuration
-    deployment_type: str = "docker-compose"  # Options: docker-compose, helm
+    deployment_type: str = "compose"  # Options: compose, helm
 
     # Helm-specific configuration
     helm_bin: str = "helm"  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
@@ -122,8 +122,8 @@ class TestConfig:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
 
         # Check deployment_type is valid
-        if self.deployment_type not in ["docker-compose", "helm"]:
-            errors.append(f"deployment_type must be 'docker-compose' or 'helm', got '{self.deployment_type}'")
+        if self.deployment_type not in ["compose", "helm"]:
+            errors.append(f"deployment_type must be 'compose' or 'helm', got '{self.deployment_type}'")
 
         # Check reranker_mode is valid
         if self.reranker_mode not in ["none", "with", "both"]:

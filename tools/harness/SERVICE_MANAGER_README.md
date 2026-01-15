@@ -48,9 +48,6 @@ Add the following to `test_configs.yaml`:
 active:
   # ... existing config ...
   
-  # Deployment configuration
-  deployment_type: docker-compose  # Options: docker-compose, helm
-  
   # Docker Compose configuration
   compose:
     profiles:
@@ -75,16 +72,18 @@ active:
 ### Docker Compose (Default)
 
 ```bash
-# Use Docker Compose (default behavior, unchanged)
+# Use Docker Compose (default behavior)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+
+# Or explicitly specify:
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=compose
 ```
 
 ### Helm with Remote Chart
 
-1. Update `test_configs.yaml` to use Helm with a remote chart:
+1. Update `test_configs.yaml` to configure Helm settings:
    ```yaml
    active:
-     deployment_type: helm
      helm:
        bin: helm  # Use "microk8s helm" for MicroK8s, "k3s helm" for K3s
        chart: nim-nvstaging/nv-ingest
@@ -94,14 +93,14 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
        values_file: .helm-overrides.yaml
    ```
 
-2. Run tests:
+2. Run tests with `--deployment-type=helm`:
    ```bash
-   uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+   uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
    ```
 
 ### Helm with Local Chart
 
-1. Update `test_configs.yaml` to use Helm with the local chart:
+1. Update `test_configs.yaml` to configure Helm to use the local chart:
    ```yaml
    active:
      deployment_type: helm
@@ -113,9 +112,9 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
        values_file: .helm-overrides.yaml
    ```
 
-2. Run tests:
+2. Run tests with `--deployment-type=helm`:
    ```bash
-   uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+   uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
    ```
 
 ## Benefits
@@ -204,22 +203,22 @@ The command is split on spaces, so multi-word commands like `microk8s helm` work
 ### Docker Compose
 Uses `profiles` to enable/disable service groups:
 ```yaml
-deployment_type: docker-compose
-profiles:
-  - retrieval
-  - table-structure
+compose:
+  profiles:
+    - retrieval
+    - table-structure
 ```
 
 ### Helm
-Use `helm_values` or `helm_values_file` to configure which services to enable:
+Use `helm.values_file` or `helm.values` to configure which services to enable:
 ```yaml
-deployment_type: helm
-helm_values_file: .helm-overrides.yaml
-# Or use inline values:
-# helm_values:
-#   api.enabled: true
-#   redis.enabled: true
-#   yolox.enabled: true
+helm:
+  values_file: .helm-overrides.yaml
+  # Or use inline values:
+  # values:
+  #   api.enabled: true
+  #   redis.enabled: true
+  #   yolox.enabled: true
 ```
 
 For Helm deployments, configure services through your values file or inline `helm_values` according to your Helm chart's schema.
