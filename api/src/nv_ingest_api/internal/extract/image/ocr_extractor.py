@@ -257,6 +257,11 @@ def _process_page_elements(df_to_process: pd.DataFrame, ocr_results: List[Tuple]
         return df_to_process
 
     for result_idx, df_idx in enumerate(valid_indices):
+        # Preserve the original base64 image before overwriting with OCR text.
+        # This enables text_image modality for multimodal embeddings.
+        original_image = df_to_process.loc[df_idx, "metadata"]["content"]
+        df_to_process.loc[df_idx, "metadata"]["text_metadata"]["source_image"] = original_image
+
         # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
         bboxes, texts, _ = ocr_results[result_idx]
         if not bboxes or not texts:

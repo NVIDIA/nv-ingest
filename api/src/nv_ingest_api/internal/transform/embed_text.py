@@ -23,7 +23,10 @@ logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
 
-MULTI_MODAL_MODELS = ["llama-3.2-nemoretriever-1b-vlm-embed-v1"]
+MULTI_MODAL_MODELS = [
+    "llama-3.2-nemoretriever-1b-vlm-embed-v1",
+    "nvidia/llama-nemotron-embed-vl-1b-v2",
+]
 
 
 # ------------------------------------------------------------------------------
@@ -326,19 +329,29 @@ def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optiona
 
 def _get_pandas_text_content(row, modality="text"):
     """
-    Extracts text content from a DataFrame row.
+    Extracts text content from a DataFrame row's metadata.
 
     Parameters
     ----------
-    row : pandas.Series
-        A row containing the 'content' key.
+    row : dict
+        The metadata dictionary containing 'content' and optionally 'text_metadata.source_image'.
 
     Returns
     -------
     str
-        The text content from the row.
+        The text content, image content, or combined text+image content based on modality.
     """
-    return row["content"]
+    if modality == "text":
+        content = row.get("content")
+    elif modality == "image":
+        source_image = row.get("text_metadata", {}).get("source_image")
+        content = _format_image_input_string(source_image)
+    elif modality == "text_image":
+        text = row.get("content")
+        source_image = row.get("text_metadata", {}).get("source_image")
+        content = _format_text_image_pair_input_string(text, source_image)
+
+    return content
 
 
 def _get_pandas_table_content(row, modality="text"):
@@ -423,6 +436,30 @@ def _get_pandas_custom_content(row, custom_content_field):
     except (TypeError, ValueError):
         logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
         return None
+
+
+def _cleanup_source_images(row):
+    """
+    Removes source_image from text_metadata to reduce metadata size.
+
+    The source_image field is used during embedding for text_image modality
+    but should be removed afterward to avoid exceeding storage limits
+    (e.g., Milvus JSON field 64KB limit).
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A DataFrame row containing 'metadata'.
+
+    Returns
+    -------
+    pandas.Series
+        The row with source_image removed from text_metadata.
+    """
+    text_metadata = row.get("metadata", {}).get("text_metadata")
+    if text_metadata and "source_image" in text_metadata:
+        del text_metadata["source_image"]
+    return row
 
 
 # ------------------------------------------------------------------------------
@@ -698,5 +735,9 @@ def transform_create_text_embeddings_internal(
         combined_df = combined_df.apply(
             _add_custom_embeddings, embeddings=custom_embeddings_dict, result_target_field=result_target_field, axis=1
         )
+
+    # Clean up source_image from text_metadata to avoid exceeding Milvus JSON field limits.
+    # The source_image is only needed during embedding and can be safely removed afterward.
+    combined_df = combined_df.apply(_cleanup_source_images, axis=1)
 
     return combined_df, {"trace_info": execution_trace_log}
