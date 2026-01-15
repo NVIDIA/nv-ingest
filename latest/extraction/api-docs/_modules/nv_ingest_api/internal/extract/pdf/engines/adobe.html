@@ -1,0 +1,944 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_api.internal.extract.pdf.engines.adobe &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_api/internal/extract/pdf/engines/adobe';</script>
+    <link rel="icon" href="../../../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal.extract.pdf.engines.adobe</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_api.internal.extract.pdf.engines.adobe</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="c1"># Copyright (c) 2024, NVIDIA CORPORATION.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pypdfium2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pdfium</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.enums.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">AccessLevelEnum</span><span class="p">,</span> <span class="n">DocumentTypeEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.enums.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContentTypeEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.enums.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContentDescriptionEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.enums.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">TableFormatEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.enums.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">TextTypeEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.internal.schemas.meta.metadata_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_metadata</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.converters</span><span class="w"> </span><span class="kn">import</span> <span class="n">bytetools</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.metadata.aggregators</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_pdf_metadata</span><span class="p">,</span> <span class="n">construct_text_metadata</span>
+
+<span class="n">ADOBE_INSTALLED</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.auth.service_principal_credentials</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServicePrincipalCredentials</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.exception.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SdkException</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.exception.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServiceApiException</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.exception.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServiceUsageException</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.io.cloud_asset</span><span class="w"> </span><span class="kn">import</span> <span class="n">CloudAsset</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.io.stream_asset</span><span class="w"> </span><span class="kn">import</span> <span class="n">StreamAsset</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdf_services</span><span class="w"> </span><span class="kn">import</span> <span class="n">PDFServices</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdf_services_media_type</span><span class="w"> </span><span class="kn">import</span> <span class="n">PDFServicesMediaType</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.jobs.extract_pdf_job</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractPDFJob</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.params.extract_pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_renditions_element_type</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.params.extract_pdf.extract_element_type</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractElementType</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.params.extract_pdf.extract_pdf_params</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractPDFParams</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.params.extract_pdf.table_structure_type</span><span class="w"> </span><span class="kn">import</span> <span class="n">TableStructureType</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">adobe.pdfservices.operation.pdfjobs.result.extract_pdf_result</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractPDFResult</span>
+
+    <span class="n">ExtractRenditionsElementType</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">extract_renditions_element_type</span><span class="o">.</span><span class="n">ExtractRenditionsElementType</span>
+    <span class="p">)</span>  <span class="c1"># black / isort conflict</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">ADOBE_INSTALLED</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="adobe_extractor">
+<a class="viewcode-back" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.extract.pdf.engines.html#nv_ingest_api.internal.extract.pdf.engines.adobe.adobe_extractor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">adobe_extractor</span><span class="p">(</span>
+    <span class="n">pdf_stream</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">,</span>
+    <span class="n">extract_text</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_images</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_infographics</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_tables</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extractor_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">execution_trace_log</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Helper function to use unstructured-io REST API to extract text from a bytestream PDF.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pdf_stream : io.BytesIO</span>
+<span class="sd">        A bytestream PDF.</span>
+<span class="sd">    extract_text : bool</span>
+<span class="sd">        Specifies whether to extract text.</span>
+<span class="sd">    extract_images : bool</span>
+<span class="sd">        Specifies whether to extract images.</span>
+<span class="sd">    extract_infographics : bool</span>
+<span class="sd">        Specifies whether to extract infographics.</span>
+<span class="sd">    extract_tables : bool</span>
+<span class="sd">        Specifies whether to extract tables.</span>
+<span class="sd">    extractor_config : dict</span>
+<span class="sd">        A dictionary containing additional extraction parameters such as API credentials,</span>
+<span class="sd">        row_data, text_depth, and other optional settings.</span>
+<span class="sd">    execution_trace_log : optional</span>
+<span class="sd">        Trace information for debugging purposes.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        A string of extracted text.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If the Adobe SDK is not installed.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If required configuration parameters are missing or invalid.</span>
+<span class="sd">    SDKError</span>
+<span class="sd">        If there is an error during extraction.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Not used for Adobe extraction, currently.</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">execution_trace_log</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">extract_infographics</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Extracting PDF with Adobe backend.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ADOBE_INSTALLED</span><span class="p">:</span>
+        <span class="n">err_msg</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;Adobe SDK not installed -- cannot extract PDF.</span><span class="se">\r\n</span><span class="s2">To install the adobe SDK please review the &quot;</span>
+            <span class="s2">&quot;license agreement at https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file and &quot;</span>
+            <span class="s2">&quot;re-launch the nv-ingest microservice with -e INSTALL_ADOBE_SDK=True.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">err_msg</span><span class="p">)</span>
+
+    <span class="c1"># Ensure extractor_config is a dictionary.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">extractor_config</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;extractor_config must be a dictionary.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Retrieve Adobe API keys.</span>
+    <span class="n">client_id</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;adobe_client_id&quot;</span><span class="p">)</span>
+    <span class="n">client_secret</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;adobe_client_secret&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">client_id</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">client_secret</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Missing Adobe API credentials in extractor_config (adobe_client_id and adobe_client_secret are required).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Get row_data from configuration.</span>
+    <span class="n">row_data</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;row_data&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">row_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing &#39;row_data&#39; in extractor_config.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Retrieve source information.</span>
+    <span class="n">source_id</span> <span class="o">=</span> <span class="n">row_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;source_id&quot;</span><span class="p">)</span>
+    <span class="n">file_name</span> <span class="o">=</span> <span class="n">row_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;_.pdf&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Retrieve and validate text_depth.</span>
+    <span class="n">text_depth_str</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text_depth&quot;</span><span class="p">,</span> <span class="s2">&quot;page&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">text_depth</span> <span class="o">=</span> <span class="n">TextTypeEnum</span><span class="p">[</span><span class="n">text_depth_str</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="n">valid_options</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">TextTypeEnum</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid text_depth value: </span><span class="si">{</span><span class="n">text_depth_str</span><span class="si">}</span><span class="s2">. Expected one of: </span><span class="si">{</span><span class="n">valid_options</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Optional settings.</span>
+    <span class="n">identify_nearby_objects</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identify_nearby_objects&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">metadata_col</span> <span class="o">=</span> <span class="n">extractor_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata_column&quot;</span><span class="p">,</span> <span class="s2">&quot;metadata&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">row_data</span><span class="p">,</span> <span class="s2">&quot;index&quot;</span><span class="p">):</span>
+        <span class="n">base_unified_metadata</span> <span class="o">=</span> <span class="n">row_data</span><span class="p">[</span><span class="n">metadata_col</span><span class="p">]</span> <span class="k">if</span> <span class="n">metadata_col</span> <span class="ow">in</span> <span class="n">row_data</span><span class="o">.</span><span class="n">index</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">base_unified_metadata</span> <span class="o">=</span> <span class="n">row_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">metadata_col</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="c1"># get base source_metadata</span>
+    <span class="n">base_source_metadata</span> <span class="o">=</span> <span class="n">base_unified_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;source_metadata&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="c1"># get source_location</span>
+    <span class="n">source_location</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;source_location&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># get collection_id (assuming coming in from source_metadata...)</span>
+    <span class="n">collection_id</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;collection_id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># get partition_id (assuming coming in from source_metadata...)</span>
+    <span class="n">partition_id</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;partition_id&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># get access_level (assuming coming in from source_metadata...)</span>
+    <span class="n">access_level</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;access_level&quot;</span><span class="p">,</span> <span class="n">AccessLevelEnum</span><span class="o">.</span><span class="n">UNKNOWN</span><span class="p">)</span>
+
+    <span class="n">source_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="n">file_name</span><span class="p">,</span>
+        <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="n">source_id</span><span class="p">,</span>
+        <span class="s2">&quot;source_location&quot;</span><span class="p">:</span> <span class="n">source_location</span><span class="p">,</span>
+        <span class="s2">&quot;collection_id&quot;</span><span class="p">:</span> <span class="n">collection_id</span><span class="p">,</span>
+        <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;partition_id&quot;</span><span class="p">:</span> <span class="n">partition_id</span><span class="p">,</span>
+        <span class="s2">&quot;access_level&quot;</span><span class="p">:</span> <span class="n">access_level</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">doc</span> <span class="o">=</span> <span class="n">pdfium</span><span class="o">.</span><span class="n">PdfDocument</span><span class="p">(</span><span class="n">pdf_stream</span><span class="p">)</span>
+    <span class="n">pdf_metadata</span> <span class="o">=</span> <span class="n">extract_pdf_metadata</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">source_id</span><span class="p">)</span>
+
+    <span class="n">document_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">source_type</span><span class="p">,</span>
+        <span class="s2">&quot;date_created&quot;</span><span class="p">:</span> <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">date_created</span><span class="p">,</span>
+        <span class="s2">&quot;last_modified&quot;</span><span class="p">:</span> <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">last_modified</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">source_metadata</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">document_metadata</span><span class="p">)</span>
+
+    <span class="n">retry_delay</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">max_delay</span> <span class="o">=</span> <span class="mi">50</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Initial setup, create credentials instance</span>
+            <span class="n">credentials</span> <span class="o">=</span> <span class="n">ServicePrincipalCredentials</span><span class="p">(</span>
+                <span class="n">client_id</span><span class="o">=</span><span class="n">client_id</span><span class="p">,</span>
+                <span class="n">client_secret</span><span class="o">=</span><span class="n">client_secret</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Creates a PDF Services instance</span>
+            <span class="n">pdf_services</span> <span class="o">=</span> <span class="n">PDFServices</span><span class="p">(</span><span class="n">credentials</span><span class="o">=</span><span class="n">credentials</span><span class="p">)</span>
+
+            <span class="c1"># Creates an asset(s) from source file(s) and upload</span>
+            <span class="n">input_asset</span> <span class="o">=</span> <span class="n">pdf_services</span><span class="o">.</span><span class="n">upload</span><span class="p">(</span><span class="n">input_stream</span><span class="o">=</span><span class="n">pdf_stream</span><span class="p">,</span> <span class="n">mime_type</span><span class="o">=</span><span class="n">PDFServicesMediaType</span><span class="o">.</span><span class="n">PDF</span><span class="p">)</span>
+
+            <span class="c1"># Create parameters for the job</span>
+            <span class="n">elements_to_extract</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">extract_text</span><span class="p">:</span>
+                <span class="n">elements_to_extract</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExtractElementType</span><span class="o">.</span><span class="n">TEXT</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">extract_tables</span><span class="p">:</span>
+                <span class="n">elements_to_extract</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExtractElementType</span><span class="o">.</span><span class="n">TABLES</span><span class="p">)</span>
+
+            <span class="n">extract_pdf_params</span> <span class="o">=</span> <span class="n">ExtractPDFParams</span><span class="p">(</span>
+                <span class="n">table_structure_type</span><span class="o">=</span><span class="n">TableStructureType</span><span class="o">.</span><span class="n">CSV</span><span class="p">,</span>
+                <span class="n">elements_to_extract</span><span class="o">=</span><span class="n">elements_to_extract</span><span class="p">,</span>
+                <span class="n">elements_to_extract_renditions</span><span class="o">=</span><span class="p">[</span><span class="n">ExtractRenditionsElementType</span><span class="o">.</span><span class="n">FIGURES</span><span class="p">]</span> <span class="k">if</span> <span class="n">extract_images</span> <span class="k">else</span> <span class="p">[],</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Creates a new job instance</span>
+            <span class="n">extract_pdf_job</span> <span class="o">=</span> <span class="n">ExtractPDFJob</span><span class="p">(</span><span class="n">input_asset</span><span class="o">=</span><span class="n">input_asset</span><span class="p">,</span> <span class="n">extract_pdf_params</span><span class="o">=</span><span class="n">extract_pdf_params</span><span class="p">)</span>
+
+            <span class="c1"># Submit the job and gets the job result</span>
+            <span class="n">location</span> <span class="o">=</span> <span class="n">pdf_services</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">extract_pdf_job</span><span class="p">)</span>
+            <span class="n">pdf_services_response</span> <span class="o">=</span> <span class="n">pdf_services</span><span class="o">.</span><span class="n">get_job_result</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">ExtractPDFResult</span><span class="p">)</span>
+
+            <span class="c1"># Get content from the resulting asset(s)</span>
+            <span class="n">result_asset</span><span class="p">:</span> <span class="n">CloudAsset</span> <span class="o">=</span> <span class="n">pdf_services_response</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span><span class="o">.</span><span class="n">get_resource</span><span class="p">()</span>
+            <span class="n">stream_asset</span><span class="p">:</span> <span class="n">StreamAsset</span> <span class="o">=</span> <span class="n">pdf_services</span><span class="o">.</span><span class="n">get_content</span><span class="p">(</span><span class="n">result_asset</span><span class="p">)</span>
+
+            <span class="n">archive</span> <span class="o">=</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">stream_asset</span><span class="o">.</span><span class="n">get_input_stream</span><span class="p">()))</span>
+            <span class="n">jsonentry</span> <span class="o">=</span> <span class="n">archive</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;structuredData.json&quot;</span><span class="p">)</span>
+            <span class="n">jsondata</span> <span class="o">=</span> <span class="n">jsonentry</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">jsondata</span><span class="p">)</span>
+
+            <span class="c1"># Request successful</span>
+            <span class="k">break</span>
+
+        <span class="k">except</span> <span class="p">(</span><span class="n">ServiceApiException</span><span class="p">,</span> <span class="n">ServiceUsageException</span><span class="p">,</span> <span class="n">SdkException</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">ServiceUsageException</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">retry_delay</span> <span class="o">*</span> <span class="mf">1.1</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">max_delay</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>
+                <span class="n">retry_delay</span> <span class="o">*=</span> <span class="mf">1.1</span>
+                <span class="n">retry_delay</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exception encountered while executing operation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">, retrying in </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span><span class="si">}</span><span class="s2">s.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exception encountered while executing operation: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="n">extracted_data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">accumulated_text</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">page_idx</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">page_nearby_blocks</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+        <span class="s2">&quot;images&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+        <span class="s2">&quot;structured&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+    <span class="p">}</span>
+
+    <span class="k">for</span> <span class="n">block_idx</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;elements&quot;</span><span class="p">]):</span>
+        <span class="c1"># Extract text</span>
+        <span class="k">if</span> <span class="n">extract_text</span> <span class="ow">and</span> <span class="s2">&quot;Text&quot;</span> <span class="ow">in</span> <span class="n">item</span> <span class="ow">and</span> <span class="s2">&quot;Table&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Path&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="s2">&quot;Figure&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Path&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Page&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">page_idx</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">text_depth</span> <span class="o">==</span> <span class="n">TextTypeEnum</span><span class="o">.</span><span class="n">PAGE</span><span class="p">:</span>
+                    <span class="n">text_extraction</span> <span class="o">=</span> <span class="n">construct_text_metadata</span><span class="p">(</span>
+                        <span class="n">accumulated_text</span><span class="p">,</span>
+                        <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+                        <span class="n">page_idx</span><span class="p">,</span>
+                        <span class="n">block_idx</span><span class="p">,</span>
+                        <span class="n">text_depth</span><span class="p">,</span>
+                        <span class="n">source_metadata</span><span class="p">,</span>
+                        <span class="n">base_unified_metadata</span><span class="p">,</span>
+                        <span class="n">bbox</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;pages&quot;</span><span class="p">][</span><span class="n">page_idx</span><span class="p">][</span><span class="s2">&quot;width&quot;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;pages&quot;</span><span class="p">][</span><span class="n">page_idx</span><span class="p">][</span><span class="s2">&quot;height&quot;</span><span class="p">]),</span>
+                    <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span>
+
+                    <span class="n">accumulated_text</span> <span class="o">=</span> <span class="p">[]</span>
+
+                <span class="n">page_nearby_blocks</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+                    <span class="s2">&quot;images&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+                    <span class="s2">&quot;structured&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;bbox&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+                <span class="p">}</span>
+                <span class="n">page_idx</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Page&quot;</span><span class="p">]</span>
+
+            <span class="n">accumulated_text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;Text&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+            <span class="k">if</span> <span class="n">text_depth</span> <span class="o">==</span> <span class="n">TextTypeEnum</span><span class="o">.</span><span class="n">BLOCK</span><span class="p">:</span>
+                <span class="n">bounds</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Bounds&quot;</span><span class="p">]</span>
+
+                <span class="n">text_extraction</span> <span class="o">=</span> <span class="n">construct_text_metadata</span><span class="p">(</span>
+                    <span class="n">accumulated_text</span><span class="p">,</span>
+                    <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+                    <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Page&quot;</span><span class="p">],</span>
+                    <span class="n">block_idx</span><span class="p">,</span>
+                    <span class="n">text_depth</span><span class="p">,</span>
+                    <span class="n">source_metadata</span><span class="p">,</span>
+                    <span class="n">base_unified_metadata</span><span class="p">,</span>
+                    <span class="n">bbox</span><span class="o">=</span><span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span>
+
+                <span class="n">accumulated_text</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">extract_images</span> <span class="ow">and</span> <span class="n">identify_nearby_objects</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;Text&quot;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="n">bounds</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Bounds&quot;</span><span class="p">]</span>
+                <span class="n">page_nearby_blocks</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">][</span><span class="s2">&quot;content&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;Text&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()))</span>
+                <span class="n">page_nearby_blocks</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">][</span><span class="s2">&quot;bbox&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+
+        <span class="c1"># Extract images</span>
+        <span class="k">if</span> <span class="n">extract_images</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Path&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;/Figure&quot;</span><span class="p">):</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Bounds&quot;</span><span class="p">]</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">figure</span> <span class="o">=</span> <span class="n">archive</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;filePaths&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+                <span class="n">base64_img</span> <span class="o">=</span> <span class="n">bytetools</span><span class="o">.</span><span class="n">base64frombytes</span><span class="p">(</span><span class="n">figure</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="n">base64_img</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+            <span class="n">image_extraction</span> <span class="o">=</span> <span class="n">_construct_image_metadata</span><span class="p">(</span>
+                <span class="n">base64_img</span><span class="p">,</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Text&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+                <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Page&quot;</span><span class="p">],</span>
+                <span class="n">block_idx</span><span class="p">,</span>
+                <span class="n">source_metadata</span><span class="p">,</span>
+                <span class="n">base_unified_metadata</span><span class="p">,</span>
+                <span class="n">page_nearby_blocks</span><span class="p">,</span>
+                <span class="n">bbox</span><span class="o">=</span><span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+            <span class="p">)</span>
+
+            <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">image_extraction</span><span class="p">)</span>
+
+        <span class="c1"># Extract tables</span>
+        <span class="k">if</span> <span class="n">extract_tables</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Path&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;/Table&quot;</span><span class="p">):</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Bounds&quot;</span><span class="p">]</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">archive</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;filePaths&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot;,&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+            <span class="n">table_extraction</span> <span class="o">=</span> <span class="n">_construct_table_metadata</span><span class="p">(</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">to_markdown</span><span class="p">(),</span>
+                <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;Page&quot;</span><span class="p">],</span>
+                <span class="n">block_idx</span><span class="p">,</span>
+                <span class="n">source_metadata</span><span class="p">,</span>
+                <span class="n">base_unified_metadata</span><span class="p">,</span>
+                <span class="n">bbox</span><span class="o">=</span><span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+            <span class="p">)</span>
+
+            <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">table_extraction</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">text_depth</span> <span class="o">==</span> <span class="n">TextTypeEnum</span><span class="o">.</span><span class="n">PAGE</span><span class="p">:</span>
+        <span class="n">text_extraction</span> <span class="o">=</span> <span class="n">construct_text_metadata</span><span class="p">(</span>
+            <span class="n">accumulated_text</span><span class="p">,</span>
+            <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+            <span class="n">page_idx</span><span class="p">,</span>
+            <span class="n">block_idx</span><span class="p">,</span>
+            <span class="n">text_depth</span><span class="p">,</span>
+            <span class="n">source_metadata</span><span class="p">,</span>
+            <span class="n">base_unified_metadata</span><span class="p">,</span>
+            <span class="c1"># bbox=(0, 0, data[&quot;pages&quot;][page_idx][&quot;width&quot;], data[&quot;pages&quot;][page_idx][&quot;height&quot;]),</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">extract_text</span> <span class="ow">and</span> <span class="n">text_depth</span> <span class="o">==</span> <span class="n">TextTypeEnum</span><span class="o">.</span><span class="n">DOCUMENT</span><span class="p">:</span>
+        <span class="n">text_extraction</span> <span class="o">=</span> <span class="n">construct_text_metadata</span><span class="p">(</span>
+            <span class="n">accumulated_text</span><span class="p">,</span>
+            <span class="n">pdf_metadata</span><span class="o">.</span><span class="n">page_count</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">text_depth</span><span class="p">,</span>
+            <span class="n">source_metadata</span><span class="p">,</span>
+            <span class="n">base_unified_metadata</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">extracted_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">text_extraction</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">extracted_data</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_construct_image_metadata</span><span class="p">(</span>
+    <span class="n">image</span><span class="p">,</span>
+    <span class="n">image_text</span><span class="p">,</span>
+    <span class="n">page_count</span><span class="p">,</span>
+    <span class="n">page_idx</span><span class="p">,</span>
+    <span class="n">block_idx</span><span class="p">,</span>
+    <span class="n">source_metadata</span><span class="p">,</span>
+    <span class="n">base_unified_metadata</span><span class="p">,</span>
+    <span class="n">page_nearby_blocks</span><span class="p">,</span>
+    <span class="n">bbox</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">content_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">IMAGE</span><span class="p">,</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="n">ContentDescriptionEnum</span><span class="o">.</span><span class="n">PDF_IMAGE</span><span class="p">,</span>
+        <span class="s2">&quot;page_number&quot;</span><span class="p">:</span> <span class="n">page_idx</span><span class="p">,</span>
+        <span class="s2">&quot;hierarchy&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;page_count&quot;</span><span class="p">:</span> <span class="n">page_count</span><span class="p">,</span>
+            <span class="s2">&quot;page&quot;</span><span class="p">:</span> <span class="n">page_idx</span><span class="p">,</span>
+            <span class="s2">&quot;block&quot;</span><span class="p">:</span> <span class="n">block_idx</span><span class="p">,</span>
+            <span class="s2">&quot;line&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;span&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;nearby_objects&quot;</span><span class="p">:</span> <span class="n">page_nearby_blocks</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+
+    <span class="n">image_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;image_type&quot;</span><span class="p">:</span> <span class="n">DocumentTypeEnum</span><span class="o">.</span><span class="n">PNG</span><span class="p">,</span>
+        <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">image_text</span><span class="p">,</span>
+        <span class="s2">&quot;image_location&quot;</span><span class="p">:</span> <span class="n">bbox</span><span class="p">,</span>
+        <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="n">bbox</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">bbox</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="n">bbox</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">-</span> <span class="n">bbox</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+    <span class="p">}</span>
+
+    <span class="n">unified_metadata</span> <span class="o">=</span> <span class="n">base_unified_metadata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">unified_metadata</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">image</span><span class="p">,</span>
+            <span class="s2">&quot;source_metadata&quot;</span><span class="p">:</span> <span class="n">source_metadata</span><span class="p">,</span>
+            <span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="n">content_metadata</span><span class="p">,</span>
+            <span class="s2">&quot;image_metadata&quot;</span><span class="p">:</span> <span class="n">image_metadata</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">validated_unified_metadata</span> <span class="o">=</span> <span class="n">validate_metadata</span><span class="p">(</span><span class="n">unified_metadata</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">IMAGE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">validated_unified_metadata</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_construct_table_metadata</span><span class="p">(</span>
+    <span class="n">table</span><span class="p">,</span>
+    <span class="n">page_count</span><span class="p">,</span>
+    <span class="n">page_idx</span><span class="p">,</span>
+    <span class="n">block_idx</span><span class="p">,</span>
+    <span class="n">source_metadata</span><span class="p">,</span>
+    <span class="n">base_unified_metadata</span><span class="p">,</span>
+    <span class="n">bbox</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">content_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">STRUCTURED</span><span class="p">,</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="n">ContentDescriptionEnum</span><span class="o">.</span><span class="n">PDF_TABLE</span><span class="p">,</span>
+        <span class="s2">&quot;page_number&quot;</span><span class="p">:</span> <span class="n">page_idx</span><span class="p">,</span>
+        <span class="s2">&quot;hierarchy&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;page_count&quot;</span><span class="p">:</span> <span class="n">page_count</span><span class="p">,</span>
+            <span class="s2">&quot;page&quot;</span><span class="p">:</span> <span class="n">page_idx</span><span class="p">,</span>
+            <span class="s2">&quot;block&quot;</span><span class="p">:</span> <span class="n">block_idx</span><span class="p">,</span>
+            <span class="s2">&quot;line&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;span&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+
+    <span class="n">table_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;table_format&quot;</span><span class="p">:</span> <span class="n">TableFormatEnum</span><span class="o">.</span><span class="n">MARKDOWN</span><span class="p">,</span>
+        <span class="s2">&quot;table_location&quot;</span><span class="p">:</span> <span class="n">bbox</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">unified_metadata</span> <span class="o">=</span> <span class="n">base_unified_metadata</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">unified_metadata</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">table</span><span class="p">,</span>
+            <span class="s2">&quot;source_metadata&quot;</span><span class="p">:</span> <span class="n">source_metadata</span><span class="p">,</span>
+            <span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="n">content_metadata</span><span class="p">,</span>
+            <span class="s2">&quot;table_metadata&quot;</span><span class="p">:</span> <span class="n">table_metadata</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">validated_unified_metadata</span> <span class="o">=</span> <span class="n">validate_metadata</span><span class="p">(</span><span class="n">unified_metadata</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">STRUCTURED</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">validated_unified_metadata</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">())]</span>
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

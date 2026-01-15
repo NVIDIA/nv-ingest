@@ -1,0 +1,61 @@
+nv\_ingest\_api.internal.extract.image package
+==============================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.extract.image.image_helpers
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.image.chart\_extractor module
+--------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.image.chart_extractor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.extract.image.image\_extractor module
+--------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.image.image_extractor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.extract.image.infographic\_extractor module
+--------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.image.infographic_extractor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.extract.image.ocr\_extractor module
+------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.image.ocr_extractor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.extract.image.table\_extractor module
+--------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.image.table_extractor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.image
+   :members:
+   :undoc-members:
+   :show-inheritance:

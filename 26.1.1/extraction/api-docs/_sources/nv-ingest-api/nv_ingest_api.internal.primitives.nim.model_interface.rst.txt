@@ -1,0 +1,93 @@
+nv\_ingest\_api.internal.primitives.nim.model\_interface package
+================================================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.cached module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.cached
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.decorators module
+--------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.decorators
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.deplot module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.deplot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.helpers module
+-----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.helpers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.nemotron\_parse module
+-------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.nemotron_parse
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.ocr module
+-------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.ocr
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.parakeet module
+------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.parakeet
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.text\_embedding module
+-------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.text_embedding
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.vlm module
+-------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.vlm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.nim.model\_interface.yolox module
+---------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface.yolox
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.model_interface
+   :members:
+   :undoc-members:
+   :show-inheritance:

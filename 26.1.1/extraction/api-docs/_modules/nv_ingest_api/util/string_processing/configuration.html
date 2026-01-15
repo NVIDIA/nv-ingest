@@ -1,0 +1,1148 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_api.util.string_processing.configuration &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/autodoc_pydantic.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_api/util/string_processing/configuration';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../string_processing.html" class="nav-link">nv_ingest_api.util.string_processing</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.util.string_processing.configuration</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_api.util.string_processing.configuration</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="c1"># flake8: noqa: E541</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.pipeline.pipeline_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineConfigSchema</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">deque</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.system.hardware_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SystemResourceProbe</span>
+
+<span class="c1"># Optional import for graphviz</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">graphviz</span>
+
+    <span class="n">GRAPHVIZ_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">GRAPHVIZ_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># Optional import for PyArrow</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">pyarrow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pa</span>
+
+    <span class="n">PYARROW_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">PYARROW_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># Optional import for Ray</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+    <span class="n">RAY_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">RAY_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># Color palette for pipeline phases</span>
+<span class="n">PHASE_COLORS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;PRE_PROCESSING&quot;</span><span class="p">:</span> <span class="s2">&quot;#e6e0d4&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;EXTRACTION&quot;</span><span class="p">:</span> <span class="s2">&quot;#d4e6e0&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;POST_PROCESSING&quot;</span><span class="p">:</span> <span class="s2">&quot;#e0d4e6&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;MUTATION&quot;</span><span class="p">:</span> <span class="s2">&quot;#d4d4e6&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;TRANSFORM&quot;</span><span class="p">:</span> <span class="s2">&quot;#e6d4d4&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;RESPONSE&quot;</span><span class="p">:</span> <span class="s2">&quot;#e6e6d4&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="pretty_print_pipeline_config">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html#nv_ingest_api.util.string_processing.configuration.pretty_print_pipeline_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pretty_print_pipeline_config</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">,</span> <span class="n">config_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a comprehensive, human-readable representation of a pipeline configuration.</span>
+
+<span class="sd">    This function creates a detailed, formatted string that displays all aspects</span>
+<span class="sd">    of a pipeline configuration including stages, dependencies, scaling settings,</span>
+<span class="sd">    and execution topology in a clear, hierarchical format.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : PipelineConfigSchema</span>
+<span class="sd">        The pipeline configuration to format and display.</span>
+<span class="sd">    config_path : str, optional</span>
+<span class="sd">        The file path of the configuration file to display in the header.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        A comprehensive pretty-printed string of the pipeline structure and runtime details.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Header with pipeline overview</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🚀 PIPELINE CONFIGURATION: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">config_path</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📁 Configuration File: </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📋 Description: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">)</span>
+
+    <span class="c1"># Runtime Configuration Summary</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">⚙️  RUNTIME CONFIGURATION:&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Dynamic Scaling: </span><span class="si">{</span><span class="s1">&#39;Disabled&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">disable_dynamic_scaling</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;Enabled&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Dynamic Memory Threshold: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">dynamic_memory_threshold</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Static Memory Threshold: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">static_memory_threshold</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID Kp: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">kp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID Ki: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">ki</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID EMA Alpha: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">ema_alpha</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID Target Queue Depth: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">target_queue_depth</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID Penalty Factor: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">penalty_factor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PID Error Boost Factor: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">pid_controller</span><span class="o">.</span><span class="n">error_boost_factor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># System Resource Information</span>
+    <span class="n">system_probe</span> <span class="o">=</span> <span class="n">SystemResourceProbe</span><span class="p">()</span>
+    <span class="n">details</span> <span class="o">=</span> <span class="n">system_probe</span><span class="o">.</span><span class="n">get_details</span><span class="p">()</span>
+
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🖥️ SYSTEM RESOURCE INFORMATION:&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Effective CPU Cores: </span><span class="si">{</span><span class="n">system_probe</span><span class="o">.</span><span class="n">effective_cores</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • CPU Detection Method: </span><span class="si">{</span><span class="n">system_probe</span><span class="o">.</span><span class="n">detection_method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Total Memory: </span><span class="si">{</span><span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1024</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Memory Detection Method: </span><span class="si">{</span><span class="n">details</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;memory_detection_method&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;unknown&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Show cgroup information if available</span>
+    <span class="k">if</span> <span class="n">details</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cgroup_type&quot;</span><span class="p">):</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Container Runtime: </span><span class="si">{</span><span class="n">details</span><span class="p">[</span><span class="s1">&#39;cgroup_type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> cgroups detected&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">details</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cgroup_quota_cores&quot;</span><span class="p">):</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • CPU Limit (cgroup): </span><span class="si">{</span><span class="n">details</span><span class="p">[</span><span class="s1">&#39;cgroup_quota_cores&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> cores&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">details</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cgroup_memory_limit_bytes&quot;</span><span class="p">):</span>
+            <span class="n">cgroup_memory_gb</span> <span class="o">=</span> <span class="n">details</span><span class="p">[</span><span class="s2">&quot;cgroup_memory_limit_bytes&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Memory Limit (cgroup): </span><span class="si">{</span><span class="n">cgroup_memory_gb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Container Runtime: No cgroup limits detected (bare metal/VM)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Show static memory threshold if dynamic scaling is disabled</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">disable_dynamic_scaling</span><span class="p">:</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">static_memory_threshold</span>
+        <span class="n">available_memory_gb</span> <span class="o">=</span> <span class="p">(</span><span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">threshold</span> <span class="o">/</span> <span class="mi">1024</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;   • Static Memory Threshold: </span><span class="si">{</span><span class="n">threshold</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">available_memory_gb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB available for replicas)&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># PyArrow Configuration Information</span>
+    <span class="k">if</span> <span class="n">PYARROW_AVAILABLE</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🏹 PYARROW CONFIGURATION:&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get default memory pool type from environment or PyArrow</span>
+        <span class="n">arrow_memory_pool_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ARROW_DEFAULT_MEMORY_POOL&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get actual memory pool information</span>
+            <span class="n">default_pool</span> <span class="o">=</span> <span class="n">pa</span><span class="o">.</span><span class="n">default_memory_pool</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Get memory pool type using backend_name property</span>
+                <span class="n">pool_type</span> <span class="o">=</span> <span class="n">default_pool</span><span class="o">.</span><span class="n">backend_name</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="c1"># Fallback to class name parsing for older PyArrow versions</span>
+                <span class="n">pool_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">default_pool</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;MemoryPool&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+            <span class="c1"># Get pool statistics if available</span>
+            <span class="n">pool_bytes_allocated</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">default_pool</span><span class="p">,</span> <span class="s2">&quot;bytes_allocated&quot;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="mi">0</span><span class="p">)()</span>
+            <span class="n">pool_max_memory</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">default_pool</span><span class="p">,</span> <span class="s2">&quot;max_memory&quot;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">)()</span>
+
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Default Memory Pool: </span><span class="si">{</span><span class="n">pool_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Environment Setting: ARROW_DEFAULT_MEMORY_POOL=</span><span class="si">{</span><span class="n">arrow_memory_pool_env</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Current Allocated: </span><span class="si">{</span><span class="n">pool_bytes_allocated</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">pool_max_memory</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Max Memory Limit: </span><span class="si">{</span><span class="n">pool_max_memory</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Max Memory Limit: No limit set&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Memory Pool: Unable to query (</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Show PyArrow version and build info</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • PyArrow Version: </span><span class="si">{</span><span class="n">pa</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check for memory mapping support</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">memory_map_support</span> <span class="o">=</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pa</span><span class="p">,</span> <span class="s2">&quot;memory_map&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pa</span><span class="p">,</span> <span class="s2">&quot;create_memory_map&quot;</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Memory Mapping Support: </span><span class="si">{</span><span class="s1">&#39;Available&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">memory_map_support</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;Not available&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Memory Mapping Support: Unknown&quot;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🏹 PYARROW CONFIGURATION:&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • PyArrow: Not available (not installed)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Ray Configuration Information</span>
+    <span class="k">if</span> <span class="n">RAY_AVAILABLE</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">⚡ RAY CONFIGURATION:&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Ray version and initialization status</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Ray Version: </span><span class="si">{</span><span class="n">ray</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Check if Ray is initialized</span>
+            <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Ray Status: Initialized&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Get cluster information if available</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">cluster_resources</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">cluster_resources</span><span class="p">()</span>
+                    <span class="n">available_resources</span> <span class="o">=</span> <span class="n">ray</span><span class="o">.</span><span class="n">available_resources</span><span class="p">()</span>
+
+                    <span class="n">total_cpus</span> <span class="o">=</span> <span class="n">cluster_resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CPU&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="n">available_cpus</span> <span class="o">=</span> <span class="n">available_resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CPU&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="n">total_memory</span> <span class="o">=</span> <span class="n">cluster_resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># Convert to GB</span>
+                    <span class="n">available_memory</span> <span class="o">=</span> <span class="n">available_resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span>
+
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Cluster CPUs: </span><span class="si">{</span><span class="n">available_cpus</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_cpus</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> available&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">total_memory</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Cluster Memory: </span><span class="si">{</span><span class="n">available_memory</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_memory</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GB available&quot;</span><span class="p">)</span>
+
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Cluster Resources: Unable to query (</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Ray Status: Not initialized&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Ray Status: Error querying (</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Ray environment variables - threading configuration</span>
+        <span class="n">ray_env_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;RAY_num_grpc_threads&quot;</span><span class="p">,</span> <span class="s2">&quot;RAY_num_server_call_thread&quot;</span><span class="p">,</span> <span class="s2">&quot;RAY_worker_num_grpc_internal_threads&quot;</span><span class="p">]</span>
+
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Threading Configuration:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">ray_env_vars</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="s2">&quot;not set&quot;</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     - </span><span class="si">{</span><span class="n">var</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Additional Ray environment variables that might be relevant</span>
+        <span class="n">other_ray_vars</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="n">ray_other_set</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">other_ray_vars</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">ray_other_set</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">var</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">ray_other_set</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Other Ray Settings:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">setting</span> <span class="ow">in</span> <span class="n">ray_other_set</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     - </span><span class="si">{</span><span class="n">setting</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">⚡ RAY CONFIGURATION:&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;   • Ray: Not available (not installed)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check if detailed stage configuration should be shown</span>
+    <span class="n">show_detailed_stages</span> <span class="o">=</span> <span class="n">logger</span><span class="o">.</span><span class="n">isEnabledFor</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">show_detailed_stages</span><span class="p">:</span>
+        <span class="c1"># Detailed Stage Configuration</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">📋 DETAILED STAGE CONFIGURATION:&quot;</span><span class="p">)</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+
+        <span class="c1"># Group stages by numeric phase for proper ordering</span>
+        <span class="n">phases_by_number</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+            <span class="c1"># Extract the actual numeric phase value</span>
+            <span class="n">phase_number</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">phase</span>
+            <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
+
+        <span class="c1"># Sort stages within each phase by dependencies and type</span>
+        <span class="k">for</span> <span class="n">phase_number</span> <span class="ow">in</span> <span class="n">phases_by_number</span><span class="p">:</span>
+            <span class="n">phase_stages</span> <span class="o">=</span> <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span>
+
+            <span class="c1"># Simple dependency-aware sorting within phase</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">stage_sort_key</span><span class="p">(</span><span class="n">stage</span><span class="p">):</span>
+                <span class="c1"># Sources first, then stages with fewer dependencies, then sinks</span>
+                <span class="n">type_priority</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="mi">1</span>
+                <span class="n">dep_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">)</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="k">return</span> <span class="p">(</span><span class="n">type_priority</span><span class="p">,</span> <span class="n">dep_count</span><span class="p">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+            <span class="n">phase_stages</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">stage_sort_key</span><span class="p">)</span>
+            <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span> <span class="o">=</span> <span class="n">phase_stages</span>
+
+        <span class="c1"># Display phases in numerical order</span>
+        <span class="k">for</span> <span class="n">phase_number</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">phases_by_number</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">phase_stages</span> <span class="o">=</span> <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">phase_stages</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Get phase name for display</span>
+            <span class="n">first_stage</span> <span class="o">=</span> <span class="n">phase_stages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">phase_name</span> <span class="o">=</span> <span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;Phase_</span><span class="si">{</span><span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">📊 </span><span class="si">{</span><span class="n">phase_name</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">phase_stages</span><span class="p">:</span>
+                <span class="c1"># Stage header with type icon</span>
+                <span class="n">stage_icon</span> <span class="o">=</span> <span class="s2">&quot;📥&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="s2">&quot;📤&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="s2">&quot;⚙️&quot;</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> STAGE: </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Type: </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Actor or callable</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">actor</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Actor: </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">actor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">stage</span><span class="o">.</span><span class="n">callable</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Callable: </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">callable</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Phase with better formatting</span>
+                <span class="n">phase_display</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">phase</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">phase</span><span class="p">)</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Phase: </span><span class="si">{</span><span class="n">phase_display</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Scaling configuration - handle both count and percentage based configs</span>
+                <span class="n">replica_info</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_min</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">replica_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_min</span><span class="si">}</span><span class="s2"> min&quot;</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_min</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">replica_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_min</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% min&quot;</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">replica_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span><span class="si">}</span><span class="s2"> max&quot;</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">replica_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% max&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">replica_info</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Scaling: </span><span class="si">{</span><span class="s1">&#39; → &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">replica_info</span><span class="p">)</span><span class="si">}</span><span class="s2"> replicas&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Scaling: Default&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Dependencies</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">:</span>
+                    <span class="n">deps</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">)</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Dependencies: </span><span class="si">{</span><span class="n">deps</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Dependencies: None (can start immediately)&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Enabled status</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stage</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Status: ⚠️  DISABLED&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Task filters for callable stages</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">callable</span> <span class="ow">and</span> <span class="n">stage</span><span class="o">.</span><span class="n">task_filters</span><span class="p">:</span>
+                    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Task Filters: </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">task_filters</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Stage Execution Flow</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🔄 PIPELINE EXECUTION FLOW:&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+
+    <span class="c1"># Group stages by numeric phase for proper ordering - ignore the broken topological sort</span>
+    <span class="n">phases_by_number</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="c1"># Extract the actual numeric phase value</span>
+        <span class="n">phase_number</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">phase</span>
+        <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
+
+    <span class="c1"># Sort stages within each phase by dependencies and type</span>
+    <span class="k">for</span> <span class="n">phase_number</span> <span class="ow">in</span> <span class="n">phases_by_number</span><span class="p">:</span>
+        <span class="n">phase_stages</span> <span class="o">=</span> <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span>
+
+        <span class="c1"># Simple dependency-aware sorting within phase</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">stage_sort_key</span><span class="p">(</span><span class="n">stage</span><span class="p">):</span>
+            <span class="c1"># Sources first, then stages with fewer dependencies, then sinks</span>
+            <span class="n">type_priority</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="mi">1</span>
+            <span class="n">dep_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">)</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">type_priority</span><span class="p">,</span> <span class="n">dep_count</span><span class="p">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">phase_stages</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">stage_sort_key</span><span class="p">)</span>
+        <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span> <span class="o">=</span> <span class="n">phase_stages</span>
+
+    <span class="c1"># Display phases in numerical order</span>
+    <span class="k">for</span> <span class="n">phase_number</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">phases_by_number</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+        <span class="n">phase_stages</span> <span class="o">=</span> <span class="n">phases_by_number</span><span class="p">[</span><span class="n">phase_number</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">phase_stages</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Get phase name for display</span>
+        <span class="n">first_stage</span> <span class="o">=</span> <span class="n">phase_stages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">phase_name</span> <span class="o">=</span> <span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;Phase_</span><span class="si">{</span><span class="n">first_stage</span><span class="o">.</span><span class="n">phase</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">📊 </span><span class="si">{</span><span class="n">phase_name</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">phase_stages</span><span class="p">:</span>
+            <span class="c1"># Stage info with proper indentation</span>
+            <span class="n">stage_icon</span> <span class="o">=</span> <span class="s2">&quot;📥&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="s2">&quot;📤&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="s2">&quot;⚙️&quot;</span>
+            <span class="n">status_icon</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">enabled</span> <span class="k">else</span> <span class="s2">&quot; ⚠️ DISABLED&quot;</span>
+
+            <span class="c1"># Show dependencies inline for better flow understanding</span>
+            <span class="n">deps_info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">:</span>
+                <span class="n">deps_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (after: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+            <span class="c1"># Add replica information</span>
+            <span class="n">replica_info</span> <span class="o">=</span> <span class="n">_get_replica_display_info</span><span class="p">(</span><span class="n">stage</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}{</span><span class="n">deps_info</span><span class="si">}{</span><span class="n">replica_info</span><span class="si">}{</span><span class="n">status_icon</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Pipeline Topology in Execution Order</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🔗 PIPELINE TOPOLOGY (Execution Flow):&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+
+    <span class="c1"># Build a more sophisticated topology view</span>
+    <span class="n">edge_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">reverse_edge_map</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># to_stage -&gt; [from_stages]</span>
+
+    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">edges</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">edge</span><span class="o">.</span><span class="n">from_stage</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">edge_map</span><span class="p">:</span>
+            <span class="n">edge_map</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">from_stage</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">edge_map</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">from_stage</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">to_stage</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_stage</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reverse_edge_map</span><span class="p">:</span>
+            <span class="n">reverse_edge_map</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">to_stage</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">reverse_edge_map</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">to_stage</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">from_stage</span><span class="p">)</span>
+
+    <span class="c1"># Show topology in execution order</span>
+    <span class="n">shown_stages</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">show_stage_connections</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">indent_level</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively show stage connections in execution order.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">in</span> <span class="n">shown_stages</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">shown_stages</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">stage_name</span><span class="p">)</span>
+        <span class="n">indent</span> <span class="o">=</span> <span class="s2">&quot;   &quot;</span> <span class="o">*</span> <span class="n">indent_level</span>
+
+        <span class="c1"># Find the stage object for type icon</span>
+        <span class="n">stage_obj</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">stage_name</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stage_obj</span><span class="p">:</span>
+            <span class="n">stage_icon</span> <span class="o">=</span> <span class="s2">&quot;📥&quot;</span> <span class="k">if</span> <span class="n">stage_obj</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="s2">&quot;📤&quot;</span> <span class="k">if</span> <span class="n">stage_obj</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="s2">&quot;⚙️&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">stage_icon</span> <span class="o">=</span> <span class="s2">&quot;❓&quot;</span>
+
+        <span class="c1"># Add replica information</span>
+        <span class="n">replica_info</span> <span class="o">=</span> <span class="n">_get_replica_display_info</span><span class="p">(</span><span class="n">stage_obj</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+
+        <span class="c1"># Show outgoing connections</span>
+        <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">in</span> <span class="n">edge_map</span><span class="p">:</span>
+            <span class="n">targets</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">edge_map</span><span class="p">[</span><span class="n">stage_name</span><span class="p">])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">indent</span><span class="si">}{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}{</span><span class="n">replica_info</span><span class="si">}</span><span class="s2"> → </span><span class="si">{</span><span class="n">targets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="c1"># Recursively show the target&#39;s connections</span>
+                <span class="n">show_stage_connections</span><span class="p">(</span><span class="n">targets</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">indent_level</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">indent</span><span class="si">}{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}{</span><span class="n">replica_info</span><span class="si">}</span><span class="s2"> → [</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+                <span class="c1"># Show each target&#39;s connections</span>
+                <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">targets</span><span class="p">:</span>
+                    <span class="n">show_stage_connections</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">indent_level</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Terminal stage (no outgoing connections)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">indent</span><span class="si">}{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}{</span><span class="n">replica_info</span><span class="si">}</span><span class="s2"> (terminal)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Start with source stages (stages with no incoming edges)</span>
+    <span class="n">source_stages</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reverse_edge_map</span> <span class="ow">and</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span><span class="p">:</span>
+            <span class="n">source_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="c1"># If no clear sources found, start with all stages that have no dependencies</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">source_stages</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reverse_edge_map</span><span class="p">:</span>
+                <span class="n">source_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="c1"># Show connections starting from sources</span>
+    <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">source_stages</span><span class="p">):</span>
+        <span class="n">show_stage_connections</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+    <span class="c1"># Show any remaining stages that weren&#39;t connected</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">shown_stages</span><span class="p">:</span>
+            <span class="n">stage_icon</span> <span class="o">=</span> <span class="s2">&quot;📥&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span> <span class="k">else</span> <span class="s2">&quot;📤&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span> <span class="k">else</span> <span class="s2">&quot;⚙️&quot;</span>
+            <span class="n">replica_info</span> <span class="o">=</span> <span class="n">_get_replica_display_info</span><span class="p">(</span><span class="n">stage</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="n">stage_icon</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}{</span><span class="n">replica_info</span><span class="si">}</span><span class="s2"> (isolated)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Summary Statistics</span>
+    <span class="n">enabled_stages</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">enabled</span><span class="p">]</span>
+    <span class="n">disabled_stages</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="o">.</span><span class="n">enabled</span><span class="p">]</span>
+    <span class="n">source_stages</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">enabled_stages</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span><span class="p">]</span>
+    <span class="n">sink_stages</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">enabled_stages</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sink&quot;</span><span class="p">]</span>
+    <span class="n">processing_stages</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">enabled_stages</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;stage&quot;</span><span class="p">]</span>
+
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">📊 PIPELINE SUMMARY:&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Total Stages: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Enabled: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">enabled_stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">disabled_stages</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Disabled: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">disabled_stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Sources: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">source_stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Processing: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">processing_stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   • Sinks: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sink_stages</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Total Edges: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">edges</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Execution Phases: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">phases_by_number</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;✅ Pipeline configuration loaded and ready for execution!&quot;</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_replica_display_info</span><span class="p">(</span><span class="n">stage</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate replica information display for a stage.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">stage</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot; [1 replica]&quot;</span>  <span class="c1"># Default display</span>
+
+    <span class="n">replicas</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span>
+    <span class="n">replica_parts</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Check if dynamic scaling is disabled</span>
+    <span class="n">dynamic_scaling_disabled</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">pipeline</span><span class="p">,</span> <span class="s2">&quot;disable_dynamic_scaling&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">dynamic_scaling_disabled</span><span class="p">:</span>
+        <span class="c1"># Static scaling mode - show resolved static replica count</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">replicas</span><span class="p">,</span> <span class="s2">&quot;static_replicas&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="c1"># Resolved static replica count</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="si">}</span><span class="s2"> static&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Strategy-based (should be resolved by now, but show strategy info)</span>
+                <span class="n">strategy_config</span> <span class="o">=</span> <span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span>
+                <span class="n">strategy_name</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">strategy</span><span class="o">.</span><span class="n">value</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;strategy&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;unknown&quot;</span>
+
+                <span class="c1"># Show strategy details</span>
+                <span class="n">strategy_details</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;memory_per_replica_mb&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="si">}</span><span class="s2">MB/replica&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;cpu_percent&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">cpu_percent</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">cpu_percent</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">% CPU&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;limit&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;max </span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="n">detail_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">strategy_details</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">if</span> <span class="n">strategy_details</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;static-</span><span class="si">{</span><span class="n">strategy_name</span><span class="si">}{</span><span class="n">detail_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Fallback to legacy fields for static mode</span>
+            <span class="k">if</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span><span class="si">}</span><span class="s2"> static&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">% static&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;1 static&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Dynamic scaling mode - show min-max range with strategy details</span>
+        <span class="n">min_val</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+        <span class="n">max_info</span> <span class="o">=</span> <span class="s2">&quot;?&quot;</span>
+
+        <span class="c1"># Get min replicas</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">replicas</span><span class="p">,</span> <span class="s2">&quot;min_replicas&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">replicas</span><span class="o">.</span><span class="n">min_replicas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">min_val</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">min_replicas</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_min</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">min_val</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_min</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_min</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">min_val</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_min</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">%&quot;</span>
+
+        <span class="c1"># Get max replicas with detailed strategy information</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">replicas</span><span class="p">,</span> <span class="s2">&quot;max_replicas&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">replicas</span><span class="o">.</span><span class="n">max_replicas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">max_info</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Strategy-based max replicas - show strategy details</span>
+                <span class="n">strategy_config</span> <span class="o">=</span> <span class="n">replicas</span><span class="o">.</span><span class="n">max_replicas</span>
+                <span class="n">strategy_name</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">strategy</span><span class="o">.</span><span class="n">value</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;strategy&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;strategy&quot;</span>
+
+                <span class="c1"># Build detailed strategy information</span>
+                <span class="n">strategy_details</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;memory_per_replica_mb&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="si">}</span><span class="s2">MB/replica&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;cpu_percent&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">cpu_percent</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">cpu_percent</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% CPU&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;value=</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">strategy_config</span><span class="p">,</span> <span class="s2">&quot;limit&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span><span class="p">:</span>
+                    <span class="n">strategy_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;limit=</span><span class="si">{</span><span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">strategy_details</span><span class="p">:</span>
+                    <span class="n">max_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">strategy_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">strategy_details</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">max_info</span> <span class="o">=</span> <span class="n">strategy_name</span>
+        <span class="k">elif</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">max_info</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_count_max</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">max_info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">cpu_percent_max</span><span class="o">*</span><span class="mi">100</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">%&quot;</span>
+
+        <span class="c1"># Show scaling range</span>
+        <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">min_val</span><span class="si">}</span><span class="s2">→</span><span class="si">{</span><span class="n">max_info</span><span class="si">}</span><span class="s2"> dynamic&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Also show static strategy if available for comparison</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">replicas</span><span class="p">,</span> <span class="s2">&quot;static_replicas&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;static=</span><span class="si">{</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">static_strategy</span> <span class="o">=</span> <span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span>
+                <span class="n">static_name</span> <span class="o">=</span> <span class="n">static_strategy</span><span class="o">.</span><span class="n">strategy</span><span class="o">.</span><span class="n">value</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">static_strategy</span><span class="p">,</span> <span class="s2">&quot;strategy&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;static&quot;</span>
+                <span class="n">static_details</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">static_strategy</span><span class="p">,</span> <span class="s2">&quot;memory_per_replica_mb&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">static_strategy</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="p">:</span>
+                    <span class="n">static_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">static_strategy</span><span class="o">.</span><span class="n">memory_per_replica_mb</span><span class="si">}</span><span class="s2">MB/replica&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">static_strategy</span><span class="p">,</span> <span class="s2">&quot;limit&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">static_strategy</span><span class="o">.</span><span class="n">limit</span><span class="p">:</span>
+                    <span class="n">static_details</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;limit=</span><span class="si">{</span><span class="n">static_strategy</span><span class="o">.</span><span class="n">limit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="n">detail_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">static_details</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">if</span> <span class="n">static_details</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                <span class="n">replica_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;static=</span><span class="si">{</span><span class="n">static_name</span><span class="si">}{</span><span class="n">detail_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">replica_parts</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot; [</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">replica_parts</span><span class="p">)</span><span class="si">}</span><span class="s2">]&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot; [1 replica]&quot;</span>
+
+
+<div class="viewcode-block" id="dump_pipeline_to_graphviz">
+<a class="viewcode-back" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html#nv_ingest_api.util.string_processing.configuration.dump_pipeline_to_graphviz">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dump_pipeline_to_graphviz</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates a Graphviz visualization of the pipeline configuration.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : PipelineConfigSchema</span>
+<span class="sd">        The pipeline configuration object.</span>
+<span class="sd">    output_path : str</span>
+<span class="sd">        The path to save the Graphviz DOT file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">GRAPHVIZ_AVAILABLE</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;graphviz is not installed. Skipping graph generation.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">dot</span> <span class="o">=</span> <span class="n">graphviz</span><span class="o">.</span><span class="n">Digraph</span><span class="p">(</span><span class="n">comment</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">dot</span><span class="o">.</span><span class="n">attr</span><span class="p">(</span>
+        <span class="s2">&quot;graph&quot;</span><span class="p">,</span>
+        <span class="n">rankdir</span><span class="o">=</span><span class="s2">&quot;TB&quot;</span><span class="p">,</span>
+        <span class="n">splines</span><span class="o">=</span><span class="s2">&quot;ortho&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;&lt;</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&lt;BR/&gt;&lt;FONT POINT-SIZE=&#39;10&#39;&gt;</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&lt;/FONT&gt;&gt;&quot;</span><span class="p">,</span>
+        <span class="n">labelloc</span><span class="o">=</span><span class="s2">&quot;t&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="s2">&quot;20&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Group stages by phase for layered layout</span>
+    <span class="n">stages_by_phase</span> <span class="o">=</span> <span class="p">{</span><span class="n">phase</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">phase</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get_phases</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">value</span><span class="p">)}</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="n">stages_by_phase</span><span class="p">[</span><span class="n">stage</span><span class="o">.</span><span class="n">phase</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
+
+    <span class="c1"># Create nodes within phase subgraphs</span>
+    <span class="k">for</span> <span class="n">phase</span><span class="p">,</span> <span class="n">stages</span> <span class="ow">in</span> <span class="n">stages_by_phase</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">stages</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">with</span> <span class="n">dot</span><span class="o">.</span><span class="n">subgraph</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;cluster_</span><span class="si">{</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">c</span><span class="p">:</span>
+            <span class="n">phase_color</span> <span class="o">=</span> <span class="n">PHASE_COLORS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;lightgrey&quot;</span><span class="p">)</span>
+            <span class="n">c</span><span class="o">.</span><span class="n">attr</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="n">phase</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;filled&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">phase_color</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">stages</span><span class="p">:</span>
+                <span class="c1"># Create a detailed HTML-like label for the node</span>
+                <span class="n">enabled_color</span> <span class="o">=</span> <span class="s2">&quot;darkgreen&quot;</span> <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">enabled</span> <span class="k">else</span> <span class="s2">&quot;red&quot;</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s1">&#39;&lt;&lt;TABLE BORDER=&quot;0&quot; CELLBORDER=&quot;1&quot; CELLSPACING=&quot;0&quot;&gt;&#39;</span>
+                <span class="n">label</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;&lt;TR&gt;&lt;TD COLSPAN=&quot;2&quot; BGCOLOR=&quot;lightblue&quot;&gt;&lt;B&gt;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&lt;/B&gt;&lt;/TD&gt;&lt;/TR&gt;&#39;</span>
+                <span class="n">label</span> <span class="o">+=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s1">&#39;&lt;TR&gt;&lt;TD&gt;Status&lt;/TD&gt;&lt;TD COLOR=&quot;</span><span class="si">{</span><span class="n">enabled_color</span><span class="si">}</span><span class="s1">&quot;&gt;&#39;</span>
+                    <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="s2">&quot;Enabled&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">stage</span><span class="o">.</span><span class="n">enabled</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;Disabled&quot;</span><span class="si">}</span><span class="s1">&lt;/TD&gt;&lt;/TR&gt;&#39;</span>
+                <span class="p">)</span>
+                <span class="n">label</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;TR&gt;&lt;TD&gt;Type&lt;/TD&gt;&lt;TD&gt;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;/TR&gt;&quot;</span>
+                <span class="n">label</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;TR&gt;&lt;TD&gt;Actor&lt;/TD&gt;&lt;TD&gt;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">actor</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;/TR&gt;&quot;</span>
+
+                <span class="c1"># Add replica info</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">exclude_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="n">label</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;TR&gt;&lt;TD&gt;Replica: </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;TD&gt;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;/TR&gt;&quot;</span>
+
+                <span class="c1"># Add config info</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">config</span><span class="p">:</span>
+                    <span class="n">label</span> <span class="o">+=</span> <span class="s1">&#39;&lt;TR&gt;&lt;TD COLSPAN=&quot;2&quot; BGCOLOR=&quot;lightgrey&quot;&gt;&lt;B&gt;Configuration&lt;/B&gt;&lt;/TD&gt;&lt;/TR&gt;&#39;</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">stage</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="n">label</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&lt;TR&gt;&lt;TD&gt;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;TD&gt;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&lt;/TD&gt;&lt;/TR&gt;&quot;</span>
+
+                <span class="n">label</span> <span class="o">+=</span> <span class="s2">&quot;&lt;/TABLE&gt;&gt;&quot;</span>
+                <span class="n">c</span><span class="o">.</span><span class="n">node</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="s2">&quot;plaintext&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Add edges for data flow</span>
+    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">edges</span><span class="p">:</span>
+        <span class="n">dot</span><span class="o">.</span><span class="n">edge</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">from_stage</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_stage</span><span class="p">,</span> <span class="n">penwidth</span><span class="o">=</span><span class="s2">&quot;2&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Add edges for logical dependencies</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">stage</span><span class="o">.</span><span class="n">runs_after</span><span class="p">:</span>
+            <span class="n">dot</span><span class="o">.</span><span class="n">edge</span><span class="p">(</span><span class="n">dep</span><span class="p">,</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;dashed&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;grey&quot;</span><span class="p">,</span> <span class="n">constraint</span><span class="o">=</span><span class="s2">&quot;false&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Add a legend</span>
+    <span class="k">with</span> <span class="n">dot</span><span class="o">.</span><span class="n">subgraph</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;cluster_legend&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">attr</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">&quot;Legend&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">)</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">node</span><span class="p">(</span><span class="s2">&quot;data_flow_legend&quot;</span><span class="p">,</span> <span class="s2">&quot;Data Flow&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="s2">&quot;plaintext&quot;</span><span class="p">)</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">node</span><span class="p">(</span><span class="s2">&quot;dependency_legend&quot;</span><span class="p">,</span> <span class="s2">&quot;Logical Dependency&quot;</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="s2">&quot;plaintext&quot;</span><span class="p">)</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">edge</span><span class="p">(</span><span class="s2">&quot;data_flow_legend&quot;</span><span class="p">,</span> <span class="s2">&quot;dependency_legend&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;invis&quot;</span><span class="p">)</span>  <span class="c1"># layout hack</span>
+        <span class="n">dot</span><span class="o">.</span><span class="n">edge</span><span class="p">(</span><span class="s2">&quot;data_flow_legend&quot;</span><span class="p">,</span> <span class="s2">&quot;dependency_legend&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">penwidth</span><span class="o">=</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;solid&quot;</span><span class="p">)</span>
+        <span class="n">dot</span><span class="o">.</span><span class="n">edge</span><span class="p">(</span><span class="s2">&quot;dependency_legend&quot;</span><span class="p">,</span> <span class="s2">&quot;data_flow_legend&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;dashed&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;grey&quot;</span><span class="p">,</span> <span class="n">constraint</span><span class="o">=</span><span class="s2">&quot;false&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">output_dir</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">dot</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pipeline graph saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save pipeline graph: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
