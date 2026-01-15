@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from pathlib import Path
 
 import click
 
@@ -149,6 +150,17 @@ def run_datasets(
         results_path = os.path.join(out_dir, "results.json")
         with open(results_path, "w") as f:
             json.dump(consolidated, f, indent=2)
+
+        # Write artifact path to session directory for parent processes (e.g., nightly runner)
+        if session_dir:
+            artifact_paths_file = Path(session_dir) / ".artifact_paths.json"
+            artifact_paths = {}
+            if artifact_paths_file.exists():
+                with open(artifact_paths_file) as f:
+                    artifact_paths = json.load(f)
+            artifact_paths[dataset_name] = str(out_dir)
+            with open(artifact_paths_file, "w") as f:
+                json.dump(artifact_paths, f, indent=2)
 
         print(f"\n{'='*60}")
         print(f"Results written to: {results_path}")

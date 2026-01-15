@@ -22,6 +22,7 @@ active:
   sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
+  vdb_backend: milvus  # milvus or lancedb
 
   # Extraction configuration
   extract_text: true
@@ -43,7 +44,7 @@ active:
   enable_image_storage: false  # Enable server-side image storage (defaults to MinIO; set IMAGE_STORAGE_URI=file://... to opt into disk)
 
   # Storage configuration
-  spill_dir: /raid/jioffe/tmp/spill
+  spill_dir: /tmp/spill
   artifacts_dir: null  # null = use default (tools/harness/artifacts)
   collection_name: null  # null = auto-generated
 
@@ -51,9 +52,11 @@ active:
   llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
 # Recall configuration (only used when running recall or e2e_recall tests)
+# Remember to start the reranker service before running recall tests:
+# docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: both  # Options: "none", "with", "both"
+  reranker_mode: none  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
@@ -64,7 +67,7 @@ recall:
 # Use: uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 datasets:
   bo767:
-    path: /raid/jioffe/bo767
+    path: /path/to/bo767
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -73,7 +76,7 @@ datasets:
     recall_dataset: bo767
 
   earnings:
-    path: /raid/jioffe/earnings_consulting
+    path: /path/to/earnings_consulting
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -82,7 +85,7 @@ datasets:
     recall_dataset: earnings
 
   bo20:
-    path: /raid/jioffe/bo20
+    path: /path/to/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -91,7 +94,7 @@ datasets:
     recall_dataset: null
 
   financebench:
-    path: /raid/jioffe/financebench
+    path: /path/to/financebench
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -120,7 +123,7 @@ datasets:
     recall_dataset: null  # No recall evaluator for single file
 
   bo10k:
-    path: /raid/jioffe/bo10k
+    path: /path/to/bo10k
     extract_text: true
     extract_tables: true
     extract_charts: true

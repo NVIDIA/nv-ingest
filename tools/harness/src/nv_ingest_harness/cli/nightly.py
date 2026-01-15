@@ -12,6 +12,7 @@ from typing import Any
 import click
 import yaml
 
+from nv_ingest_harness.config import load_config
 from nv_ingest_harness.reporting.baselines import validate_results, check_all_passed, get_expected_counts
 from nv_ingest_harness.reporting.environment import get_environment_data
 from nv_ingest_harness.sinks import SlackSink, HistorySink
@@ -49,9 +50,28 @@ def run_harness(dataset: str, case: str = "e2e", session_dir: Path | None = None
     result = subprocess.run(cmd, capture_output=False)
 
     if session_dir:
-        artifact_dir = session_dir / dataset
-        if artifact_dir.exists() and (artifact_dir / "results.json").exists():
-            return result.returncode, artifact_dir
+        session_dir = Path(session_dir)
+
+        artifact_paths_file = session_dir / ".artifact_paths.json"
+        if artifact_paths_file.exists():
+            with open(artifact_paths_file) as f:
+                artifact_paths = json.load(f)
+            artifact_dir_str = artifact_paths.get(dataset)
+            if artifact_dir_str:
+                artifact_dir = Path(artifact_dir_str)
+                if artifact_dir.exists() and (artifact_dir / "results.json").exists():
+                    return result.returncode, artifact_dir
+
+        cfg = load_config(case=case, dataset=dataset)
+        artifact_name = cfg.test_name or dataset
+        candidate = session_dir / artifact_name
+        if candidate.exists() and (candidate / "results.json").exists():
+            return result.returncode, candidate
+
+        candidates = [d for d in session_dir.iterdir() if d.is_dir() and (d / "results.json").exists()]
+        if candidates:
+            candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            return result.returncode, candidates[0]
     else:
         artifacts_root = Path(__file__).parents[3] / "artifacts"
         if artifacts_root.exists():

@@ -7,8 +7,9 @@ import os
 import time
 from typing import Callable, Dict, Tuple
 
-from nv_ingest_harness.utils.interact import embed_info, kv_event_log, load_collection, unload_collection
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log
 from nv_ingest_harness.utils.recall import get_dataset_evaluator, get_recall_collection_name
+from nv_ingest_harness.utils.vdb import get_lancedb_path
 
 
 def evaluate_recall_with_reranker(
@@ -72,6 +73,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     recall_top_k = getattr(config, "recall_top_k", 10)
     recall_dataset = getattr(config, "recall_dataset", None)
     ground_truth_dir = getattr(config, "ground_truth_dir", None)
+    vdb_backend = config.vdb_backend
 
     # Validate reranker_mode
     if reranker_mode not in ["none", "with", "both"]:
@@ -93,6 +95,10 @@ def main(config=None, log_path: str = "test_results") -> int:
     # This allows e2e.py and recall.py to use the same collection when run separately
     collection_name = config.collection_name or get_recall_collection_name(test_name)
 
+    lancedb_path = None
+    if vdb_backend == "lancedb":
+        lancedb_path = get_lancedb_path(config, collection_name)
+
     # Print configuration
     print("=" * 60)
     print("Recall Test Configuration")
@@ -100,6 +106,9 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Dataset: {recall_dataset}")
     print(f"Test Name: {test_name}")
     print(f"Collection: {collection_name}")
+    print(f"VDB Backend: {vdb_backend}")
+    if lancedb_path:
+        print(f"LanceDB Path: {lancedb_path}")
     print(f"Reranker Mode: {reranker_mode}")
     print(f"Top K: {recall_top_k}")
     print(f"Model: {model_name} (sparse={sparse}, gpu_search={gpu_search})")
@@ -111,10 +120,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         print(f"ERROR: Unknown dataset '{recall_dataset}'")
         return 1
 
-    # Load the multimodal collection
-    milvus_uri = f"http://{hostname}:19530"
-    print(f"Loading collection: {collection_name}")
-    load_collection(milvus_uri, collection_name)
+    if lancedb_path:
+        print(f"Using LanceDB at: {lancedb_path}")
 
     try:
         recall_results = {}
@@ -127,7 +134,13 @@ def main(config=None, log_path: str = "test_results") -> int:
             "top_k": recall_top_k,
             "gpu_search": gpu_search,
             "ground_truth_dir": ground_truth_dir,
+            "vdb_backend": vdb_backend,
+            "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
+            "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
         }
+        if vdb_backend == "lancedb":
+            evaluation_params["sparse"] = False  # LanceDB doesn't support hybrid search
+            evaluation_params["table_path"] = lancedb_path
 
         # Run without reranker (if mode is "none" or "both")
         if reranker_mode in ["none", "both"]:
@@ -176,10 +189,6 @@ def main(config=None, log_path: str = "test_results") -> int:
 
         traceback.print_exc()
         return 1
-    finally:
-        # Unload the multimodal collection
-        print(f"Unloading collection: {collection_name}")
-        unload_collection(milvus_uri, collection_name)
 
 
 if __name__ == "__main__":

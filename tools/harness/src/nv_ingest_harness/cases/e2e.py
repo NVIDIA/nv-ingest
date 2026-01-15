@@ -6,20 +6,16 @@ import time
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
-from nv_ingest_client.util.milvus import nvingest_retrieval
+from nv_ingest_client.util.vdb.lancedb import retrieval
 
-from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, segment_results, pdf_page_count
+from nv_ingest_harness.utils.vdb import get_lancedb_path
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
 # Suppress LazyLoadedList file not found errors to reduce terminal bloat
 lazy_logger = logging.getLogger("nv_ingest_client.client.interface")
 lazy_logger.setLevel(logging.CRITICAL)
-
-try:
-    from pymilvus import MilvusClient
-except Exception:
-    MilvusClient = None  # Optional; stats logging will be skipped if unavailable
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -199,13 +195,12 @@ def main(config=None, log_path: str = "test_results") -> int:
 
         ingestor = ingestor.store(**store_kwargs)
 
-    # VDB upload and save results
+    # VDB upload and save results (using LanceDB)
+    lancedb_path = get_lancedb_path(config, collection_name)
     ingestor = ingestor.vdb_upload(
-        collection_name=collection_name,
-        dense_dim=dense_dim,
-        sparse=sparse,
-        gpu_search=gpu_search,
-        model_name=model_name,
+        vdb_op="lancedb",
+        uri=lancedb_path,
+        table_name=collection_name,
         purge_results_after_upload=False,
     ).save_to_disk(output_directory=spill_dir)
 
@@ -222,7 +217,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
-    milvus_chunks(f"http://{hostname}:19530", collection_name)
+    # (Skipping milvus_chunks - using LanceDB)
     text_results, table_results, chart_results = segment_results(results)
     kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
     kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)
@@ -247,21 +242,19 @@ def main(config=None, log_path: str = "test_results") -> int:
         else:
             print("  No document data available")
 
-    # Retrieval sanity
+    # Retrieval sanity (using LanceDB)
     queries = [
         "What is the dog doing and where?",
         "How many dollars does a power drill cost?",
     ]
     querying_start = time.time()
-    _ = nvingest_retrieval(
+    _ = retrieval(
         queries,
-        collection_name,
-        hybrid=sparse,
+        table_path=lancedb_path,
+        table_name=collection_name,
         embedding_endpoint=f"http://{hostname}:8012/v1",
-        embedding_model_name=model_name,
         model_name=model_name,
         top_k=5,
-        gpu_search=gpu_search,
     )
     retrieval_time = time.time() - querying_start
     kv_event_log("retrieval_time_s", retrieval_time, log_path)
