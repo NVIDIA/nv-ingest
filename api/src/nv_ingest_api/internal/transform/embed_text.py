@@ -464,6 +464,72 @@ def _cleanup_source_images(row):
     return row
 
 
+def _aggregate_page_content(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregates text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries.
+
+    For each page, collects text from:
+    - TEXT elements: content field
+    - STRUCTURED elements (tables/charts): table_metadata.table_content field
+
+    The aggregated text is stored in image_metadata.text for PAGE_IMAGE entries,
+    enabling text_image modality embedding with full page context.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing extracted content with metadata.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with PAGE_IMAGE entries updated to include aggregated page text.
+    """
+    # Build mapping of page_number -> list of text content
+    page_text_map: Dict[int, List[str]] = {}
+
+    for _, row in df.iterrows():
+        metadata = row.get("metadata", {})
+        content_metadata = metadata.get("content_metadata", {})
+        content_type = content_metadata.get("type")
+        page_number = content_metadata.get("page_number")
+
+        if page_number is None:
+            continue
+
+        if page_number not in page_text_map:
+            page_text_map[page_number] = []
+
+        # Collect text from TEXT elements
+        if content_type == ContentTypeEnum.TEXT.value:
+            text_content = metadata.get("content")
+            if text_content and isinstance(text_content, str) and text_content.strip():
+                page_text_map[page_number].append(text_content.strip())
+
+        # Collect text from STRUCTURED elements (tables, charts)
+        elif content_type == ContentTypeEnum.STRUCTURED.value:
+            table_content = metadata.get("table_metadata", {}).get("table_content")
+            if table_content and isinstance(table_content, str) and table_content.strip():
+                page_text_map[page_number].append(table_content.strip())
+
+    # Apply aggregated text to PAGE_IMAGE entries
+    for idx, row in df.iterrows():
+        metadata = row.get("metadata", {})
+        content_metadata = metadata.get("content_metadata", {})
+
+        if (
+            content_metadata.get("type") == ContentTypeEnum.IMAGE.value
+            and content_metadata.get("subtype") == ContentTypeEnum.PAGE_IMAGE.value
+        ):
+            page_number = content_metadata.get("page_number")
+            if page_number in page_text_map and page_text_map[page_number]:
+                aggregated_text = "\n\n".join(page_text_map[page_number])
+                image_metadata = metadata.get("image_metadata", {})
+                image_metadata["text"] = aggregated_text
+
+    return df
+
+
 # ------------------------------------------------------------------------------
 # Batch Processing Utilities
 # ------------------------------------------------------------------------------
@@ -612,6 +678,15 @@ def transform_create_text_embeddings_internal(
     if df_transform_ledger.empty:
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
+    # Aggregate text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries
+    image_elements_aggregate_page_content = (
+        task_config.get("image_elements_aggregate_page_content")
+        or transform_config.image_elements_aggregate_page_content
+    )
+    if image_elements_aggregate_page_content:
+        df_transform_ledger = _aggregate_page_content(df_transform_ledger)
+        logger.debug("Aggregated page content into PAGE_IMAGE entries for text_image embedding")
+
     embedding_dataframes = []
     content_masks = []
 
@@ -632,12 +707,34 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
+    # Determine which content types to embed
+    def _get_embed_flag(content_type: ContentTypeEnum) -> bool:
+        flag_map = {
+            ContentTypeEnum.TEXT: task_config.get("embed_text_elements"),
+            ContentTypeEnum.STRUCTURED: task_config.get("embed_structured_elements"),
+            ContentTypeEnum.IMAGE: task_config.get("embed_image_elements"),
+            ContentTypeEnum.AUDIO: task_config.get("embed_audio_elements"),
+        }
+        default_map = {
+            ContentTypeEnum.TEXT: transform_config.embed_text_elements,
+            ContentTypeEnum.STRUCTURED: transform_config.embed_structured_elements,
+            ContentTypeEnum.IMAGE: transform_config.embed_image_elements,
+            ContentTypeEnum.AUDIO: transform_config.embed_audio_elements,
+        }
+        task_flag = flag_map.get(content_type)
+        return task_flag if task_flag is not None else default_map.get(content_type, True)
+
     def _content_type_getter(row):
         return row["content_metadata"]["type"]
 
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
             logger.warning(f"Skipping text_embedding generation for unsupported content type: {content_type}")
+            continue
+
+        # Check if this content type should be embedded
+        if not _get_embed_flag(content_type):
+            logger.debug(f"Skipping embedding for content type {content_type} (disabled by configuration)")
             continue
 
         # Get rows matching the content type
