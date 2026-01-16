@@ -25,7 +25,14 @@ def download_tokenizer(model_name, save_path, token=None):
                 print("Tokenizer will be downloaded at runtime if needed.")
 
 
-token = os.getenv("HF_ACCESS_TOKEN")
+# Read token from file if available, otherwise fall back to env var
+token_file_path = "./scripts/private_local/hf_token.txt"
+if os.path.exists(token_file_path):
+    with open(token_file_path, "r") as f:
+        token = f.read().strip()
+else:
+    token = os.getenv("HF_ACCESS_TOKEN")
+
 model_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
 
 if os.getenv("DOWNLOAD_LLAMA_TOKENIZER") == "True":
