@@ -239,7 +239,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:latest
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:26.1.1
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
