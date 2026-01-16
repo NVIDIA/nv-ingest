@@ -678,11 +678,40 @@ def transform_create_text_embeddings_internal(
     if df_transform_ledger.empty:
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
-    # Aggregate text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries
-    image_elements_aggregate_page_content = (
-        task_config.get("image_elements_aggregate_page_content")
-        or transform_config.image_elements_aggregate_page_content
+    # Determine if page content aggregation should be enabled
+    image_elements_modality = (
+        task_config.get("image_elements_modality") or transform_config.image_elements_modality
     )
+
+    # Check if user explicitly set the aggregation flag
+    explicit_aggregate_setting = task_config.get("image_elements_aggregate_page_content")
+    image_elements_aggregate_page_content = (
+        explicit_aggregate_setting
+        if explicit_aggregate_setting is not None
+        else transform_config.image_elements_aggregate_page_content
+    )
+
+    # Auto-enable aggregation when using text_image modality with PAGE_IMAGE entries
+    # Only auto-enable if user hasn't explicitly set the flag
+    if explicit_aggregate_setting is None and not image_elements_aggregate_page_content:
+        if image_elements_modality == "text_image":
+            # Check if PAGE_IMAGE entries exist
+            def _has_page_images(df):
+                for _, row in df.iterrows():
+                    metadata = row.get("metadata", {})
+                    content_metadata = metadata.get("content_metadata", {})
+                    if (
+                        content_metadata.get("type") == ContentTypeEnum.IMAGE.value
+                        and content_metadata.get("subtype") == ContentTypeEnum.PAGE_IMAGE.value
+                    ):
+                        return True
+                return False
+
+            if _has_page_images(df_transform_ledger):
+                image_elements_aggregate_page_content = True
+                logger.debug("Auto-enabled page content aggregation for text_image modality with PAGE_IMAGE entries")
+
+    # Aggregate text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries
     if image_elements_aggregate_page_content:
         df_transform_ledger = _aggregate_page_content(df_transform_ledger)
         logger.debug("Aggregated page content into PAGE_IMAGE entries for text_image embedding")
@@ -708,6 +737,7 @@ def transform_create_text_embeddings_internal(
     }
 
     # Determine which content types to embed
+    # When aggregating page content, automatically skip TEXT and STRUCTURED unless explicitly set
     def _get_embed_flag(content_type: ContentTypeEnum) -> bool:
         flag_map = {
             ContentTypeEnum.TEXT: task_config.get("embed_text_elements"),
@@ -722,7 +752,16 @@ def transform_create_text_embeddings_internal(
             ContentTypeEnum.AUDIO: transform_config.embed_audio_elements,
         }
         task_flag = flag_map.get(content_type)
-        return task_flag if task_flag is not None else default_map.get(content_type, True)
+        if task_flag is not None:
+            return task_flag
+        # When aggregating page content, skip TEXT and STRUCTURED by default
+        # since their content is already included in PAGE_IMAGE entries
+        if image_elements_aggregate_page_content and content_type in (
+            ContentTypeEnum.TEXT,
+            ContentTypeEnum.STRUCTURED,
+        ):
+            return False
+        return default_map.get(content_type, True)
 
     def _content_type_getter(row):
         return row["content_metadata"]["type"]
