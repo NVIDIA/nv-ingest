@@ -18,8 +18,6 @@ This guide covers how resource scaling modes work across stages in [NeMo Retriev
 
 ## Configure (docker-compose)
 
-Edit `services > nv-ingest-ms-runtime > environment` in `docker-compose.yaml`.
-
 ### Select mode
 
 - **Dynamic (default)**
