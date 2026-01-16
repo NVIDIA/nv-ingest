@@ -318,7 +318,9 @@ def _add_custom_embeddings(row, embeddings, result_target_field):
 def _format_image_input_string(image_b64: Optional[str]) -> str:
     if not image_b64:
         return
-    return f"data:image/png;base64,{image_b64}"
+    # Detect format from base64 magic bytes: JPEG starts with /9j/, PNG starts with iVBORw
+    mime_type = "image/jpeg" if image_b64.startswith("/9j/") else "image/png"
+    return f"data:{mime_type};base64,{image_b64}"
 
 
 def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optional[str]) -> str:
