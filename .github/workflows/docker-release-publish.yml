@@ -41,7 +41,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker buildx create --use
-          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --secret id=hf_token,src=./scripts/private_local/hf_token.txt -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }} .
+          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg DOWNLOAD_LLAMA_TOKENIZER=True --secret id=hf_token,src=./scripts/private_local/hf_token.txt -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }} .
 
       - name: Cleanup HF token file
         if: always()
