@@ -28,9 +28,25 @@ jobs:
       # Build the Docker image using the Dockerfile
       # Github does not allowing access secrets on pull requests. Therefore for this action we use the open source ubuntu
       # base image and not the one hosted in nvcr.io
+      - name: Create HF token file
+        if: ${{ secrets.HF_ACCESS_TOKEN != '' }}
+        run: |
+          mkdir -p ./scripts/private_local
+          echo "${{ secrets.HF_ACCESS_TOKEN }}" > ./scripts/private_local/hf_token.txt
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
       - name: Build Docker image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 -t nv-ingest:latest .
+          SECRET_ARG=""
+          if [ -f ./scripts/private_local/hf_token.txt ]; then
+            SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
+          fi
+          DOCKER_BUILDKIT=1 docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 $SECRET_ARG -t nv-ingest:latest .
+
+      - name: Cleanup HF token file
+        if: always()
+        run: rm -f ./scripts/private_local/hf_token.txt
 
       - name: Run Pytest inside Docker container
         run: |
