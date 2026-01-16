@@ -28,7 +28,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Create HF token file
-        if: ${{ secrets.HF_ACCESS_TOKEN != '' }}
         run: |
           mkdir -p ./scripts/private_local
           echo "${{ secrets.HF_ACCESS_TOKEN }}" > ./scripts/private_local/hf_token.txt
@@ -39,7 +38,7 @@ jobs:
       - name: Build Docker image
         run: |
           SECRET_ARG=""
-          if [ -f ./scripts/private_local/hf_token.txt ]; then
+          if [ -s ./scripts/private_local/hf_token.txt ]; then
             SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
           fi
           docker buildx create --use
