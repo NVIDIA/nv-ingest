@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import requests
+from nv_ingest_harness.sinks.slack import SlackSink
 
 # Metrics to compare, grouped by category
 THROUGHPUT_METRICS = ["pages_per_second", "ingestion_time_s"]
@@ -412,6 +412,7 @@ def format_slack_blocks(
     threshold: float = 2.0,
 ) -> dict[str, Any]:
     """Format comparison as Slack Block Kit payload."""
+    # TODO: Consolidate Slack formatting into SlackSink helpers when PR scope allows.
     label_a = baseline_label or comparison.run_a.name
     label_b = compare_label or comparison.run_b.name
 
@@ -503,23 +504,11 @@ def post_to_slack(
         return False
 
     payload = format_slack_blocks(comparison, baseline_label, compare_label, note, threshold)
-
-    try:
-        response = requests.post(
-            url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
-        if response.ok:
-            print("Successfully posted comparison to Slack.")
-            return True
-        else:
-            print(f"Failed to post to Slack (status={response.status_code}): {response.text}")
-            return False
-    except Exception as e:
-        print(f"Error posting to Slack: {e}")
-        return False
+    sink = SlackSink({"enabled": True, "webhook_url": url})
+    if sink.post_payload(payload):
+        print("Successfully posted comparison to Slack.")
+        return True
+    return False
 
 
 def format_session_cli_table(
@@ -724,20 +713,8 @@ def post_session_to_slack(
         return False
 
     payload = format_session_slack_blocks(result, baseline_label, compare_label, note, threshold)
-
-    try:
-        response = requests.post(
-            url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
-        if response.ok:
-            print("Successfully posted session comparison to Slack.")
-            return True
-        else:
-            print(f"Failed to post to Slack (status={response.status_code}): {response.text}")
-            return False
-    except Exception as e:
-        print(f"Error posting to Slack: {e}")
-        return False
+    sink = SlackSink({"enabled": True, "webhook_url": url})
+    if sink.post_payload(payload):
+        print("Successfully posted session comparison to Slack.")
+        return True
+    return False

@@ -2,41 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Slack sink for posting benchmark results."""
 
-import json
 import os
-import re
 from typing import Any
 
 import requests
 
 from nv_ingest_harness.sinks.base import Sink
-
-_POST_TEMPLATE = """
-{
-  "username": "nv-ingest Benchmark Runner",
-  "icon_emoji": ":rocket:",
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "nv-ingest Nightly Benchmark Summary"
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "$EXECUTIVE_SUMMARY"
-      }
-    },
-    {
-      "type": "divider"
-    },
-    $REPORT_JSON_TEXT
-  ]
-}
-"""
 
 _BLANK_ROW = [
     {"type": "rich_text", "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": " "}]}]},
@@ -95,10 +66,34 @@ class SlackSink(Sink):
         if not self.enabled:
             print("SlackSink: Not enabled, skipping post.")
             return
-        self._post()
-        print("SlackSink: Posted results to Slack.")
+        posted = self._post()
+        if posted:
+            print("SlackSink: Posted results to Slack.")
+        else:
+            print("SlackSink: Failed to post results to Slack.")
 
-    def _post(self) -> None:
+    def post_payload(self, payload: dict[str, Any]) -> bool:
+        if not self.enabled:
+            print("SlackSink: Not enabled, skipping post.")
+            return False
+        return self._post_payload(payload)
+
+    def _post_payload(self, payload: dict[str, Any]) -> bool:
+        if not self.webhook_url:
+            print("SlackSink: No webhook_url configured.")
+            return False
+        response = requests.post(
+            self.webhook_url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30,
+        )
+        if not response.ok:
+            print(f"SlackSink: Failed to post (status={response.status_code}): {response.text}")
+            return False
+        return True
+
+    def _post(self) -> bool:
         indent = "-    "
 
         rows = []
@@ -177,30 +172,24 @@ class SlackSink(Sink):
             rows.pop(-1)
 
         table_dict = {"type": "table", "rows": rows}
-        report_json_text = json.dumps(table_dict, indent=2)
         exec_summary = f"Session: `{self.session_name}`"
-        message_values = {
-            "REPORT_JSON_TEXT": report_json_text,
-            "EXECUTIVE_SUMMARY": exec_summary,
+        payload = {
+            "username": "nv-ingest Benchmark Runner",
+            "icon_emoji": ":rocket:",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "nv-ingest Nightly Benchmark Summary"},
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": exec_summary},
+                },
+                {"type": "divider"},
+                table_dict,
+            ],
         }
-        payload = self._substitute_template(_POST_TEMPLATE, message_values).strip()
-        response = requests.post(
-            self.webhook_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
-        if not response.ok:
-            print(f"SlackSink: Failed to post (status={response.status_code}): {response.text}")
-
-    @staticmethod
-    def _substitute_template(template_str: str, values: dict[str, str]) -> str:
-        def replacer(match: re.Match[str]) -> str:
-            var_with_dollar = match.group(0)
-            varname = var_with_dollar[1:]
-            return str(values.get(varname, var_with_dollar))
-
-        return re.sub(r"\$[A-Za-z0-9_]+", replacer, template_str)
+        return self._post_payload(payload)
 
     @staticmethod
     def _two_column_row(left: str, right: str) -> list[dict[str, Any]]:

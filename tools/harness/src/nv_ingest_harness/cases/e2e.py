@@ -6,7 +6,7 @@ import time
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
-from nv_ingest_client.util.vdb.lancedb import retrieval
+from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log, segment_results, pdf_page_count
 from nv_ingest_harness.utils.vdb import get_lancedb_path
@@ -195,14 +195,28 @@ def main(config=None, log_path: str = "test_results") -> int:
 
         ingestor = ingestor.store(**store_kwargs)
 
-    # VDB upload and save results (using LanceDB)
-    lancedb_path = get_lancedb_path(config, collection_name)
-    ingestor = ingestor.vdb_upload(
-        vdb_op="lancedb",
-        uri=lancedb_path,
-        table_name=collection_name,
-        purge_results_after_upload=False,
-    ).save_to_disk(output_directory=spill_dir)
+    # VDB upload and save results (respect vdb_backend)
+    vdb_backend = config.vdb_backend
+    lancedb_path = None
+    if vdb_backend == "lancedb":
+        lancedb_path = get_lancedb_path(config, collection_name)
+        ingestor = ingestor.vdb_upload(
+            vdb_op="lancedb",
+            uri=lancedb_path,
+            table_name=collection_name,
+            purge_results_after_upload=False,
+        )
+    else:
+        ingestor = ingestor.vdb_upload(
+            vdb_op="milvus",
+            collection_name=collection_name,
+            dense_dim=dense_dim,
+            sparse=sparse,
+            gpu_search=gpu_search,
+            model_name=model_name,
+            purge_results_after_upload=False,
+        )
+    ingestor = ingestor.save_to_disk(output_directory=spill_dir)
 
     results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
     ingestion_time = time.time() - ingestion_start
@@ -242,20 +256,37 @@ def main(config=None, log_path: str = "test_results") -> int:
         else:
             print("  No document data available")
 
-    # Retrieval sanity (using LanceDB)
+    # Retrieval sanity (matching vdb_backend)
     queries = [
         "What is the dog doing and where?",
         "How many dollars does a power drill cost?",
     ]
     querying_start = time.time()
-    _ = retrieval(
-        queries,
-        table_path=lancedb_path,
-        table_name=collection_name,
-        embedding_endpoint=f"http://{hostname}:8012/v1",
-        model_name=model_name,
-        top_k=5,
-    )
+    if vdb_backend == "lancedb":
+        try:
+            from nv_ingest_client.util.vdb.lancedb import retrieval as lancedb_retrieval
+        except ImportError as exc:
+            print(f"Warning: LanceDB retrieval not available ({exc}). Skipping retrieval sanity check.")
+        else:
+            _ = lancedb_retrieval(
+                queries,
+                table_path=lancedb_path,
+                table_name=collection_name,
+                embedding_endpoint=f"http://{hostname}:8012/v1",
+                model_name=model_name,
+                top_k=5,
+            )
+    else:
+        _ = nvingest_retrieval(
+            queries,
+            collection_name,
+            hybrid=sparse,
+            embedding_endpoint=f"http://{hostname}:8012/v1",
+            model_name=model_name,
+            top_k=5,
+            gpu_search=gpu_search,
+            nv_ranker=False,
+        )
     retrieval_time = time.time() - querying_start
     kv_event_log("retrieval_time_s", retrieval_time, log_path)
 

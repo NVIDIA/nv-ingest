@@ -5,7 +5,7 @@ Automated benchmarks with Slack reporting and historical tracking.
 ## Quick Start
 
 ```bash
-cd tools/harness && source ~/setup_env.sh
+cd tools/harness
 
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 uv run nv-ingest-harness-nightly
@@ -14,6 +14,7 @@ uv run nv-ingest-harness-nightly
 uv run nv-ingest-harness-nightly --skip-slack        # No Slack
 uv run nv-ingest-harness-nightly --skip-fresh-start  # Use running services
 uv run nv-ingest-harness-nightly --dry-run           # Show config only
+uv run nv-ingest-harness-nightly --note "Testing new embedding model"
 ```
 
 ## Configuration

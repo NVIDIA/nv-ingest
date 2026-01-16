@@ -133,6 +133,12 @@ def load_results(artifact_dir: Path) -> dict:
     type=click.Path(exists=True, path_type=Path),
     help="Replay results from artifact directories to Slack (can specify multiple)",
 )
+@click.option(
+    "--note",
+    type=str,
+    default=None,
+    help="Optional note to attach to the session summary and Slack output",
+)
 def main(
     config_path: Path | None,
     skip_slack: bool,
@@ -140,6 +146,7 @@ def main(
     skip_fresh_start: bool,
     dry_run: bool,
     replay_dirs: tuple[Path, ...],
+    note: str | None,
 ):
     """Run nightly benchmarks and post results."""
     if replay_dirs:
@@ -174,6 +181,8 @@ def main(
     print(f"Recall datasets: {recall_datasets}")
     print(f"Reranker mode: {reranker_mode}")
     print(f"Fresh start: {fresh_start}")
+    if note:
+        print(f"Note: {note}")
     print(f"{'='*60}\n")
 
     if dry_run:
@@ -190,6 +199,8 @@ def main(
     os.environ["RECALL_TOP_K"] = str(recall_top_k)
 
     env_data = get_environment_data()
+    if note:
+        env_data["note"] = note
     print("Environment:")
     for key, val in env_data.items():
         print(f"  {key}: {val}")
@@ -244,6 +255,7 @@ def main(
         # nightly-specific extensions
         config_file=str(config_file),
         environment=env_data,
+        note=note,
         datasets={
             "e2e": e2e_datasets,
             "e2e_recall": recall_datasets,
