@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Docker Compose Override File
+# This file allows you to customize environment variables for NIM services
+# and override the nv-ingest-ms-runtime inference protocols to use HTTP.
+#
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.override.yaml up
+
+services:
+  # Page Elements NIM - Customize environment variables as needed
+  page-elements:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=10000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=100
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=2
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${PAGE_ELEMENTS_GPU_ID:-0}"]
+              capabilities: [gpu]
+  # Graphic Elements NIM - Customize environment variables as needed
+  graphic-elements:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=10000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=100
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=2
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GRAPHIC_ELEMENTS_GPU_ID:-1}"]
+              capabilities: [gpu]
+  # Table Structure NIM - Customize environment variables as needed
+  table-structure:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      # - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=10000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=100
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=2
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${TABLE_STRUCTURE_GPU_ID:-2}"]
+              capabilities: [gpu]
+
+  # OCR NIM - Customize environment variables as needed
+  ocr:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=10000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=100
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=2
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${OCR_GPU_ID:-3}"]
+              capabilities: [gpu]
+  # NV-Ingest Runtime - Override inference protocols to HTTP
+  nv-ingest-ms-runtime:
+    environment:
+      # Override INFER_PROTOCOL to HTTP for all NIM services
+      # Page Elements (YOLOX)
+      - YOLOX_INFER_PROTOCOL=http
+      # Graphic Elements
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
+      # Table Structure
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
+      # OCR
+      - OCR_INFER_PROTOCOL=http
