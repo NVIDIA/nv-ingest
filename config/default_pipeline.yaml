@@ -72,11 +72,11 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000 # Heuristic max consumption
+        memory_per_replica_mb: 5000 # Reduced to allow more replicas
       static_replicas:
         strategy: "memory_static_global_percent"
-        memory_per_replica_mb: 10000
-        limit: 16
+        memory_per_replica_mb: 5000
+        limit: 32
 
   - name: "audio_extractor"
     type: "stage"
@@ -193,10 +193,10 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "static"
-        value: 2
+        value: 8
       static_replicas:
         strategy: "static"
-        value: 1
+        value: 4
 
   - name: "table_extractor"
     type: "stage"
@@ -219,11 +219,11 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000
+        memory_per_replica_mb: 5000
       static_replicas:
         strategy: "memory_static_global_percent"
-        memory_per_replica_mb: 10000
-        limit: 6
+        memory_per_replica_mb: 5000
+        limit: 24
 
   - name: "chart_extractor"
     type: "stage"
@@ -246,11 +246,11 @@ stages:
       min_replicas: 0
       max_replicas:
         strategy: "memory_thresholding"
-        memory_per_replica_mb: 10000
+        memory_per_replica_mb: 5000
       static_replicas:
         strategy: "memory_static_global_percent"
-        memory_per_replica_mb: 10000
-        limit: 6
+        memory_per_replica_mb: 5000
+        limit: 24
 
   # Post-processing / Mutators
   - name: "image_filter"
@@ -414,41 +414,41 @@ edges:
   # Intake
   - from: "source_stage"
     to: "metadata_injector"
-    queue_size: 32
+    queue_size: 64
 
   # Document Extractors
   - from: "metadata_injector"
     to: "pdf_extractor"
-    queue_size: 32
+    queue_size: 128
   - from: "pdf_extractor"
     to: "audio_extractor"
-    queue_size: 32
+    queue_size: 64
   - from: "audio_extractor"
     to: "docx_extractor"
-    queue_size: 32
+    queue_size: 64
   - from: "docx_extractor"
     to: "pptx_extractor"
-    queue_size: 32
+    queue_size: 64
   - from: "pptx_extractor"
     to: "image_extractor"
-    queue_size: 32
+    queue_size: 64
   - from: "image_extractor"
     to: "html_extractor"
-    queue_size: 32
+    queue_size: 64
   - from: "html_extractor"
     to: "infographic_extractor"
-    queue_size: 32
+    queue_size: 128
 
   # Primitive Extractors
   - from: "infographic_extractor"
     to: "table_extractor"
-    queue_size: 32
+    queue_size: 128
   - from: "table_extractor"
     to: "chart_extractor"
-    queue_size: 32
+    queue_size: 128
   - from: "chart_extractor"
     to: "image_filter"
-    queue_size: 32
+    queue_size: 64
 
   # Primitive Mutators
   - from: "image_filter"
