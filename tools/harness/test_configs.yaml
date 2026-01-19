@@ -59,6 +59,18 @@ recall:
   recall_top_k: 10
   ground_truth_dir: null
 
+# Sweep configuration
+# Define sets of environment variables to sweep through
+# Usage: uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --sweep=batch_size
+sweeps:
+  batch_size:
+    - PAGE_ELEMENTS_BATCH_SIZE: 32
+      GRAPHIC_ELEMENTS_BATCH_SIZE: 32
+      TABLE_STRUCTURE_BATCH_SIZE: 32
+    - PAGE_ELEMENTS_BATCH_SIZE: 64
+      GRAPHIC_ELEMENTS_BATCH_SIZE: 64
+      TABLE_STRUCTURE_BATCH_SIZE: 64
+
 # Pre-configured datasets
 # Each dataset includes path, extraction settings, and recall evaluator
 # Use: uv run nv-ingest-harness-run --case=e2e --dataset=bo767

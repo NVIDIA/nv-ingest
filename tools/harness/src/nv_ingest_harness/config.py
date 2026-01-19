@@ -314,3 +314,33 @@ def list_presets(config_file: str = "test_configs.yaml") -> List[str]:
         yaml_data = yaml.safe_load(f)
 
     return list(yaml_data.get("presets", {}).keys())
+
+
+def get_sweep_config(sweep_name: str, config_file: str = "test_configs.yaml") -> List[dict]:
+    """
+    Get sweep configuration by name.
+
+    Args:
+        sweep_name: Name of the sweep configuration
+        config_file: Config file name
+
+    Returns:
+        List of environment variable dictionaries
+
+    Raises:
+        ValueError: If sweep name not found
+    """
+    config_path = Path(__file__).resolve().parents[2] / config_file
+
+    if not config_path.exists():
+        # Fallback for when running from different directories
+        config_path = Path(__file__).parent / config_file
+
+    with open(config_path) as f:
+        yaml_data = yaml.safe_load(f)
+
+    sweeps = yaml_data.get("sweeps", {})
+    if sweep_name not in sweeps:
+        raise ValueError(f"Sweep '{sweep_name}' not found in {config_file}. Available sweeps: {list(sweeps.keys())}")
+
+    return sweeps[sweep_name]

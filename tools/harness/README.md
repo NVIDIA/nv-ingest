@@ -254,6 +254,52 @@ uv run nv-ingest-harness-run --case=recall --dataset=bo767,earnings
 - Summary printed at end showing success/failure for each dataset
 - Services stop once at end (unless `--keep-up`)
 
+### Infrastructure Sweeping
+
+Infrastructure sweeping allows you to automatically iterate through different sets of environment variables (e.g., GPU memory limits, batch sizes) to test pipeline stability and performance across different infrastructure configurations.
+
+**1. Define Sweeps in `test_configs.yaml`:**
+
+Add a `sweeps` section to your configuration file. Each named sweep contains a list of environment variable dictionaries.
+
+```yaml
+sweeps:
+  batch_size_sweep:
+    - PAGE_ELEMENTS_BATCH_SIZE: 32
+      GRAPHIC_ELEMENTS_BATCH_SIZE: 32
+    - PAGE_ELEMENTS_BATCH_SIZE: 64
+      GRAPHIC_ELEMENTS_BATCH_SIZE: 64
+
+  gpu_mem_sweep:
+    - PAGE_ELEMENTS_CUDA_MEMORY_POOL_MB: 2048
+    - PAGE_ELEMENTS_CUDA_MEMORY_POOL_MB: 4096
+```
+
+**2. Run the Sweep:**
+
+Use the `--sweep` flag to trigger the infrastructure sweep loop. This automatically forces `--managed` mode to restart services between iterations.
+
+```bash
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --sweep=batch_size_sweep
+```
+
+**Sweep Behavior:**
+1.  **Iterate**: Loops through each configuration defined in the sweep.
+2.  **Restart**: Stops existing services and restarts them with the new environment variables applied.
+3.  **Run**: Executes the specified test case and dataset(s).
+4.  **Repeat**: Continues until all configurations have been tested.
+5.  **Artifacts**: Each iteration generates a timestamped artifact directory containing `results.json` with the active `sweep_config` injected for traceability.
+
+**Multi-Dataset Sweeps:**
+
+You can combine infrastructure sweeping with dataset sweeping:
+
+```bash
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings --sweep=batch_size_sweep
+```
+
+This runs a full grid: `(Config A x [bo767, earnings]) -> Restart -> (Config B x [bo767, earnings])`.
+
 ### Using Environment Variables
 
 ```bash
