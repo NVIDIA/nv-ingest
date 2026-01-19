@@ -157,6 +157,19 @@ EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dat
 # Result: Uses bo767 path, but extract_images=true (env override) and api_version=v2 (env override)
 ```
 
+### Optional: Capture CPU/memory utilization
+
+To connect wall-time vs resident-time to actual infrastructure saturation, you can capture Docker-level utilization during a run:
+
+```bash
+python run.py --case=e2e --dataset=bo20 --docker-stats
+```
+
+This writes `docker_stats.csv` into the artifact directory and records its path in `results.json` under `docker_stats`.
+Use `--docker-stats-interval-s` (or `DOCKER_STATS_INTERVAL_S`) to adjust the sampling rate.
+
+#### Summarize `docker_stats.csv`
+
 **Precedence Details:**
 1. **Environment variables** - Highest priority, useful for CI/CD overrides
 2. **Dataset-specific config** - Applied automatically when using `--dataset=<name>`
@@ -198,6 +211,72 @@ EXTRACT_IMAGES=true API_VERSION=v2 uv run nv-ingest-harness-run --case=e2e --dat
 - `spill_dir` (string): Temporary processing directory
 - `artifacts_dir` (string): Test output directory (auto-generated if null)
 - `collection_name` (string): Milvus collection name (auto-generated as `{test_name}_multimodal` if null, deterministic - no timestamp)
+
+#### Trace Capture Options
+- `enable_traces` (boolean): When `true`, the `e2e` case requests parent-level trace payloads from the V2 API (see `docs/docs/extraction/v2-api-guide.md`) and emits per-stage summaries.
+- `trace_output_dir` (string or null): Optional override for where raw trace JSON files are written. Defaults to `<artifact_dir>/traces` when null.
+
+When traces are enabled:
+
+1. Each processed document gets a raw payload written to `trace_output_dir/<index>_<source>.json` that contains the complete `"trace::"` dictionary plus a small stage summary. These files match the structure shown in `scripts/private_local/trace.json`.
+2. `results.json` automatically gains a `trace_summary` block every time `run.py` executes a traced case—no manual helper calls needed.
+3. The per-document section now includes the full timing context needed for wait-time analysis:
+   - `submission_ts_s`: FastAPI submission timestamp (wall-clock seconds)
+   - `ray_start_ts_s` / `ray_end_ts_s`: first stage entry and last stage exit inside Ray
+   - `ray_wait_s`: latency between submission and Ray start (pre-Ray wait)
+   - `in_ray_queue_s`: cumulative resident seconds spent in `*_channel_in` actors (Ray queue wait)
+   - `total_wall_s`: elapsed Ray processing window (`ray_end - ray_start`)
+   - `total_resident_s`: summed resident seconds across all compute stages
+
+Example:
+
+```json
+"trace_summary": {
+  "documents": 20,
+  "output_dir": "/raid/.../scripts/tests/artifacts/bo20_20251119_183733_UTC/traces",
+  "stage_totals": {
+    "pdf_extractor": {
+      "documents": 20,
+      "total_resident_s": 32.18,
+      "avg_resident_s": 1.61,
+      "max_resident_s": 2.04,
+      "min_resident_s": 1.42
+    }
+  },
+  "document_totals": [
+    {
+      "document_index": 0,
+      "source_id": "doc001.pdf",
+      "submission_ts_s": 1732194383.812345,
+      "total_resident_s": 1.58,
+      "ray_start_ts_s": 1732194384.123456,
+      "ray_end_ts_s": 1732194399.901234,
+      "total_wall_s": 15.78,
+      "ray_wait_s": 0.311111,
+      "in_ray_queue_s": 0.042381
+    },
+    {
+      "document_index": 1,
+      "source_id": "doc002.pdf",
+      "submission_ts_s": 1732194384.034567,
+      "total_resident_s": 1.64,
+      "ray_start_ts_s": 1732194385.012345,
+      "ray_end_ts_s": 1732194400.456789,
+      "total_wall_s": 15.44,
+      "ray_wait_s": 0.977778,
+      "in_ray_queue_s": 0.063255
+    }
+    // ...
+  ]
+}
+```
+
+**Enable via YAML or environment variables:**
+
+- YAML: set `enable_traces: true` (and optionally `trace_output_dir`) in the `active` section.
+- Environment: `ENABLE_TRACES=true TRACE_OUTPUT_DIR=/raid/jioffe/traces python run.py --case=e2e --dataset=bo20`
+
+> ℹ️ Tracing is most valuable with V2 + PDF splitting enabled. Follow the guidance in `docs/docs/extraction/v2-api-guide.md` to ensure `api_version=v2` and `pdf_split_page_count` are configured.
 
 ### Valid Configuration Values
 
@@ -741,6 +820,8 @@ All test cases receive a validated `TestConfig` object with typed fields, elimin
    CASES = ["e2e", "e2e_with_llm_summary", "your_new_case"]
    ```
 
+> ℹ️ Import hygiene: `run.py` now prepends the `cases/`, `tests/`, `scripts/`, and repo-root directories to `sys.path` before loading a case, so new modules can directly import shared helpers (`from scripts.interact import ...`, `from scripts.tests.utils import ...`) without mutating `sys.path` locally.
+
 ### Extending Configuration
 
 To add new configurable parameters:
@@ -821,6 +902,82 @@ EXTRACT_IMAGES=true uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 - **Configuration**: See `config.py` for complete field list and validation logic
 - **Test utilities**: See `interact.py` for shared helper functions  
+## Profiling & Trace Capture Workflow
+
+### Baseline vs RC Trace Runs
+
+1. **Prep environment**
+   ```bash
+   source ~/setup_env.sh
+   nv-restart             # baseline (local build)
+   # or
+   nv-stop && nv-start-release   # RC image
+   ```
+2. **Enable traces + V2 split settings (env vars or YAML)**
+   ```bash
+   export API_VERSION=v2
+   export PDF_SPLIT_PAGE_COUNT=32          # use 16/64/etc. as needed
+   export ENABLE_TRACES=true
+   # Optional: export TRACE_OUTPUT_DIR=/raid/jioffe/traces/baseline
+   ```
+3. **Run datasets (repeat for bo20 + bo767, baseline + RC)**
+   ```bash
+   python scripts/tests/run.py --case=e2e --dataset=bo20
+   python scripts/tests/run.py --case=e2e --dataset=bo767
+   ```
+4. **Collect artifacts**
+   - `stdout.txt` → console logs
+   - `results.json` → includes `trace_summary` with per-stage resident seconds
+   - `traces/*.json` → raw payloads identical to `scripts/private_local/trace.json`
+   - Use descriptive folder names (e.g., copy artifacts to `artifacts/baseline_bo20/`) to keep baseline vs RC side-by-side.
+5. **Visualize stage resident times**
+   ```bash
+   # Default: stage plot with clean defaults (excludes queues, network, nested, PDFium micro)
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json
+   
+   # Include additional stages for debugging
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json --include-nested --include-queues
+   
+   # Generate PDFium breakdown plot (for benchmarking PDFium rendering changes)
+   python scripts/tests/tools/plot_stage_totals.py \
+     scripts/tests/artifacts/<run>/results.json --pdfium-plot --pdfium-csv
+   ```
+   
+   **Default behavior:**
+   - Generates `results.stage_time.png` - Stage resident time bar chart
+   - Always rebuilds trace summary from raw traces for reproducibility
+   - Sorts by total resident seconds (descending)
+   - Excludes queues, network stages, nested stages, and PDFium micro-stages by default
+   - Prints top 10 stages summary to console
+   
+   **Filtering options (for debugging):**
+   - `--include-nested` - Include nested stage names (e.g., chart/table OCR workloads)
+   - `--include-network` - Include broker/network-in stages
+   - `--include-queues` - Include queue stages (`*_channel_in`)
+   - `--include-pdfium-micro` - Include PDFium micro-spans (render/bitmap/scale/pad)
+   - `--trace-dir` - Override trace directory (auto-detected if omitted)
+   
+   **PDFium benchmarking (optional):**
+   - `--pdfium-plot` - Generate PDFium per-document breakdown plot (`results.pdfium_docs.png`)
+   - `--pdfium-csv` - Export PDFium breakdown to CSV (`results.pdfium_breakdown.csv`, requires `--pdfium-plot`)
+
+### Future Trace Visualization Case (roadmap)
+
+With `trace_summary` + raw dumps in place, a follow-on `cases/e2e_profile.py` can:
+- Accept one or two artifact directories (baseline vs RC) as input.
+- Load each run’s `trace_summary` and optional raw trace JSON to compute deltas.
+- Emit per-stage bar/violin charts (resident vs wall clock) plus CSV summaries.
+- Store outputs under `trace_profile/` inside each artifact directory.
+
+Open questions before implementing:
+- Preferred plotting backend (`matplotlib`, `plotly`, or Altair) and whether CI should emit PNG, HTML, or both.
+- Artifact naming for comparisons (e.g., `trace_profile/baseline_vs_rc/bo20.png`).
+- Regression thresholds and alerting expectations (what % delta constitutes a failure?).
+- Should the visualization case automatically diff against the most recent baseline or just emit standalone assets?
+
+Capturing these answers (plus a few representative trace samples) will let a future sprint land the visualization workflow quickly.
 - **Docker setup**: See project root README for service management commands
 - **API documentation**: See `docs/` for API version differences
 

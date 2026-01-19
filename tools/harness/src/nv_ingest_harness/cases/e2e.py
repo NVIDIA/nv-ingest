@@ -9,6 +9,7 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from nv_ingest_harness.utils.trace_summary import summarize_traces
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
@@ -74,6 +75,18 @@ def main(config=None, log_path: str = "test_results") -> int:
     enable_caption = config.enable_caption
     enable_split = config.enable_split
     enable_image_storage = config.enable_image_storage
+
+    # Trace capture
+    enable_traces = getattr(config, "enable_traces", False)
+    trace_output_dir = getattr(config, "trace_output_dir", None)
+    trace_dir = None
+    if enable_traces:
+        trace_dir = (
+            os.path.abspath(os.path.expanduser(trace_output_dir))
+            if trace_output_dir
+            else os.path.join(log_path, "traces")
+        )
+        print(f"Trace capture enabled. Raw traces will be written to: {trace_dir}")
 
     # Text splitting configuration
     split_chunk_size = config.split_chunk_size
@@ -209,7 +222,20 @@ def main(config=None, log_path: str = "test_results") -> int:
         purge_results_after_upload=False,
     ).save_to_disk(output_directory=spill_dir)
 
-    results, failures = ingestor.ingest(show_progress=True, return_failures=True, save_to_disk=True)
+    ingest_kwargs = {
+        "show_progress": True,
+        "return_failures": True,
+        "save_to_disk": True,
+    }
+    if enable_traces:
+        ingest_kwargs["return_traces"] = True
+
+    ingest_result = ingestor.ingest(**ingest_kwargs)
+    if enable_traces:
+        results, failures, traces_list = ingest_result
+    else:
+        results, failures = ingest_result
+        traces_list = []
     ingestion_time = time.time() - ingestion_start
     kv_event_log("result_count", len(results), log_path)
     kv_event_log("failure_count", len(failures), log_path)
@@ -266,6 +292,12 @@ def main(config=None, log_path: str = "test_results") -> int:
     retrieval_time = time.time() - querying_start
     kv_event_log("retrieval_time_s", retrieval_time, log_path)
 
+    trace_summary = None
+    if enable_traces:
+        trace_summary = summarize_traces(traces_list, results, trace_dir)
+        if trace_summary:
+            kv_event_log("trace_documents", trace_summary["documents"], log_path)
+
     # Summarize - Build comprehensive results dict
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"
     test_name = config.test_name or dataset_name
@@ -310,6 +342,9 @@ def main(config=None, log_path: str = "test_results") -> int:
     if enable_split:
         test_results["test_config"]["split_chunk_size"] = split_chunk_size
         test_results["test_config"]["split_chunk_overlap"] = split_chunk_overlap
+
+    if trace_summary:
+        test_results["trace_summary"] = trace_summary
 
     print(f"\n{test_name}_e2e summary:")
     print(json.dumps(test_results, indent=2))

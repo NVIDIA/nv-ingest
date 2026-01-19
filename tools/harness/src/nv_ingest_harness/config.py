@@ -18,6 +18,21 @@ from pathlib import Path
 from typing import Optional, List
 
 
+def get_repo_root() -> Path:
+    """Get the nv-ingest repository root directory."""
+    # config.py is at: tools/harness/src/nv_ingest_harness/config.py
+    # parents[4] = nv-ingest repo root
+    return Path(__file__).resolve().parents[4]
+
+
+def resolve_path(path: str) -> str:
+    """Resolve relative paths against repo root; absolute paths unchanged."""
+    p = Path(path)
+    if p.is_absolute():
+        return str(p)
+    return str(get_repo_root() / p)
+
+
 @dataclass
 class TestConfig:
     """Test configuration matching YAML active section"""
@@ -58,6 +73,10 @@ class TestConfig:
     split_chunk_size: int = 1024
     split_chunk_overlap: int = 150
     enable_image_storage: bool = False  # Server-side image storage (MinIO/local disk)
+
+    # Trace configuration
+    enable_traces: bool = False
+    trace_output_dir: Optional[str] = None
 
     # Image storage configuration
     store_structured: bool = True
@@ -217,6 +236,10 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
     normalized_cli = {k.replace("-", "_"): v for k, v in cli_overrides.items() if v is not None}
     config_dict.update(normalized_cli)
 
+    # Resolve dataset_dir relative to repo root
+    if "dataset_dir" in config_dict:
+        config_dict["dataset_dir"] = resolve_path(config_dict["dataset_dir"])
+
     # Build config object
     try:
         config = TestConfig(**config_dict)
@@ -276,6 +299,8 @@ def _load_env_overrides() -> dict:
         "SPLIT_CHUNK_SIZE": ("split_chunk_size", parse_int),
         "SPLIT_CHUNK_OVERLAP": ("split_chunk_overlap", parse_int),
         "ENABLE_IMAGE_STORAGE": ("enable_image_storage", parse_bool),
+        "ENABLE_TRACES": ("enable_traces", parse_bool),
+        "TRACE_OUTPUT_DIR": ("trace_output_dir", str),
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
