@@ -416,8 +416,49 @@ def format_slack_blocks(
     label_a = baseline_label or comparison.run_a.name
     label_b = compare_label or comparison.run_b.name
 
+    # Build table rows with 4 columns: Metric, Baseline, Compare, Delta
     rows = []
-    rows.append(_slack_row_bold("Metric", f"{label_a} → {label_b}"))
+    # Header row
+    rows.append(
+        [
+            {
+                "type": "rich_text",
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [{"type": "text", "text": "Metric", "style": {"bold": True}}],
+                    }
+                ],
+            },
+            {
+                "type": "rich_text",
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [{"type": "text", "text": label_a, "style": {"bold": True}}],
+                    }
+                ],
+            },
+            {
+                "type": "rich_text",
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [{"type": "text", "text": label_b, "style": {"bold": True}}],
+                    }
+                ],
+            },
+            {
+                "type": "rich_text",
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [{"type": "text", "text": "Delta", "style": {"bold": True}}],
+                    }
+                ],
+            },
+        ]
+    )
 
     for m in comparison.metrics:
         val_a_str = format_value(m.name, m.value_a)
@@ -430,7 +471,26 @@ def format_slack_blocks(
             elif m.improved is False:
                 delta_str = f"❌ {delta_str}"
 
-        rows.append(_slack_row(m.name, f"{val_a_str} → {val_b_str} ({delta_str})"))
+        rows.append(
+            [
+                {
+                    "type": "rich_text",
+                    "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": m.name}]}],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": val_a_str}]}],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": val_b_str}]}],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": delta_str}]}],
+                },
+            ]
+        )
 
     desc_text = (
         f"*Baseline:* `{label_a}` ({comparison.run_a.timestamp})\n*Compare:* `{label_b}` ({comparison.run_b.timestamp})"
@@ -614,16 +674,53 @@ def format_session_slack_blocks(
 
     blocks.append({"type": "divider"})
 
+    # Return header blocks and dataset tables separately
+    # The caller will send multiple messages: one header + one per dataset
+    dataset_tables = {}
     for dataset, comparison in result.comparisons.items():
-        blocks.append(
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*{dataset}*"},
-            }
-        )
-
+        # Build table rows with 4 columns: Metric, Baseline, Compare, Delta
         rows = []
-        rows.append(_slack_row_bold("Metric", f"{label_a} → {label_b}"))
+        # Header row
+        rows.append(
+            [
+                {
+                    "type": "rich_text",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": "Metric", "style": {"bold": True}}],
+                        }
+                    ],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": label_a, "style": {"bold": True}}],
+                        }
+                    ],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": label_b, "style": {"bold": True}}],
+                        }
+                    ],
+                },
+                {
+                    "type": "rich_text",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": "Delta", "style": {"bold": True}}],
+                        }
+                    ],
+                },
+            ]
+        )
 
         for m in comparison.metrics:
             val_a_str = format_value(m.name, m.value_a)
@@ -636,14 +733,34 @@ def format_session_slack_blocks(
                 elif m.improved is False:
                     delta_str = f"❌ {delta_str}"
 
-            rows.append(_slack_row(m.name, f"{val_a_str} → {val_b_str} ({delta_str})"))
+            rows.append(
+                [
+                    {
+                        "type": "rich_text",
+                        "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": m.name}]}],
+                    },
+                    {
+                        "type": "rich_text",
+                        "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": val_a_str}]}],
+                    },
+                    {
+                        "type": "rich_text",
+                        "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": val_b_str}]}],
+                    },
+                    {
+                        "type": "rich_text",
+                        "elements": [{"type": "rich_text_section", "elements": [{"type": "text", "text": delta_str}]}],
+                    },
+                ]
+            )
 
-        blocks.append({"type": "table", "rows": rows})
+        dataset_tables[dataset] = rows
 
     return {
         "username": "nv-ingest Benchmark Runner",
         "icon_emoji": ":bar_chart:",
         "blocks": blocks,
+        "_dataset_tables": dataset_tables,  # Internal field for multiple messages
     }
 
 
@@ -706,15 +823,48 @@ def post_session_to_slack(
     note: str | None = None,
     threshold: float = 2.0,
 ) -> bool:
-    """Post session comparison to Slack webhook."""
+    """Post session comparison to Slack webhook.
+
+    Sends multiple messages: one header message with session info,
+    then one message per dataset with its own table (since Slack only allows one table per message).
+    """
     url = webhook_url or os.environ.get("SLACK_WEBHOOK_URL")
     if not url:
         print("Error: No Slack webhook URL provided. Set SLACK_WEBHOOK_URL env var or use --webhook-url.")
         return False
 
-    payload = format_session_slack_blocks(result, baseline_label, compare_label, note, threshold)
     sink = SlackSink({"enabled": True, "webhook_url": url})
-    if sink.post_payload(payload):
-        print("Successfully posted session comparison to Slack.")
-        return True
-    return False
+
+    # Get the formatted blocks and dataset tables
+    payload_data = format_session_slack_blocks(result, baseline_label, compare_label, note, threshold)
+    dataset_tables = payload_data.pop("_dataset_tables", {})
+
+    # Send header message (without tables)
+    header_payload = {
+        "username": payload_data["username"],
+        "icon_emoji": payload_data["icon_emoji"],
+        "blocks": payload_data["blocks"],
+    }
+
+    if not sink.post_payload(header_payload):
+        return False
+
+    # Send one message per dataset with its own table
+    for dataset, rows in dataset_tables.items():
+        dataset_payload = {
+            "username": payload_data["username"],
+            "icon_emoji": payload_data["icon_emoji"],
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*{dataset}*"},
+                },
+                {"type": "table", "rows": rows},
+            ],
+        }
+
+        if not sink.post_payload(dataset_payload):
+            return False
+
+    print("Successfully posted session comparison to Slack.")
+    return True

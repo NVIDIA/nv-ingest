@@ -34,6 +34,6 @@ dev = [
 package = true
 
 [tool.uv.sources]
-nv-ingest = { path = "../../src" }
-nv-ingest-api = { path = "../../api/" }
-nv-ingest-client = { path = "../../client/" }
+nv-ingest = { path = "../../src", editable = true }
+nv-ingest-api = { path = "../../api/", editable = true }
+nv-ingest-client = { path = "../../client/", editable = true }

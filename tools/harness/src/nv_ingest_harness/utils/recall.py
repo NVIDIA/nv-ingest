@@ -9,7 +9,6 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
-from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -17,14 +16,38 @@ from nv_ingest_client.util.milvus import nvingest_retrieval
 from nv_ingest_harness.utils.cases import get_repo_root
 
 
-def _get_retrieval_func(vdb_backend: str, table_path: Optional[str] = None):
-    """Get the retrieval function for the specified VDB backend."""
-    if vdb_backend == "lancedb":
-        from nv_ingest_client.util.vdb.lancedb import retrieval
+def _get_retrieval_func(
+    vdb_backend: str,
+    table_path: Optional[str] = None,
+    table_name: Optional[str] = None,
+):
+    """
+    Get the retrieval function for the specified VDB backend.
 
+    For LanceDB, creates a single client instance that is reused across all
+    retrieval calls, avoiding repeated database/table opens.
+
+    Args:
+        vdb_backend: "milvus" or "lancedb"
+        table_path: Path to LanceDB database directory (required for lancedb)
+        table_name: Table/collection name (used to pre-initialize LanceDB client)
+
+    Returns:
+        Retrieval function that accepts (queries, **kwargs) and returns results.
+    """
+    if vdb_backend == "lancedb":
         if not table_path:
             raise ValueError("table_path required for lancedb backend")
-        return partial(retrieval, table_path=table_path)
+        from nv_ingest_client.util.vdb.lancedb import LanceDB
+
+        # Create client once, reuse for all retrieval calls
+        lancedb_client = LanceDB(uri=table_path, table_name=table_name or "nv-ingest")
+
+        def lancedb_retrieval(queries, **kwargs):
+            # table_name already set on client, but can be overridden via kwargs
+            return lancedb_client.retrieval(queries, **kwargs)
+
+        return lancedb_retrieval
     return nvingest_retrieval
 
 
@@ -75,6 +98,12 @@ def get_recall_scores(
     num_queries = len(queries)
     num_batches = (num_queries + batch_size - 1) // batch_size
 
+    # Create retrieval function once, outside the batch loop
+    if vdb_backend == "lancedb":
+        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+    else:
+        retrieval_func = None  # Use nvingest_retrieval directly
+
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, num_queries)
@@ -85,10 +114,8 @@ def get_recall_scores(
             print(f"  Processing batch {batch_idx + 1}/{num_batches} ({len(batch_queries)} queries)")
 
         if vdb_backend == "lancedb":
-            retrieval_func = _get_retrieval_func("lancedb", table_path)
             batch_answers = retrieval_func(
                 batch_queries,
-                table_name=collection_name,
                 embedding_endpoint=f"http://{hostname}:8012/v1",
                 model_name=model_name,
                 top_k=top_k,
@@ -186,6 +213,12 @@ def get_recall_scores_pdf_only(
     num_queries = len(queries)
     num_batches = (num_queries + batch_size - 1) // batch_size
 
+    # Create retrieval function once, outside the batch loop
+    if vdb_backend == "lancedb":
+        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+    else:
+        retrieval_func = None  # Use nvingest_retrieval directly
+
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, num_queries)
@@ -196,10 +229,8 @@ def get_recall_scores_pdf_only(
             print(f"  Processing batch {batch_idx + 1}/{num_batches} ({len(batch_queries)} queries)")
 
         if vdb_backend == "lancedb":
-            retrieval_func = _get_retrieval_func("lancedb", table_path)
             batch_answers = retrieval_func(
                 batch_queries,
-                table_name=collection_name,
                 embedding_endpoint=f"http://{hostname}:8012/v1",
                 model_name=model_name,
                 top_k=top_k,

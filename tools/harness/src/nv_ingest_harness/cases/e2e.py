@@ -8,7 +8,7 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
-from nv_ingest_harness.utils.interact import embed_info, kv_event_log, segment_results, pdf_page_count
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
 from nv_ingest_harness.utils.vdb import get_lancedb_path
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
@@ -231,7 +231,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
-    # (Skipping milvus_chunks - using LanceDB)
+    if vdb_backend != "lancedb":
+        milvus_chunks(f"http://{hostname}:19530", collection_name)
     text_results, table_results, chart_results = segment_results(results)
     kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
     kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)
@@ -264,14 +265,13 @@ def main(config=None, log_path: str = "test_results") -> int:
     querying_start = time.time()
     if vdb_backend == "lancedb":
         try:
-            from nv_ingest_client.util.vdb.lancedb import retrieval as lancedb_retrieval
+            from nv_ingest_client.util.vdb.lancedb import LanceDB
         except ImportError as exc:
             print(f"Warning: LanceDB retrieval not available ({exc}). Skipping retrieval sanity check.")
         else:
-            _ = lancedb_retrieval(
+            lancedb_client = LanceDB(uri=lancedb_path, table_name=collection_name)
+            _ = lancedb_client.retrieval(
                 queries,
-                table_path=lancedb_path,
-                table_name=collection_name,
                 embedding_endpoint=f"http://{hostname}:8012/v1",
                 model_name=model_name,
                 top_k=5,

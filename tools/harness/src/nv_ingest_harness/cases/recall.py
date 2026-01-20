@@ -24,7 +24,7 @@ def evaluate_recall_with_reranker(
 
     Args:
         evaluator: Dataset evaluator function
-        collection_name: Milvus collection name
+        collection_name: Collection/table name (Milvus collection or LanceDB table)
         evaluation_params: Dict of evaluation parameters (hostname, sparse, etc.)
         use_reranker: Whether to use reranker
         log_path: Path for logging output

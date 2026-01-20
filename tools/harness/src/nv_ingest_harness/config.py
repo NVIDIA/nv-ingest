@@ -111,6 +111,10 @@ class TestConfig:
         if self.reranker_mode not in ["none", "with", "both"]:
             errors.append(f"reranker_mode must be 'none', 'with', or 'both', got '{self.reranker_mode}'")
 
+        # Check vdb_backend is valid
+        if self.vdb_backend not in ["milvus", "lancedb"]:
+            errors.append(f"vdb_backend must be 'milvus' or 'lancedb', got '{self.vdb_backend}'")
+
         # Check dataset_dir exists (can be file, directory, or glob pattern)
         # Check if it's a glob pattern (contains *, ?, or [)
         is_glob = any(char in self.dataset_dir for char in ["*", "?", "["])
