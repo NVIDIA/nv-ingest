@@ -679,9 +679,7 @@ def transform_create_text_embeddings_internal(
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
     # Determine if page content aggregation should be enabled
-    image_elements_modality = (
-        task_config.get("image_elements_modality") or transform_config.image_elements_modality
-    )
+    image_elements_modality = task_config.get("image_elements_modality") or transform_config.image_elements_modality
 
     # Check if user explicitly set the aggregation flag
     explicit_aggregate_setting = task_config.get("image_elements_aggregate_page_content")
