@@ -123,7 +123,7 @@ def extract_tables_and_charts_yolox(
     yolox_client = None
 
     try:
-        model_interface = YoloxPageElementsModelInterface()
+        model_interface = YoloxPageElementsModelInterface(endpoints=config["yolox_endpoints"])
         yolox_client = create_inference_client(
             config["yolox_endpoints"],
             model_interface,

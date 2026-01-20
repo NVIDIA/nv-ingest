@@ -106,6 +106,12 @@ def test_retrieval_calls_embed_and_search(monkeypatch):
         def limit(self, n):
             return self
 
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
+            return self
+
         def to_list(self):
             return self._items
 
@@ -121,7 +127,7 @@ def test_retrieval_calls_embed_and_search(monkeypatch):
     assert isinstance(results, list)
     assert len(results) == len(queries)
     # Each entry should be the list returned by FakeSearchResult.to_list()
-    assert results[0][0]["text"] == "hit1"
+    assert results[0][0]["entity"]["text"] == "hit1"
 
 
 def test_run_calls_create_and_write(monkeypatch):
@@ -325,6 +331,12 @@ def test_retrieval_with_custom_embedding_params(monkeypatch):
         def limit(self, n):
             return self
 
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
+            return self
+
         def to_list(self):
             return [{"text": "result", "metadata": 1, "source": "s"}]
 
@@ -371,6 +383,12 @@ def test_retrieval_with_custom_result_fields(monkeypatch):
         def limit(self, n):
             return self
 
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
+            return self
+
         def to_list(self):
             return [{"custom_field": "value"}]
 
@@ -407,6 +425,12 @@ def test_retrieval_with_custom_top_k(monkeypatch):
             captured_limit.append(n)
             return self
 
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
+            return self
+
         def to_list(self):
             return [{"text": "result"}]
 
@@ -439,6 +463,12 @@ def test_retrieval_default_top_k(monkeypatch):
 
         def limit(self, n):
             captured_limit.append(n)
+            return self
+
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
             return self
 
         def to_list(self):
@@ -493,6 +523,12 @@ def test_retrieval_multiple_queries(monkeypatch):
         def limit(self, n):
             return self
 
+        def refine_factor(self, n):
+            return self
+
+        def nprobes(self, n):
+            return self
+
         def to_list(self):
             return [{"text": f"result_{self.query_idx}"}]
 
@@ -512,6 +548,6 @@ def test_retrieval_multiple_queries(monkeypatch):
 
     # Should have results for all 3 queries
     assert len(results) == 3
-    assert results[0][0]["text"] == "result_0"
-    assert results[1][0]["text"] == "result_1"
-    assert results[2][0]["text"] == "result_2"
+    assert results[0][0]["entity"]["text"] == "result_0"
+    assert results[1][0]["entity"]["text"] == "result_1"
+    assert results[2][0]["entity"]["text"] == "result_2"

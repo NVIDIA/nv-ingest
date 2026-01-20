@@ -40,6 +40,7 @@ class TestConfig:
     gpu_search: bool = False
     embedding_model: str = "auto"
     llm_summarization_model: str = "nvdev/nvidia/llama-3.1-nemotron-70b-instruct"
+    vdb_backend: str = "milvus"
 
     # Extraction configuration
     extract_text: bool = True
@@ -53,7 +54,7 @@ class TestConfig:
     # Optional pipeline steps
     enable_caption: bool = False
     caption_prompt: Optional[str] = None
-    caption_system_prompt: Optional[str] = None
+    caption_reasoning: Optional[bool] = None
     enable_split: bool = False
     split_chunk_size: int = 1024
     split_chunk_overlap: int = 150
@@ -70,6 +71,7 @@ class TestConfig:
     spill_dir: str = "/tmp/spill"
     artifacts_dir: Optional[str] = None
     collection_name: Optional[str] = None
+    lancedb_dir: Optional[str] = None
 
     # File type configuration (for non-PDF datasets like video)
     file_pattern: Optional[str] = None  # e.g., "*.mp4", "*.pdf" (default: "*.pdf")
@@ -114,6 +116,10 @@ class TestConfig:
         # Check reranker_mode is valid
         if self.reranker_mode not in ["none", "with", "both"]:
             errors.append(f"reranker_mode must be 'none', 'with', or 'both', got '{self.reranker_mode}'")
+
+        # Check vdb_backend is valid
+        if self.vdb_backend not in ["milvus", "lancedb"]:
+            errors.append(f"vdb_backend must be 'milvus' or 'lancedb', got '{self.vdb_backend}'")
 
         # Check dataset_dir exists (can be file, directory, or glob pattern)
         # Check if it's a glob pattern (contains *, ?, or [)
@@ -268,6 +274,7 @@ def _load_env_overrides() -> dict:
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),
         "LLM_SUMMARIZATION_MODEL": ("llm_summarization_model", str),
+        "VDB_BACKEND": ("vdb_backend", str),
         "EXTRACT_TEXT": ("extract_text", parse_bool),
         "EXTRACT_TABLES": ("extract_tables", parse_bool),
         "EXTRACT_CHARTS": ("extract_charts", parse_bool),
@@ -277,7 +284,7 @@ def _load_env_overrides() -> dict:
         "TABLE_OUTPUT_FORMAT": ("table_output_format", str),
         "ENABLE_CAPTION": ("enable_caption", parse_bool),
         "CAPTION_PROMPT": ("caption_prompt", str),
-        "CAPTION_SYSTEM_PROMPT": ("caption_system_prompt", str),
+        "CAPTION_REASONING": ("caption_reasoning", parse_bool),
         "ENABLE_SPLIT": ("enable_split", parse_bool),
         "SPLIT_CHUNK_SIZE": ("split_chunk_size", parse_int),
         "SPLIT_CHUNK_OVERLAP": ("split_chunk_overlap", parse_int),
@@ -285,6 +292,7 @@ def _load_env_overrides() -> dict:
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
+        "LANCEDB_DIR": ("lancedb_dir", str),
         "RERANKER_MODE": ("reranker_mode", str),
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),

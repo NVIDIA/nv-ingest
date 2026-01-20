@@ -100,7 +100,7 @@ def yolox_grpc_infer_with_timing(
     except Exception:
         return "error", 0.0
 
-    model_interface = YoloxPageElementsModelInterface()
+    model_interface = YoloxPageElementsModelInterface(endpoints=(endpoint, ""))
     client = None
     start = time.time()
     try:

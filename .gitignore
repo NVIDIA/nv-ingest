@@ -237,5 +237,13 @@ artifacts/
 .cursor
 
 # Ignore tools/harness/private_local
-tools/private_local
-tools/harness/history.db
+tools/private_local/*
+
+# LanceDB artifacts
+lancedb_*/
+tools/harness/lancedb/
+
+# Harness history database
+history.db
+history.db-shm
+history.db-wal

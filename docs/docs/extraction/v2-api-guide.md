@@ -1,4 +1,4 @@
-# V2 API Complete Guide: PDF Pre Splitting
+# NeMo Retriever Extraction V2 API Guide: PDF Pre Splitting
 
 > **TL;DR:** V2 API automatically splits large PDFs into chunks for faster parallel processing.
 > 

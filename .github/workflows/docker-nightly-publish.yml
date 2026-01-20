@@ -36,8 +36,17 @@ jobs:
       - name: Log in to NGC Registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
+      - name: Create HF token file
+        run: |
+          mkdir -p ./scripts/private_local
+          echo "${{ secrets.HF_ACCESS_TOKEN }}" > ./scripts/private_local/hf_token.txt
+
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
           docker buildx create --use
-          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }} --build-arg DOWNLOAD_LLAMA_TOKENIZER=True --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
+          docker buildx build --platform linux/amd64,linux/arm64 --push --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg DOWNLOAD_LLAMA_TOKENIZER=True --secret id=hf_token,src=./scripts/private_local/hf_token.txt -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
+
+      - name: Cleanup HF token file
+        if: always()
+        run: rm -f ./scripts/private_local/hf_token.txt

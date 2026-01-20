@@ -22,6 +22,7 @@ active:
   sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
+  vdb_backend: milvus  # milvus or lancedb
 
   # Extraction configuration
   extract_text: true
@@ -35,7 +36,7 @@ active:
   # Optional pipeline steps
   enable_caption: false  # Enable image captioning (ensure vlm profile is enabled)
   caption_prompt: null  # Override caption user prompt (null = service default)
-  caption_system_prompt: null  # Set "/think" or "/no_think" to control reasoning (null = service default)
+  caption_reasoning: null  # Enable reasoning: true = enable, false = disable, null = service default (default is false)
 
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
@@ -51,6 +52,8 @@ active:
   llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
 # Recall configuration (only used when running recall or e2e_recall tests)
+# Remember to start the reranker service before running recall tests:
+# docker compose --profile reranker up -d
 recall:
   recall_dataset: null
   reranker_mode: both  # Options: "none", "with", "both" - requires reranker profile enabled
@@ -70,7 +73,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: bo767  # Evaluator for recall testing
+    recall_dataset: bo767
 
   earnings:
     path: /path/to/earnings_consulting
@@ -79,7 +82,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: earnings  # Evaluator for recall testing
+    recall_dataset: earnings
 
   bo20:
     path: /path/to/bo20
@@ -88,16 +91,25 @@ datasets:
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: null  # bo20 does not have recall
+    recall_dataset: null
 
   financebench:
-    path: /path/to/financebench_full
+    path: /path/to/financebench
     extract_text: true
     extract_tables: true
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: finance_bench  # Evaluator for recall testing
+    recall_dataset: finance_bench
+
+  bo10k:
+    path: /path/to/bo10k
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: bo10k
 
   # Single file example
   single:

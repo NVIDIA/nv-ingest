@@ -7,12 +7,17 @@ def get_vdb_op_cls(vdb_op: str):
     Returns the class if found, else raises ValueError.
     """
 
-    available_vdb_ops = ["milvus"]
+    available_vdb_ops = ["milvus", "lancedb"]
 
     if vdb_op == "milvus":
         from nv_ingest_client.util.vdb.milvus import Milvus
 
         return Milvus
+
+    if vdb_op == "lancedb":
+        from nv_ingest_client.util.vdb.lancedb import LanceDB
+
+        return LanceDB
 
     raise ValueError(f"Invalid vdb_op: {vdb_op}. Available vdb_ops - {available_vdb_ops}.")
 

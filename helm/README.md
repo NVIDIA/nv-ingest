@@ -9,7 +9,7 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-> Starting with version 26.0.0, the [NVIDIA NIM Operator](https://docs.nvidia.com/nim-operator/latest/install.html) is **required**. All NIM services are now deployed via NIM Operator CRDs (NIMCache and NIMService), not Helm subcharts.
+> Starting with version 26.1.0, the [NVIDIA NIM Operator](https://docs.nvidia.com/nim-operator/latest/install.html) is required. All NIM services are now deployed by using NIM Operator CRDs (NIMCache and NIMService), not Helm subcharts.
 >
 > **Upgrading from 25.9.0:**
 > 1. Install NIM Operator before upgrading
