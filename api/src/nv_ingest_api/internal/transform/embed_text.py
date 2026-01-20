@@ -365,7 +365,7 @@ def _get_pandas_table_content(row, modality="text"):
         if text:
             content = _format_text_image_pair_input_string(text, image)
         else:
-            content = _format_image_input_string(image) # Fallback to image only if text is empty
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
 
     return content
 
@@ -401,7 +401,7 @@ def _get_pandas_image_content(row, modality="text"):
         if text:
             content = _format_text_image_pair_input_string(text, image)
         else:
-            content = _format_image_input_string(image) # Fallback to image only if text is empty
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
 
     if subtype == "page_image":
         # A workaround to save memory for full page images.
