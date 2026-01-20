@@ -133,7 +133,7 @@ class NemotronParseConfigSchema(LowercaseProtocolMixin):
     nemotron_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     nemotron_parse_infer_protocol: str = ""
 
-    nemotron_parse_model_name: str = "nvidia/nemotron-parse"
+    nemotron_parse_model_name: Optional[str] = "nvidia/nemotron-parse"
 
     timeout: float = 300.0
 
