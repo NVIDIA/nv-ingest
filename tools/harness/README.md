@@ -581,6 +581,48 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
 ```
 
+## Nightly Benchmarks
+
+Automated benchmarks with Slack reporting and historical tracking.
+
+```bash
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+uv run nv-ingest-harness-nightly              # Full run
+uv run nv-ingest-harness-nightly --skip-slack # No Slack
+uv run nv-ingest-harness-nightly --dry-run    # Show config only
+```
+
+Configure datasets and sinks in `nightly_config.yaml`. See [NIGHTLY.md](NIGHTLY.md) for details.
+
+## Comparison and Stats
+
+Compare runs or sessions and analyze historical trends.
+
+### Compare two runs or sessions
+
+```bash
+# Compare two single runs (artifact directories with results.json)
+uv run nv-ingest-harness-compare tools/harness/artifacts/bo20_20260109_053814_UTC tools/harness/artifacts/bo20_20260110_204419_UTC
+
+# Compare two nightly sessions (directories with session_summary.json)
+uv run nv-ingest-harness-compare tools/harness/artifacts/nightly_20260109 tools/harness/artifacts/nightly_20260112 \
+  --baseline-label "Main RC" --compare-label "NIM RC" --note "Testing new drops"
+
+# Output markdown or post to Slack
+uv run nv-ingest-harness-compare <run_a> <run_b> --markdown compare.md
+uv run nv-ingest-harness-compare <run_a> <run_b> --slack
+```
+
+### Stats from history database
+
+```bash
+# Analyze recent history for a dataset (defaults to tools/harness/history.db)
+uv run nv-ingest-harness-stats --dataset=bo20 --limit=10
+
+# Filter by session name pattern or use a custom DB
+uv run nv-ingest-harness-stats --dataset=bo20 --session=nightly --db tools/harness/history.db
+```
+
 ## Artifacts and Logging
 
 All test outputs are collected in timestamped directories:
