@@ -9,7 +9,6 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
-from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -64,10 +63,7 @@ def get_recall_scores(
     nv_ranker_endpoint: Optional[str] = None,
     nv_ranker_model_name: Optional[str] = None,
     ground_truth_dir: Optional[str] = None,
-<<<<<<< HEAD
     batch_size: int = 100,
-=======
->>>>>>> 055d4d72 (feat: add LanceDB VDB operator with harness recall support)
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
 ) -> Dict[int, float]:
@@ -101,35 +97,11 @@ def get_recall_scores(
     num_queries = len(queries)
     num_batches = (num_queries + batch_size - 1) // batch_size
 
-<<<<<<< HEAD
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
         retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
-=======
-    if vdb_backend == "lancedb":
-        retrieval_func = _get_retrieval_func("lancedb", table_path)
-        all_answers = retrieval_func(
-            query_df["query"].to_list(),
-            table_name=collection_name,
-            embedding_endpoint=f"http://{hostname}:8012/v1",
-            model_name=model_name,
-            top_k=top_k,
-            nv_ranker=nv_ranker,
-        )
-    else:
-        all_answers = nvingest_retrieval(
-            query_df["query"].to_list(),
-            collection_name,
-            hybrid=sparse,
-            embedding_endpoint=f"http://{hostname}:8012/v1",
-            model_name=model_name,
-            top_k=top_k,
-            gpu_search=gpu_search,
-            nv_ranker=nv_ranker,
-        )
->>>>>>> 055d4d72 (feat: add LanceDB VDB operator with harness recall support)
 
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
