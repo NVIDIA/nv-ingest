@@ -9,6 +9,7 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -24,13 +25,13 @@ def _get_retrieval_func(
     """
     Get the retrieval function for the specified VDB backend.
 
-    For LanceDB, creates a single client instance that is reused across all
-    retrieval calls, avoiding repeated database/table opens.
+    For LanceDB, returns a partial of lancedb_retrieval with table_path pre-filled.
+    For Milvus, returns nvingest_retrieval directly.
 
     Args:
         vdb_backend: "milvus" or "lancedb"
         table_path: Path to LanceDB database directory (required for lancedb)
-        table_name: Table/collection name (used to pre-initialize LanceDB client)
+        table_name: Table/collection name (optional, can be passed at call time)
 
     Returns:
         Retrieval function that accepts (queries, **kwargs) and returns results.
@@ -38,16 +39,9 @@ def _get_retrieval_func(
     if vdb_backend == "lancedb":
         if not table_path:
             raise ValueError("table_path required for lancedb backend")
-        from nv_ingest_client.util.vdb.lancedb import LanceDB
+        from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
 
-        # Create client once, reuse for all retrieval calls
-        lancedb_client = LanceDB(uri=table_path, table_name=table_name or "nv-ingest")
-
-        def lancedb_retrieval(queries, **kwargs):
-            # table_name already set on client, but can be overridden via kwargs
-            return lancedb_client.retrieval(queries, **kwargs)
-
-        return lancedb_retrieval
+        return partial(lancedb_retrieval, table_path=table_path)
     return nvingest_retrieval
 
 

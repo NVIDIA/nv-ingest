@@ -106,92 +106,26 @@ class LanceDB(VDB):
         )
         return records
 
-    def retrieval(
-        self,
-        queries,
-        table=None,
-        table_path=None,
-        table_name=None,
-        embedding_endpoint: str = "http://localhost:8012/v1",
-        nvidia_api_key: str = None,
-        model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2",
-        top_k: int = 10,
-        refine_factor: int = 50,
-        n_probe: int = 64,
-        nv_ranker: bool = False,
-        nv_ranker_endpoint: str = None,
-        nv_ranker_model_name: str = None,
-        nv_ranker_top_k: int = 100,
-        result_fields=None,
-        **kwargs,
-    ):
-        """Run LanceDB retrieval and return results in Milvus-style format."""
-        table_path = table_path or self.uri
-        table_name = table_name or self.table_name
-        if result_fields is None:
-            result_fields = ["text", "metadata", "source", "_distance"]
+    def retrieval(self, queries, **kwargs):
+        """
+        Run LanceDB retrieval by delegating to lancedb_retrieval.
 
-        if table is None:
-            db = lancedb.connect(uri=table_path)
-            table = db.open_table(table_name)
-
-        embed_model = partial(
-            infer_microservice,
-            model_name=model_name,
-            embedding_endpoint=embedding_endpoint,
-            nvidia_api_key=nvidia_api_key,
-            input_type="query",
-            output_names=["embeddings"],
-            grpc=not ("http" in urlparse(embedding_endpoint).scheme),
+        Uses instance defaults for table_path (self.uri) and table_name (self.table_name)
+        unless overridden via kwargs.
+        """
+        return lancedb_retrieval(
+            queries,
+            table_path=kwargs.pop("table_path", self.uri),
+            table_name=kwargs.pop("table_name", self.table_name),
+            **kwargs,
         )
 
-        search_top_k = nv_ranker_top_k if nv_ranker else top_k
 
-        results = []
-        query_embeddings = embed_model(queries)
-        for query_embed in query_embeddings:
-            search_results = (
-                table.search([query_embed], vector_column_name="vector")
-                .select(result_fields)
-                .limit(search_top_k)
-                .refine_factor(refine_factor)
-                .nprobes(n_probe)
-                .to_list()
-            )
-            formatted = []
-            for r in search_results:
-                formatted.append(
-                    {
-                        "entity": {
-                            "source": {"source_id": r.get("source")},
-                            "content_metadata": {"page_number": r.get("metadata")},
-                            "text": r.get("text"),
-                        }
-                    }
-                )
-            results.append(formatted)
-
-        if nv_ranker:
-            rerank_results = []
-            for query, candidates in zip(queries, results):
-                rerank_results.append(
-                    nv_rerank(
-                        query,
-                        candidates,
-                        reranker_endpoint=nv_ranker_endpoint,
-                        model_name=nv_ranker_model_name,
-                        topk=top_k,
-                    )
-                )
-            results = rerank_results
-
-        return results
-
-
-def retrieval(
+def lancedb_retrieval(
     queries,
-    table_path: str,
+    table_path: str = None,
     table_name: str = "nv-ingest",
+    table=None,
     embedding_endpoint: str = "http://localhost:8012/v1",
     nvidia_api_key: str = None,
     model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2",
@@ -202,47 +136,68 @@ def retrieval(
     nv_ranker_endpoint: str = None,
     nv_ranker_model_name: str = None,
     nv_ranker_top_k: int = 100,
+    result_fields=None,
     **kwargs,
 ):
     """
-    LanceDB retrieval function.
+    Standalone LanceDB retrieval function.
+
+    This is the primary interface for LanceDB vector search. It embeds queries using the
+    specified embedding model and performs vector similarity search against
+    a LanceDB table.
 
     Parameters
     ----------
     queries : list[str]
         Text queries to search for.
-    table_path : str
-        Path to the LanceDB database directory.
+    table_path : str, optional
+        Path to the LanceDB database directory (the `uri` used during ingestion).
+        Required if `table` is not provided.
     table_name : str, optional
-        Name of the table within the LanceDB database.
+        Name of the table within the LanceDB database (default: "nv-ingest").
+    table : object, optional
+        Pre-opened LanceDB table object. If provided, table_path and table_name
+        are ignored. Useful for reusing connections or testing.
     embedding_endpoint : str, optional
-        URL of the embedding microservice.
+        URL of the embedding microservice (default: "http://localhost:8012/v1").
     nvidia_api_key : str, optional
-        NVIDIA API key for authentication.
+        NVIDIA API key for authentication. If None, no auth is used.
     model_name : str, optional
-        Name of the embedding model.
+        Name of the embedding model (default: "nvidia/llama-3.2-nv-embedqa-1b-v2").
     top_k : int, optional
-        Number of results to return per query.
+        Number of results to return per query (default: 10).
     refine_factor : int, optional
-        LanceDB search refine factor for accuracy.
+        LanceDB search refine factor for accuracy (default: 50).
     n_probe : int, optional
-        Number of partitions to probe during search.
+        Number of partitions to probe during search (default: 64).
     nv_ranker : bool, optional
-        Whether to apply NV reranker after retrieval.
+        Whether to apply NV reranker after retrieval (default: False).
     nv_ranker_endpoint : str, optional
         URL of the reranker microservice.
     nv_ranker_model_name : str, optional
         Name of the reranker model.
     nv_ranker_top_k : int, optional
-        Number of candidates to fetch before reranking.
+        Number of candidates to fetch before reranking (default: 100).
+    result_fields : list, optional
+        List of field names to retrieve from each hit document (default:
+        ["text", "metadata", "source", "_distance"]).
+    **kwargs
+        Additional keyword arguments (ignored, for API compatibility).
 
     Returns
     -------
     list[list[dict]]
-        For each query, a list of result dicts formatted to match Milvus output structure.
+        For each query, a list of result dicts formatted to match Milvus output
+        structure for recall scoring compatibility.
     """
-    db = lancedb.connect(uri=table_path)
-    table = db.open_table(table_name)
+    if table is None:
+        if table_path is None:
+            raise ValueError("Either table or table_path must be provided")
+        db = lancedb.connect(uri=table_path)
+        table = db.open_table(table_name)
+
+    if result_fields is None:
+        result_fields = ["text", "metadata", "source", "_distance"]
 
     embed_model = partial(
         infer_microservice,
@@ -261,7 +216,7 @@ def retrieval(
     for query_embed in query_embeddings:
         search_results = (
             table.search([query_embed], vector_column_name="vector")
-            .select(["text", "metadata", "source", "_distance"])
+            .select(result_fields)
             .limit(search_top_k)
             .refine_factor(refine_factor)
             .nprobes(n_probe)
@@ -272,9 +227,9 @@ def retrieval(
             formatted.append(
                 {
                     "entity": {
-                        "source": {"source_id": r["source"]},
-                        "content_metadata": {"page_number": r["metadata"]},
-                        "text": r["text"],
+                        "source": {"source_id": r.get("source")},
+                        "content_metadata": {"page_number": r.get("metadata")},
+                        "text": r.get("text"),
                     }
                 }
             )
