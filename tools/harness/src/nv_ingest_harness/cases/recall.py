@@ -5,6 +5,7 @@ Recall-only test case - evaluates recall against existing collections.
 import json
 import os
 import time
+import traceback
 from typing import Callable, Dict, Tuple
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log
@@ -123,27 +124,28 @@ def main(config=None, log_path: str = "test_results") -> int:
     if lancedb_path:
         print(f"Using LanceDB at: {lancedb_path}")
 
-    try:
-        recall_results = {}
+    recall_results = {}
+    exit_code = 0
 
-        # Prepare evaluation parameters
-        evaluation_params = {
-            "hostname": hostname,
-            "sparse": sparse,
-            "model_name": model_name,
-            "top_k": recall_top_k,
-            "gpu_search": gpu_search,
-            "ground_truth_dir": ground_truth_dir,
-            "vdb_backend": vdb_backend,
-            "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
-            "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
-        }
-        if vdb_backend == "lancedb":
-            evaluation_params["sparse"] = False  # LanceDB doesn't support hybrid search
-            evaluation_params["table_path"] = lancedb_path
+    # Prepare evaluation parameters
+    evaluation_params = {
+        "hostname": hostname,
+        "sparse": sparse,
+        "model_name": model_name,
+        "top_k": recall_top_k,
+        "gpu_search": gpu_search,
+        "ground_truth_dir": ground_truth_dir,
+        "vdb_backend": vdb_backend,
+        "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
+        "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
+    }
+    if vdb_backend == "lancedb":
+        evaluation_params["sparse"] = False  # LanceDB doesn't support hybrid search
+        evaluation_params["table_path"] = lancedb_path
 
-        # Run without reranker (if mode is "none" or "both")
-        if reranker_mode in ["none", "both"]:
+    # Run without reranker (if mode is "none" or "both")
+    if reranker_mode in ["none", "both"]:
+        try:
             scores, _ = evaluate_recall_with_reranker(
                 evaluator=evaluator,
                 collection_name=collection_name,
@@ -152,9 +154,13 @@ def main(config=None, log_path: str = "test_results") -> int:
                 log_path=log_path,
             )
             recall_results["no_reranker"] = scores
+        except Exception as e:
+            print(f"ERROR: Recall evaluation (without reranker) failed: {e}")
+            traceback.print_exc()
+            exit_code = 1
 
-        # Run with reranker (if mode is "with" or "both")
-        if reranker_mode in ["with", "both"]:
+    if reranker_mode in ["with", "both"]:
+        try:
             scores, _ = evaluate_recall_with_reranker(
                 evaluator=evaluator,
                 collection_name=collection_name,
@@ -163,32 +169,28 @@ def main(config=None, log_path: str = "test_results") -> int:
                 log_path=log_path,
             )
             recall_results["with_reranker"] = scores
+        except Exception as e:
+            print(f"ERROR: Recall evaluation (with reranker) failed: {e}")
+            traceback.print_exc()
+            exit_code = 1
 
-        # Save results
-        results_file = os.path.join(log_path, "_test_results.json")
-        test_results = {
-            "test_type": "recall",
-            "dataset": recall_dataset,
-            "test_name": test_name,
-            "collection_name": collection_name,
-            "reranker_mode": reranker_mode,
-            "recall_results": recall_results,
-        }
-        with open(results_file, "w") as f:
-            json.dump(test_results, f, indent=2)
+    results_file = os.path.join(log_path, "_test_results.json")
+    test_results = {
+        "test_type": "recall",
+        "dataset": recall_dataset,
+        "test_name": test_name,
+        "collection_name": collection_name,
+        "reranker_mode": reranker_mode,
+        "recall_results": recall_results,
+    }
+    with open(results_file, "w") as f:
+        json.dump(test_results, f, indent=2)
 
-        print("\n" + "=" * 60)
-        print("Recall Evaluation Complete")
-        print("=" * 60)
+    print("\n" + "=" * 60)
+    print("Recall Evaluation Complete" if exit_code == 0 else "Recall Evaluation Completed with Errors")
+    print("=" * 60)
 
-        return 0
-
-    except Exception as e:
-        print(f"ERROR: Recall evaluation failed: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return 1
+    return exit_code
 
 
 if __name__ == "__main__":
