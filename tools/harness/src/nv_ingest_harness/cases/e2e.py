@@ -112,8 +112,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         caption_flags = []
         if config.caption_prompt:
             caption_flags.append("prompt override")
-        if config.caption_system_prompt:
-            caption_flags.append("system prompt override")
+        if config.caption_reasoning is not None:
+            caption_flags.append(f"reasoning={'on' if config.caption_reasoning else 'off'}")
         if caption_flags:
             pipeline_opts.append(f"caption ({', '.join(caption_flags)})")
         else:
@@ -164,8 +164,8 @@ def main(config=None, log_path: str = "test_results") -> int:
         caption_kwargs = {}
         if config.caption_prompt:
             caption_kwargs["prompt"] = config.caption_prompt
-        if config.caption_system_prompt:
-            caption_kwargs["system_prompt"] = config.caption_system_prompt
+        if config.caption_reasoning is not None:
+            caption_kwargs["reasoning"] = config.caption_reasoning
         ingestor = ingestor.caption(**caption_kwargs)
 
     if enable_split:

@@ -25,7 +25,21 @@ def download_tokenizer(model_name, save_path, token=None):
                 print("Tokenizer will be downloaded at runtime if needed.")
 
 
-token = os.getenv("HF_ACCESS_TOKEN")
+HF_TOKEN_FILE = "/run/secrets/hf_token"
+
+token = None
+if os.path.exists(HF_TOKEN_FILE):
+    with open(HF_TOKEN_FILE, "r") as f:
+        token = f.read().strip()
+    if token:
+        print(f"Using HF token from secret file: {HF_TOKEN_FILE}")
+if not token:
+    token = os.getenv("HF_ACCESS_TOKEN")
+    if token:
+        print("Using HF token from HF_ACCESS_TOKEN environment variable")
+    else:
+        print("No HF token provided (some gated models may not be accessible)")
+
 model_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
 
 if os.getenv("DOWNLOAD_LLAMA_TOKENIZER") == "True":
