@@ -98,7 +98,7 @@ def _run_chart_inference(
             model_name="paddle",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
-    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}:
         future_ocr_kwargs.update(
             model_name=ocr_model_name,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
@@ -239,9 +239,10 @@ def _create_ocr_client(
     ocr_model_name: str,
     auth_token: str,
 ) -> NimClient:
+    nemo_retriever_ocr_models = {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}
     ocr_model_interface = (
         NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        if ocr_model_name in nemo_retriever_ocr_models
         else PaddleOCRModelInterface()
     )
 
@@ -250,9 +251,7 @@ def _create_ocr_client(
         model_interface=ocr_model_interface,
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
-        enable_dynamic_batching=(
-            True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"} else False
-        ),
+        enable_dynamic_batching=(True if ocr_model_name in nemo_retriever_ocr_models else False),
         dynamic_batch_memory_budget_mb=32,
     )
 
