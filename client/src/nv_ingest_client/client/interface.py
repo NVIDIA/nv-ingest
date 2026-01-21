@@ -12,7 +12,6 @@ import logging
 import os
 import shutil
 import tempfile
-import threading
 from io import BytesIO
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
@@ -201,6 +200,54 @@ class LazyLoadedList(collections.abc.Sequence):
 
     def get_all_items(self) -> List[Any]:
         return list(self.__iter__())
+
+
+def _build_return_tuple(
+    results: List[Any],
+    failures: List[Any],
+    traces_list: List[Any],
+    parent_trace_ids: List[Any],
+    return_failures: bool,
+    return_traces: bool,
+    include_parent_trace_ids: bool,
+) -> Union[List[Any], Tuple[Any, ...]]:
+    """
+    Build the return value for ingest methods based on requested outputs.
+    This helper ensures consistent return value construction across both
+    ingest() and ingest_async() methods.
+    Parameters
+    ----------
+    results : List[Any]
+        The primary results from ingestion.
+    failures : List[Any]
+        List of failures encountered during ingestion.
+    traces_list : List[Any]
+        Trace metrics for each processed job.
+    parent_trace_ids : List[Any]
+        Parent trace identifiers (V2 API only).
+    return_failures : bool
+        Whether to include failures in the return value.
+    return_traces : bool
+        Whether to include traces in the return value.
+    include_parent_trace_ids : bool
+        Whether to include parent trace IDs in the return value.
+    Returns
+    -------
+    Union[List[Any], Tuple[Any, ...]]
+        If only results are requested, returns the results list directly.
+        Otherwise, returns a tuple in the order:
+        (results, [failures], [traces], [parent_trace_ids])
+    """
+    returns = [results]
+
+    if return_failures:
+        returns.append(failures)
+    if return_traces:
+        returns.append(traces_list)
+    if include_parent_trace_ids:
+        returns.append(parent_trace_ids)
+
+    return tuple(returns) if len(returns) > 1 else results
 
 
 class Ingestor:
@@ -508,6 +555,76 @@ class Ingestor:
             )
         return None
 
+    def _setup_telemetry(self, kwargs: Dict[str, Any]) -> bool:
+        """
+        Setup telemetry controls from kwargs.
+        This helper ensures consistent telemetry setup across both
+        ingest() and ingest_async() methods.
+        Parameters
+        ----------
+        kwargs : Dict[str, Any]
+            The keyword arguments dict. Telemetry options will be popped from it.
+        Returns
+        -------
+        bool
+            Whether to show telemetry summary after processing.
+        """
+        enable_telemetry: Optional[bool] = kwargs.pop("enable_telemetry", None)
+        show_telemetry: Optional[bool] = kwargs.pop("show_telemetry", None)
+
+        if show_telemetry is None:
+            # Fallback to env NV_INGEST_CLIENT_SHOW_TELEMETRY (0/1), default off
+            try:
+                show_telemetry = bool(int(os.getenv("NV_INGEST_CLIENT_SHOW_TELEMETRY", "0")))
+            except ValueError:
+                show_telemetry = False
+
+        # If user explicitly wants to show telemetry but did not specify enable_telemetry,
+        # ensure collection is enabled so summary isn't empty.
+        if enable_telemetry is None and show_telemetry:
+            enable_telemetry = True
+
+        if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
+            self._client.enable_telemetry(bool(enable_telemetry))
+
+        return show_telemetry
+
+    def _show_telemetry_summary(self) -> None:
+        """
+        Print telemetry summary to stdout and log.
+        This helper ensures consistent telemetry output across both
+        ingest() and ingest_async() methods.
+        """
+        try:
+            summary = self._client.summarize_telemetry()
+            print("NvIngestClient Telemetry Summary:", json.dumps(summary, indent=2))
+            logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
+        except Exception:
+            pass
+
+    def _setup_io_executor(
+        self, thread_name_prefix: str = "IngestorIO"
+    ) -> Tuple[Optional[ThreadPoolExecutor], List[Future]]:
+        """
+        Setup I/O executor for disk saving if output configuration is set.
+        This helper ensures consistent I/O executor setup across both
+        ingest() and ingest_async() methods.
+        Parameters
+        ----------
+        thread_name_prefix : str, optional
+            Prefix for the thread pool executor threads. Default is "IngestorIO".
+        Returns
+        -------
+        Tuple[Optional[ThreadPoolExecutor], List[Future]]
+            A tuple containing the executor (or None if not configured) and
+            an empty list for tracking futures.
+        """
+        if self._output_config:
+            output_dir = self._output_config["output_directory"]
+            os.makedirs(output_dir, exist_ok=True)
+            return ThreadPoolExecutor(max_workers=1, thread_name_prefix=thread_name_prefix), []
+        return None, []
+
     def ingest(
         self,
         show_progress: bool = False,
@@ -517,7 +634,14 @@ class Ingestor:
         **kwargs: Any,
     ) -> Union[List[Any], Tuple[Any, ...]]:
         """
-        Ingest documents by submitting jobs and fetching results concurrently.
+        Ingest documents by submitting jobs and fetching results synchronously.
+        This is a thin wrapper around ingest_async() that adds progress bar support
+        and blocks until completion.
+
+        .. warning::
+            `ingest_async` is the core implementation. Any functional modifications to the
+            ingestion process should be made in `ingest_async`. This method (`ingest`)
+            is strictly a synchronous wrapper around that core logic.
 
         Parameters
         ----------
@@ -553,8 +677,6 @@ class Ingestor:
         if save_to_disk and (not self._output_config):
             self.save_to_disk()
 
-        include_parent_trace_ids = bool(kwargs.pop("include_parent_trace_ids", False))
-
         self._prepare_ingest_run()
 
         # Add jobs locally first
@@ -562,192 +684,32 @@ class Ingestor:
             raise RuntimeError("Job specs missing.")
         self._job_ids = self._client.add_job(self._job_specs)
 
-        final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
-
-        # Lock for thread-safe appending to final_results_payload_list by I/O tasks
-        results_lock = threading.Lock() if self._output_config else None
-
-        io_executor: Optional[ThreadPoolExecutor] = None
-        io_futures: List[Future] = []
-
-        if self._output_config:
-            io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="IngestorDiskIO")
-
-        def _perform_save_task(doc_data, job_id, source_name):
-            # This function runs in the io_executor
-            results = self._write_results_to_disk(doc_data, source_name, job_id)
-            if results:
-                if results_lock:
-                    with results_lock:
-                        final_results_payload_list.append(results)
-                else:  # Should not happen if io_executor is used
-                    final_results_payload_list.append(results)
-
-        def _disk_save_callback(
-            results_data: Dict[str, Any],
-            job_id: str,
-        ):
-            source_name = self._resolve_source_name(job_id, results_data)
-
-            if not results_data:
-                logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
-                if pbar:
-                    pbar.update(1)
-                return
-
-            if io_executor:
-                future = io_executor.submit(_perform_save_task, results_data, job_id, source_name)
-                io_futures.append(future)
-            else:  # Fallback to blocking save if no I/O pool
-                _perform_save_task(results_data, job_id, source_name)
-
-            if pbar:
-                pbar.update(1)
-
-        def _in_memory_callback(
-            results_data: Dict[str, Any],
-            job_id: str,
-        ):
-            if pbar:
-                pbar.update(1)
-
         pbar = tqdm(total=len(self._job_ids), desc="Processing", unit="doc") if show_progress else None
-        callback: Optional[Callable] = None
 
-        if self._output_config:
-            callback = _disk_save_callback
-            stream_to_callback_only = True
+        def _progress_callback():
+            if pbar:
+                pbar.update(1)
 
-            output_dir = self._output_config["output_directory"]
-            os.makedirs(output_dir, exist_ok=True)
-        else:
-            callback = _in_memory_callback
-            stream_to_callback_only = False
+        try:
+            future = self.ingest_async(
+                return_failures=return_failures,
+                return_traces=return_traces,
+                progress_callback=_progress_callback,
+                **kwargs,
+            )
+            return future.result()
+        finally:
+            if pbar:
+                pbar.close()
 
-        # Default concurrent-processing parameters
-        DEFAULT_TIMEOUT: int = 100
-        DEFAULT_MAX_RETRIES: int = None
-        DEFAULT_VERBOSE: bool = False
-
-        timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
-        max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
-        verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
-
-        proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
-
-        # Telemetry controls (optional)
-        enable_telemetry: Optional[bool] = kwargs.pop("enable_telemetry", None)
-        show_telemetry: Optional[bool] = kwargs.pop("show_telemetry", None)
-        if show_telemetry is None:
-            # Fallback to env NV_INGEST_CLIENT_SHOW_TELEMETRY (0/1), default off
-            try:
-                show_telemetry = bool(int(os.getenv("NV_INGEST_CLIENT_SHOW_TELEMETRY", "0")))
-            except ValueError:
-                show_telemetry = False
-        # If user explicitly wants to show telemetry but did not specify enable_telemetry,
-        # ensure collection is enabled so summary isn't empty.
-        if enable_telemetry is None and show_telemetry:
-            enable_telemetry = True
-        if enable_telemetry is not None and hasattr(self._client, "enable_telemetry"):
-            self._client.enable_telemetry(bool(enable_telemetry))
-
-        # Call process_jobs_concurrently
-        proc_result = self._client.process_jobs_concurrently(
-            job_indices=self._job_ids,
-            job_queue_id=self._job_queue_id,
-            timeout=timeout,
-            max_job_retries=max_job_retries,
-            completion_callback=callback,
-            return_failures=True,
-            stream_to_callback_only=stream_to_callback_only,
-            verbose=verbose,
-            return_traces=return_traces,
-            **proc_kwargs,
-        )
-
-        # Unpack result based on return_traces flag
-        if return_traces:
-            results, failures, traces_list = proc_result
-        else:
-            results, failures = proc_result
-            traces_list = []  # Empty list when traces not requested
-
-        if show_progress and pbar:
-            pbar.close()
-
-        if io_executor:
-            for future in as_completed(io_futures):
-                try:
-                    future.result()
-                except Exception as e_io:
-                    logger.error(f"A disk I/O task failed: {e_io}", exc_info=True)
-            io_executor.shutdown(wait=True)
-
-        if self._output_config:
-            results = final_results_payload_list
-
-        if self._vdb_bulk_upload:
-            if len(failures) > 0:
-                # Calculate success metrics
-                total_jobs = len(results) + len(failures)
-                successful_jobs = len(results)
-
-                if return_failures:
-                    # Emit message about partial success
-                    logger.warning(
-                        f"Job was not completely successful. "
-                        f"{successful_jobs} out of {total_jobs} records completed successfully. "
-                        f"Uploading successful results to vector database."
-                    )
-
-                    # Upload only the successful results
-                    if successful_jobs > 0:
-                        self._vdb_bulk_upload.run(results)
-
-                        if self._purge_results_after_vdb_upload:
-                            logger.info("Purging saved results from disk after successful VDB upload.")
-                            self._purge_saved_results(results)
-
-                else:
-                    # Original behavior: raise RuntimeError
-                    raise RuntimeError(
-                        "Failed to ingest documents, unable to complete vdb bulk upload due to "
-                        f"no successful results. {len(failures)} out of {total_jobs} records failed "
-                    )
-            else:
-                # No failures - proceed with normal upload
-                self._vdb_bulk_upload.run(results)
-
-                if self._purge_results_after_vdb_upload:
-                    logger.info("Purging saved results from disk after successful VDB upload.")
-                    self._purge_saved_results(results)
-
-        # Print telemetry summary if requested
-        if show_telemetry:
-            try:
-                summary = self._client.summarize_telemetry()
-                # Print to stdout and log for convenience
-                print("NvIngestClient Telemetry Summary:", json.dumps(summary, indent=2))
-                logger.info("NvIngestClient Telemetry Summary: %s", json.dumps(summary, indent=2))
-            except Exception:
-                pass
-
-        parent_trace_ids = self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
-
-        # Build return tuple based on requested outputs
-        # Order: results, failures (if requested), traces (if requested), parent_trace_ids (if requested)
-        returns = [results]
-
-        if return_failures:
-            returns.append(failures)
-        if return_traces:
-            returns.append(traces_list)
-        if include_parent_trace_ids:
-            returns.append(parent_trace_ids)
-
-        return tuple(returns) if len(returns) > 1 else results
-
-    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **kwargs: Any) -> Future:
+    def ingest_async(
+        self,
+        *,
+        return_failures: bool = False,
+        return_traces: bool = False,
+        progress_callback: Optional[Callable[[], None]] = None,
+        **kwargs: Any,
+    ) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
@@ -761,6 +723,8 @@ class Ingestor:
             If True, return a tuple containing failures; otherwise, only return results. Default is False.
         return_traces : bool, optional
             If True, return trace metrics alongside results. Default is False.
+        progress_callback : callable, optional
+            A callback function invoked after each job completes. Used by ingest() for progress bar updates.
         kwargs : dict
             Additional parameters passed to the concurrent processor.
             Optional flags include `include_parent_trace_ids=True` to also return
@@ -776,52 +740,55 @@ class Ingestor:
             - return_traces=True: (results, traces)
             - return_failures=True, return_traces=True: (results, failures, traces)
 
+        Notes
+        -----
+        This is the core implementation. The synchronous ingest() method is a thin wrapper
+        around this method that adds progress bar support.
         """
         try:
-            self._prepare_ingest_run()
+            if not self._job_ids:
+                self._prepare_ingest_run()
+                if self._job_specs is None:
+                    raise RuntimeError("Job specs missing for ingest_async.")
+                self._job_ids = self._client.add_job(self._job_specs)
 
-            # Add jobs locally first
-            if self._job_specs is None:
-                raise RuntimeError("Job specs missing for ingest_async.")
-            self._job_ids = self._client.add_job(self._job_specs)
             self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
+
+            show_telemetry = self._setup_telemetry(kwargs)
 
             proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently_async, **kwargs)
 
-            stream_to_callback_only = False
-            completion_callback = None
+            stream_to_callback_only = bool(self._output_config)
             async_results_map = {}
 
             io_executor = None
             io_futures = []
 
             if self._output_config:
-                stream_to_callback_only = True
-                output_dir = self._output_config["output_directory"]
+                io_executor, io_futures = self._setup_io_executor(thread_name_prefix="IngestAsyncIO")
 
-                os.makedirs(output_dir, exist_ok=True)
+            def _io_task(results_data: Dict[str, Any], job_id: str):
+                try:
+                    source_name = self._resolve_source_name(job_id, results_data)
+                    result = self._write_results_to_disk(results_data, source_name, job_id)
+                    if result:
+                        # Store the LazyLoadedList in our map using job_id as key
+                        async_results_map[job_id] = result
+                except Exception as e:
+                    logger.error(f"Error in async I/O task for job {job_id}: {e}", exc_info=True)
 
-                io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="IngestAsyncIO")
-
-                def _io_task(data: Dict[str, Any], job_id: str):
-                    try:
-                        source_name = self._resolve_source_name(job_id, data)
-                        result = self._write_results_to_disk(data, source_name, job_id)
-                        if result:
-                            # Store the LazyLoadedList in our map using job_id as key
-                            async_results_map[job_id] = result
-                    except Exception as e:
-                        logger.error(f"Error in async I/O task for job {job_id}: {e}", exc_info=True)
-
-                def _composite_callback(data: Dict[str, Any], job_id: str):
-                    """Callback executed by worker threads to save data to disk."""
-                    try:
-                        future = io_executor.submit(_io_task, data, job_id)
+            def _completion_callback(results_data: Dict[str, Any], job_id: str):
+                """Callback executed by worker threads for each completed job."""
+                try:
+                    if io_executor:
+                        future = io_executor.submit(_io_task, results_data, job_id)
                         io_futures.append(future)
-                    except Exception as e:
-                        logger.error(f"Error in async callback for job {job_id}: {e}", exc_info=True)
+                    if progress_callback:
+                        progress_callback()
+                except Exception as e:
+                    logger.error(f"Error in completion callback for job {job_id}: {e}", exc_info=True)
 
-                completion_callback = _composite_callback
+            completion_callback = _completion_callback if (io_executor or progress_callback) else None
 
             final_future: Future = Future()
 
@@ -861,6 +828,10 @@ class Ingestor:
                         for item in results:
                             if isinstance(item, str) and item in async_results_map:
                                 final_results_list.append(async_results_map[item])
+                        if not final_results_list and async_results_map:
+                            final_results_list = list(async_results_map.values())
+                        elif not final_results_list and results:
+                            final_results_list = results
                     else:
                         final_results_list = results
 
@@ -880,30 +851,30 @@ class Ingestor:
                             if self._job_states[job_id].state != JobStateEnum.COMPLETED:
                                 self._job_states[job_id].state = JobStateEnum.COMPLETED
 
-                    if self._vdb_bulk_upload and final_results_list:
-                        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
-                            results_future = Future()
-                            results_future.set_result(final_results_list)
-                            vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
-                            vdb_future.result()
+                    if self._vdb_bulk_upload:
+                        self._handle_vdb_upload(
+                            results=final_results_list,
+                            failures=failures,
+                            return_failures=return_failures,
+                            use_async=True,
+                        )
 
-                            if self._purge_results_after_vdb_upload and self._output_config:
-                                logger.info("Purging saved results from disk after successful VDB upload.")
-                                self._purge_saved_results(final_results_list)
+                    if show_telemetry:
+                        self._show_telemetry_summary()
 
                     parent_trace_ids = (
                         self._client.consume_completed_parent_trace_ids() if include_parent_trace_ids else []
                     )
 
-                    returns = [final_results_list]
-                    if return_failures:
-                        returns.append(failures)
-                    if return_traces:
-                        returns.append(traces_list)
-                    if include_parent_trace_ids:
-                        returns.append(parent_trace_ids)
-
-                    final_result = tuple(returns) if len(returns) > 1 else final_results_list
+                    final_result = _build_return_tuple(
+                        results=final_results_list,
+                        failures=failures,
+                        traces_list=traces_list,
+                        parent_trace_ids=parent_trace_ids,
+                        return_failures=return_failures,
+                        return_traces=return_traces,
+                        include_parent_trace_ids=include_parent_trace_ids,
+                    )
 
                     if not final_future.done():
                         final_future.set_result(final_result)
@@ -1411,6 +1382,80 @@ class Ingestor:
         ensure_directory_with_permissions(output_directory)
 
         return self
+
+    def _handle_vdb_upload(
+        self,
+        results: List[Any],
+        failures: List[Any],
+        return_failures: bool,
+        use_async: bool = False,
+    ) -> None:
+        """
+        Handle VDB bulk upload with consistent failure handling.
+        This helper ensures consistent VDB upload behavior across both
+        ingest() and ingest_async() methods.
+        Parameters
+        ----------
+        results : List[Any]
+            The successful results to upload.
+        failures : List[Any]
+            List of failures encountered during ingestion.
+        return_failures : bool
+            If True, partial uploads are allowed with a warning.
+            If False, raises RuntimeError when there are failures.
+        use_async : bool, optional
+            If True, uses run_async method for the upload. Default is False.
+        Raises
+        ------
+        RuntimeError
+            If there are failures and return_failures is False.
+        """
+        if not self._vdb_bulk_upload:
+            return
+
+        if not results:
+            if failures:
+                total_jobs = len(failures)
+                if return_failures:
+                    logger.warning(
+                        f"Job was not completely successful. 0 out of {total_jobs} records completed successfully. "
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Failed to ingest documents, unable to complete vdb bulk upload due to "
+                        f"no successful results. {total_jobs} out of {total_jobs} records failed."
+                    )
+            return
+
+        if len(failures) > 0:
+            total_jobs = len(results) + len(failures)
+            successful_jobs = len(results)
+
+            if return_failures:
+                logger.warning(
+                    f"Job was not completely successful. "
+                    f"{successful_jobs} out of {total_jobs} records completed successfully. "
+                    f"Uploading successful results to vector database."
+                )
+            else:
+                raise RuntimeError(
+                    f"Failed to ingest documents, unable to complete vdb bulk upload due to "
+                    f"failures. {len(failures)} out of {total_jobs} records failed."
+                )
+
+        if use_async:
+            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="VDB_Uploader") as vdb_executor:
+                results_future = Future()
+                results_future.set_result(results)
+                vdb_future = vdb_executor.submit(self._vdb_bulk_upload.run_async, results_future)
+                vdb_future.result()
+        else:
+            self._vdb_bulk_upload.run(results)
+
+        # Purge results if configured
+        if self._purge_results_after_vdb_upload:
+            logger.info("Purging saved results from disk after successful VDB upload.")
+            self._purge_saved_results(results)
 
     def _purge_saved_results(self, saved_results: List[LazyLoadedList]):
         """
