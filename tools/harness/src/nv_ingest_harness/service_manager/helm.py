@@ -353,17 +353,23 @@ done
             print()
         print("=" * 60)
 
-    def stop(self) -> int:
+    def stop(self, clean: bool = False) -> int:
         """
         Uninstall Helm release.
 
         Note: Port forwards should be stopped separately via _stop_port_forwards()
         to allow keeping services up while cleaning up port-forward processes.
 
+        Args:
+            clean: If True, also delete the namespace (full cleanup)
+
         Returns:
             0 on success, non-zero on failure
         """
         print(f"Uninstalling Helm release {self.release_name}...")
+
+        # Stop port forwards first
+        self._stop_port_forwards()
 
         cmd = self.helm_cmd + ["uninstall", self.release_name, "--namespace", self.namespace]
 
@@ -371,6 +377,15 @@ done
         rc = subprocess.call(cmd)
         if rc != 0:
             print(f"Warning: helm uninstall returned {rc}")
+
+        # If clean mode, also delete the namespace for a complete cleanup
+        if clean:
+            print(f"Deleting namespace {self.namespace}...")
+            kubectl_cmd = self.kubectl_cmd + ["delete", "namespace", self.namespace, "--ignore-not-found"]
+            print("$", " ".join(kubectl_cmd))
+            rc2 = subprocess.call(kubectl_cmd)
+            if rc2 != 0:
+                print(f"Warning: kubectl delete namespace returned {rc2}")
 
         return 0
 

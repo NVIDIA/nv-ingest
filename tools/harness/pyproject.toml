@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "docker>=7.1.0",
     "milvus-lite==2.4.12",
     "nv-ingest",
     "nv-ingest-api",

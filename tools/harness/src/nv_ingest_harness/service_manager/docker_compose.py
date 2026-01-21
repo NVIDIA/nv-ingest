@@ -52,9 +52,12 @@ class DockerComposeManager(ServiceManager):
         print("$", " ".join(cmd))
         return subprocess.call(cmd)
 
-    def stop(self) -> int:
+    def stop(self, clean: bool = False) -> int:
         """
         Stop Docker Compose services.
+
+        Args:
+            clean: If True, also remove volumes and orphans
 
         Returns:
             0 on success
@@ -63,6 +66,11 @@ class DockerComposeManager(ServiceManager):
 
         # Stop all services
         down_cmd = ["docker", "compose", "-f", self.compose_file, "--profile", "*", "down"]
+        
+        # Add cleanup flags if clean mode
+        if clean:
+            down_cmd += ["-v", "--remove-orphans"]
+        
         print("$", " ".join(down_cmd))
         rc = subprocess.call(down_cmd)
         if rc != 0:

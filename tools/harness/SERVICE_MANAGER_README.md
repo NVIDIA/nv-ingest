@@ -20,7 +20,8 @@ tools/harness/src/nv_ingest_harness/service_manager/
 
 1. **ServiceManager (base.py)**: Abstract base class defining the interface for all service managers
    - `start(no_build: bool) -> int`: Start services
-   - `stop() -> int`: Stop and cleanup services
+   - `stop(clean: bool) -> int`: Stop and cleanup services (clean=True removes volumes/namespace)
+   - `restart(build: bool, clean: bool, timeout: int) -> int`: Restart services (stop, start, wait for readiness)
    - `check_readiness(timeout_s: int) -> bool`: Poll for service readiness
    - `get_service_url(service: str) -> str`: Get service endpoint URLs
 

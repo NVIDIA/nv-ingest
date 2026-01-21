@@ -12,15 +12,16 @@ from typing import Any
 import click
 import yaml
 
-from nv_ingest_harness.config import load_config
+from nv_ingest_harness.config import load_config, TestConfig
 from nv_ingest_harness.reporting.baselines import validate_results, check_all_passed, get_expected_counts
 from nv_ingest_harness.reporting.environment import get_environment_data
+from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.sinks import SlackSink, HistorySink
 from nv_ingest_harness.utils.cases import now_timestr
-from nv_ingest_harness.utils.docker import restart_services
 from nv_ingest_harness.utils.session import create_session_dir, write_session_summary
 
 DEFAULT_CONFIG_PATH = Path(__file__).parents[3] / "nightly_config.yaml"
+REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 def load_nightly_config(config_path: Path) -> dict[str, Any]:
@@ -28,6 +29,45 @@ def load_nightly_config(config_path: Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Nightly config not found: {config_path}")
     with open(config_path) as f:
         return yaml.safe_load(f)
+
+
+def create_infrastructure_config(nightly_config: dict, deployment_type: str) -> TestConfig:
+    """
+    Create a TestConfig object from nightly infrastructure config.
+    
+    Args:
+        nightly_config: Loaded nightly config YAML
+        deployment_type: Deployment type ('compose' or 'helm')
+        
+    Returns:
+        TestConfig object suitable for service manager
+    """
+    infra = nightly_config.get("infrastructure", {})
+    
+    # Start with base infrastructure settings
+    config_dict = {
+        "dataset_dir": ".",  # Required but not used for service management
+        "deployment_type": deployment_type,
+        "readiness_timeout": infra.get("readiness_timeout", 600),
+        "hostname": infra.get("hostname", "localhost"),
+    }
+    
+    # Add compose-specific settings
+    if deployment_type == "compose":
+        compose_config = infra.get("compose", {})
+        config_dict["profiles"] = compose_config.get("profiles", ["retrieval", "table-structure"])
+    
+    # Add helm-specific settings
+    elif deployment_type == "helm":
+        helm_config = infra.get("helm", {})
+        # Map helm config keys to TestConfig field names
+        for key, value in helm_config.items():
+            if key.startswith("kubectl_"):
+                config_dict[key] = value
+            else:
+                config_dict[f"helm_{key}"] = value
+    
+    return TestConfig(**config_dict)
 
 
 def run_harness(dataset: str, case: str = "e2e", session_dir: Path | None = None) -> tuple[int, Path | None]:
@@ -107,6 +147,12 @@ def load_results(artifact_dir: Path) -> dict:
     help="Path to nightly config YAML (default: nightly_config.yaml)",
 )
 @click.option(
+    "--deployment-type",
+    type=click.Choice(["compose", "helm"], case_sensitive=False),
+    default="compose",
+    help="Deployment type for service management (compose or helm)",
+)
+@click.option(
     "--skip-slack",
     is_flag=True,
     help="Disable Slack posting (overrides config)",
@@ -141,6 +187,7 @@ def load_results(artifact_dir: Path) -> dict:
 )
 def main(
     config_path: Path | None,
+    deployment_type: str,
     skip_slack: bool,
     skip_history: bool,
     skip_fresh_start: bool,
@@ -219,8 +266,18 @@ def main(
 
     if fresh_start:
         timeout = infra_config.get("readiness_timeout", 600)
-        profiles = infra_config.get("profiles")  # None uses DEFAULT_PROFILES
-        rc = restart_services(profiles=profiles, timeout=timeout, build=False, clean=True)
+        
+        # Create service manager config from infrastructure settings
+        try:
+            service_config = create_infrastructure_config(config, deployment_type)
+        except Exception as e:
+            print(f"Error creating service configuration: {e}")
+            return 1
+        
+        # Create and use service manager for restart
+        service_manager = create_service_manager(service_config, REPO_ROOT)
+        rc = service_manager.restart(build=False, clean=True, timeout=timeout)
+        
         if rc != 0:
             print(f"Warning: Service restart returned {rc}")
 
