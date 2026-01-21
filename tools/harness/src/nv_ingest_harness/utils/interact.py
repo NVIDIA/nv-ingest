@@ -316,7 +316,7 @@ def pdf_page_count(path: str) -> int:
 
     This function handles both single PDF files and directories containing PDFs.
     For a file path, it counts pages in that specific PDF.
-    For a directory path, it scans for all PDF files and counts total pages.
+    For a directory path, it recursively scans for all PDF files and counts total pages.
     If a PDF file cannot be processed, an error message is printed and the file is skipped.
 
     Args:
@@ -337,17 +337,18 @@ def pdf_page_count(path: str) -> int:
                 print(f"{path} failed: {e}")
         return total_pages
 
-    # Handle directory
+    # Handle directory - recursively search for PDFs
     if os.path.isdir(path):
-        for filename in os.listdir(path):
-            if filename.endswith(".pdf"):
-                filepath = os.path.join(path, filename)
-                try:
-                    pdf = pdfium.PdfDocument(filepath)
-                    total_pages += len(pdf)
-                except Exception as e:
-                    print(f"{filepath} failed: {e}")
-                    continue
+        for root, _, files in os.walk(path):
+            for filename in files:
+                if filename.lower().endswith(".pdf"):
+                    filepath = os.path.join(root, filename)
+                    try:
+                        pdf = pdfium.PdfDocument(filepath)
+                        total_pages += len(pdf)
+                    except Exception as e:
+                        print(f"{filepath} failed: {e}")
+                        continue
 
     return total_pages
 

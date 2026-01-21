@@ -51,6 +51,7 @@ active:
   sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
+  vdb_backend: milvus  # milvus or lancedb
 
   # Extraction configuration
   extract_text: true
@@ -80,6 +81,8 @@ active:
   llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
 # Recall configuration (only used when running recall or e2e_recall tests)
+# Remember to start the reranker service before running recall tests:
+# docker compose --profile reranker up -d
 recall:
   recall_dataset: null
   reranker_mode: none  # Options: "none", "with", "both"
@@ -99,7 +102,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: bo767  # Evaluator for recall testing
+    recall_dataset: bo767
 
   earnings:
     path: /path/to/earnings_consulting
@@ -108,7 +111,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: earnings  # Evaluator for recall testing
+    recall_dataset: earnings
 
   bo20:
     path: /path/to/bo20
@@ -117,16 +120,16 @@ datasets:
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: null  # bo20 does not have recall
+    recall_dataset: null
 
   financebench:
-    path: /path/to/financebench_full
+    path: /path/to/financebench
     extract_text: true
     extract_tables: true
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: finance_bench  # Evaluator for recall testing
+    recall_dataset: finance_bench
 
   # Single file example
   single:
@@ -147,3 +150,12 @@ datasets:
     extract_images: true
     extract_infographics: true
     recall_dataset: null  # No recall evaluator for single file
+
+  bo10k:
+    path: /path/to/bo10k
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: bo10k
