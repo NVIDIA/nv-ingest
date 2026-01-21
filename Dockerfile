@@ -225,13 +225,11 @@ CMD ["/bin/bash"]
 
 FROM nv_ingest_install AS docs
 
-# Install dependencies needed for docs generation
-# Clear stale apt lists and use --fix-missing to handle repository issues
-RUN rm -rf /var/lib/apt/lists/* \
-    && apt-get update --fix-missing \
-    && apt-get install -y --no-install-recommends make \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Install make via conda to avoid apt repository issues
+# (deb-src repos enabled in base stage can cause apt-get update failures)
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    source activate nv_ingest_runtime \
+    && mamba install -y -c conda-forge make
 
 COPY docs docs
 
