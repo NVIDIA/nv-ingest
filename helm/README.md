@@ -45,7 +45,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-26.1.1.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-26.1.2.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -54,7 +54,7 @@ helm upgrade \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="26.1.1"
+    --set image.tag="26.1.2"
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
@@ -105,7 +105,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==26.1.1
+pip install nv-ingest-client==26.1.2
 ```
 
 #### Rest Endpoint Ingress
@@ -347,7 +347,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"26.1.1"` |  |
+| image.tag | string | `"26.1.2"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
