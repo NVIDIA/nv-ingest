@@ -10,12 +10,18 @@ dependencies = [
     "nv-ingest",
     "nv-ingest-api",
     "nv-ingest-client",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "pynvml>=11.5.0",
 ]
 
 [project.scripts]
 nv-ingest-harness-run = "nv_ingest_harness.cli.run:main"
 nv-ingest-harness-sweep = "nv_ingest_harness.cli.sweep:main"
 nv-ingest-harness-ingest = "nv_ingest_harness.cli.ingest:main"
+nv-ingest-harness-nightly = "nv_ingest_harness.cli.nightly:main"
+nv-ingest-harness-compare = "nv_ingest_harness.cli.compare:main"
+nv-ingest-harness-stats = "nv_ingest_harness.cli.stats:main"
 
 [dependency-groups]
 dev = [
@@ -28,6 +34,6 @@ dev = [
 package = true
 
 [tool.uv.sources]
-nv-ingest = { path = "../../src" }
-nv-ingest-api = { path = "../../api/" }
-nv-ingest-client = { path = "../../client/" }
+nv-ingest = { path = "../../src", editable = true }
+nv-ingest-api = { path = "../../api/", editable = true }
+nv-ingest-client = { path = "../../client/", editable = true }

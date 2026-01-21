@@ -425,6 +425,36 @@ You can specify multiple `--profile` options.
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
+## Specifying MIG slices for NIM models in NV-Ingest
+
+When deploying NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the values.yaml file for the corresponding NIM microservice. For IBM CAS deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles. [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md​)
+
+To target a specific MIG profile (for example, a 3g.20gb slice on an A100) for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
+
+The following example shows the pattern (paths will vary by NIM, such as `nvingest.nvidiaNim`.`nemoretrieverPageElements` instead of the generic `nvingest.nim` placeholder):[catalog.ngc.nvidia](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nv-ingest)​:
+
+
+```shell
+nvingest:
+  nvidiaNim:
+    nemoretrieverPageElements:
+      modelName: "meta/llama3-8b-instruct"        # Example NIM model
+      resources:
+        limits:
+          nvidia.com/mig-3g.20gb: 1               # MIG profile resource
+        requests:
+          nvidia.com/mig-3g.20gb: 1
+      nodeSelector:
+        nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb
+```
+
+Key points:
+
+* Use the appropriate NIM‑specific values path (for example, `nvingest.nvidiaNim.nemoretrieverPageElements.resources`) rather than the generic `nvingest.nim` placeholder.
+* Set `resources.requests` and `resources.limits` to the desired MIG resource name (for example, `nvidia.com/mig-3g.20gb`).
+* Use `nodeSelector` (or tolerations/affinity, if preferred) to target nodes labeled with the corresponding MIG‑enabled GPU product (for example, `nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb`).
+
+This syntax and structure can be repeated for each NIM model used by CAS, ensuring that each NV-Ingest NIM pod is mapped to the correct MIG slice type and scheduled onto compatible nodes.
 
 !!! important
 

@@ -199,6 +199,7 @@ COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_sour
 COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
 RUN  --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=secret,id=hf_token,required=false \
     source activate nv_ingest_runtime \
     && python3 /workspace/docker/post_build_triggers.py
 
