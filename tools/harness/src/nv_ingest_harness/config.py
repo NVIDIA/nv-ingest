@@ -40,6 +40,7 @@ class TestConfig:
     gpu_search: bool = False
     embedding_model: str = "auto"
     llm_summarization_model: str = "nvdev/nvidia/llama-3.1-nemotron-70b-instruct"
+    vdb_backend: str = "milvus"
 
     # Extraction configuration
     extract_text: bool = True
@@ -70,6 +71,7 @@ class TestConfig:
     spill_dir: str = "/tmp/spill"
     artifacts_dir: Optional[str] = None
     collection_name: Optional[str] = None
+    lancedb_dir: Optional[str] = None
 
     # Recall configuration
     reranker_mode: str = "none"  # Options: "none", "with", "both"
@@ -108,6 +110,10 @@ class TestConfig:
         # Check reranker_mode is valid
         if self.reranker_mode not in ["none", "with", "both"]:
             errors.append(f"reranker_mode must be 'none', 'with', or 'both', got '{self.reranker_mode}'")
+
+        # Check vdb_backend is valid
+        if self.vdb_backend not in ["milvus", "lancedb"]:
+            errors.append(f"vdb_backend must be 'milvus' or 'lancedb', got '{self.vdb_backend}'")
 
         # Check dataset_dir exists (can be file, directory, or glob pattern)
         # Check if it's a glob pattern (contains *, ?, or [)
@@ -262,6 +268,7 @@ def _load_env_overrides() -> dict:
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),
         "LLM_SUMMARIZATION_MODEL": ("llm_summarization_model", str),
+        "VDB_BACKEND": ("vdb_backend", str),
         "EXTRACT_TEXT": ("extract_text", parse_bool),
         "EXTRACT_TABLES": ("extract_tables", parse_bool),
         "EXTRACT_CHARTS": ("extract_charts", parse_bool),
@@ -279,6 +286,7 @@ def _load_env_overrides() -> dict:
         "SPILL_DIR": ("spill_dir", str),
         "ARTIFACTS_DIR": ("artifacts_dir", str),
         "COLLECTION_NAME": ("collection_name", str),
+        "LANCEDB_DIR": ("lancedb_dir", str),
         "RERANKER_MODE": ("reranker_mode", str),
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),

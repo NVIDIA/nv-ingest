@@ -377,7 +377,10 @@ def _get_pandas_table_content(row, modality="text"):
     elif modality == "text_image":
         text = row.get("table_metadata", {}).get("table_content")
         image = row.get("content")
-        content = _format_text_image_pair_input_string(text, image)
+        if text:
+            content = _format_text_image_pair_input_string(text, image)
+        else:
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
 
     return content
 
@@ -410,7 +413,10 @@ def _get_pandas_image_content(row, modality="text"):
         else:
             text = row.get("image_metadata", {}).get("caption")
         image = row.get("content")
-        content = _format_text_image_pair_input_string(text, image)
+        if text:
+            content = _format_text_image_pair_input_string(text, image)
+        else:
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
 
     if subtype == "page_image":
         # A workaround to save memory for full page images.
