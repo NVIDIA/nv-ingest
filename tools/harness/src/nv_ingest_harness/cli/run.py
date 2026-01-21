@@ -14,6 +14,7 @@ from nv_ingest_harness.utils.session import (
     write_session_summary,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 
 

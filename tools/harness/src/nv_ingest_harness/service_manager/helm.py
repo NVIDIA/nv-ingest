@@ -1,5 +1,7 @@
 """Helm service manager implementation."""
 
+import os
+import signal
 import subprocess
 import time
 import urllib.request
@@ -150,7 +152,10 @@ class HelmManager(ServiceManager):
                 }
             ]
 
-        # Start each port forward
+        # Group port forwards by service (after resolving patterns)
+        # Map: service_name -> [(local_port, remote_port), ...]
+        service_port_map = {}
+
         for pf_config in port_forwards:
             service_pattern = pf_config.get("service")
             local_port = pf_config.get("local_port")
@@ -167,39 +172,55 @@ class HelmManager(ServiceManager):
                 print(f"Warning: No services found matching pattern '{service_pattern}'")
                 continue
 
-            # Start port forward for each matching service
+            # Add ports to each matching service
             for service_name in service_names:
-                self._start_single_port_forward(
-                    service_name=service_name,
-                    local_port=local_port,
-                    remote_port=remote_port,
-                )
+                if service_name not in service_port_map:
+                    service_port_map[service_name] = []
+                service_port_map[service_name].append((local_port, remote_port))
+
+        # Start consolidated port forwards
+        for service_name, port_pairs in service_port_map.items():
+            self._start_single_port_forward(
+                service_name=service_name,
+                port_pairs=port_pairs,
+            )
 
     def _start_single_port_forward(
-        self, service_name: str, local_port: int, remote_port: int, timeout: int = 120, retry_interval: int = 5
+        self, service_name: str, port_pairs: list[tuple[int, int]], timeout: int = 120, retry_interval: int = 5
     ) -> None:
         """
-        Start kubectl port-forward for a single service with retry logic.
+        Start kubectl port-forward for a single service with multiple ports and retry logic.
+        
+        The port-forward is wrapped in a resilient shell loop that automatically restarts
+        if the connection drops (e.g., due to pod restarts).
 
         Args:
             service_name: Name of the service to forward
-            local_port: Local port to bind to
-            remote_port: Remote port on the service
+            port_pairs: List of (local_port, remote_port) tuples
             timeout: Maximum time to wait for port-forward to succeed (seconds)
             retry_interval: Time between retry attempts (seconds)
         """
-        # Build port-forward command
-        # Format: kubectl port-forward -n namespace service/name local_port:remote_port
-        cmd = self.kubectl_cmd + [
-            "port-forward",
-            "-n",
-            self.namespace,
-            f"service/{service_name}",
-            f"{local_port}:{remote_port}",
-        ]
+        # Build base kubectl port-forward command
+        kubectl_cmd_str = " ".join(self.kubectl_cmd)
+        port_strs = [f"{local}:{remote}" for local, remote in port_pairs]
+        ports_arg = " ".join(port_strs)
+        
+        # Create a resilient wrapper script that auto-restarts on failure
+        # This handles pod restarts and transient failures
+        wrapper_script = f"""
+while true; do
+    echo "[$(date)] Starting port-forward for {service_name}..." >&2
+    {kubectl_cmd_str} port-forward -n {self.namespace} service/{service_name} {ports_arg}
+    EXIT_CODE=$?
+    echo "[$(date)] Port-forward exited with code $EXIT_CODE, restarting in {retry_interval}s..." >&2
+    sleep {retry_interval}
+done
+"""
 
-        description = f"{service_name} ({local_port}:{remote_port})"
-        print("$", " ".join(cmd), "(background)")
+        # Build description
+        ports_desc = " ".join(port_strs)
+        description = f"{service_name} ({ports_desc})"
+        print(f"$ {kubectl_cmd_str} port-forward -n {self.namespace} service/{service_name} {ports_arg} (background, auto-restart)")
         print(f"Waiting for {service_name} pod to be ready (timeout: {timeout}s)...")
 
         start_time = time.time()
@@ -207,38 +228,40 @@ class HelmManager(ServiceManager):
 
         while time.time() - start_time < timeout:
             try:
-                # Start port-forward in background
+                # Start resilient port-forward wrapper in background
+                # Create new process group so we can kill all children later
                 process = subprocess.Popen(
-                    cmd,
+                    ["bash", "-c", wrapper_script],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    preexec_fn=os.setsid,  # Create new process group
                 )
 
                 # Give it a moment to establish
                 time.sleep(2)
 
-                # Check if process is still running (didn't exit with error)
+                # Check if wrapper process is still running
                 poll_result = process.poll()
                 if poll_result is not None:
-                    # Process exited, read error output
+                    # Wrapper exited unexpectedly, read error output
                     _, stderr = process.communicate()
                     error_msg = stderr.decode("utf-8").strip() if stderr else f"exit code {poll_result}"
 
                     # Check if it's a "pod not running" error that we should retry
-                    if "pod is not running" in error_msg or "Pending" in error_msg:
+                    if "pod is not running" in error_msg or "Pending" in error_msg or "not found" in error_msg:
                         elapsed = int(time.time() - start_time)
                         print(f"  Attempt {attempt}: Pod not ready yet (elapsed: {elapsed}s)")
                         time.sleep(retry_interval)
                         attempt += 1
                         continue
                     else:
-                        # Different error, don't retry
+                        # Different error, don't retry initial setup
                         print(f"Error: Port forwarding for {service_name} failed: {error_msg}")
                         return
                 else:
-                    # Success! Process is still running
+                    # Success! Wrapper process is running (it will auto-restart kubectl inside)
                     self.port_forward_processes.append((process, description))
-                    print(f"Port forwarding started for {description} (PID: {process.pid})")
+                    print(f"Port forwarding started for {description} (PID: {process.pid}, auto-restart enabled)")
                     return
 
             except Exception as e:
@@ -249,7 +272,7 @@ class HelmManager(ServiceManager):
         print(f"Error: Port forwarding for {service_name} failed to establish after {timeout}s (pod may not be ready)")
 
     def _stop_port_forwards(self) -> None:
-        """Stop all port-forward processes."""
+        """Stop all port-forward processes and their children."""
         if not self.port_forward_processes:
             return
 
@@ -258,13 +281,31 @@ class HelmManager(ServiceManager):
         for process, description in self.port_forward_processes:
             try:
                 print(f"  Stopping {description} (PID: {process.pid})...")
-                process.terminate()
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                print("    Port forward didn't terminate, killing...")
-                process.kill()
+                # Kill the entire process group (bash wrapper + kubectl children)
+                pgid = os.getpgid(process.pid)
+                os.killpg(pgid, signal.SIGTERM)
+                
+                # Wait for graceful termination
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    print("    Port forward didn't terminate, force killing...")
+                    # Force kill if necessary
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                        process.wait(timeout=2)
+                    except Exception:
+                        pass
+            except ProcessLookupError:
+                # Process already terminated
+                print(f"    Process {process.pid} already terminated")
             except Exception as e:
                 print(f"    Warning: Error stopping port forward: {e}")
+                # Fallback: try to kill just the parent process
+                try:
+                    process.kill()
+                except Exception:
+                    pass
 
         self.port_forward_processes = []
 
@@ -280,27 +321,36 @@ class HelmManager(ServiceManager):
                 }
             ]
 
-        print("\nTo manually recreate port forwards, run:")
-        print("=" * 60)
+        # Group port forwards by service (same as _start_port_forwards)
+        service_port_map = {}
+
         for pf in port_forwards:
-            service = pf.get("service")
+            service_pattern = pf.get("service")
             local = pf.get("local_port")
             remote = pf.get("remote_port")
 
-            if "*" in service:
-                print(f"  # For pattern: {service}")
-                matches = self._find_services_by_pattern(service)
-                for match in matches:
-                    cmd = " ".join(
-                        self.kubectl_cmd
-                        + ["port-forward", "-n", self.namespace, f"service/{match}", f"{local}:{remote}"]
-                    )
-                    print(f"  {cmd} &")
-            else:
-                cmd = " ".join(
-                    self.kubectl_cmd + ["port-forward", "-n", self.namespace, f"service/{service}", f"{local}:{remote}"]
-                )
-                print(f"  {cmd} &")
+            if not all([service_pattern, local, remote]):
+                continue
+
+            # Find matching services
+            service_names = self._find_services_by_pattern(service_pattern)
+
+            # Add ports to each matching service
+            for service_name in service_names:
+                if service_name not in service_port_map:
+                    service_port_map[service_name] = []
+                service_port_map[service_name].append((local, remote))
+
+        print("\nTo manually recreate port forwards (with auto-restart), run:")
+        print("=" * 60)
+        for service_name, port_pairs in service_port_map.items():
+            port_strs = [f"{local}:{remote}" for local, remote in port_pairs]
+            kubectl_cmd_str = " ".join(self.kubectl_cmd)
+            ports_arg = " ".join(port_strs)
+            # Show resilient version with auto-restart loop
+            print(f"  # Auto-restarting port-forward for {service_name}:")
+            print(f"  while true; do {kubectl_cmd_str} port-forward -n {self.namespace} service/{service_name} {ports_arg}; sleep 5; done &")
+            print()
         print("=" * 60)
 
     def stop(self) -> int:
@@ -324,12 +374,13 @@ class HelmManager(ServiceManager):
 
         return 0
 
-    def check_readiness(self, timeout_s: int) -> bool:
+    def check_readiness(self, timeout_s: int, check_milvus: bool = True) -> bool:
         """
         Check readiness by polling HTTP endpoint.
 
         Args:
             timeout_s: Timeout in seconds
+            check_milvus: If True, also check Milvus health endpoint
 
         Returns:
             True if ready, False on timeout
@@ -339,9 +390,21 @@ class HelmManager(ServiceManager):
 
         while time.time() < deadline:
             try:
+                # Check main service health
                 with urllib.request.urlopen(url, timeout=5) as resp:
                     if resp.status == 200:
-                        return True
+                        # If Milvus check is enabled, verify it's also ready
+                        if check_milvus:
+                            hostname = getattr(self.config, "hostname", "localhost")
+                            milvus_url = f"http://{hostname}:9091/healthz"
+                            try:
+                                with urllib.request.urlopen(milvus_url, timeout=5) as milvus_resp:
+                                    if milvus_resp.status == 200:
+                                        return True
+                            except Exception:
+                                pass
+                        else:
+                            return True
             except Exception:
                 pass
             time.sleep(3)

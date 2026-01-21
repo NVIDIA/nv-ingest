@@ -77,12 +77,13 @@ class DockerComposeManager(ServiceManager):
 
         return 0
 
-    def check_readiness(self, timeout_s: int) -> bool:
+    def check_readiness(self, timeout_s: int, check_milvus: bool = True) -> bool:
         """
         Poll the health endpoint until ready.
 
         Args:
             timeout_s: Timeout in seconds
+            check_milvus: If True, also check Milvus health endpoint
 
         Returns:
             True if ready, False on timeout
@@ -92,9 +93,21 @@ class DockerComposeManager(ServiceManager):
 
         while time.time() < deadline:
             try:
+                # Check main service health
                 with urllib.request.urlopen(url, timeout=5) as resp:
                     if resp.status == 200:
-                        return True
+                        # If Milvus check is enabled, verify it's also ready
+                        if check_milvus:
+                            hostname = getattr(self.config, "hostname", "localhost")
+                            milvus_url = f"http://{hostname}:9091/healthz"
+                            try:
+                                with urllib.request.urlopen(milvus_url, timeout=5) as milvus_resp:
+                                    if milvus_resp.status == 200:
+                                        return True
+                            except Exception:
+                                pass
+                        else:
+                            return True
             except Exception:
                 pass
             time.sleep(3)
