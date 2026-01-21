@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Docker Compose Override File
+# This file allows you to customize environment variables for NIM services
+# and override the nv-ingest-ms-runtime inference protocols to use HTTP.
+#
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.override.yaml up
+
+services:
+  # NV-Ingest Runtime - Mount config and set custom pipeline
+  nv-ingest-ms-runtime:
+    volumes:
+      - ./config:/workspace/config
+    environment:
+      - INGEST_CONFIG_PATH=/workspace/config/default_pipeline.yaml
+
+  # Page Elements NIM - Customize environment variables as needed
+  page-elements:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=8
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+      - NIM_TRITON_RATE_LIMIT=256  # Override base value of 3 to allow high concurrency
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${PAGE_ELEMENTS_GPU_ID:-0}"]
+              capabilities: [gpu]
+  # Graphic Elements NIM - Customize environment variables as needed
+  graphic-elements:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=8
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+      - NIM_TRITON_RATE_LIMIT=256  # Override base value of 3 to allow high concurrency
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GRAPHIC_ELEMENTS_GPU_ID:-0}"]
+              capabilities: [gpu]
+  # Table Structure NIM - Customize environment variables as needed
+  table-structure:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=8
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+      - NIM_TRITON_RATE_LIMIT=256  # Override base value of 3 to allow high concurrency
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${TABLE_STRUCTURE_GPU_ID:-0}"]
+              capabilities: [gpu]
+
+  # OCR NIM - Customize environment variables as needed
+  ocr:
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_PIPELINE_MAX_BATCH_SIZE=64
+      - NIM_TRITON_PIPELINE_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_DATA_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_BATCH_SIZE=16
+      - NIM_TRITON_MODEL_MAX_QUEUE_DELAY_MICROSECONDS=5000
+      - NIM_TRITON_WORKER_INSTANCE_COUNT=8
+      - NIM_TRITON_ENABLE_PIPELINE_TIMING=true
+      - NIM_TRITON_RATE_LIMIT=256  # Override base value of 3 to allow high concurrency
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${OCR_GPU_ID:-1}"]
+              capabilities: [gpu]
