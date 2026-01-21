@@ -1,0 +1,23 @@
+{{- $claimName := .Values.nimOperator.draResources.name -}}
+{{- $existing := lookup "resource.k8s.io/v1beta2" "ResourceClaim" .Release.Namespace $claimName -}}
+{{- if and
+      (.Capabilities.APIVersions.Has "resource.k8s.io/v1beta2")
+      (.Values.nimOperator.draResources.enabled)
+      (not $existing)
+}}
+apiVersion: resource.k8s.io/v1beta2
+kind: ResourceClaim
+metadata:
+  name: {{ $claimName }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "5"
+spec:
+  devices:
+    requests:
+      - name: {{ $claimName }}-gpu
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 1
+          allocationMode: ExactCount
+{{- end }}
