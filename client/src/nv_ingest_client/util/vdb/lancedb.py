@@ -241,7 +241,7 @@ def lancedb_retrieval(
         Number of candidates to fetch before reranking (default: 50).
     result_fields : list, optional
         List of field names to retrieve from each hit document (default:
-        ["text", "metadata", "source", "_distance"]).
+        ["text", "metadata", "source"]).
     **kwargs
         Additional keyword arguments (ignored, for API compatibility).
 
@@ -258,7 +258,7 @@ def lancedb_retrieval(
         table = db.open_table(table_name)
 
     if result_fields is None:
-        result_fields = ["text", "metadata", "source", "_distance"]
+        result_fields = ["text", "metadata", "source"]
 
     embed_model = partial(
         infer_microservice,

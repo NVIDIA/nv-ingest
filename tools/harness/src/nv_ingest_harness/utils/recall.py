@@ -41,10 +41,11 @@ def _get_retrieval_func(
             raise ValueError("table_path required for lancedb backend")
         from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
 
-        # Include table_name in partial if provided, otherwise use default
+        kwargs = {"table_path": table_path}
         if table_name:
-            return partial(lancedb_retrieval, table_path=table_path, table_name=table_name)
-        return partial(lancedb_retrieval, table_path=table_path)
+            kwargs["table_name"] = table_name
+        return partial(lancedb_retrieval, **kwargs)
+
     return nvingest_retrieval
 
 
