@@ -54,8 +54,8 @@ class ChartExtractorConfigSchema(LowercaseProtocolMixin):
     ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     ocr_infer_protocol: str = ""
 
-    nim_batch_size: int = 2
-    workers_per_progress_engine: int = 5
+    nim_batch_size: int = 8
+    workers_per_progress_engine: int = 12
 
     @model_validator(mode="before")
     @classmethod

@@ -131,10 +131,12 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.class_labels = class_labels
 
         if endpoints:
-            self.model_name = get_yolox_model_name(endpoints[0], default_model_name="yolox_ensemble")
-            self._grpc_uses_bls = self.model_name == "pipeline"
+            self.model_name = get_yolox_model_name(endpoints[0], default_model_name="pipeline")
         else:
-            self._grpc_uses_bls = False
+            self.model_name = "pipeline"
+
+        # Always use BLS format for gRPC - NIMs use the pipeline model
+        self._grpc_uses_bls = True
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -213,26 +215,25 @@ class YoloxModelInterfaceBase(ModelInterface):
             return chunks
 
         if protocol == "grpc":
-            logger.debug("Formatting input for gRPC Yolox Ensemble model")
+            logger.debug("Formatting input for gRPC Yolox BLS pipeline model")
+
+            # Convert images to base64 data URLs as expected by the NIM BLS pipeline
             b64_images = [numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT) for image in data["images"]]
-            b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
+            b64_data_urls = [f"data:image/{YOLOX_PAGE_IMAGE_FORMAT.lower()};base64,{b64}" for b64 in b64_images]
+
+            b64_chunks = chunk_list_geometrically(b64_data_urls, max_batch_size)
             original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
             shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
             batched_inputs = []
             formatted_batch_data = []
             for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
-                input_array = np.array(b64_chunk, dtype=np.object_)
+                # Create input array with shape [1, N] for BLS pipeline
+                # This matches the NIM's expected format: batch of 1 request containing N images
+                input_array = np.array(b64_chunk, dtype=np.object_).reshape(1, -1)
 
-                if self._grpc_uses_bls:
-                    # For BLS with dynamic batching (max_batch_size > 0), we need to add explicit batch dimension
-                    # Shape [N] becomes [1, N] to indicate: batch of 1, containing N images
-                    input_array = input_array.reshape(1, -1)
-                    thresholds = np.array([[self.conf_threshold, self.iou_threshold]], dtype=np.float32)
-                else:
-                    current_batch_size = input_array.shape[0]
-                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
-                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+                # Thresholds with shape [1, 2] for BLS pipeline
+                thresholds = np.array([[self.conf_threshold, self.iou_threshold]], dtype=np.float32)
 
                 batched_inputs.append([input_array, thresholds])
                 formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
@@ -336,7 +337,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         Parameters
         ----------
         output_array : np.ndarray
-            The raw output from the Yolox model.
+            The raw output from the Yolox model. For BLS pipeline, shape is [1, N].
         kwargs : dict
             Additional parameters for processing, including thresholds and number of classes.
 
@@ -351,11 +352,13 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         elif protocol == "grpc":
             results = []
-            # For grpc, apply the same NIM postprocessing.
-            for out in output:
+            # For BLS pipeline, output shape is [1, N] - flatten to iterate over individual results
+            flat_output = output.flatten() if hasattr(output, "flatten") else output
+            for out in flat_output:
                 if isinstance(out, bytes):
                     out = out.decode("utf-8")
                 if isinstance(out, dict):
+                    results.append(out)
                     continue
                 results.append(json.loads(out))
         inference_results = self.postprocess_annotations(results, **kwargs)
