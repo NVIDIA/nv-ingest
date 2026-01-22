@@ -5,48 +5,57 @@ from nv_ingest_client.util.vdb import lancedb as lancedb_mod
 
 
 def make_sample_results():
-    # two record-sets, each with two items
+    """
+    Create sample NV-Ingest pipeline results for testing.
+
+    Returns records in the format produced by the extraction pipeline,
+    including document_type which is required for text extraction routing.
+    """
     return [
         [
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": [0.1, 0.2],
-                    "content": "a",
+                    "content": "text content a",
                     "content_metadata": {"page_number": 1},
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             },
             {
+                "document_type": "text",
                 "metadata": {
-                    "embedding": None,
-                    "content": "skip",
+                    "embedding": None,  # Should be skipped - no embedding
+                    "content": "skip me",
                     "content_metadata": {"page_number": 2},
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             },
         ],
         [
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": [0.3, 0.4],
-                    "content": "b",
+                    "content": "text content b",
                     "content_metadata": {"page_number": 3},
                     "source_metadata": {"source_id": "s2"},
-                }
+                },
             },
         ],
     ]
 
 
 def test_create_lancedb_results_filters_and_transforms():
+    """Test that create_lancedb_results correctly filters and transforms records."""
     results = make_sample_results()
     out = lancedb_mod.create_lancedb_results(results)
     # Should skip the entry with None embedding and produce 2 entries
     assert isinstance(out, list)
     assert len(out) == 2
     assert out[0]["vector"] == [0.1, 0.2]
-    assert out[0]["text"] == "a"
-    assert out[0]["metadata"] == 1
+    assert out[0]["text"] == "text content a"
+    assert out[0]["metadata"] == "1"  # page_number converted to string
     assert out[0]["source"] == "s1"
 
 
@@ -180,12 +189,13 @@ def test_create_lancedb_results_all_none_embeddings():
     results = [
         [
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": None,
                     "content": "a",
                     "content_metadata": {"page_number": 1},
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             },
         ]
     ]
@@ -198,28 +208,31 @@ def test_create_lancedb_results_mixed_embeddings():
     results = [
         [
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": [0.1],
                     "content": "keep",
                     "content_metadata": {"page_number": 1},
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             },
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": None,
                     "content": "skip",
                     "content_metadata": {"page_number": 2},
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             },
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": [0.2, 0.3],
                     "content": "keep2",
                     "content_metadata": {"page_number": 3},
                     "source_metadata": {"source_id": "s2"},
-                }
+                },
             },
         ]
     ]
@@ -484,25 +497,26 @@ def test_retrieval_default_top_k(monkeypatch):
     assert captured_limit[0] == 10
 
 
-def test_create_lancedb_results_missing_field_raises_keyerror():
-    """Test that missing required fields raise KeyError."""
+def test_create_lancedb_results_missing_content_metadata_graceful():
+    """Test that missing content_metadata is handled gracefully (empty dict default)."""
     results = [
         [
             {
+                "document_type": "text",
                 "metadata": {
                     "embedding": [0.1],
-                    "content": "a",
-                    # Missing content_metadata
+                    "content": "text with missing content_metadata",
+                    # Missing content_metadata - should use empty dict default
                     "source_metadata": {"source_id": "s1"},
-                }
+                },
             }
         ]
     ]
-    try:
-        lancedb_mod.create_lancedb_results(results)
-        assert False, "Expected KeyError for missing content_metadata"
-    except KeyError:
-        pass  # Expected
+    out = lancedb_mod.create_lancedb_results(results)
+    # Should still produce output with empty string for page number
+    assert len(out) == 1
+    assert out[0]["metadata"] == ""  # No page_number available
+    assert out[0]["text"] == "text with missing content_metadata"
 
 
 def test_retrieval_multiple_queries(monkeypatch):
@@ -551,3 +565,252 @@ def test_retrieval_multiple_queries(monkeypatch):
     assert results[0][0]["entity"]["text"] == "result_0"
     assert results[1][0]["entity"]["text"] == "result_1"
     assert results[2][0]["entity"]["text"] == "result_2"
+
+
+# ============ Tests for _get_text_for_element() ============
+
+
+def test_get_text_for_element_text_type():
+    """Test text extraction for document_type='text'."""
+    element = {
+        "document_type": "text",
+        "metadata": {
+            "content": "This is plain text content",
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "This is plain text content"
+
+
+def test_get_text_for_element_structured_table():
+    """Test text extraction for structured tables."""
+    element = {
+        "document_type": "structured",
+        "metadata": {
+            "content_metadata": {"subtype": "table"},
+            "table_metadata": {"table_content": "| Col1 | Col2 |\n| A | B |"},
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "| Col1 | Col2 |\n| A | B |"
+
+
+def test_get_text_for_element_structured_chart():
+    """Test text extraction for structured charts."""
+    element = {
+        "document_type": "structured",
+        "metadata": {
+            "content_metadata": {"subtype": "chart"},
+            "table_metadata": {"table_content": "Chart showing revenue trends"},
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "Chart showing revenue trends"
+
+
+def test_get_text_for_element_structured_infographic():
+    """Test text extraction for infographics."""
+    element = {
+        "document_type": "structured",
+        "metadata": {
+            "content_metadata": {"subtype": "infographic"},
+            "table_metadata": {"table_content": "Infographic content description"},
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "Infographic content description"
+
+
+def test_get_text_for_element_image_caption():
+    """Test text extraction for images uses caption (not base64 data)."""
+    element = {
+        "document_type": "image",
+        "metadata": {
+            "content_metadata": {"subtype": "image"},
+            "image_metadata": {"caption": "A photo of a dog playing"},
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "A photo of a dog playing"
+
+
+def test_get_text_for_element_page_image_uses_text():
+    """Test that page_image subtype uses 'text' field (OCR) instead of caption."""
+    element = {
+        "document_type": "image",
+        "metadata": {
+            "content_metadata": {"subtype": "page_image"},
+            "image_metadata": {
+                "text": "OCR extracted text from page",
+                "caption": "Should not use this",
+            },
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "OCR extracted text from page"
+
+
+def test_get_text_for_element_audio():
+    """Test text extraction for audio uses transcript."""
+    element = {
+        "document_type": "audio",
+        "metadata": {
+            "audio_metadata": {"audio_transcript": "Hello, this is the audio transcript"},
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "Hello, this is the audio transcript"
+
+
+def test_get_text_for_element_unknown_type_fallback():
+    """Test that unknown document types fall back to metadata.content."""
+    element = {
+        "document_type": "unknown_type",
+        "metadata": {
+            "content": "Fallback content",
+        },
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result == "Fallback content"
+
+
+def test_get_text_for_element_missing_metadata():
+    """Test graceful handling of missing metadata fields."""
+    element = {
+        "document_type": "text",
+        "metadata": {},  # No content field
+    }
+    result = lancedb_mod._get_text_for_element(element)
+    assert result is None
+
+
+# ============ Tests for enable_* filtering ============
+
+
+def test_create_lancedb_results_filters_by_document_type():
+    """Test that enable_* parameters filter document types correctly."""
+    results = [
+        [
+            {
+                "document_type": "text",
+                "metadata": {
+                    "embedding": [0.1],
+                    "content": "text content",
+                    "content_metadata": {"page_number": 1},
+                    "source_metadata": {"source_id": "s1"},
+                },
+            },
+            {
+                "document_type": "structured",
+                "metadata": {
+                    "embedding": [0.2],
+                    "content_metadata": {"page_number": 2, "subtype": "table"},
+                    "source_metadata": {"source_id": "s1"},
+                    "table_metadata": {"table_content": "table content"},
+                },
+            },
+            {
+                "document_type": "structured",
+                "metadata": {
+                    "embedding": [0.3],
+                    "content_metadata": {"page_number": 3, "subtype": "chart"},
+                    "source_metadata": {"source_id": "s1"},
+                    "table_metadata": {"table_content": "chart content"},
+                },
+            },
+        ]
+    ]
+
+    # Filter out tables
+    out = lancedb_mod.create_lancedb_results(results, enable_tables=False)
+    assert len(out) == 2
+    texts = [r["text"] for r in out]
+    assert "text content" in texts
+    assert "chart content" in texts
+    assert "table content" not in texts
+
+    # Filter out text
+    out = lancedb_mod.create_lancedb_results(results, enable_text=False)
+    assert len(out) == 2
+    texts = [r["text"] for r in out]
+    assert "table content" in texts
+    assert "chart content" in texts
+    assert "text content" not in texts
+
+    # Filter out charts
+    out = lancedb_mod.create_lancedb_results(results, enable_charts=False)
+    assert len(out) == 2
+    texts = [r["text"] for r in out]
+    assert "text content" in texts
+    assert "table content" in texts
+    assert "chart content" not in texts
+
+
+def test_create_lancedb_results_filters_images():
+    """Test that enable_images filters image documents."""
+    results = [
+        [
+            {
+                "document_type": "text",
+                "metadata": {
+                    "embedding": [0.1],
+                    "content": "text",
+                    "content_metadata": {"page_number": 1},
+                    "source_metadata": {"source_id": "s1"},
+                },
+            },
+            {
+                "document_type": "image",
+                "metadata": {
+                    "embedding": [0.2],
+                    "content_metadata": {"page_number": 2, "subtype": "image"},
+                    "source_metadata": {"source_id": "s1"},
+                    "image_metadata": {"caption": "image caption"},
+                },
+            },
+        ]
+    ]
+
+    # With images enabled
+    out = lancedb_mod.create_lancedb_results(results, enable_images=True)
+    assert len(out) == 2
+
+    # With images disabled
+    out = lancedb_mod.create_lancedb_results(results, enable_images=False)
+    assert len(out) == 1
+    assert out[0]["text"] == "text"
+
+
+def test_create_lancedb_results_filters_audio():
+    """Test that enable_audio filters audio documents."""
+    results = [
+        [
+            {
+                "document_type": "text",
+                "metadata": {
+                    "embedding": [0.1],
+                    "content": "text",
+                    "content_metadata": {"page_number": 1},
+                    "source_metadata": {"source_id": "s1"},
+                },
+            },
+            {
+                "document_type": "audio",
+                "metadata": {
+                    "embedding": [0.2],
+                    "content_metadata": {"page_number": 2},
+                    "source_metadata": {"source_id": "s1"},
+                    "audio_metadata": {"audio_transcript": "audio transcript"},
+                },
+            },
+        ]
+    ]
+
+    # With audio enabled
+    out = lancedb_mod.create_lancedb_results(results, enable_audio=True)
+    assert len(out) == 2
+
+    # With audio disabled
+    out = lancedb_mod.create_lancedb_results(results, enable_audio=False)
+    assert len(out) == 1
+    assert out[0]["text"] == "text"
