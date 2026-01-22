@@ -14,21 +14,132 @@ from nv_ingest_client.util.vdb.milvus import nv_rerank
 logger = logging.getLogger(__name__)
 
 
-def create_lancedb_results(results):
-    """Transform NV-Ingest pipeline results into LanceDB ingestible rows."""
-    old_results = [res["metadata"] for result in results for res in result]
+def _get_text_for_element(element):
+    """
+    Extract searchable text from an element based on document_type.
+
+    Matches Milvus behavior: for images, use caption/OCR text instead of raw content.
+    This prevents base64-encoded images from being stored in the text field.
+    """
+    doc_type = element.get("document_type")
+    metadata = element.get("metadata", {})
+
+    if doc_type == "text":
+        return metadata.get("content")
+    elif doc_type == "structured":
+        # Tables, charts, infographics
+        table_meta = metadata.get("table_metadata", {})
+        return table_meta.get("table_content")
+    elif doc_type == "image":
+        # Use caption/OCR text, not raw base64 image data
+        image_meta = metadata.get("image_metadata", {})
+        content_meta = metadata.get("content_metadata", {})
+        if content_meta.get("subtype") == "page_image":
+            return image_meta.get("text")
+        else:
+            return image_meta.get("caption")
+    elif doc_type == "audio":
+        audio_meta = metadata.get("audio_metadata", {})
+        return audio_meta.get("audio_transcript")
+    else:
+        # Fallback for unknown types
+        return metadata.get("content")
+
+
+def create_lancedb_results(
+    results,
+    enable_text: bool = True,
+    enable_charts: bool = True,
+    enable_tables: bool = True,
+    enable_images: bool = True,
+    enable_infographics: bool = True,
+    enable_audio: bool = True,
+    max_text_length: int = 65535,
+):
+    """
+    Transform NV-Ingest pipeline results into LanceDB ingestible rows.
+
+    Matches Milvus behavior by extracting appropriate text based on document_type,
+    rather than storing raw content (which may include base64 images).
+
+    Parameters
+    ----------
+    results : list
+        Pipeline output results.
+    enable_text : bool
+        Include text documents.
+    enable_charts : bool
+        Include chart documents.
+    enable_tables : bool
+        Include table documents.
+    enable_images : bool
+        Include image documents (stores caption/OCR, not raw image).
+    enable_infographics : bool
+        Include infographic documents.
+    enable_audio : bool
+        Include audio documents (stores transcript).
+    max_text_length : int
+        Maximum text length to store (skip longer texts).
+    """
     lancedb_rows = []
-    for result in old_results:
-        if result["embedding"] is None:
-            continue
-        lancedb_rows.append(
-            {
-                "vector": result["embedding"],
-                "text": result["content"],
-                "metadata": result["content_metadata"]["page_number"],
-                "source": result["source_metadata"]["source_id"],
-            }
-        )
+
+    for result in results:
+        for element in result:
+            metadata = element.get("metadata", {})
+            doc_type = element.get("document_type")
+
+            # Check if embedding exists
+            embedding = metadata.get("embedding")
+            if embedding is None:
+                continue
+
+            # Filter by document type
+            content_meta = metadata.get("content_metadata", {})
+            subtype = content_meta.get("subtype")
+
+            if doc_type == "text" and not enable_text:
+                continue
+            elif doc_type == "structured":
+                if subtype == "chart" and not enable_charts:
+                    continue
+                elif subtype == "table" and not enable_tables:
+                    continue
+                elif subtype == "infographic" and not enable_infographics:
+                    continue
+            elif doc_type == "image" and not enable_images:
+                continue
+            elif doc_type == "audio" and not enable_audio:
+                continue
+
+            # Extract appropriate text based on document type
+            text = _get_text_for_element(element)
+
+            if not text:
+                source_name = metadata.get("source_metadata", {}).get("source_name", "unknown")
+                pg_num = content_meta.get("page_number")
+                logger.debug(f"No text found for entity: {source_name} page: {pg_num} type: {doc_type}")
+                continue
+
+            # Skip overly long texts
+            if len(text) > max_text_length:
+                source_name = metadata.get("source_metadata", {}).get("source_name", "unknown")
+                pg_num = content_meta.get("page_number")
+                logger.warning(
+                    f"Text too long ({len(text)} chars), skipping. "
+                    f"Consider using SplitTask for smaller chunks. "
+                    f"file: {source_name}, page: {pg_num}"
+                )
+                continue
+
+            lancedb_rows.append(
+                {
+                    "vector": embedding,
+                    "text": text,
+                    "metadata": str(content_meta.get("page_number", "")),
+                    "source": metadata.get("source_metadata", {}).get("source_id", ""),
+                }
+            )
+
     return lancedb_rows
 
 
@@ -135,7 +246,7 @@ def lancedb_retrieval(
     nv_ranker: bool = False,
     nv_ranker_endpoint: str = None,
     nv_ranker_model_name: str = None,
-    nv_ranker_top_k: int = 100,
+    nv_ranker_top_k: int = 50,
     result_fields=None,
     **kwargs,
 ):
@@ -177,7 +288,7 @@ def lancedb_retrieval(
     nv_ranker_model_name : str, optional
         Name of the reranker model.
     nv_ranker_top_k : int, optional
-        Number of candidates to fetch before reranking (default: 100).
+        Number of candidates to fetch before reranking (default: 50).
     result_fields : list, optional
         List of field names to retrieve from each hit document (default:
         ["text", "metadata", "source", "_distance"]).
@@ -237,7 +348,10 @@ def lancedb_retrieval(
 
     if nv_ranker:
         rerank_results = []
-        for query, candidates in zip(queries, results):
+        num_queries = len(queries)
+        for idx, (query, candidates) in enumerate(zip(queries, results), 1):
+            if num_queries > 1:
+                print(f"    Reranking query {idx}/{num_queries}...", end="\r", flush=True)
             rerank_results.append(
                 nv_rerank(
                     query,
@@ -247,6 +361,8 @@ def lancedb_retrieval(
                     topk=top_k,
                 )
             )
+        if num_queries > 1:
+            print()  # New line after progress indicator
         results = rerank_results
 
     return results
