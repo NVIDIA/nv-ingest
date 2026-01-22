@@ -46,40 +46,17 @@ def _get_text_for_element(element):
         return metadata.get("content")
 
 
-def create_lancedb_results(
-    results,
-    enable_text: bool = True,
-    enable_charts: bool = True,
-    enable_tables: bool = True,
-    enable_images: bool = True,
-    enable_infographics: bool = True,
-    enable_audio: bool = True,
-    max_text_length: int = 65535,
-):
+def create_lancedb_results(results):
     """
     Transform NV-Ingest pipeline results into LanceDB ingestible rows.
 
-    Matches Milvus behavior by extracting appropriate text based on document_type,
-    rather than storing raw content (which may include base64 images).
+    Extracts appropriate text based on document_type rather than storing
+    raw content (which may include base64 images).
 
     Parameters
     ----------
     results : list
         Pipeline output results.
-    enable_text : bool
-        Include text documents.
-    enable_charts : bool
-        Include chart documents.
-    enable_tables : bool
-        Include table documents.
-    enable_images : bool
-        Include image documents (stores caption/OCR, not raw image).
-    enable_infographics : bool
-        Include infographic documents.
-    enable_audio : bool
-        Include audio documents (stores transcript).
-    max_text_length : int
-        Maximum text length to store (skip longer texts).
     """
     lancedb_rows = []
 
@@ -93,23 +70,7 @@ def create_lancedb_results(
             if embedding is None:
                 continue
 
-            # Filter by document type
             content_meta = metadata.get("content_metadata", {})
-            subtype = content_meta.get("subtype")
-
-            if doc_type == "text" and not enable_text:
-                continue
-            elif doc_type == "structured":
-                if subtype == "chart" and not enable_charts:
-                    continue
-                elif subtype == "table" and not enable_tables:
-                    continue
-                elif subtype == "infographic" and not enable_infographics:
-                    continue
-            elif doc_type == "image" and not enable_images:
-                continue
-            elif doc_type == "audio" and not enable_audio:
-                continue
 
             # Extract appropriate text based on document type
             text = _get_text_for_element(element)
@@ -118,17 +79,6 @@ def create_lancedb_results(
                 source_name = metadata.get("source_metadata", {}).get("source_name", "unknown")
                 pg_num = content_meta.get("page_number")
                 logger.debug(f"No text found for entity: {source_name} page: {pg_num} type: {doc_type}")
-                continue
-
-            # Skip overly long texts
-            if len(text) > max_text_length:
-                source_name = metadata.get("source_metadata", {}).get("source_name", "unknown")
-                pg_num = content_meta.get("page_number")
-                logger.warning(
-                    f"Text too long ({len(text)} chars), skipping. "
-                    f"Consider using SplitTask for smaller chunks. "
-                    f"file: {source_name}, page: {pg_num}"
-                )
                 continue
 
             lancedb_rows.append(
@@ -351,7 +301,7 @@ def lancedb_retrieval(
         num_queries = len(queries)
         for idx, (query, candidates) in enumerate(zip(queries, results), 1):
             if num_queries > 1:
-                print(f"    Reranking query {idx}/{num_queries}...", end="\r", flush=True)
+                logger.info(f"Reranking query {idx}/{num_queries}")
             rerank_results.append(
                 nv_rerank(
                     query,
@@ -361,8 +311,6 @@ def lancedb_retrieval(
                     topk=top_k,
                 )
             )
-        if num_queries > 1:
-            print()  # New line after progress indicator
         results = rerank_results
 
     return results
