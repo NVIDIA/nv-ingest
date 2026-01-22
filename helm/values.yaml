@@ -599,6 +599,9 @@ containerArgs: []
 ## @section Nim Operator parameters
 ## @param nimCache.pvc.storageClass Specifies the storage class for the PVCs
 nimOperator:
+  draResources:
+    enabled: false
+    name: "nvingest-claim"
   ## @section Nim Operator NimCache Configuration
   ## @param nimOperator.nimCache.pvc.storageClass [string] Storage class to use for all NimCache PVCs. Overrides per-model storageClass if set.
   nimCache:
@@ -658,11 +661,12 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
         port: 8000
-      service:
         grpcPort: 8001
     env:
       - name: NIM_HTTP_API_PORT
@@ -726,6 +730,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
@@ -772,6 +778,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
@@ -818,6 +826,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
@@ -860,6 +870,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
@@ -908,6 +920,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
@@ -988,6 +1002,8 @@ nimOperator:
     resources:
       limits:
         nvidia.com/gpu: 1
+#    draResources:
+#    - resourceClaimName: nvingest-claim
     expose:
       service:
         type: ClusterIP
