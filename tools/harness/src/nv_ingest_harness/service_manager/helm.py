@@ -7,7 +7,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-from .base import ServiceManager
+from nv_ingest_harness.service_manager.base import ServiceManager
+from nv_ingest_harness.utils.interact import run_cmd
 
 
 class HelmManager(ServiceManager):
@@ -91,8 +92,7 @@ class HelmManager(ServiceManager):
             for key, value in self.config.helm_values.items():
                 cmd += ["--set", f"{key}={value}"]
 
-        print("$", " ".join(cmd))
-        rc = subprocess.call(cmd)
+        rc = run_cmd(cmd)
 
         if rc == 0:
             # Start port forwarding for all configured services
@@ -504,8 +504,7 @@ done
 
         cmd = self.helm_cmd + ["uninstall", self.release_name, "--namespace", self.namespace]
 
-        print("$", " ".join(cmd))
-        rc = subprocess.call(cmd)
+        rc = run_cmd(cmd)
         if rc != 0:
             print(f"Warning: helm uninstall returned {rc}")
 
@@ -513,8 +512,7 @@ done
         if clean:
             print(f"Deleting namespace {self.namespace}...")
             kubectl_cmd = self.kubectl_cmd + ["delete", "namespace", self.namespace, "--ignore-not-found"]
-            print("$", " ".join(kubectl_cmd))
-            rc2 = subprocess.call(kubectl_cmd)
+            rc2 = run_cmd(kubectl_cmd)
             if rc2 != 0:
                 print(f"Warning: kubectl delete namespace returned {rc2}")
 

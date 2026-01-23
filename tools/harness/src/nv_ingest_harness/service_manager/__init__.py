@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from .base import ServiceManager
-from .docker_compose import DockerComposeManager
-from .helm import HelmManager
+from nv_ingest_harness.service_manager.base import ServiceManager
+from nv_ingest_harness.service_manager.docker_compose import DockerComposeManager
+from nv_ingest_harness.service_manager.helm import HelmManager
 
 
 def create_service_manager(config, repo_root: Path) -> ServiceManager:

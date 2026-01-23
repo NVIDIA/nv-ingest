@@ -5,7 +5,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-from .base import ServiceManager
+from nv_ingest_harness.service_manager.base import ServiceManager
+from nv_ingest_harness.utils.interact import run_cmd
 
 
 class DockerComposeManager(ServiceManager):
@@ -49,8 +50,7 @@ class DockerComposeManager(ServiceManager):
         else:
             cmd += ["up", "-d"]
 
-        print("$", " ".join(cmd))
-        return subprocess.call(cmd)
+        return run_cmd(cmd)
 
     def stop(self, clean: bool = False) -> int:
         """
@@ -71,15 +71,13 @@ class DockerComposeManager(ServiceManager):
         if clean:
             down_cmd += ["-v", "--remove-orphans"]
 
-        print("$", " ".join(down_cmd))
-        rc = subprocess.call(down_cmd)
+        rc = run_cmd(down_cmd)
         if rc != 0:
             print(f"Warning: docker compose down returned {rc}")
 
         # Remove containers forcefully
         rm_cmd = ["docker", "compose", "-f", self.compose_file, "--profile", "*", "rm", "--force"]
-        print("$", " ".join(rm_cmd))
-        rc2 = subprocess.call(rm_cmd)
+        rc2 = run_cmd(rm_cmd)
         if rc2 != 0:
             print(f"Warning: docker compose rm returned {rc2}")
 
