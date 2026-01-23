@@ -117,7 +117,7 @@ datasets:
     recall_dataset: earnings
 
   bo20:
-    path: /localhome/charlesb/datasets/bo20
+    path: /path/to/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true
