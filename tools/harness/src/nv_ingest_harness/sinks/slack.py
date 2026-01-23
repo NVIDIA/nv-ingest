@@ -28,6 +28,11 @@ RECALL_METRICS = [
     "recall_multimodal_@5_reranker",
 ]
 
+# Slack user ID mapping for tagging users in notifications
+PIC_DICT = {
+    "randy": "U9TBF6WT0",
+}
+
 
 class SlackSink(Sink):
     """Slack sink that posts table-formatted results using Block Kit."""
@@ -43,6 +48,8 @@ class SlackSink(Sink):
             self.enabled = False
 
         self.default_metrics = sink_config.get("default_metrics", DEFAULT_METRICS)
+        # Users to tag in Slack notifications (list of names from PIC_DICT)
+        self.users_to_tag = sink_config.get("users_to_tag", [])
         self.session_name: str | None = None
         self.env_data: dict[str, Any] = {}
         self.results_to_report: list[dict[str, Any]] = []
@@ -173,21 +180,45 @@ class SlackSink(Sink):
 
         table_dict = {"type": "table", "rows": rows}
         exec_summary = f"Session: `{self.session_name}`"
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": "nv-ingest Nightly Benchmark Summary"},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": exec_summary},
+            },
+            {"type": "divider"},
+            table_dict,
+        ]
+
+        # Add user mentions if configured
+        if self.users_to_tag:
+            user_mentions = []
+            for user_name in self.users_to_tag:
+                if user_name in PIC_DICT:
+                    user_id = PIC_DICT[user_name]
+                    user_mentions.append(f"<@{user_id}>")
+
+            if user_mentions:
+                blocks.append(
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"cc {' '.join(user_mentions)}",
+                            }
+                        ],
+                    }
+                )
+
         payload = {
             "username": "nv-ingest Benchmark Runner",
             "icon_emoji": ":rocket:",
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": "nv-ingest Nightly Benchmark Summary"},
-                },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": exec_summary},
-                },
-                {"type": "divider"},
-                table_dict,
-            ],
+            "blocks": blocks,
         }
         return self._post_payload(payload)
 

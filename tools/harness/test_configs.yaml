@@ -19,10 +19,11 @@ active:
     - table-structure
 
   # Runtime configuration
-  sparse: false  # Use sparse embeddings
+  sparse: false  # Use sparse embeddings (Milvus only)
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
-  vdb_backend: milvus  # milvus or lancedb
+  vdb_backend: lancedb  # milvus or lancedb
+  hybrid: false  # LanceDB hybrid retrieval (FTS + vector)
 
   # Extraction configuration
   extract_text: true
@@ -56,7 +57,7 @@ active:
 # docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: none  # Options: "none", "with", "both"
+  reranker_mode: both  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
