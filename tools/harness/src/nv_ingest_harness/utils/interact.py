@@ -22,6 +22,7 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> int:
     print("$", " ".join(str(c) for c in cmd))
     return subprocess.call(cmd, cwd=cwd)
 
+
 def embed_info():
     """Get embedding model information from the embedding service or running containers.
 
