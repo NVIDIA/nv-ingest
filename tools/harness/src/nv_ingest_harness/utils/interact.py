@@ -24,15 +24,14 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> int:
 
 
 def embed_info():
-    """Get embedding model information from the embedding service or running containers.
+    """Get embedding model information from the embedding service.
 
-    This function first attempts to query the embedding service API at localhost:8012
-    to get the model name. If that fails (e.g., in Docker Compose deployments or when
-    service is unavailable), it falls back to checking running Docker containers.
+    This function attempts to query the embedding service API at localhost:8012
+    to get the model name.
 
     Returns:
         tuple: A tuple containing (model_name: str, embedding_dimension: int).
-               Returns a default model if no specific service or container is found.
+               Returns a default model if the embedding service is not available.
     """
     # Model name to embedding dimension mapping
     MODEL_DIMENSIONS = {
