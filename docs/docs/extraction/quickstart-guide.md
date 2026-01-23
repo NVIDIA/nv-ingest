@@ -119,7 +119,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
+pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 ```
 
 !!! tip
@@ -425,15 +425,15 @@ You can specify multiple `--profile` options.
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
-## Specifying MIG slices for NIM models in NV-Ingest
 
-When deploying NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the values.yaml file for the corresponding NIM microservice. For IBM CAS deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles. [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md​)
+## Specify MIG slices for NIM models
 
-To target a specific MIG profile (for example, a 3g.20gb slice on an A100) for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
+When you deploy NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md%E2%80%8B).​
 
-The following example shows the pattern (paths will vary by NIM, such as `nvingest.nvidiaNim`.`nemoretrieverPageElements` instead of the generic `nvingest.nim` placeholder):[catalog.ngc.nvidia](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nv-ingest)​:
+To target a specific MIG profile—for example, a 3g.20gb slice on an A100, which is a hardware-partitioned virtual GPU instance that gives your workload a fixed mid-sized share of the A100’s compute plus 20 GB of dedicated GPU memory and behaves like a smaller independent GPU—for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
 
-
+The following example shows the pattern. Paths vary by NIM, such as `nvingest.nvidiaNim.nemoretrieverPageElements` instead of the generic `nvingest.nim` placeholder. For details refer to [catalog.ngc.nvidia](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nv-ingest)​.
+Set `resources.requests` and `resources.limits` to the name of the MIG resource that you want (for example, `nvidia.com/mig-3g.20gb`).
 ```shell
 nvingest:
   nvidiaNim:
@@ -447,13 +447,10 @@ nvingest:
       nodeSelector:
         nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb
 ```
-
 Key points:
-
 * Use the appropriate NIM‑specific values path (for example, `nvingest.nvidiaNim.nemoretrieverPageElements.resources`) rather than the generic `nvingest.nim` placeholder.
 * Set `resources.requests` and `resources.limits` to the desired MIG resource name (for example, `nvidia.com/mig-3g.20gb`).
-* Use `nodeSelector` (or tolerations/affinity, if preferred) to target nodes labeled with the corresponding MIG‑enabled GPU product (for example, `nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb`).
-
+* Use `nodeSelector` (or tolerations/affinity, if you prefer) to target nodes labeled with the corresponding MIG‑enabled GPU product (for example, `nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb`).
 This syntax and structure can be repeated for each NIM model used by CAS, ensuring that each NV-Ingest NIM pod is mapped to the correct MIG slice type and scheduled onto compatible nodes.
 
 !!! important

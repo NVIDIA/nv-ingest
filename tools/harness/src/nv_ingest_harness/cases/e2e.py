@@ -82,6 +82,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Dataset: {data_dir}")
     print(f"Collection: {collection_name}")
     print(f"Embed: {model_name} (dim={dense_dim}, sparse={sparse})")
+    print(f"VDB Backend: {config.vdb_backend}")
 
     # Extraction config
     extractions = []
