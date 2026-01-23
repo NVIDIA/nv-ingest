@@ -235,6 +235,8 @@ artifacts/
 
 # Ignore cursor rules
 .cursor
+
+# Ignore tools/harness/private_local
 tools/private_local/*
 
 # LanceDB artifacts
