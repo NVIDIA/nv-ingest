@@ -42,7 +42,6 @@ sinks:
 
 # Infrastructure
 infrastructure:
-  fresh_start: true  # Run nv-clean && nv-start before benchmarks
   readiness_timeout: 600  # Seconds to wait for services to be ready
   hostname: localhost  # Hostname for service endpoints
   

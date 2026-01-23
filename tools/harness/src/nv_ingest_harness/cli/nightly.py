@@ -12,16 +12,14 @@ from typing import Any
 import click
 import yaml
 
-from nv_ingest_harness.config import load_config, TestConfig
+from nv_ingest_harness.config import load_config
 from nv_ingest_harness.reporting.baselines import validate_results, check_all_passed, get_expected_counts
 from nv_ingest_harness.reporting.environment import get_environment_data
-from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.sinks import SlackSink, HistorySink
 from nv_ingest_harness.utils.cases import now_timestr
 from nv_ingest_harness.utils.session import create_session_dir, write_session_summary
 
 DEFAULT_CONFIG_PATH = Path(__file__).parents[3] / "nightly_config.yaml"
-REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 def load_nightly_config(config_path: Path) -> dict[str, Any]:
@@ -31,54 +29,33 @@ def load_nightly_config(config_path: Path) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def create_infrastructure_config(nightly_config: dict, deployment_type: str) -> TestConfig:
-    """
-    Create a TestConfig object from nightly infrastructure config.
+def run_harness(
+    dataset: str,
+    case: str = "e2e",
+    session_dir: Path | None = None,
+    managed: bool = False,
+    deployment_type: str = "compose",
+) -> tuple[int, Path | None]:
+    """Run a single harness test.
     
     Args:
-        nightly_config: Loaded nightly config YAML
-        deployment_type: Deployment type ('compose' or 'helm')
-        
-    Returns:
-        TestConfig object suitable for service manager
+        dataset: Dataset name to run
+        case: Test case type (e2e or e2e_recall)
+        session_dir: Session directory for artifacts
+        managed: If True, pass --managed flag to run.py for service lifecycle management
+        deployment_type: Deployment type (compose or helm)
     """
-    infra = nightly_config.get("infrastructure", {})
-    
-    # Start with base infrastructure settings
-    config_dict = {
-        "dataset_dir": ".",  # Required but not used for service management
-        "deployment_type": deployment_type,
-        "readiness_timeout": infra.get("readiness_timeout", 600),
-        "hostname": infra.get("hostname", "localhost"),
-    }
-    
-    # Add compose-specific settings
-    if deployment_type == "compose":
-        compose_config = infra.get("compose", {})
-        config_dict["profiles"] = compose_config.get("profiles", ["retrieval", "table-structure"])
-    
-    # Add helm-specific settings
-    elif deployment_type == "helm":
-        helm_config = infra.get("helm", {})
-        # Map helm config keys to TestConfig field names
-        for key, value in helm_config.items():
-            if key.startswith("kubectl_"):
-                config_dict[key] = value
-            else:
-                config_dict[f"helm_{key}"] = value
-    
-    return TestConfig(**config_dict)
-
-
-def run_harness(dataset: str, case: str = "e2e", session_dir: Path | None = None) -> tuple[int, Path | None]:
-    """Run a single harness test."""
     cmd = [
         sys.executable,
         "-m",
         "nv_ingest_harness.cli.run",
         f"--case={case}",
         f"--dataset={dataset}",
+        f"--deployment-type={deployment_type}",
     ]
+
+    if managed:
+        cmd.append("--managed")
 
     if session_dir:
         cmd.append(f"--session-dir={str(session_dir)}")
@@ -163,9 +140,9 @@ def load_results(artifact_dir: Path) -> dict:
     help="Disable SQLite history storage (overrides config)",
 )
 @click.option(
-    "--skip-fresh-start",
+    "--managed",
     is_flag=True,
-    help="Skip service restart (overrides config)",
+    help="Enable managed service lifecycle (start/stop services for each dataset)",
 )
 @click.option(
     "--dry-run",
@@ -190,7 +167,7 @@ def main(
     deployment_type: str,
     skip_slack: bool,
     skip_history: bool,
-    skip_fresh_start: bool,
+    managed: bool,
     dry_run: bool,
     replay_dirs: tuple[Path, ...],
     note: str | None,
@@ -214,7 +191,6 @@ def main(
     e2e_datasets = runs_config.get("e2e", [])
     recall_datasets = runs_config.get("e2e_recall", [])
     reranker_mode = recall_config.get("reranker_mode", "both")
-    fresh_start = infra_config.get("fresh_start", True) and not skip_fresh_start
     session_name = f"nightly_{now_timestr()}"
     session_dir = create_session_dir(session_name)
 
@@ -227,7 +203,8 @@ def main(
     print(f"E2E datasets: {e2e_datasets}")
     print(f"Recall datasets: {recall_datasets}")
     print(f"Reranker mode: {reranker_mode}")
-    print(f"Fresh start: {fresh_start}")
+    print(f"Deployment type: {deployment_type}")
+    print(f"Managed services: {managed}")
     if note:
         print(f"Note: {note}")
     print(f"{'='*60}\n")
@@ -264,28 +241,17 @@ def main(
     for sink in sinks:
         sink.initialize(session_name, env_data)
 
-    if fresh_start:
-        timeout = infra_config.get("readiness_timeout", 600)
-        
-        # Create service manager config from infrastructure settings
-        try:
-            service_config = create_infrastructure_config(config, deployment_type)
-        except Exception as e:
-            print(f"Error creating service configuration: {e}")
-            return 1
-        
-        # Create and use service manager for restart
-        service_manager = create_service_manager(service_config, REPO_ROOT)
-        rc = service_manager.restart(build=False, clean=True, timeout=timeout)
-        
-        if rc != 0:
-            print(f"Warning: Service restart returned {rc}")
-
     all_results = []
 
     for dataset in e2e_datasets:
         print(f"\n--- Running e2e for {dataset} ---")
-        rc, artifact_dir = run_harness(dataset, case="e2e", session_dir=session_dir)
+        rc, artifact_dir = run_harness(
+            dataset,
+            case="e2e",
+            session_dir=session_dir,
+            managed=managed,
+            deployment_type=deployment_type,
+        )
         result = _process_result(dataset, rc, artifact_dir, case="e2e")
         all_results.append(result)
 
@@ -294,7 +260,13 @@ def main(
 
     for dataset in recall_datasets:
         print(f"\n--- Running e2e_recall for {dataset} ---")
-        rc, artifact_dir = run_harness(dataset, case="e2e_recall", session_dir=session_dir)
+        rc, artifact_dir = run_harness(
+            dataset,
+            case="e2e_recall",
+            session_dir=session_dir,
+            managed=managed,
+            deployment_type=deployment_type,
+        )
         result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
         all_results.append(result)
 

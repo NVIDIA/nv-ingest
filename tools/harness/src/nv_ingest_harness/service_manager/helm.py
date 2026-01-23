@@ -47,9 +47,9 @@ class HelmManager(ServiceManager):
 
         # kubectl command (for port forwarding)
         kubectl_bin = getattr(config, "kubectl_bin", "kubectl")
-        kubectl_sudo = getattr(config, "kubectl_sudo") or helm_sudo  # Default to same as helm_sudo
+        self.kubectl_sudo = getattr(config, "kubectl_sudo") or helm_sudo  # Default to same as helm_sudo
 
-        if kubectl_sudo:
+        if self.kubectl_sudo:
             self.kubectl_cmd = ["sudo"] + kubectl_bin.split()
         else:
             self.kubectl_cmd = kubectl_bin.split()
@@ -274,6 +274,8 @@ done
     def _stop_port_forwards(self) -> None:
         """Stop all port-forward processes and their children."""
         if not self.port_forward_processes:
+            # Even if we don't have tracked processes, clean up any orphaned ones
+            self._cleanup_orphaned_port_forwards()
             return
 
         print(f"Stopping {len(self.port_forward_processes)} port forward(s)...")
@@ -308,6 +310,131 @@ done
                     pass
 
         self.port_forward_processes = []
+        
+        # Final cleanup: kill any orphaned port-forward processes for this namespace
+        self._cleanup_orphaned_port_forwards()
+
+    def _cleanup_orphaned_port_forwards(self) -> None:
+        """
+        Clean up any orphaned port-forward processes for this namespace.
+        
+        This is a fallback cleanup that searches for and kills any remaining
+        kubectl port-forward processes that are forwarding services in our namespace.
+        """
+        print(f"Checking for orphaned port-forward processes in namespace '{self.namespace}'...")
+        
+        try:
+            # Find all port-forward processes for this namespace
+            # The command line will contain: "port-forward -n <namespace>"
+            search_pattern = f"port-forward.*-n {self.namespace}"
+            
+            # Use pgrep to find matching processes
+            pgrep_cmd = ["pgrep", "-f", search_pattern]
+            result = subprocess.run(pgrep_cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                pids = result.stdout.strip().split('\n')
+                print(f"  Found {len(pids)} orphaned port-forward process(es), cleaning up...")
+                
+                for pid in pids:
+                    try:
+                        pid_int = int(pid)
+                        print(f"    Killing PID {pid_int}...")
+                        
+                        # Use sudo if configured (same as kubectl commands)
+                        if self.kubectl_sudo:
+                            # Kill with sudo
+                            subprocess.run(["sudo", "kill", "-TERM", str(pid_int)], 
+                                         stderr=subprocess.DEVNULL)
+                            time.sleep(1)
+                            # Force kill if still running
+                            subprocess.run(["sudo", "kill", "-9", str(pid_int)],
+                                         stderr=subprocess.DEVNULL)
+                        else:
+                            # Kill without sudo - try process group first
+                            try:
+                                pgid = os.getpgid(pid_int)
+                                os.killpg(pgid, signal.SIGTERM)
+                                time.sleep(1)
+                                # Force kill if still running
+                                try:
+                                    os.killpg(pgid, signal.SIGKILL)
+                                except ProcessLookupError:
+                                    pass  # Already dead
+                            except (ProcessLookupError, PermissionError):
+                                # Process group kill failed, try individual process
+                                try:
+                                    os.kill(pid_int, signal.SIGTERM)
+                                    time.sleep(1)
+                                    os.kill(pid_int, signal.SIGKILL)
+                                except ProcessLookupError:
+                                    pass  # Already dead
+                                except PermissionError:
+                                    print(f"      Permission denied (sudo not enabled in config)")
+                    except (ValueError, Exception) as e:
+                        print(f"      Warning: Could not kill PID {pid}: {e}")
+                
+                print("  Orphaned process cleanup complete")
+            else:
+                print("  No orphaned port-forward processes found")
+                
+        except FileNotFoundError:
+            # pgrep not available, try alternative method with ps
+            print("  pgrep not found, trying ps...")
+            try:
+                ps_cmd = ["ps", "aux"]
+                result = subprocess.run(ps_cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    lines = result.stdout.split('\n')
+                    pids_to_kill = []
+                    
+                    for line in lines:
+                        if f"port-forward" in line and f"-n {self.namespace}" in line:
+                            # Extract PID (second column in ps aux output)
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                try:
+                                    pids_to_kill.append(int(parts[1]))
+                                except ValueError:
+                                    continue
+                    
+                    if pids_to_kill:
+                        print(f"  Found {len(pids_to_kill)} orphaned port-forward process(es), cleaning up...")
+                        for pid in pids_to_kill:
+                            try:
+                                print(f"    Killing PID {pid}...")
+                                
+                                # Use sudo if configured (same as kubectl commands)
+                                if self.kubectl_sudo:
+                                    # Kill with sudo
+                                    subprocess.run(["sudo", "kill", "-TERM", str(pid)],
+                                                 stderr=subprocess.DEVNULL)
+                                    time.sleep(0.5)
+                                    subprocess.run(["sudo", "kill", "-9", str(pid)],
+                                                 stderr=subprocess.DEVNULL)
+                                else:
+                                    # Kill without sudo
+                                    try:
+                                        os.kill(pid, signal.SIGTERM)
+                                        time.sleep(0.5)
+                                        try:
+                                            os.kill(pid, signal.SIGKILL)
+                                        except ProcessLookupError:
+                                            pass
+                                    except PermissionError:
+                                        print(f"      Permission denied (sudo not enabled in config)")
+                                    except ProcessLookupError:
+                                        pass
+                            except Exception as e:
+                                print(f"      Warning: Could not kill PID {pid}: {e}")
+                        print("  Orphaned process cleanup complete")
+                    else:
+                        print("  No orphaned port-forward processes found")
+            except Exception as e:
+                print(f"  Warning: Could not check for orphaned processes: {e}")
+        except Exception as e:
+            print(f"  Warning: Error during orphaned process cleanup: {e}")
 
     def print_port_forward_commands(self) -> None:
         """Print commands to manually recreate port forwards."""
