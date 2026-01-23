@@ -44,14 +44,14 @@ sinks:
 infrastructure:
   readiness_timeout: 600  # Seconds to wait for services to be ready
   hostname: localhost  # Hostname for service endpoints
-  
+
   # Docker Compose configuration
   compose:
     profiles:  # Docker compose profiles to start
       - retrieval
       - table-structure
       - reranker  # Required for recall evaluation
-  
+
   # Helm configuration
   helm:
     bin: microk8s helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")

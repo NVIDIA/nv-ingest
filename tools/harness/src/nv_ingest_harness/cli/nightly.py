@@ -37,7 +37,7 @@ def run_harness(
     deployment_type: str = "compose",
 ) -> tuple[int, Path | None]:
     """Run a single harness test.
-    
+
     Args:
         dataset: Dataset name to run
         case: Test case type (e2e or e2e_recall)
@@ -186,7 +186,6 @@ def main(
     runs_config = config.get("runs", {})
     recall_config = config.get("recall", {})
     sinks_config = config.get("sinks", {})
-    infra_config = config.get("infrastructure", {})
 
     e2e_datasets = runs_config.get("e2e", [])
     recall_datasets = runs_config.get("e2e_recall", [])

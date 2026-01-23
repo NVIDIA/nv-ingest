@@ -66,11 +66,11 @@ class DockerComposeManager(ServiceManager):
 
         # Stop all services
         down_cmd = ["docker", "compose", "-f", self.compose_file, "--profile", "*", "down"]
-        
+
         # Add cleanup flags if clean mode
         if clean:
             down_cmd += ["-v", "--remove-orphans"]
-        
+
         print("$", " ".join(down_cmd))
         rc = subprocess.call(down_cmd)
         if rc != 0:
