@@ -126,7 +126,8 @@ def load_results(artifact_dir: Path) -> dict:
 @click.option(
     "--managed",
     is_flag=True,
-    help="Manage services (start/stop). If enabled, services are started before tests and stopped after (unless --keep-up)",
+    help="Manage services (start/stop). If enabled, services are started before tests and stopped after (unless"
+    " --keep-up)",
 )
 @click.option(
     "--keep-up",
@@ -181,13 +182,6 @@ def main(
     """Run nightly benchmarks and post results."""
     if replay_dirs:
         return _replay_results(replay_dirs)
-
-    # Validate mutually exclusive options
-    if managed and not skip_fresh_start:
-        # Both managed and fresh_start (not skipped) cannot be true
-        infra_config_fresh_start = True  # Will check actual config below
-    else:
-        infra_config_fresh_start = False
 
     config_file = config_path or DEFAULT_CONFIG_PATH
     try:

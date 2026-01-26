@@ -1,5 +1,4 @@
 import glob
-import http.client
 import inspect
 import json
 import os
@@ -58,11 +57,11 @@ def embed_info(
     DEFAULT_DIMENSION = 1024
 
     url = "http://localhost:8012/v1/models"
-    
+
     # Try to fetch model info from embedding service API with retry/backoff
     for attempt in range(max_retries):
         should_retry = False
-        
+
         try:
             with urllib.request.urlopen(url, timeout=request_timeout) as response:
                 # Check if we got a successful response
@@ -79,21 +78,21 @@ def embed_info(
                             return model_name, dimension
                     # Got 200 but incomplete/invalid data - retry
                     should_retry = True
-                    
+
         except Exception:
             # Any exception should trigger retry
             should_retry = True
-        
+
         # If we need to retry and haven't exhausted attempts, backoff and continue
         if should_retry:
             if attempt == max_retries - 1:
                 # Last attempt failed, fall back to defaults
                 return DEFAULT_MODEL, DEFAULT_DIMENSION
-            
+
             # Calculate backoff time with exponential increase
-            backoff_time = initial_backoff * (backoff_multiplier ** attempt)
+            backoff_time = initial_backoff * (backoff_multiplier**attempt)
             time.sleep(backoff_time)
-    
+
     # Fallback if we somehow exit the loop without returning
     return DEFAULT_MODEL, DEFAULT_DIMENSION
 
