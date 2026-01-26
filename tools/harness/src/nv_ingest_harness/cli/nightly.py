@@ -15,11 +15,13 @@ import yaml
 from nv_ingest_harness.config import load_config
 from nv_ingest_harness.reporting.baselines import validate_results, check_all_passed, get_expected_counts
 from nv_ingest_harness.reporting.environment import get_environment_data
+from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.sinks import SlackSink, HistorySink
 from nv_ingest_harness.utils.cases import now_timestr
 from nv_ingest_harness.utils.session import create_session_dir, write_session_summary
 
 DEFAULT_CONFIG_PATH = Path(__file__).parents[3] / "nightly_config.yaml"
+REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 def load_nightly_config(config_path: Path) -> dict[str, Any]:
@@ -33,18 +35,10 @@ def run_harness(
     dataset: str,
     case: str = "e2e",
     session_dir: Path | None = None,
-    managed: bool = False,
     deployment_type: str = "compose",
+    managed: bool = False,
 ) -> tuple[int, Path | None]:
-    """Run a single harness test.
-
-    Args:
-        dataset: Dataset name to run
-        case: Test case type (e2e or e2e_recall)
-        session_dir: Session directory for artifacts
-        managed: If True, pass --managed flag to run.py for service lifecycle management
-        deployment_type: Deployment type (compose or helm)
-    """
+    """Run a single harness test."""
     cmd = [
         sys.executable,
         "-m",
@@ -127,7 +121,17 @@ def load_results(artifact_dir: Path) -> dict:
     "--deployment-type",
     type=click.Choice(["compose", "helm"], case_sensitive=False),
     default="compose",
-    help="Deployment type for service management (compose or helm)",
+    help="Deployment type for services (compose or helm)",
+)
+@click.option(
+    "--managed",
+    is_flag=True,
+    help="Manage services (start/stop). If enabled, services are started before tests and stopped after (unless --keep-up)",
+)
+@click.option(
+    "--keep-up",
+    is_flag=True,
+    help="Keep services running after nightly run completes (only with --managed)",
 )
 @click.option(
     "--skip-slack",
@@ -140,9 +144,9 @@ def load_results(artifact_dir: Path) -> dict:
     help="Disable SQLite history storage (overrides config)",
 )
 @click.option(
-    "--managed",
+    "--skip-fresh-start",
     is_flag=True,
-    help="Enable managed service lifecycle (start/stop services for each dataset)",
+    help="Skip service restart (overrides config, mutually exclusive with --managed)",
 )
 @click.option(
     "--dry-run",
@@ -165,9 +169,11 @@ def load_results(artifact_dir: Path) -> dict:
 def main(
     config_path: Path | None,
     deployment_type: str,
+    managed: bool,
+    keep_up: bool,
     skip_slack: bool,
     skip_history: bool,
-    managed: bool,
+    skip_fresh_start: bool,
     dry_run: bool,
     replay_dirs: tuple[Path, ...],
     note: str | None,
@@ -175,6 +181,13 @@ def main(
     """Run nightly benchmarks and post results."""
     if replay_dirs:
         return _replay_results(replay_dirs)
+
+    # Validate mutually exclusive options
+    if managed and not skip_fresh_start:
+        # Both managed and fresh_start (not skipped) cannot be true
+        infra_config_fresh_start = True  # Will check actual config below
+    else:
+        infra_config_fresh_start = False
 
     config_file = config_path or DEFAULT_CONFIG_PATH
     try:
@@ -186,10 +199,19 @@ def main(
     runs_config = config.get("runs", {})
     recall_config = config.get("recall", {})
     sinks_config = config.get("sinks", {})
+    infra_config = config.get("infrastructure", {})
 
     e2e_datasets = runs_config.get("e2e", [])
     recall_datasets = runs_config.get("e2e_recall", [])
     reranker_mode = recall_config.get("reranker_mode", "both")
+    fresh_start = infra_config.get("fresh_start", True) and not skip_fresh_start
+
+    # Validate mutually exclusive options: fresh_start and managed
+    if fresh_start and managed:
+        print("Error: Cannot use both --managed and fresh_start=true in config.")
+        print("  Either set infrastructure.fresh_start=false in config or use --skip-fresh-start flag")
+        return 1
+
     session_name = f"nightly_{now_timestr()}"
     session_dir = create_session_dir(session_name)
 
@@ -203,7 +225,10 @@ def main(
     print(f"Recall datasets: {recall_datasets}")
     print(f"Reranker mode: {reranker_mode}")
     print(f"Deployment type: {deployment_type}")
-    print(f"Managed services: {managed}")
+    print(f"Managed mode: {managed}")
+    if managed:
+        print(f"Keep services up: {keep_up}")
+    print(f"Fresh start: {fresh_start}")
     if note:
         print(f"Note: {note}")
     print(f"{'='*60}\n")
@@ -240,16 +265,76 @@ def main(
     for sink in sinks:
         sink.initialize(session_name, env_data)
 
+    service_manager = None
+
+    # Handle service lifecycle based on mode
+    if fresh_start:
+        # fresh_start mode: restart services once using config deployment_type
+        print("\n" + "=" * 60)
+        print(f"Fresh start: Restarting services using {deployment_type}")
+        print("=" * 60)
+
+        # Load config to get profiles and settings
+        first_dataset = e2e_datasets[0] if e2e_datasets else (recall_datasets[0] if recall_datasets else None)
+        if not first_dataset:
+            print("Error: No datasets configured")
+            return 1
+
+        service_config = load_config(
+            case="e2e",
+            dataset=first_dataset,
+            deployment_type=deployment_type,
+        )
+
+        service_manager = create_service_manager(service_config, REPO_ROOT)
+        rc = service_manager.restart(build=False, clean=True, timeout=service_config.readiness_timeout)
+        if rc != 0:
+            print(f"Warning: Service restart returned {rc}")
+
+    elif managed:
+        # managed mode: start services, run tests, stop at end if not keep_up
+        print("\n" + "=" * 60)
+        print(f"Managed mode: Starting services using {deployment_type}")
+        print("=" * 60)
+
+        # Load config to get profiles and settings
+        first_dataset = e2e_datasets[0] if e2e_datasets else (recall_datasets[0] if recall_datasets else None)
+        if not first_dataset:
+            print("Error: No datasets configured")
+            return 1
+
+        service_config = load_config(
+            case="e2e",
+            dataset=first_dataset,
+            deployment_type=deployment_type,
+        )
+
+        service_manager = create_service_manager(service_config, REPO_ROOT)
+
+        # Start services
+        if service_manager.start(no_build=True) != 0:
+            print("Failed to start services")
+            return 1
+
+        # Wait for readiness
+        if not service_manager.check_readiness(service_config.readiness_timeout):
+            print("Services failed to become ready")
+            service_manager.stop()
+            return 1
+
+        print("Services ready!")
+
     all_results = []
 
+    # Run all datasets - services stay up across all iterations
     for dataset in e2e_datasets:
         print(f"\n--- Running e2e for {dataset} ---")
         rc, artifact_dir = run_harness(
             dataset,
             case="e2e",
             session_dir=session_dir,
-            managed=managed,
             deployment_type=deployment_type,
+            managed=False,  # Don't manage per-dataset, already managed at nightly level
         )
         result = _process_result(dataset, rc, artifact_dir, case="e2e")
         all_results.append(result)
@@ -263,14 +348,34 @@ def main(
             dataset,
             case="e2e_recall",
             session_dir=session_dir,
-            managed=managed,
             deployment_type=deployment_type,
+            managed=False,  # Don't manage per-dataset, already managed at nightly level
         )
         result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
         all_results.append(result)
 
         for sink in sinks:
             sink.process_result(result)
+
+    # Cleanup managed services if needed
+    if managed and service_manager:
+        # Always cleanup port forwards (prevents orphaned processes)
+        if hasattr(service_manager, "_stop_port_forwards"):
+            service_manager._stop_port_forwards()
+
+        # Only stop services if not keeping up
+        if not keep_up:
+            print("\n" + "=" * 60)
+            print("Stopping managed services")
+            print("=" * 60)
+            service_manager.stop()
+        else:
+            print("\n" + "=" * 60)
+            print("Services are kept running (--keep-up enabled)")
+            print("Port forwards have been cleaned up to prevent orphaned processes.")
+            if hasattr(service_manager, "print_port_forward_commands"):
+                service_manager.print_port_forward_commands()
+            print("=" * 60)
 
     for sink in sinks:
         sink.finalize()
@@ -288,6 +393,8 @@ def main(
             "e2e": e2e_datasets,
             "e2e_recall": recall_datasets,
         },
+        infrastructure="managed" if managed else ("fresh_start" if fresh_start else "attach"),
+        deployment_type=deployment_type,
     )
 
     print("\n" + "=" * 60)

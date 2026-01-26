@@ -41,42 +41,8 @@ sinks:
     retention_days: 90  # Auto-prune runs older than 90 days
 
 # Infrastructure
+# Note: Infrastructure settings (compose/helm profiles, readiness_timeout, etc.)
+# are configured in test_configs.yaml under the 'active' section.
+# This section only contains nightly-specific settings.
 infrastructure:
-  readiness_timeout: 600  # Seconds to wait for services to be ready
-  hostname: localhost  # Hostname for service endpoints
-
-  # Docker Compose configuration
-  compose:
-    profiles:  # Docker compose profiles to start
-      - retrieval
-      - table-structure
-      - reranker  # Required for recall evaluation
-
-  # Helm configuration
-  helm:
-    bin: microk8s helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
-    sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
-    kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
-    kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
-    chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
-    chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
-    release: nv-ingest
-    namespace: nv-ingest
-    values_file: .helm-env  # Optional: path to values file
-    # Multiple port forwards for Helm services
-    port_forwards:
-      - service: nv-ingest
-        local_port: 7670
-        remote_port: 7670
-      - service: nv-ingest-milvus
-        local_port: 19530
-        remote_port: 19530
-      - service: nv-ingest-milvus
-        local_port: 9091
-        remote_port: 9091
-      - service: "*embed*"  # Wildcard pattern to match embedding services
-        local_port: 8012
-        remote_port: 8000
-    # values:  # Optional: inline Helm values
-    #   api.enabled: true
-    #   redis.enabled: true
+  fresh_start: true  # Restart services before running nightly benchmarks (mutually exclusive with --managed)

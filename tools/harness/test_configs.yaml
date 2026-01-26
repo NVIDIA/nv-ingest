@@ -20,6 +20,7 @@ active:
     profiles:
       - retrieval
       - table-structure
+      - reranker  # Required for recall evaluation
 
   # Helm configuration
   helm:
@@ -28,7 +29,7 @@ active:
     kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
     kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
     chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
-    chart_version: 26.1.0-RC7  # Chart version (required for remote charts)
+    chart_version: 26.1.2  # Chart version (required for remote charts)
     release: nv-ingest
     namespace: nv-ingest
     values_file: .helm-env  # Optional: path to values file
