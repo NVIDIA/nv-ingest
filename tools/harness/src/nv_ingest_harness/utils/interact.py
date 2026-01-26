@@ -1,4 +1,5 @@
 import glob
+import http.client
 import inspect
 import json
 import os
@@ -23,15 +24,26 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> int:
     return subprocess.call(cmd, cwd=cwd)
 
 
-def embed_info():
+def embed_info(
+    max_retries: int = 5,
+    initial_backoff: float = 1.0,
+    backoff_multiplier: float = 2.0,
+    request_timeout: float = 2.0,
+):
     """Get embedding model information from the embedding service.
 
     This function attempts to query the embedding service API at localhost:8012
-    to get the model name.
+    to get the model name with retry logic and exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 5)
+        initial_backoff: Initial backoff time in seconds (default: 1.0)
+        backoff_multiplier: Multiplier for exponential backoff (default: 2.0)
+        request_timeout: Timeout for each request in seconds (default: 2.0)
 
     Returns:
         tuple: A tuple containing (model_name: str, embedding_dimension: int).
-               Returns a default model if the embedding service is not available.
+               Returns a default model if the embedding service is not available after retries.
     """
     # Model name to embedding dimension mapping
     MODEL_DIMENSIONS = {
@@ -45,20 +57,45 @@ def embed_info():
     DEFAULT_MODEL = "nvidia/nv-embedqa-e5-v5"
     DEFAULT_DIMENSION = 1024
 
-    # Try to fetch model info from embedding service API (Helm/Kubernetes deployments)
-    try:
-        url = "http://localhost:8012/v1/models"
-        with urllib.request.urlopen(url, timeout=2) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                if data.get("data") and len(data["data"]) > 0:
-                    model_name = data["data"][0].get("id")
-                    if model_name:
-                        dimension = MODEL_DIMENSIONS.get(model_name, DEFAULT_DIMENSION)
-                        return model_name, dimension
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, socket.timeout, Exception):
-        # API not available, fall back to default values
-        return DEFAULT_MODEL, DEFAULT_DIMENSION
+    url = "http://localhost:8012/v1/models"
+    
+    # Try to fetch model info from embedding service API with retry/backoff
+    for attempt in range(max_retries):
+        should_retry = False
+        
+        try:
+            with urllib.request.urlopen(url, timeout=request_timeout) as response:
+                # Check if we got a successful response
+                if response.status != 200:
+                    # Non-200 response should trigger retry
+                    should_retry = True
+                else:
+                    data = json.loads(response.read().decode("utf-8"))
+                    # Check if we got valid data
+                    if data.get("data") and len(data["data"]) > 0:
+                        model_name = data["data"][0].get("id")
+                        if model_name:
+                            dimension = MODEL_DIMENSIONS.get(model_name, DEFAULT_DIMENSION)
+                            return model_name, dimension
+                    # Got 200 but incomplete/invalid data - retry
+                    should_retry = True
+                    
+        except Exception:
+            # Any exception should trigger retry
+            should_retry = True
+        
+        # If we need to retry and haven't exhausted attempts, backoff and continue
+        if should_retry:
+            if attempt == max_retries - 1:
+                # Last attempt failed, fall back to defaults
+                return DEFAULT_MODEL, DEFAULT_DIMENSION
+            
+            # Calculate backoff time with exponential increase
+            backoff_time = initial_backoff * (backoff_multiplier ** attempt)
+            time.sleep(backoff_time)
+    
+    # Fallback if we somehow exit the loop without returning
+    return DEFAULT_MODEL, DEFAULT_DIMENSION
 
 
 def clean_spill(path: str):
