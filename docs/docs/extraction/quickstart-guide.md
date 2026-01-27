@@ -12,7 +12,7 @@ Use the provided [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If preferred, you can run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you can configure.
+If you prefer, you can run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you can configure.
 
 a. Git clone the repo:
 
