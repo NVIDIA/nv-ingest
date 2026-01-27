@@ -44,7 +44,7 @@ d. Create a .env file that contains your NVIDIA Build API key.
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
    
-e. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+e. Make sure that NVIDIA is set as your default container runtime before you run the docker compose command by running the following code.
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
