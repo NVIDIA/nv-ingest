@@ -44,12 +44,17 @@ active:
       - service: nv-ingest-milvus
         local_port: 9091
         remote_port: 9091
+      - service: nv-ingest-minio
+        local_port: 9000
+        remote_port: 9000
       - service: "*embed*"  # Wildcard pattern to match embedding services
         local_port: 8012
         remote_port: 8000
-    # values:  # Optional: inline Helm values
-    #   api.enabled: true
-    #   redis.enabled: true
+      - service: "*rerank*"  # Wildcard pattern to match reranker services
+        local_port: 8020
+        remote_port: 8000
+    values:  # inline Helm values
+      nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled: true
 
   # Runtime configuration
   sparse: false  # Use sparse embeddings
