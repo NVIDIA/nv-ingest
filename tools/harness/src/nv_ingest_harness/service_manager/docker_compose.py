@@ -82,13 +82,14 @@ class DockerComposeManager(ServiceManager):
 
         return 0
 
-    def check_readiness(self, timeout_s: int, check_milvus: bool = True) -> bool:
+    def check_readiness(self, timeout_s: int, check_milvus: bool = True, check_embedding: bool = True) -> bool:
         """
         Poll the health endpoint until ready.
 
         Args:
             timeout_s: Timeout in seconds
             check_milvus: If True, also check Milvus health endpoint
+            check_embedding: If True, also check embedding service health endpoint
 
         Returns:
             True if ready, False on timeout
@@ -101,17 +102,31 @@ class DockerComposeManager(ServiceManager):
                 # Check main service health
                 with urllib.request.urlopen(url, timeout=5) as resp:
                     if resp.status == 200:
+                        all_services_ready = True
+
                         # If Milvus check is enabled, verify it's also ready
                         if check_milvus:
                             hostname = getattr(self.config, "hostname", "localhost")
                             milvus_url = f"http://{hostname}:9091/healthz"
                             try:
                                 with urllib.request.urlopen(milvus_url, timeout=5) as milvus_resp:
-                                    if milvus_resp.status == 200:
-                                        return True
+                                    if milvus_resp.status != 200:
+                                        all_services_ready = False
                             except Exception:
-                                pass
-                        else:
+                                all_services_ready = False
+
+                        # If embedding check is enabled, verify it's also ready
+                        if check_embedding:
+                            hostname = getattr(self.config, "hostname", "localhost")
+                            embedding_url = f"http://{hostname}:8012/v1/health/ready"
+                            try:
+                                with urllib.request.urlopen(embedding_url, timeout=5) as embedding_resp:
+                                    if embedding_resp.status != 200:
+                                        all_services_ready = False
+                            except Exception:
+                                all_services_ready = False
+
+                        if all_services_ready:
                             return True
             except Exception:
                 pass
