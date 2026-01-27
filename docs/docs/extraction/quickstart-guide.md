@@ -143,7 +143,7 @@ This command opens a shell in the `/workspace` directory, where the `DATASET_ROO
 ```
 From this prompt, you can run the described `nv-ingest` CLI and Python examples.
 
-Because many service URIs default to localhost, running inside the `nv-ingest` container also requires specifying URIs manually so services can communicate across containers on the internal Docker network. See the example below for how to set the `milvus_uri`.
+Because many service URIs default to localhost, running inside the `nv-ingest` container also requires that you specify URIs manually so that services can communicate across containers on the internal Docker network. See the example following for how to set the `milvus_uri`.
 
 ## Step 3: Ingest Documents
 
