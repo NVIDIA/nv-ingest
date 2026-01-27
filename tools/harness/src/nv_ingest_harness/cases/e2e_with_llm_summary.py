@@ -93,6 +93,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Embed model: {model_name}, dim: {dense_dim}")
     print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
+    print(f"VDB Backend: {config.vdb_backend}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")

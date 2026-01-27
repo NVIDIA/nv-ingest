@@ -33,7 +33,23 @@ class TestConfig:
     # Infrastructure
     hostname: str = "localhost"
     readiness_timeout: int = 600
-    profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])
+    profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])  # Docker Compose only
+
+    # Deployment configuration
+    deployment_type: str = "compose"  # Options: compose, helm
+
+    # Helm-specific configuration
+    helm_bin: str = "helm"  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
+    helm_sudo: bool = False  # Prepend sudo to helm commands (useful for microk8s, k3s)
+    kubectl_bin: str = "kubectl"  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
+    kubectl_sudo: Optional[bool] = None  # Prepend sudo to kubectl commands (defaults to helm_sudo if not set)
+    helm_chart: Optional[str] = None  # Remote chart reference (e.g., "nim-nvstaging/nv-ingest"), None = use local chart
+    helm_chart_version: Optional[str] = None  # Chart version (e.g., "26.1.0-RC7")
+    helm_release: str = "nv-ingest"
+    helm_namespace: str = "nv-ingest"
+    helm_values_file: Optional[str] = None
+    helm_values: Optional[dict] = None
+    helm_port_forwards: Optional[List[dict]] = None  # List of {service, local_port, remote_port}
 
     # Runtime configuration
     sparse: bool = True
@@ -106,6 +122,10 @@ class TestConfig:
         # Check api_version is valid
         if self.api_version not in ["v1", "v2"]:
             errors.append(f"api_version must be 'v1' or 'v2', got '{self.api_version}'")
+
+        # Check deployment_type is valid
+        if self.deployment_type not in ["compose", "helm"]:
+            errors.append(f"deployment_type must be 'compose' or 'helm', got '{self.deployment_type}'")
 
         # Check reranker_mode is valid
         if self.reranker_mode not in ["none", "with", "both"]:
@@ -188,6 +208,27 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
     if not config_dict:
         raise ValueError("Config file must have 'active' section")
 
+    # Flatten nested deployment configurations (compose and helm)
+    # This allows cleaner YAML organization while keeping flat config structure
+    if "compose" in config_dict:
+        compose_config = config_dict.pop("compose")
+        if isinstance(compose_config, dict):
+            # Keys from compose section are used as-is (e.g., profiles)
+            for key, value in compose_config.items():
+                config_dict[key] = value
+
+    if "helm" in config_dict:
+        helm_config = config_dict.pop("helm")
+        if isinstance(helm_config, dict):
+            # Map helm section keys to their config field names
+            for key, value in helm_config.items():
+                # Keys that already have a prefix (kubectl_*) don't need helm_ prefix
+                if key.startswith("kubectl_"):
+                    config_dict[key] = value
+                else:
+                    # Other keys get helm_ prefix
+                    config_dict[f"helm_{key}"] = value
+
     # Merge recall section when running recall test cases
     # The recall section provides additional configuration for recall evaluation
     if case in ("recall", "e2e_recall"):
@@ -264,6 +305,16 @@ def _load_env_overrides() -> dict:
         "HOSTNAME": ("hostname", str),
         "READINESS_TIMEOUT": ("readiness_timeout", parse_int),
         "PROFILES": ("profiles", parse_list),
+        "DEPLOYMENT_TYPE": ("deployment_type", str),
+        "HELM_BIN": ("helm_bin", str),
+        "HELM_SUDO": ("helm_sudo", parse_bool),
+        "KUBECTL_BIN": ("kubectl_bin", str),
+        "KUBECTL_SUDO": ("kubectl_sudo", parse_bool),
+        "HELM_CHART": ("helm_chart", str),
+        "HELM_CHART_VERSION": ("helm_chart_version", str),
+        "HELM_RELEASE": ("helm_release", str),
+        "HELM_NAMESPACE": ("helm_namespace", str),
+        "HELM_VALUES_FILE": ("helm_values_file", str),
         "SPARSE": ("sparse", parse_bool),
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),

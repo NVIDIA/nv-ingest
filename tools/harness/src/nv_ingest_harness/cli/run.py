@@ -6,18 +6,15 @@ from pathlib import Path
 import click
 
 from nv_ingest_harness.config import load_config
+from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
-from nv_ingest_harness.utils.docker import (
-    stop_services,
-    start_services,
-    readiness_wait,
-)
 from nv_ingest_harness.utils.session import (
     create_session_dir,
     get_artifact_path,
     write_session_summary,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 
 
@@ -25,6 +22,7 @@ def run_datasets(
     case,
     dataset_list,
     managed,
+    deployment_type,
     no_build,
     keep_up,
     doc_analysis,
@@ -32,6 +30,7 @@ def run_datasets(
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
+    service_manager = None
     session_summary_path = None
 
     # Start services once if managed mode
@@ -40,23 +39,21 @@ def run_datasets(
         first_config = load_config(
             case=case,
             dataset=dataset_list[0],
+            deployment_type=deployment_type,
         )
 
-        # Start services
-        profile_list = first_config.profiles
-        if not profile_list:
-            print("No profiles specified")
-            return 1
+        # Create appropriate service manager based on config
+        service_manager = create_service_manager(first_config, REPO_ROOT)
 
-        build = not no_build
-        if start_services(profiles=profile_list, build=build) != 0:
+        # Start services
+        if service_manager.start(no_build=no_build) != 0:
             print("Failed to start services")
             return 1
 
         # Wait for readiness
-        if not readiness_wait(first_config.readiness_timeout):
+        if not service_manager.check_readiness(first_config.readiness_timeout):
             print("Services failed to become ready")
-            stop_services()
+            service_manager.stop()
             return 1
 
     # Run each dataset
@@ -70,6 +67,7 @@ def run_datasets(
             config = load_config(
                 case=case,
                 dataset=dataset_name,
+                deployment_type=deployment_type,
             )
         except (FileNotFoundError, ValueError) as e:
             print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
@@ -176,9 +174,22 @@ def run_datasets(
             }
         )
 
-    # Stop services if managed mode and not keeping up
-    if managed and not keep_up:
-        stop_services()
+    # Cleanup managed services
+    if managed and service_manager:
+        # Always cleanup port forwards (prevents orphaned processes)
+        if hasattr(service_manager, "_stop_port_forwards"):
+            service_manager._stop_port_forwards()
+
+        # Only uninstall services if not keeping up
+        if not keep_up:
+            service_manager.stop()
+        else:
+            print("\n" + "=" * 60)
+            print("Services are kept running (--keep-up enabled)")
+            print("Port forwards have been cleaned up to prevent orphaned processes.")
+            if hasattr(service_manager, "print_port_forward_commands"):
+                service_manager.print_port_forward_commands()
+            print("=" * 60)
 
     # Write session summary if using a session
     if session_dir:
@@ -274,8 +285,12 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
 @click.command()
 @click.option("--case", default="e2e", help="Test case name to run")
+@click.option("--managed", is_flag=True, help="Manage services (start/stop). Default: attach to existing services")
 @click.option(
-    "--managed", is_flag=True, help="Manage Docker services (start/stop). Default: attach to existing services"
+    "--deployment-type",
+    type=click.Choice(["compose", "helm"], case_sensitive=False),
+    default="compose",
+    help="Deployment type for managed services (managed mode only)",
 )
 @click.option(
     "--dataset", help="Dataset name(s) - single name, comma-separated list, or path (e.g., bo767 or bo767,earnings)"
@@ -298,6 +313,7 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 def main(
     case,
     managed,
+    deployment_type,
     dataset,
     no_build,
     keep_up,
@@ -331,6 +347,7 @@ def main(
         case=case,
         dataset_list=dataset_list,
         managed=managed,
+        deployment_type=deployment_type,
         no_build=no_build,
         keep_up=keep_up,
         doc_analysis=doc_analysis,
