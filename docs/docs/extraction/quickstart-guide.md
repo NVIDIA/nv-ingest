@@ -136,7 +136,7 @@ To work inside the container, run the following code.
 ```bash
 docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
 ```
-This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment includes all necessary Python client libraries, indicated by the prompt:
+This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment includes all necessary Python client libraries. You should see a prompt similar to the following.
 
 ```bash
 (nv_ingest_runtime) root@aba77e2a4bde:/workspace#
