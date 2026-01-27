@@ -41,10 +41,8 @@ sinks:
     retention_days: 90  # Auto-prune runs older than 90 days
 
 # Infrastructure
+# Note: Infrastructure settings (compose/helm profiles, readiness_timeout, etc.)
+# are configured in test_configs.yaml under the 'active' section.
+# This section only contains nightly-specific settings.
 infrastructure:
-  fresh_start: true  # Run nv-clean && nv-start before benchmarks
-  readiness_timeout: 600  # Seconds to wait for services to be ready
-  profiles:  # Docker compose profiles to start
-    - retrieval
-    - table-structure
-    - reranker  # Required for recall evaluation
+  fresh_start: true  # Restart services before running nightly benchmarks (mutually exclusive with --managed)
