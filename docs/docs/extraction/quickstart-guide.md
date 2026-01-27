@@ -22,7 +22,7 @@ b. Change the directory to the cloned repo by running the following code.
    
     `cd nv-ingest`.
 
-c. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+c. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `docker login` command.
 
     ```shell
     # This is required to access pre-built containers and NIM microservices
