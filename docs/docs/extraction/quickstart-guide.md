@@ -18,7 +18,7 @@ a. Git clone the repo:
 
     `git clone https://github.com/nvidia/nv-ingest`
 
-b. Change the directory to the cloned repo
+b. Change the directory to the cloned repo by running the following code.
    
     `cd nv-ingest`.
 
