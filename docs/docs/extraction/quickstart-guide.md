@@ -1,6 +1,6 @@
 # Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
 
-This guide help you get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
+This guide helps you get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
 
 ## Step 1: Start Containers
