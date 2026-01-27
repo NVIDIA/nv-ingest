@@ -351,21 +351,25 @@ def main(
         for sink in sinks:
             sink.process_result(result)
 
-    # Cleanup managed services if needed
-    if managed and service_manager:
-        # Always cleanup port forwards (prevents orphaned processes)
+    # Cleanup services and port forwards if needed
+    if service_manager:
+        # Always cleanup port forwards for helm deployments (prevents orphaned processes)
         if hasattr(service_manager, "_stop_port_forwards"):
             service_manager._stop_port_forwards()
 
-        # Only stop services if not keeping up
-        if not keep_up:
+        if managed and not keep_up:
+            # Stop services in managed mode without keep_up
             print("\n" + "=" * 60)
             print("Stopping managed services")
             print("=" * 60)
             service_manager.stop()
         else:
+            # Services are kept running (managed with keep_up, or fresh_start)
             print("\n" + "=" * 60)
-            print("Services are kept running (--keep-up enabled)")
+            if managed:
+                print("Services are kept running (--keep-up enabled)")
+            else:
+                print("Services are running (fresh_start mode)")
             print("Port forwards have been cleaned up to prevent orphaned processes.")
             if hasattr(service_manager, "print_port_forward_commands"):
                 service_manager.print_port_forward_commands()
