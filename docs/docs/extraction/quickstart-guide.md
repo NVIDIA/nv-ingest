@@ -129,7 +129,7 @@ pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 
 !!! note
 
-Interaction from the host requires the appropriate port to be exposed from the `nv-ingest` container, as defined in the `docker-compose.yaml` file. If preferred, you can disable this exposed port and interact directly with the NV-Ingest service from within its container.
+Interaction from the host requires the appropriate port to be exposed from the `nv-ingest` container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the NV-Ingest service from within its container.
 
 To work inside the container, run the following code.
 
