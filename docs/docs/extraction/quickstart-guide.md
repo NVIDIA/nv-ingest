@@ -113,7 +113,7 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
 You can interact with the NV-Ingest service from the host, or by using `docker exec` to run commands in the NV-Ingest container.
 
-To interact from the host, you'll need a Python environment with the installed the client dependencies:
+To interact from the host, you'll need a Python environment that has the client dependencies installed. For example, you can use a Conda environment.
 
 ```
 # conda not required but makes it easy to create a fresh Python environment
