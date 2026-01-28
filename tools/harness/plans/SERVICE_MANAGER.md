@@ -28,12 +28,18 @@ tools/harness/src/nv_ingest_harness/service_manager/
    - `restart(build: bool, clean: bool, timeout: int) -> int`: Restart services (stop, start, wait for readiness)
    - `check_readiness(timeout_s: int, check_milvus: bool) -> bool`: Poll for service readiness
    - `get_service_url(service: str) -> str`: Get service endpoint URLs
+   - `dump_logs(artifacts_dir: Path) -> int`: Dump service logs to artifacts directory (abstract method)
 
 2. **DockerComposeManager (docker_compose.py)**: Manages services using Docker Compose
    - Uses profiles from config to enable/disable service groups
    - Supports `--no-build` flag to skip building Docker images
    - Polls health endpoint for main service and optionally Milvus
    - Cleans up containers and volumes on stop
+   - **SKU Override Support**: Accepts `sku` parameter to load GPU-specific override files
+   - **Log Dumping**: Implements `dump_logs()` to capture container logs
+     - Dumps individual container logs: `container_<name>.log`
+     - Dumps combined logs: `docker_compose_combined.log`
+     - Includes timestamps and handles errors gracefully
 
 3. **HelmManager (helm.py)**: Manages services using Helm
    - Installs/upgrades Helm releases with version support
@@ -44,8 +50,199 @@ tools/harness/src/nv_ingest_harness/service_manager/
    - **Auto-restart**: Port-forwards automatically restart on pod restarts/failures
    - **Cleanup**: Port-forwards always cleaned up (even with `--keep-up`)
    - Polls health endpoint for readiness
+   - **Log Dumping**: Implements `dump_logs()` to capture pod logs
+     - Dumps logs for each container in each pod: `pod_<name>_<container>.log`
+     - Captures previous logs if container restarted: `pod_<name>_<container>_previous.log`
+     - Dumps pod status: `pod_status.txt`
+     - Dumps pod events: `pod_events.txt`
+     - Includes timestamps and handles multi-container pods
 
 4. **create_service_manager()**: Factory function that creates the appropriate manager based on `deployment_type` config
+   - Accepts `sku` parameter for Docker Compose GPU-specific overrides
+   - Passes `sku` to `DockerComposeManager` constructor
+
+## SKU Override Support
+
+The service manager supports GPU-specific configuration overrides for Docker Compose deployments via the `--sku` CLI option.
+
+### Implementation Details
+
+#### CLI Layer (`cli/run.py`, `cli/nightly.py`)
+- Both CLIs accept `--sku` parameter (e.g., `--sku=a10g`)
+- Parameter is passed through to `create_service_manager()`
+- Subprocess calls (in nightly.py) include `--sku` argument
+
+#### Service Manager Factory (`service_manager/__init__.py`)
+- `create_service_manager()` accepts `sku` parameter
+- Passes `sku` to `DockerComposeManager` constructor
+- Ignored for Helm deployments (only applies to Docker Compose)
+
+#### Docker Compose Manager (`service_manager/docker_compose.py`)
+- Accepts `sku` parameter in `__init__()`
+- Checks for override file: `docker-compose.<sku>.yaml`
+- Prints warning if specified but not found
+- Uses `_build_compose_cmd()` helper to construct commands
+- All docker compose commands include override file via multiple `-f` flags
+
+### SKU Parameter Flow
+
+```
+CLI (run.py/nightly.py)
+  └─> --sku=a10g
+       └─> create_service_manager(config, repo_root, sku)
+            └─> DockerComposeManager(config, repo_root, sku)
+                 └─> Check: docker-compose.a10g.yaml exists?
+                      └─> _build_compose_cmd() adds: -f docker-compose.yaml -f docker-compose.a10g.yaml
+                           └─> Used by: start(), stop(), dump_logs()
+```
+
+### Available SKU Override Files
+- `docker-compose.a10g.yaml` - NVIDIA A10G GPU settings
+- `docker-compose.a100-40gb.yaml` - NVIDIA A100 40GB GPU settings
+- `docker-compose.l40s.yaml` - NVIDIA L40S GPU settings
+
+### Usage Examples
+
+```bash
+# Run with A10G GPU settings
+python -m nv_ingest_harness.cli.run \
+  --dataset=bo767 \
+  --case=e2e \
+  --managed \
+  --deployment-type=compose \
+  --sku=a10g
+
+# Nightly benchmarks with L40S settings
+python -m nv_ingest_harness.cli.nightly \
+  --deployment-type=compose \
+  --managed \
+  --sku=l40s
+```
+
+### Override File Structure
+
+Override files typically contain GPU-specific tuning parameters:
+
+```yaml
+# docker-compose.a10g.yaml
+services:
+  page-elements:
+    environment:
+      - NIM_TRITON_MAX_BATCH_SIZE=1
+  
+  graphic-elements:
+    environment:
+      - NIM_TRITON_MAX_BATCH_SIZE=1
+  
+  embedding:
+    environment:
+      - NIM_TRITON_MAX_SEQ_LENGTH=128
+```
+
+Docker Compose automatically merges the base file with the override file, with the override taking precedence.
+
+## Service Log Dumping
+
+The service manager automatically captures logs from managed services to the artifacts directory when tests complete.
+
+### Implementation Details
+
+#### Base Service Manager (`service_manager/base.py`)
+- Added abstract method `dump_logs(artifacts_dir: Path) -> int`
+- Required for all service manager implementations
+- Returns exit code (0 = success)
+
+#### Docker Compose Log Dumping (`service_manager/docker_compose.py`)
+- Lists all containers using `docker compose ps -q`
+- Dumps individual container logs with container names: `container_<name>.log`
+- Dumps combined logs from all services: `docker_compose_combined.log`
+- Includes timestamps and handles errors gracefully
+- Uses `docker logs` for individual containers and `docker compose logs` for combined output
+- Timeouts: 60s per container, 120s for combined logs
+- Continues on errors to ensure cleanup completes
+
+#### Helm Log Dumping (`service_manager/helm.py`)
+- Lists all pods in namespace using `kubectl get pods`
+- Dumps logs for each container in each pod: `pod_<name>_<container>.log`
+- Captures previous logs if container restarted: `pod_<name>_<container>_previous.log`
+- Dumps pod status: `pod_status.txt`
+- Dumps pod events: `pod_events.txt`
+- Includes timestamps in all logs
+- Handles multi-container pods correctly
+- Timeouts: 60s per container/pod, 120s for status/events
+- Continues on errors to ensure cleanup completes
+
+#### CLI Integration (`cli/run.py`, `cli/nightly.py`)
+
+**run.py:**
+- Determines log directory:
+  - `<session_dir>/service_logs/` if using session directory
+  - `<artifact_dir>/service_logs/` as fallback
+  - Timestamped directory in artifacts root if no other location available
+- Calls `service_manager.dump_logs(logs_dir)` before stopping services
+- Log dumping occurs before port-forward cleanup and service shutdown
+
+**nightly.py:**
+- Dumps logs to `<session_dir>/service_logs/`
+- Integrated into existing service lifecycle management
+- Logs captured before cleanup in main orchestration loop
+
+### Log Directory Structure
+
+#### Docker Compose
+```
+service_logs/
+├── container_nv-ingest-1.log
+├── container_redis-1.log
+├── container_milvus-standalone-1.log
+├── container_embedding-1.log
+└── docker_compose_combined.log
+```
+
+#### Helm (Kubernetes)
+```
+service_logs/
+├── pod_nv-ingest-ms-runtime-abc123_nv-ingest.log
+├── pod_nv-ingest-ms-runtime-abc123_nv-ingest_previous.log
+├── pod_redis-master-0_redis.log
+├── pod_milvus-standalone-xyz789_milvus.log
+├── pod_status.txt
+└── pod_events.txt
+```
+
+### Usage Examples
+
+Log dumping happens automatically when running in managed mode:
+
+```bash
+# Single dataset with managed services
+python -m nv_ingest_harness.cli.run --case=e2e --dataset=bo767 --managed --deployment-type=compose
+# Logs saved to: artifacts/bo767_compose_<timestamp>/service_logs/
+
+# Multiple datasets with session directory
+python -m nv_ingest_harness.cli.run --case=e2e --dataset=bo767,earnings --managed --session-name=test_session
+# Logs saved to: artifacts/test_session/service_logs/
+
+# Nightly benchmarks with Helm
+python -m nv_ingest_harness.cli.nightly --managed --deployment-type=helm
+# Logs saved to: artifacts/nightly_<timestamp>/service_logs/
+```
+
+### Benefits
+
+1. **Debugging**: Complete service logs preserved for post-mortem analysis
+2. **Automatic**: No manual log collection needed
+3. **Organized**: Logs stored with test artifacts for easy correlation
+4. **Comprehensive**: Captures all container/pod logs, statuses, and events
+5. **Failure Analysis**: Helps diagnose infrastructure issues in test failures
+6. **Non-blocking**: Continues on errors to ensure cleanup completes
+
+### Error Handling
+
+- Timeouts handled with subprocess timeout parameters
+- Missing or failed log captures print warnings but don't fail the test
+- Directory creation errors handled gracefully
+- Process errors (return codes) logged but don't stop cleanup
 
 ## Configuration
 
@@ -67,7 +264,7 @@ active:
   # Docker Compose-specific settings
   profiles:
     - retrieval
-    - table-structure
+    - reranker
     # Add other profiles as needed
   
   hostname: localhost  # Default hostname for service URLs
@@ -124,6 +321,7 @@ The service manager is controlled via CLI flags:
 - `--deployment-type=<type>`: Set deployment type (`compose` or `helm`)
   - Overrides `deployment_type` in YAML config
   - Defaults to `compose` if not specified in either place
+- `--sku=<sku>`: GPU-specific override file for Docker Compose (e.g., `a10g`, `l40s`, `a100-40gb`)
 - `--no-build`: Skip building Docker images (Docker Compose only)
 - `--keep-up`: Keep services running after test completes (does not apply to port-forwards)
 - `--doc-analysis`: Show per-document element breakdown in results
@@ -136,6 +334,9 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 
 # Explicitly specify Docker Compose (same as default)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=compose
+
+# With GPU-specific settings (SKU override)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
 
 # Skip rebuilding images
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
@@ -334,8 +535,7 @@ Uses `profiles` to enable/disable service groups defined in `docker-compose.yaml
 ```yaml
 profiles:
   - retrieval
-  - table-structure
-  - embedding
+  - reranker
 ```
 
 These map to services marked with `profiles:` in the Docker Compose file.

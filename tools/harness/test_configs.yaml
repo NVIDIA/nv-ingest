@@ -19,7 +19,6 @@ active:
   compose:
     profiles:
       - retrieval
-      - table-structure
       - reranker  # Required for recall evaluation
 
   # Helm configuration
@@ -28,7 +27,7 @@ active:
     sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
     kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
     kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
-    chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
+    chart: nemo-microservices/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
     chart_version: 26.1.2  # Chart version (required for remote charts)
     release: nv-ingest
     namespace: nv-ingest

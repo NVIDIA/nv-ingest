@@ -586,3 +586,144 @@ done
         if service == "health":
             return f"http://{hostname}:7670/v1/health/ready"
         return f"http://{hostname}:7670"
+
+    def dump_logs(self, artifacts_dir: Path) -> int:
+        """
+        Dump logs of all Helm-managed pods to artifacts directory.
+
+        Args:
+            artifacts_dir: Directory to write log files to
+
+        Returns:
+            0 on success, non-zero on failure
+        """
+        print(f"Dumping Helm pod logs to {artifacts_dir}...")
+
+        # Ensure artifacts directory exists
+        artifacts_dir = Path(artifacts_dir)
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get list of pods in the namespace
+        get_pods_cmd = self.kubectl_cmd + [
+            "get",
+            "pods",
+            "-n",
+            self.namespace,
+            "-o",
+            'jsonpath={range .items[*]}{.metadata.name}{"\\n"}{end}',
+        ]
+
+        try:
+            result = subprocess.run(get_pods_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"Warning: Could not list pods: {result.stderr.strip()}")
+                return result.returncode
+
+            pod_names = [name.strip() for name in result.stdout.strip().split("\n") if name.strip()]
+
+            if not pod_names:
+                print(f"No pods found in namespace {self.namespace}")
+                return 0
+
+            print(f"Found {len(pod_names)} pod(s) to dump logs from")
+
+            # Dump logs for each pod
+            for pod_name in pod_names:
+                # Get containers in the pod
+                get_containers_cmd = self.kubectl_cmd + [
+                    "get",
+                    "pod",
+                    pod_name,
+                    "-n",
+                    self.namespace,
+                    "-o",
+                    "jsonpath={.spec.containers[*].name}",
+                ]
+                containers_result = subprocess.run(get_containers_cmd, capture_output=True, text=True, timeout=10)
+
+                if containers_result.returncode != 0:
+                    print(f"  Warning: Could not list containers for pod {pod_name}")
+                    container_names = [""]  # Try to get logs without specifying container
+                else:
+                    container_names = containers_result.stdout.strip().split()
+
+                # Dump logs for each container in the pod
+                for container_name in container_names:
+                    if container_name:
+                        log_file = artifacts_dir / f"pod_{pod_name}_{container_name}.log"
+                        print(f"  Dumping logs for pod {pod_name}, container {container_name} to {log_file.name}")
+                        logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "-c",
+                            container_name,
+                            "--timestamps",
+                        ]
+                    else:
+                        log_file = artifacts_dir / f"pod_{pod_name}.log"
+                        print(f"  Dumping logs for pod {pod_name} to {log_file.name}")
+                        logs_cmd = self.kubectl_cmd + ["logs", pod_name, "-n", self.namespace, "--timestamps"]
+
+                    with open(log_file, "w") as f:
+                        log_result = subprocess.run(logs_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=60)
+                        if log_result.returncode != 0:
+                            print(f"    Warning: Failed to dump logs for {pod_name}/{container_name or 'default'}")
+
+                    # Also try to get previous logs if container restarted
+                    if container_name:
+                        prev_log_file = artifacts_dir / f"pod_{pod_name}_{container_name}_previous.log"
+                        prev_logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "-c",
+                            container_name,
+                            "--previous",
+                            "--timestamps",
+                        ]
+                    else:
+                        prev_log_file = artifacts_dir / f"pod_{pod_name}_previous.log"
+                        prev_logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "--previous",
+                            "--timestamps",
+                        ]
+
+                    # Try to get previous logs (will fail if container hasn't restarted)
+                    prev_result = subprocess.run(
+                        prev_logs_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60
+                    )
+                    if prev_result.returncode == 0 and prev_result.stdout:
+                        with open(prev_log_file, "wb") as f:
+                            f.write(prev_result.stdout)
+                        print(f"    Also dumped previous logs to {prev_log_file.name}")
+
+            # Dump pod status information
+            status_file = artifacts_dir / "pod_status.txt"
+            print(f"  Dumping pod status to {status_file.name}")
+            status_cmd = self.kubectl_cmd + ["get", "pods", "-n", self.namespace, "-o", "wide"]
+            with open(status_file, "w") as f:
+                subprocess.run(status_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+
+            # Dump pod events
+            events_file = artifacts_dir / "pod_events.txt"
+            print(f"  Dumping pod events to {events_file.name}")
+            events_cmd = self.kubectl_cmd + ["get", "events", "-n", self.namespace, "--sort-by=.lastTimestamp"]
+            with open(events_file, "w") as f:
+                subprocess.run(events_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+
+            print("Log dump complete")
+            return 0
+
+        except subprocess.TimeoutExpired:
+            print("Error: Timeout while dumping logs")
+            return 1
+        except Exception as e:
+            print(f"Error: Failed to dump logs: {e}")
+            return 1
