@@ -1,5 +1,6 @@
 """Helm service manager implementation."""
 
+import json
 import os
 import signal
 import subprocess
@@ -7,12 +8,69 @@ import time
 import urllib.request
 from pathlib import Path
 
+import yaml
+
 from nv_ingest_harness.service_manager.base import ServiceManager
 from nv_ingest_harness.utils.interact import run_cmd
 
 
 class HelmManager(ServiceManager):
     """Manages services using Helm."""
+
+    @staticmethod
+    def _flatten_dict(data: dict, parent_key: str = "", sep: str = ".") -> dict:
+        """
+        Flatten a nested dictionary into dot-notation keys.
+
+        Args:
+            data: The dictionary to flatten
+            parent_key: The parent key prefix
+            sep: The separator to use between keys
+
+        Returns:
+            Flattened dictionary with dot-notation keys
+        """
+        items = []
+        for key, value in data.items():
+            new_key = f"{parent_key}{sep}{key}" if parent_key else key
+
+            if isinstance(value, dict):
+                items.extend(HelmManager._flatten_dict(value, new_key, sep=sep).items())
+            elif isinstance(value, list):
+                # For lists, we need to use indexed notation or JSON
+                # Store as-is for JSON encoding
+                items.append((new_key, value))
+            else:
+                items.append((new_key, value))
+        return dict(items)
+
+    @staticmethod
+    def _add_values_to_command(cmd: list, values_dict: dict) -> list:
+        """
+        Add values from a dictionary to a Helm command using --set and --set-json.
+
+        Args:
+            cmd: The command list to append to
+            values_dict: The flattened values dictionary
+
+        Returns:
+            Updated command list
+        """
+        for key, value in values_dict.items():
+            # Use --set-json for complex types (lists, dicts, booleans, null)
+            if isinstance(value, (list, dict)):
+                cmd += ["--set-json", f"{key}={json.dumps(value)}"]
+            elif isinstance(value, bool):
+                # Helm expects lowercase boolean strings
+                cmd += ["--set", f"{key}={str(value).lower()}"]
+            elif value is None:
+                cmd += ["--set-json", f"{key}=null"]
+            else:
+                # Use --set for simple strings and numbers
+                # Escape commas and backslashes in string values
+                str_value = str(value).replace("\\", "\\\\").replace(",", "\\,")
+                cmd += ["--set", f"{key}={str_value}"]
+        return cmd
 
     def __init__(self, config, repo_root: Path):
         """
@@ -79,11 +137,30 @@ class HelmManager(ServiceManager):
         if self.chart_version:
             cmd += ["--version", self.chart_version]
 
-        # Add values file if specified
+        # Parse and add values from YAML file if specified
         if self.values_file:
             values_path = self.repo_root / self.values_file
             if values_path.exists():
-                cmd += ["-f", str(values_path)]
+                try:
+                    print(f"Loading values from {values_path}...")
+                    with open(values_path, "r") as f:
+                        values_data = yaml.safe_load(f)
+
+                    if values_data:
+                        # Flatten the YAML structure
+                        flattened_values = self._flatten_dict(values_data)
+                        print(f"Parsed {len(flattened_values)} value(s) from {self.values_file}")
+
+                        # Add to command using --set and --set-json
+                        cmd = self._add_values_to_command(cmd, flattened_values)
+                    else:
+                        print(f"Warning: Values file {values_path} is empty")
+                except yaml.YAMLError as e:
+                    print(f"Error: Failed to parse YAML file {values_path}: {e}")
+                    return 1
+                except Exception as e:
+                    print(f"Error: Failed to read values file {values_path}: {e}")
+                    return 1
             else:
                 print(f"Warning: Values file {values_path} not found, skipping")
 
