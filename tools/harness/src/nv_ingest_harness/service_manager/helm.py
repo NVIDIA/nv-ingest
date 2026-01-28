@@ -1,5 +1,6 @@
 """Helm service manager implementation."""
 
+import json
 import os
 import signal
 import subprocess
@@ -7,12 +8,69 @@ import time
 import urllib.request
 from pathlib import Path
 
+import yaml
+
 from nv_ingest_harness.service_manager.base import ServiceManager
 from nv_ingest_harness.utils.interact import run_cmd
 
 
 class HelmManager(ServiceManager):
     """Manages services using Helm."""
+
+    @staticmethod
+    def _flatten_dict(data: dict, parent_key: str = "", sep: str = ".") -> dict:
+        """
+        Flatten a nested dictionary into dot-notation keys.
+
+        Args:
+            data: The dictionary to flatten
+            parent_key: The parent key prefix
+            sep: The separator to use between keys
+
+        Returns:
+            Flattened dictionary with dot-notation keys
+        """
+        items = []
+        for key, value in data.items():
+            new_key = f"{parent_key}{sep}{key}" if parent_key else key
+
+            if isinstance(value, dict):
+                items.extend(HelmManager._flatten_dict(value, new_key, sep=sep).items())
+            elif isinstance(value, list):
+                # For lists, we need to use indexed notation or JSON
+                # Store as-is for JSON encoding
+                items.append((new_key, value))
+            else:
+                items.append((new_key, value))
+        return dict(items)
+
+    @staticmethod
+    def _add_values_to_command(cmd: list, values_dict: dict) -> list:
+        """
+        Add values from a dictionary to a Helm command using --set and --set-json.
+
+        Args:
+            cmd: The command list to append to
+            values_dict: The flattened values dictionary
+
+        Returns:
+            Updated command list
+        """
+        for key, value in values_dict.items():
+            # Use --set-json for complex types (lists, dicts, booleans, null)
+            if isinstance(value, (list, dict)):
+                cmd += ["--set-json", f"{key}={json.dumps(value)}"]
+            elif isinstance(value, bool):
+                # Helm expects lowercase boolean strings
+                cmd += ["--set", f"{key}={str(value).lower()}"]
+            elif value is None:
+                cmd += ["--set-json", f"{key}=null"]
+            else:
+                # Use --set for simple strings and numbers
+                # Escape commas and backslashes in string values
+                str_value = str(value).replace("\\", "\\\\").replace(",", "\\,")
+                cmd += ["--set", f"{key}={str_value}"]
+        return cmd
 
     def __init__(self, config, repo_root: Path):
         """
@@ -79,11 +137,30 @@ class HelmManager(ServiceManager):
         if self.chart_version:
             cmd += ["--version", self.chart_version]
 
-        # Add values file if specified
+        # Parse and add values from YAML file if specified
         if self.values_file:
             values_path = self.repo_root / self.values_file
             if values_path.exists():
-                cmd += ["-f", str(values_path)]
+                try:
+                    print(f"Loading values from {values_path}...")
+                    with open(values_path, "r") as f:
+                        values_data = yaml.safe_load(f)
+
+                    if values_data:
+                        # Flatten the YAML structure
+                        flattened_values = self._flatten_dict(values_data)
+                        print(f"Parsed {len(flattened_values)} value(s) from {self.values_file}")
+
+                        # Add to command using --set and --set-json
+                        cmd = self._add_values_to_command(cmd, flattened_values)
+                    else:
+                        print(f"Warning: Values file {values_path} is empty")
+                except yaml.YAMLError as e:
+                    print(f"Error: Failed to parse YAML file {values_path}: {e}")
+                    return 1
+                except Exception as e:
+                    print(f"Error: Failed to read values file {values_path}: {e}")
+                    return 1
             else:
                 print(f"Warning: Values file {values_path} not found, skipping")
 
@@ -586,3 +663,211 @@ done
         if service == "health":
             return f"http://{hostname}:7670/v1/health/ready"
         return f"http://{hostname}:7670"
+
+    def dump_logs(self, artifacts_dir: Path) -> int:
+        """
+        Dump logs of all Helm-managed pods to artifacts directory.
+
+        Args:
+            artifacts_dir: Directory to write log files to
+
+        Returns:
+            0 on success, non-zero on failure
+        """
+        print(f"Dumping Helm pod logs to {artifacts_dir}...")
+
+        # Ensure artifacts directory exists
+        artifacts_dir = Path(artifacts_dir)
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get list of pods in the namespace
+        get_pods_cmd = self.kubectl_cmd + [
+            "get",
+            "pods",
+            "-n",
+            self.namespace,
+            "-o",
+            'jsonpath={range .items[*]}{.metadata.name}{"\\n"}{end}',
+        ]
+
+        try:
+            result = subprocess.run(get_pods_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"Warning: Could not list pods: {result.stderr.strip()}")
+                return result.returncode
+
+            pod_names = [name.strip() for name in result.stdout.strip().split("\n") if name.strip()]
+
+            if not pod_names:
+                print(f"No pods found in namespace {self.namespace}")
+                return 0
+
+            print(f"Found {len(pod_names)} pod(s) to dump logs from")
+
+            # Dump logs for each pod
+            for pod_name in pod_names:
+                # Get containers in the pod
+                get_containers_cmd = self.kubectl_cmd + [
+                    "get",
+                    "pod",
+                    pod_name,
+                    "-n",
+                    self.namespace,
+                    "-o",
+                    "jsonpath={.spec.containers[*].name}",
+                ]
+                containers_result = subprocess.run(get_containers_cmd, capture_output=True, text=True, timeout=10)
+
+                if containers_result.returncode != 0:
+                    print(f"  Warning: Could not list containers for pod {pod_name}")
+                    container_names = [""]  # Try to get logs without specifying container
+                else:
+                    container_names = containers_result.stdout.strip().split()
+
+                # Dump logs for each container in the pod
+                for container_name in container_names:
+                    if container_name:
+                        log_file = artifacts_dir / f"pod_{pod_name}_{container_name}.log"
+                        print(f"  Dumping logs for pod {pod_name}, container {container_name} to {log_file.name}")
+                        logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "-c",
+                            container_name,
+                            "--timestamps",
+                        ]
+                    else:
+                        log_file = artifacts_dir / f"pod_{pod_name}.log"
+                        print(f"  Dumping logs for pod {pod_name} to {log_file.name}")
+                        logs_cmd = self.kubectl_cmd + ["logs", pod_name, "-n", self.namespace, "--timestamps"]
+
+                    with open(log_file, "w") as f:
+                        log_result = subprocess.run(logs_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=60)
+                        if log_result.returncode != 0:
+                            print(f"    Warning: Failed to dump logs for {pod_name}/{container_name or 'default'}")
+
+                    # Also try to get previous logs if container restarted
+                    if container_name:
+                        prev_log_file = artifacts_dir / f"pod_{pod_name}_{container_name}_previous.log"
+                        prev_logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "-c",
+                            container_name,
+                            "--previous",
+                            "--timestamps",
+                        ]
+                    else:
+                        prev_log_file = artifacts_dir / f"pod_{pod_name}_previous.log"
+                        prev_logs_cmd = self.kubectl_cmd + [
+                            "logs",
+                            pod_name,
+                            "-n",
+                            self.namespace,
+                            "--previous",
+                            "--timestamps",
+                        ]
+
+                    # Try to get previous logs (will fail if container hasn't restarted)
+                    prev_result = subprocess.run(
+                        prev_logs_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60
+                    )
+                    if prev_result.returncode == 0 and prev_result.stdout:
+                        with open(prev_log_file, "wb") as f:
+                            f.write(prev_result.stdout)
+                        print(f"    Also dumped previous logs to {prev_log_file.name}")
+
+            # Dump pod status information
+            status_file = artifacts_dir / "pod_status.txt"
+            print(f"  Dumping pod status to {status_file.name}")
+            status_cmd = self.kubectl_cmd + ["get", "pods", "-n", self.namespace, "-o", "wide"]
+            with open(status_file, "w") as f:
+                subprocess.run(status_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+
+            # Dump pod events
+            events_file = artifacts_dir / "pod_events.txt"
+            print(f"  Dumping pod events to {events_file.name}")
+            events_cmd = self.kubectl_cmd + ["get", "events", "-n", self.namespace, "--sort-by=.lastTimestamp"]
+            with open(events_file, "w") as f:
+                subprocess.run(events_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+
+            # Dump environment variables for each pod
+            print("  Dumping pod environment variables...")
+            for pod_name in pod_names:
+                # Get containers in the pod
+                get_containers_cmd = self.kubectl_cmd + [
+                    "get",
+                    "pod",
+                    pod_name,
+                    "-n",
+                    self.namespace,
+                    "-o",
+                    "jsonpath={.spec.containers[*].name}",
+                ]
+                containers_result = subprocess.run(get_containers_cmd, capture_output=True, text=True, timeout=10)
+
+                if containers_result.returncode != 0:
+                    print(f"    Warning: Could not list containers for pod {pod_name}")
+                    container_names = []
+                else:
+                    container_names = containers_result.stdout.strip().split()
+
+                # Dump env vars for each container in the pod
+                for container_name in container_names:
+                    env_file = artifacts_dir / f"pod_{pod_name}_{container_name}_env.txt"
+                    print(f"    Dumping env vars for pod {pod_name}, container {container_name} to {env_file.name}")
+
+                    # Get environment variables using kubectl exec
+                    # Note: We use 'env' command which is typically available in most containers
+                    env_cmd = self.kubectl_cmd + [
+                        "exec",
+                        pod_name,
+                        "-n",
+                        self.namespace,
+                        "-c",
+                        container_name,
+                        "--",
+                        "env",
+                    ]
+
+                    with open(env_file, "w") as f:
+                        env_result = subprocess.run(env_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+                        if env_result.returncode != 0:
+                            # If exec fails, try to get env from pod spec instead
+                            print("      Warning: Could not exec into container, trying to get env from pod spec...")
+                            spec_env_cmd = self.kubectl_cmd + [
+                                "get",
+                                "pod",
+                                pod_name,
+                                "-n",
+                                self.namespace,
+                                "-o",
+                                f"jsonpath={{.spec.containers[?(@.name=='{container_name}')].env[*]}}",
+                            ]
+                            spec_result = subprocess.run(
+                                spec_env_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30
+                            )
+                            if spec_result.returncode == 0 and spec_result.stdout:
+                                with open(env_file, "wb") as spec_f:
+                                    spec_f.write(
+                                        b"# Environment variables from pod spec (may not include all runtime env "
+                                        b"vars)\n"
+                                    )
+                                    spec_f.write(spec_result.stdout)
+                                print(f"      Dumped env vars from pod spec to {env_file.name}")
+                            else:
+                                print(f"      Warning: Failed to dump env vars for {pod_name}/{container_name}")
+
+            print("Log dump complete")
+            return 0
+
+        except subprocess.TimeoutExpired:
+            print("Error: Timeout while dumping logs")
+            return 1
+        except Exception as e:
+            print(f"Error: Failed to dump logs: {e}")
+            return 1

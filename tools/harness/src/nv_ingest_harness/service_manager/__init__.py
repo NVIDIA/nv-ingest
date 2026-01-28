@@ -7,13 +7,14 @@ from nv_ingest_harness.service_manager.docker_compose import DockerComposeManage
 from nv_ingest_harness.service_manager.helm import HelmManager
 
 
-def create_service_manager(config, repo_root: Path) -> ServiceManager:
+def create_service_manager(config, repo_root: Path, sku: str | None = None) -> ServiceManager:
     """
     Factory to create the appropriate service manager based on config.
 
     Args:
         config: Configuration object with deployment_type attribute
         repo_root: Path to the repository root
+        sku: Optional GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s)
 
     Returns:
         ServiceManager instance (DockerComposeManager or HelmManager)
@@ -24,7 +25,7 @@ def create_service_manager(config, repo_root: Path) -> ServiceManager:
     deployment_type = getattr(config, "deployment_type", "compose")
 
     if deployment_type == "compose":
-        return DockerComposeManager(config, repo_root)
+        return DockerComposeManager(config, repo_root, sku=sku)
     elif deployment_type == "helm":
         return HelmManager(config, repo_root)
     else:

@@ -72,6 +72,19 @@ class ServiceManager(ABC):
         """
         pass
 
+    @abstractmethod
+    def dump_logs(self, artifacts_dir: Path) -> int:
+        """
+        Dump logs of all managed containers/pods to artifacts directory.
+
+        Args:
+            artifacts_dir: Directory to write log files to
+
+        Returns:
+            0 on success, non-zero on failure
+        """
+        pass
+
     def restart(self, build: bool = False, clean: bool = True, timeout: int = 600) -> int:
         """
         Restart services (stop, clean, start, wait for readiness).
