@@ -241,6 +241,33 @@ class DockerComposeManager(ServiceManager):
                 if combined_result.returncode != 0:
                     print("    Warning: Failed to dump combined logs")
 
+            # Dump environment variables for each container
+            print("  Dumping container environment variables...")
+            for container_id in container_ids:
+                # Get container name
+                inspect_cmd = ["docker", "inspect", "--format", "{{.Name}}", container_id]
+                name_result = subprocess.run(inspect_cmd, capture_output=True, text=True, timeout=10)
+                if name_result.returncode == 0:
+                    container_name = name_result.stdout.strip().lstrip("/")
+                else:
+                    container_name = container_id[:12]  # Use short ID as fallback
+
+                env_file = artifacts_dir / f"container_{container_name}_env.txt"
+                print(f"    Dumping env vars for {container_name} to {env_file.name}")
+
+                # Dump container environment variables using docker inspect
+                env_cmd = [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    "{{range .Config.Env}}{{println .}}{{end}}",
+                    container_id,
+                ]
+                with open(env_file, "w") as f:
+                    env_result = subprocess.run(env_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+                    if env_result.returncode != 0:
+                        print(f"      Warning: Failed to dump env vars for {container_name}")
+
             print("Log dump complete")
             return 0
 

@@ -718,6 +718,73 @@ done
             with open(events_file, "w") as f:
                 subprocess.run(events_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
 
+            # Dump environment variables for each pod
+            print("  Dumping pod environment variables...")
+            for pod_name in pod_names:
+                # Get containers in the pod
+                get_containers_cmd = self.kubectl_cmd + [
+                    "get",
+                    "pod",
+                    pod_name,
+                    "-n",
+                    self.namespace,
+                    "-o",
+                    "jsonpath={.spec.containers[*].name}",
+                ]
+                containers_result = subprocess.run(get_containers_cmd, capture_output=True, text=True, timeout=10)
+
+                if containers_result.returncode != 0:
+                    print(f"    Warning: Could not list containers for pod {pod_name}")
+                    container_names = []
+                else:
+                    container_names = containers_result.stdout.strip().split()
+
+                # Dump env vars for each container in the pod
+                for container_name in container_names:
+                    env_file = artifacts_dir / f"pod_{pod_name}_{container_name}_env.txt"
+                    print(f"    Dumping env vars for pod {pod_name}, container {container_name} to {env_file.name}")
+
+                    # Get environment variables using kubectl exec
+                    # Note: We use 'env' command which is typically available in most containers
+                    env_cmd = self.kubectl_cmd + [
+                        "exec",
+                        pod_name,
+                        "-n",
+                        self.namespace,
+                        "-c",
+                        container_name,
+                        "--",
+                        "env",
+                    ]
+
+                    with open(env_file, "w") as f:
+                        env_result = subprocess.run(env_cmd, stdout=f, stderr=subprocess.STDOUT, timeout=30)
+                        if env_result.returncode != 0:
+                            # If exec fails, try to get env from pod spec instead
+                            print("      Warning: Could not exec into container, trying to get env from pod spec...")
+                            spec_env_cmd = self.kubectl_cmd + [
+                                "get",
+                                "pod",
+                                pod_name,
+                                "-n",
+                                self.namespace,
+                                "-o",
+                                f"jsonpath={{.spec.containers[?(@.name=='{container_name}')].env[*]}}",
+                            ]
+                            spec_result = subprocess.run(
+                                spec_env_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30
+                            )
+                            if spec_result.returncode == 0 and spec_result.stdout:
+                                with open(env_file, "wb") as spec_f:
+                                    spec_f.write(
+                                        b"# Environment variables from pod spec (may not include all runtime env "
+                                        b"vars)\n"
+                                    )
+                                    spec_f.write(spec_result.stdout)
+                                print(f"      Dumped env vars from pod spec to {env_file.name}")
+                            else:
+                                print(f"      Warning: Failed to dump env vars for {pod_name}/{container_name}")
+
             print("Log dump complete")
             return 0
 

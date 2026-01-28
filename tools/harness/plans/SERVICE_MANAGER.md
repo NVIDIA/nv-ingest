@@ -156,9 +156,11 @@ The service manager automatically captures logs from managed services to the art
 - Lists all containers using `docker compose ps -q`
 - Dumps individual container logs with container names: `container_<name>.log`
 - Dumps combined logs from all services: `docker_compose_combined.log`
+- **Dumps environment variables for each container**: `container_<name>_env.txt`
 - Includes timestamps and handles errors gracefully
 - Uses `docker logs` for individual containers and `docker compose logs` for combined output
-- Timeouts: 60s per container, 120s for combined logs
+- Uses `docker inspect` to capture container environment variables
+- Timeouts: 60s per container, 120s for combined logs, 30s for env vars
 - Continues on errors to ensure cleanup completes
 
 #### Helm Log Dumping (`service_manager/helm.py`)
@@ -167,9 +169,12 @@ The service manager automatically captures logs from managed services to the art
 - Captures previous logs if container restarted: `pod_<name>_<container>_previous.log`
 - Dumps pod status: `pod_status.txt`
 - Dumps pod events: `pod_events.txt`
+- **Dumps environment variables for each container**: `pod_<name>_<container>_env.txt`
 - Includes timestamps in all logs
 - Handles multi-container pods correctly
-- Timeouts: 60s per container/pod, 120s for status/events
+- Uses `kubectl exec ... env` to capture runtime environment variables
+- Falls back to pod spec env vars if exec fails
+- Timeouts: 60s per container/pod, 120s for status/events, 30s for env vars
 - Continues on errors to ensure cleanup completes
 
 #### CLI Integration (`cli/run.py`, `cli/nightly.py`)
@@ -193,9 +198,13 @@ The service manager automatically captures logs from managed services to the art
 ```
 service_logs/
 ├── container_nv-ingest-1.log
+├── container_nv-ingest-1_env.txt
 ├── container_redis-1.log
+├── container_redis-1_env.txt
 ├── container_milvus-standalone-1.log
+├── container_milvus-standalone-1_env.txt
 ├── container_embedding-1.log
+├── container_embedding-1_env.txt
 └── docker_compose_combined.log
 ```
 
@@ -203,9 +212,12 @@ service_logs/
 ```
 service_logs/
 ├── pod_nv-ingest-ms-runtime-abc123_nv-ingest.log
+├── pod_nv-ingest-ms-runtime-abc123_nv-ingest_env.txt
 ├── pod_nv-ingest-ms-runtime-abc123_nv-ingest_previous.log
 ├── pod_redis-master-0_redis.log
+├── pod_redis-master-0_redis_env.txt
 ├── pod_milvus-standalone-xyz789_milvus.log
+├── pod_milvus-standalone-xyz789_milvus_env.txt
 ├── pod_status.txt
 └── pod_events.txt
 ```
@@ -230,12 +242,13 @@ python -m nv_ingest_harness.cli.nightly --managed --deployment-type=helm
 
 ### Benefits
 
-1. **Debugging**: Complete service logs preserved for post-mortem analysis
-2. **Automatic**: No manual log collection needed
-3. **Organized**: Logs stored with test artifacts for easy correlation
-4. **Comprehensive**: Captures all container/pod logs, statuses, and events
-5. **Failure Analysis**: Helps diagnose infrastructure issues in test failures
-6. **Non-blocking**: Continues on errors to ensure cleanup completes
+1. **Debugging**: Complete service logs and environment variables preserved for post-mortem analysis
+2. **Automatic**: No manual log or env var collection needed
+3. **Organized**: Logs and env vars stored with test artifacts for easy correlation
+4. **Comprehensive**: Captures all container/pod logs, environment variables, statuses, and events
+5. **Configuration Visibility**: Environment variables help diagnose configuration-related issues
+6. **Failure Analysis**: Helps diagnose infrastructure and configuration issues in test failures
+7. **Non-blocking**: Continues on errors to ensure cleanup completes
 
 ### Error Handling
 
