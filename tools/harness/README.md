@@ -648,6 +648,9 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
 
 # Use GPU-specific configuration (A10G, L40S, A100-40GB)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
+
+# Disable service log dumping (enabled by default)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
 ```
 
 ### GPU-Specific Configuration (SKU Override)
@@ -733,7 +736,7 @@ tools/harness/artifacts/<test_name>_<timestamp>_UTC/
 
 ### Service Logs
 
-When running in managed mode (`--managed`), service logs are automatically dumped to the artifacts directory before services are stopped:
+When running in managed mode (`--managed`), service logs are automatically dumped to the artifacts directory before services are stopped (enabled by default):
 
 ```
 tools/harness/artifacts/<session_or_run>/service_logs/
@@ -744,6 +747,15 @@ tools/harness/artifacts/<session_or_run>/service_logs/
 ├── pod_redis-master-0.log
 ├── pod_status.txt                      # Helm: pod status
 └── pod_events.txt                      # Helm: Kubernetes events
+```
+
+**Disabling log dumping:**
+```bash
+# Skip log collection if not needed (saves time)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
+
+# Or for nightly runs
+uv run nv-ingest-harness-nightly --managed --no-dump-logs
 ```
 
 **Log collection features:**

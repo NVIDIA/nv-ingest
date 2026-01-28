@@ -28,6 +28,7 @@ def run_datasets(
     doc_analysis,
     session_dir: str | None = None,
     sku: str | None = None,
+    dump_logs: bool = True,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
@@ -182,25 +183,26 @@ def run_datasets(
 
     # Cleanup managed services
     if managed and service_manager:
-        # Dump logs before stopping services
-        # Determine where to dump logs
-        if session_dir:
-            # Dump to session directory if using sessions
-            logs_dir = Path(session_dir) / "service_logs"
-        else:
-            # Dump to first result's artifact directory as fallback
-            if results and results[0].get("artifact_dir") != "N/A":
-                logs_dir = Path(results[0]["artifact_dir"]) / "service_logs"
+        # Dump logs before stopping services if enabled
+        if dump_logs:
+            # Determine where to dump logs
+            if session_dir:
+                # Dump to session directory if using sessions
+                logs_dir = Path(session_dir) / "service_logs"
             else:
-                # Last resort: create a timestamped directory in artifacts root
-                from nv_ingest_harness.utils.session import get_default_artifacts_root
+                # Dump to first result's artifact directory as fallback
+                if results and results[0].get("artifact_dir") != "N/A":
+                    logs_dir = Path(results[0]["artifact_dir"]) / "service_logs"
+                else:
+                    # Last resort: create a timestamped directory in artifacts root
+                    from nv_ingest_harness.utils.session import get_default_artifacts_root
 
-                logs_dir = get_default_artifacts_root() / f"service_logs_{now_timestr()}"
+                    logs_dir = get_default_artifacts_root() / f"service_logs_{now_timestr()}"
 
-        print(f"\n{'='*60}")
-        print("Dumping service logs...")
-        print(f"{'='*60}")
-        service_manager.dump_logs(logs_dir)
+            print(f"\n{'='*60}")
+            print("Dumping service logs...")
+            print(f"{'='*60}")
+            service_manager.dump_logs(logs_dir)
 
         # Always cleanup port forwards (prevents orphaned processes)
         if hasattr(service_manager, "_stop_port_forwards"):
@@ -343,6 +345,11 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     help="GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s). Only applies to managed Compose "
     "services.",
 )
+@click.option(
+    "--dump-logs/--no-dump-logs",
+    default=True,
+    help="Dump service logs to artifacts directory before cleanup (managed mode only). Default: enabled",
+)
 def main(
     case,
     managed,
@@ -354,6 +361,7 @@ def main(
     session_dir,
     session_name,
     sku,
+    dump_logs,
 ):
 
     if not dataset:
@@ -387,6 +395,7 @@ def main(
         doc_analysis=doc_analysis,
         session_dir=str(session_dir) if session_dir else None,
         sku=sku,
+        dump_logs=dump_logs,
     )
 
 

@@ -178,6 +178,11 @@ def load_results(artifact_dir: Path) -> dict:
     help="GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s). Only applies to managed Compose "
     "services.",
 )
+@click.option(
+    "--dump-logs/--no-dump-logs",
+    default=True,
+    help="Dump service logs to artifacts directory before cleanup. Default: enabled",
+)
 def main(
     config_path: Path | None,
     deployment_type: str,
@@ -190,6 +195,7 @@ def main(
     replay_dirs: tuple[Path, ...],
     note: str | None,
     sku: str | None,
+    dump_logs: bool,
 ):
     """Run nightly benchmarks and post results."""
     if replay_dirs:
@@ -367,12 +373,13 @@ def main(
 
     # Cleanup services and port forwards if needed
     if service_manager:
-        # Dump logs before stopping services
-        logs_dir = session_dir / "service_logs"
-        print(f"\n{'='*60}")
-        print("Dumping service logs...")
-        print(f"{'='*60}")
-        service_manager.dump_logs(logs_dir)
+        # Dump logs before stopping services if enabled
+        if dump_logs:
+            logs_dir = session_dir / "service_logs"
+            print(f"\n{'='*60}")
+            print("Dumping service logs...")
+            print(f"{'='*60}")
+            service_manager.dump_logs(logs_dir)
 
         # Always cleanup port forwards for helm deployments (prevents orphaned processes)
         if hasattr(service_manager, "_stop_port_forwards"):
