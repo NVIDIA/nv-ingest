@@ -549,6 +549,72 @@ EXTRACT_TABLES=false uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 **Note**: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.
 
+## Deployment Types
+
+The harness supports two deployment orchestrators for managing nv-ingest services:
+
+### Docker Compose (Default)
+
+Docker Compose is the default deployment type and is ideal for local development and testing:
+
+```bash
+# Default - uses Docker Compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+
+# Explicitly specify Docker Compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=compose
+```
+
+**Features:**
+- Local container orchestration
+- Fast startup and rebuild
+- GPU-specific configuration via `--sku` option (A10G, L40S, A100-40GB)
+- Profile-based service selection
+- Docker volume management
+
+### Helm (Kubernetes)
+
+Helm deployment is for Kubernetes-based testing (MicroK8s, K3s, cloud K8s):
+
+```bash
+# Use Helm deployment
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
+```
+
+**Features:**
+- Kubernetes-native deployment
+- Automatic port-forwarding with auto-restart for resilience
+- Supports both remote charts (from Helm repos) and local `./helm` chart
+- Pod log collection with previous logs on restart
+- Namespace isolation
+
+**Configuration:**
+Set deployment type in `test_configs.yaml` or use `--deployment-type` CLI flag:
+
+```yaml
+active:
+  deployment_type: compose  # or "helm"
+  
+  # Docker Compose settings
+  profiles: [retrieval, reranker]
+  
+  # Helm settings (only used when deployment_type: helm)
+  helm_bin: helm  # or "microk8s helm", "k3s helm"
+  helm_chart: nim-nvstaging/nv-ingest
+  helm_chart_version: 26.1.0-RC7
+  helm_release: nv-ingest
+  helm_namespace: nv-ingest
+  helm_values_file: .helm-env
+```
+
+**CLI flag overrides YAML setting:**
+```bash
+# Override to Helm even if YAML has deployment_type: compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
+```
+
+For detailed Helm and Docker Compose configuration, see `plans/SERVICE_MANAGER.md`.
+
 ## Execution Modes
 
 ### Attach Mode (Default)
@@ -561,7 +627,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 - Runs test case only (no service management)
 - Faster for iterative testing
 - Use when Docker services are already up
-- `--no-build` and `--keep-up` flags are ignored in attach mode
+- `--no-build`, `--keep-up`, and `--sku` flags are ignored in attach mode
 
 ### Managed Mode
 
@@ -572,7 +638,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 - Starts Docker services automatically
 - Waits for service readiness (configurable timeout)
 - Runs test case
-- Collects artifacts
+- Collects artifacts and service logs
 - Stops services after test (unless `--keep-up`)
 
 **Managed mode options:**
@@ -582,7 +648,39 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
 
 # Keep services running after test (useful for multi-test scenarios)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
+
+# Use GPU-specific configuration (A10G, L40S, A100-40GB)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
+
+# Disable service log dumping (enabled by default)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
 ```
+
+### GPU-Specific Configuration (SKU Override)
+
+The harness supports GPU-specific configuration overrides for Docker Compose deployments via the `--sku` option:
+
+```bash
+# A10G GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
+
+# L40S GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=l40s
+
+# A100 40GB GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a100-40gb
+```
+
+**How it works:**
+- Loads GPU-specific override file: `docker-compose.<sku>.yaml`
+- Merges with base `docker-compose.yaml` configuration
+- Override settings take precedence (typically batch sizes, memory limits, etc.)
+- Only applies to Docker Compose deployments (ignored for Helm)
+
+**Available SKUs:**
+- `a10g` - NVIDIA A10G GPU settings
+- `l40s` - NVIDIA L40S GPU settings
+- `a100-40gb` - NVIDIA A100 40GB GPU settings
 
 ## Nightly Benchmarks
 
@@ -638,6 +736,50 @@ tools/harness/artifacts/<test_name>_<timestamp>_UTC/
 ```
 
 **Note**: Artifact directories use timestamps for tracking test runs over time, while collection names are deterministic (no timestamps) to enable collection reuse and recall evaluation.
+
+### Service Logs
+
+When running in managed mode (`--managed`), service logs are automatically dumped to the artifacts directory before services are stopped (enabled by default):
+
+```
+tools/harness/artifacts/<session_or_run>/service_logs/
+├── container_nv-ingest-1.log           # Docker Compose: individual container logs
+├── container_redis-1.log
+├── docker_compose_combined.log         # Docker Compose: combined logs
+├── pod_nv-ingest-ms-runtime-xxx.log   # Helm: pod logs
+├── pod_redis-master-0.log
+├── pod_status.txt                      # Helm: pod status
+└── pod_events.txt                      # Helm: Kubernetes events
+```
+
+**Disabling log dumping:**
+```bash
+# Skip log collection if not needed (saves time)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
+
+# Or for nightly runs
+uv run nv-ingest-harness-nightly --managed --no-dump-logs
+```
+
+**Log collection features:**
+- **Automatic**: Logs are captured before services are stopped
+- **Comprehensive**: Includes all containers/pods in the deployment
+- **Timestamped**: Container/pod logs include timestamps for correlation
+- **Previous logs**: For Helm, also captures previous container logs if pods restarted
+- **Debugging aids**: Helm logs include pod status and events for troubleshooting
+
+**Docker Compose logs include:**
+- Individual container logs with container names
+- Combined logs from all services
+- Stderr and stdout streams
+
+**Helm logs include:**
+- Logs from each container in each pod
+- Previous logs if containers restarted
+- Pod status information (`kubectl get pods`)
+- Kubernetes events (`kubectl get events`)
+
+This feature is particularly useful for debugging test failures and understanding service behavior during test runs.
 
 ### Results Structure
 

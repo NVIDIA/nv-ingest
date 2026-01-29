@@ -41,6 +41,7 @@ def get_artifact_path(
     session_dir: Path | str | None,
     dataset_name: str,
     base_dir: Path | str | None = None,
+    deployment_type: str | None = None,
 ) -> Path:
     """
     Get artifact path for a dataset.
@@ -52,6 +53,7 @@ def get_artifact_path(
         session_dir: Session directory path, or None for standalone artifacts.
         dataset_name: Name of the dataset (e.g., 'bo767').
         base_dir: Base directory for artifacts when not using session_dir.
+        deployment_type: Deployment type ('compose' or 'helm') for managed runs, or None for attach mode.
 
     Returns:
         Path to the artifact directory (created if needed).
@@ -59,11 +61,21 @@ def get_artifact_path(
     dataset_name = dataset_name or "unknown"
 
     if session_dir:
-        path = Path(session_dir) / dataset_name
+        # Include deployment type in path if provided (managed mode)
+        if deployment_type:
+            path = Path(session_dir) / f"{dataset_name}_{deployment_type}"
+        else:
+            path = Path(session_dir) / f"{dataset_name}_attach"
     else:
         root = Path(base_dir) if base_dir else get_default_artifacts_root()
         timestamp = now_timestr()
-        dirname = f"{dataset_name}_{timestamp}" if dataset_name else timestamp
+        # Include deployment type in standalone artifacts if provided
+        if deployment_type:
+            dirname = (
+                f"{dataset_name}_{deployment_type}_{timestamp}" if dataset_name else f"{deployment_type}_{timestamp}"
+            )
+        else:
+            dirname = f"{dataset_name}_attach_{timestamp}" if dataset_name else f"attach_{timestamp}"
         path = root / dirname
 
     path.mkdir(parents=True, exist_ok=True)
