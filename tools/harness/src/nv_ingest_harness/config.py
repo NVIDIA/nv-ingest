@@ -89,6 +89,12 @@ class TestConfig:
     collection_name: Optional[str] = None
     lancedb_dir: Optional[str] = None
 
+    # File type configuration (for non-PDF datasets like video)
+    file_pattern: Optional[str] = None  # e.g., "*.mp4", "*.pdf" (default: "*.pdf")
+    max_file_size_gb: Optional[float] = None  # Filter files larger than this (useful for video)
+    max_files: Optional[int] = None  # Limit number of files to process (useful for testing)
+    total_size_mb: Optional[float] = None  # Precalculated total dataset size (for MB/s metric)
+
     # Recall configuration
     reranker_mode: str = "none"  # Options: "none", "with", "both"
     recall_top_k: int = 10
@@ -342,6 +348,9 @@ def _load_env_overrides() -> dict:
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
         "RECALL_DATASET": ("recall_dataset", str),
+        "FILE_PATTERN": ("file_pattern", str),
+        "MAX_FILE_SIZE_GB": ("max_file_size_gb", float),
+        "MAX_FILES": ("max_files", parse_int),
     }
 
     overrides = {}
