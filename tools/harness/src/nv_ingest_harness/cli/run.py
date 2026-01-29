@@ -29,11 +29,18 @@ def run_datasets(
     session_dir: str | None = None,
     sku: str | None = None,
     dump_logs: bool = True,
+    note: str | None = None,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
     service_manager = None
     session_summary_path = None
+
+    # Print note if provided
+    if note:
+        print(f"\n{'='*60}")
+        print(f"Note: {note}")
+        print(f"{'='*60}\n")
 
     # Start services once if managed mode
     if managed:
@@ -136,6 +143,9 @@ def run_datasets(
             "return_code": rc,
         }
 
+        if note:
+            consolidated["note"] = note
+
         if managed:
             consolidated["profiles"] = config.profiles
 
@@ -222,14 +232,19 @@ def run_datasets(
     # Write session summary if using a session
     if session_dir:
         session_name = os.path.basename(session_dir)
+        extras = {
+            # run.py-specific extensions
+            "case": case,
+            "infrastructure": "managed" if managed else "attach",
+            "datasets": dataset_list,
+        }
+        if note:
+            extras["note"] = note
         session_summary_path = write_session_summary(
             session_dir=session_dir,
             session_name=session_name,
             results=results,
-            # run.py-specific extensions
-            case=case,
-            infrastructure="managed" if managed else "attach",
-            datasets=dataset_list,
+            **extras,
         )
 
     # Print summary
@@ -350,6 +365,12 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     default=True,
     help="Dump service logs to artifacts directory before cleanup (managed mode only). Default: enabled",
 )
+@click.option(
+    "--note",
+    type=str,
+    default=None,
+    help="Optional note to label this run (appears in results.json, session summary, and stdout)",
+)
 def main(
     case,
     managed,
@@ -362,6 +383,7 @@ def main(
     session_name,
     sku,
     dump_logs,
+    note,
 ):
 
     if not dataset:
@@ -396,6 +418,7 @@ def main(
         session_dir=str(session_dir) if session_dir else None,
         sku=sku,
         dump_logs=dump_logs,
+        note=note,
     )
 
 
