@@ -1,0 +1,19 @@
+name: Login to NGC Registry
+description: Authenticate with NVIDIA NGC Container Registry
+
+inputs:
+  registry:
+    description: 'Registry URL'
+    required: false
+    default: 'nvcr.io'
+  password:
+    description: 'NGC API token'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to NGC Registry
+      shell: bash
+      run: |
+        echo "${{ inputs.password }}" | docker login ${{ inputs.registry }} --username "\$oauthtoken" --password-stdin
