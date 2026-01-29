@@ -130,6 +130,9 @@ class IngestTaskFilterSchema(BaseModelNoExt):
 
 class IngestTaskDedupParams(BaseModelNoExt):
     filter: bool = False
+    enable_bbox_dedup: bool = True
+    iou_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
+    bbox_dedup_prefer_structured: bool = True
 
 
 class IngestTaskDedupSchema(BaseModelNoExt):
