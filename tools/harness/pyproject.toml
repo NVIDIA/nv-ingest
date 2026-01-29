@@ -13,6 +13,10 @@ dependencies = [
     "pyyaml>=6.0",
     "requests>=2.31.0",
     "pynvml>=11.5.0",
+    "nemotron-page-elements-v3",
+    "nemotron-graphic-elements-v1",
+    "nemotron-table-structure-v1",
+    "matplotlib",
 ]
 
 [project.scripts]

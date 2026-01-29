@@ -46,14 +46,14 @@ def get_image_paths(input_path: str, extensions: tuple = (".png", ".jpg", ".jpeg
 def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[dict, float]:
     """
     Run inference on a single image using torch.utils.benchmark.Timer.
-    
+
     Includes both preprocessing and forward pass in the timing.
-    
+
     Args:
         model: The loaded model
         img: Image as numpy array
         num_repeats: Number of times to run inference for timing (default: 1)
-    
+
     Returns:
         Tuple of (predictions dict, mean inference time in seconds)
     """
@@ -63,15 +63,15 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
         globals={"model": model, "img": img},
         num_threads=1,
     )
-    
+
     # Run timed inference
     measurement = timer.timeit(num_repeats)
-    
+
     # Run once more to get the actual predictions
     with torch.inference_mode():
         x = model.preprocess(img)
         preds = model(x, img.shape)[0]
-    
+
     return preds, measurement.mean
 
 
@@ -151,9 +151,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         preds, inference_time = benchmark_inference(model, img, num_repeats=num_repeats)
 
         # Post-processing
-        boxes, labels, scores = postprocess_preds_table_structure(
-            preds, model.threshold, model.labels
-        )
+        boxes, labels, scores = postprocess_preds_table_structure(preds, model.threshold, model.labels)
 
         num_detections = len(boxes)
         total_detections += num_detections
