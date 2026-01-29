@@ -143,8 +143,13 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
     model_name: Optional[str] = None
     api_key: Optional[str] = Field(default=None, repr=False)
     filter_errors: bool = False
+    embed_text_elements: Optional[bool] = None
+    embed_structured_elements: Optional[bool] = None
+    embed_image_elements: Optional[bool] = None
+    embed_audio_elements: Optional[bool] = None
     text_elements_modality: Optional[str] = None
     image_elements_modality: Optional[str] = None
+    image_elements_aggregate_page_content: Optional[bool] = None
     structured_elements_modality: Optional[str] = None
     audio_elements_modality: Optional[str] = None
     custom_content_field: Optional[str] = None
