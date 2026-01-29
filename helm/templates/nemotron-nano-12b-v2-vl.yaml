@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.repository }}:{{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "nemotron_nano_12b_v2_vl") }}"
       pullSecret: "{{ index .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: nemotron-nano-12b-v2-vl
 spec:
   image:
-    repository: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.repository }}
-    tag: {{ .Values.nimOperator.nemotron_nano_12b_v2_vl.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "nemotron_nano_12b_v2_vl") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "nemotron_nano_12b_v2_vl") }}
     pullPolicy: IfNotPresent
     pullSecrets:
 {{ toYaml .Values.nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets | nindent 6 }}

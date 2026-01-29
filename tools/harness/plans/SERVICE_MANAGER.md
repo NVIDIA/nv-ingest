@@ -92,7 +92,7 @@ CLI (run.py/nightly.py)
        └─> create_service_manager(config, repo_root, sku)
             └─> DockerComposeManager(config, repo_root, sku)
                  └─> Check: docker-compose.a10g.yaml exists?
-                      └─> _build_compose_cmd() adds: -f docker-compose.yaml -f docker-compose.a10g.yaml
+                      └─> _build_compose_cmd() adds: -f docker-compose.yaml -f release.yaml -f docker-compose.a10g.yaml
                            └─> Used by: start(), stop(), dump_logs()
 ```
 

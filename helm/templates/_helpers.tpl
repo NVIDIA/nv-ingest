@@ -74,3 +74,34 @@ Create secret to access docker registry
   {{- define "nv-ingest.ngcApiSecret" }}
   {{- printf "%s" .Values.ngcApiSecret.password  }}
   {{- end }}
+
+{{/*
+Resolve NIM image ref/repo/tag from release.yaml.
+
+release.yaml is intended to be passed as a Helm values file and contains:
+  x-nv-ingest-release:
+    nim:
+      <nimOperatorKey>:
+        ref: "repo:tag"
+*/}}
+
+{{- define "nv-ingest.release.nimRef" -}}
+{{- $root := .root -}}
+{{- $key := .key -}}
+{{- $release := index $root.Values "x-nv-ingest-release" -}}
+{{- if and $release (hasKey $release "nim") (hasKey (index $release "nim") $key) (hasKey (index (index $release "nim") $key) "ref") -}}
+{{- index (index (index $release "nim") $key) "ref" -}}
+{{- else -}}
+{{- fail (printf "Missing required release.yaml value: x-nv-ingest-release.nim.%s.ref (pass -f release.yaml)" $key) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "nv-ingest.release.nimRepository" -}}
+{{- $ref := include "nv-ingest.release.nimRef" . -}}
+{{- regexReplaceAll ":([^:]*)$" $ref "" -}}
+{{- end -}}
+
+{{- define "nv-ingest.release.nimTag" -}}
+{{- $ref := include "nv-ingest.release.nimRef" . -}}
+{{- regexReplaceAll "^.*:" $ref "" -}}
+{{- end -}}

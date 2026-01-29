@@ -510,7 +510,7 @@ ingestor = ingestor.store(
 ```bash
 # Set DATASET_ROOT before starting services
 export DATASET_ROOT=/raid/my-project/nv-ingest-data
-docker compose up -d
+docker compose -f docker-compose.yaml -f release.yaml up -d
 ```
 
 ```python

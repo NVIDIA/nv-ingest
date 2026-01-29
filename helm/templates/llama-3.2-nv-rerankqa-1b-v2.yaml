@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}:{{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "llama_3_2_nv_rerankqa_1b_v2") }}"
       pullSecret: "{{ index .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: llama-32-nv-rerankqa-1b-v2
 spec:
   image:
-    repository: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}
-    tag: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "llama_3_2_nv_rerankqa_1b_v2") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "llama_3_2_nv_rerankqa_1b_v2") }}
     pullPolicy: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullPolicy }}
     pullSecrets:
 {{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets | nindent 6 }}

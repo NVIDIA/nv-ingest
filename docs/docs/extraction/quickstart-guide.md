@@ -48,9 +48,14 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
+6. Start core services. This example uses the retrieval profile. For more information about other profiles, see [Profile Information](#profile-information).
 
-    `docker compose --profile retrieval up`
+    ```shell
+    docker compose \
+      -f docker-compose.yaml \
+      -f release.yaml \
+      --profile retrieval up
+    ```
 
     !!! tip
 
@@ -61,12 +66,13 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
         The default configuration may not fit on a single GPU for some hardware targets. If you are running on any of the following GPUs, use a `docker compose` override file to reduce VRAM usage:
         - A100-SXM4-40GB
         - A10G
-        Override files typically lower per-service memory allocation, batch sizes, or concurrency. This trades peak throughput for making the full pipeline runnable on the available GPU. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
+        Override files typically lower per-service memory allocation, batch sizes, or concurrency. This trades peak throughput for making the full pipeline runnable on the available GPU. To use an override file, include it in your `docker compose up` command by adding an additional `-f` flag after `release.yaml`. The settings in later files override the values that are set in earlier files.
 
     The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
     ```shell
     docker compose \
       -f docker-compose.yaml \
+      -f release.yaml \
       -f docker-compose.a100-40gb.yaml \
       --profile retrieval up
     ```

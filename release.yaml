@@ -1,0 +1,54 @@
+#
+# Single source of truth for NIM image versions.
+#
+# This file is intentionally BOTH:
+# - a docker-compose override file (top-level `services:`)
+# - a Helm values override file (top-level `x-nv-ingest-release:`)
+#
+# Usage:
+# - Docker Compose: `docker compose -f docker-compose.yaml -f release.yaml up`
+# - Helm:           `helm upgrade --install nv-ingest ./helm -f helm/values.yaml -f release.yaml`
+#
+
+x-nv-ingest-release:
+  nim:
+    # Keys here match Helm's `.Values.nimOperator.<key>` entries.
+    page_elements:
+      ref: &page_elements_ref "nvcr.io/nim/nvidia/nemoretriever-page-elements-v3:1.7.0"
+    graphic_elements:
+      ref: &graphic_elements_ref "nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1:1.6.0"
+    table_structure:
+      ref: &table_structure_ref "nvcr.io/nim/nvidia/nemoretriever-table-structure-v1:1.6.0"
+    nemoretriever_ocr_v1:
+      ref: &ocr_ref "nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1"
+    embedqa:
+      ref: &embedqa_ref "nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.1"
+    llama_3_2_nv_rerankqa_1b_v2:
+      ref: &rerankqa_ref "nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2:1.8.0"
+    nemotron_parse:
+      ref: &nemotron_parse_ref "nvcr.io/nim/nvidia/nemotron-parse:1.5.0"
+    nemotron_nano_12b_v2_vl:
+      ref: &nemotron_nano_12b_v2_vl_ref "nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl:1.5.0"
+    audio:
+      ref: &audio_ref "nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us:1.4.0"
+
+services:
+  # These service names match `docker-compose.yaml`.
+  page-elements:
+    image: *page_elements_ref
+  graphic-elements:
+    image: *graphic_elements_ref
+  table-structure:
+    image: *table_structure_ref
+  ocr:
+    image: *ocr_ref
+  embedding:
+    image: *embedqa_ref
+  reranker:
+    image: *rerankqa_ref
+  nemotron-parse:
+    image: *nemotron_parse_ref
+  vlm:
+    image: *nemotron_nano_12b_v2_vl_ref
+  audio:
+    image: *audio_ref
