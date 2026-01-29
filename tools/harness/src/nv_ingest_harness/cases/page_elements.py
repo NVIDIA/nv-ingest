@@ -8,7 +8,7 @@ Uses torch.utils.benchmark for accurate timing with automatic CUDA synchronizati
 and warmup handling.
 
 Usage:
-    uv run nv-ingest-harness-run --case=page_elements --dataset=/path/to/page/images
+    uv run nv-ingest-harness-run --case=page_elements --dataset=/path/to/page_images
 
 Requirements:
     - nemotron_page_elements_v3 package installed

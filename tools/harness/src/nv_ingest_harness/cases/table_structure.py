@@ -8,7 +8,7 @@ Uses torch.utils.benchmark for accurate timing with automatic CUDA synchronizati
 and warmup handling.
 
 Usage:
-    uv run nv-ingest-harness-run --case=table_structure --dataset=/path/to/table/images
+    uv run nv-ingest-harness-run --case=table_structure --dataset=/path/to/table_images
 
 Requirements:
     - nemotron_table_structure_v1 package installed
