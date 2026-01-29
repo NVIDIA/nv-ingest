@@ -60,9 +60,7 @@ def calculate_iou(bbox1: Tuple[float, ...], bbox2: Tuple[float, ...]) -> float:
     return intersection_area / union_area
 
 
-def _normalize_bbox(
-    bbox: Tuple[float, ...], max_dimensions: Tuple[float, float]
-) -> Tuple[float, float, float, float]:
+def _normalize_bbox(bbox: Tuple[float, ...], max_dimensions: Tuple[float, float]) -> Tuple[float, float, float, float]:
     """
     Normalize bounding box coordinates by max dimensions.
 
