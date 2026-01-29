@@ -29,7 +29,7 @@ class DedupTask(Task):
         content_type: _TypeContentType = "image",
         filter: bool = False,
         enable_bbox_dedup: bool = True,
-        iou_threshold: float = 0.4,
+        iou_threshold: float = 0.45,
         prefer_structured: bool = True,
     ) -> None:
         """

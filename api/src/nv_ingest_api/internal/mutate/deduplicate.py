@@ -171,7 +171,7 @@ def _get_structured_bbox_info(row: pd.Series) -> Optional[Dict[str, Any]]:
 
 def deduplicate_by_bbox_internal(
     df_ledger: pd.DataFrame,
-    iou_threshold: float = 0.4,
+    iou_threshold: float = 0.45,
     prefer_structured: bool = True,
 ) -> pd.DataFrame:
     """
@@ -311,7 +311,7 @@ def deduplicate_images_internal(
             - "filter": bool, if True duplicate rows are removed; if False, duplicates are marked.
             - "hash_algorithm": str, the algorithm to use for hashing (default "md5").
             - "enable_bbox_dedup": bool, if True also deduplicate by bounding box overlap.
-            - "iou_threshold": float, IoU threshold for bbox dedup (default 0.4).
+            - "iou_threshold": float, IoU threshold for bbox dedup (default 0.45).
             - "bbox_dedup_prefer_structured": bool, if True keep structured elements (default True).
     mutate_config : ImageDedupSchema, optional
     execution_trace_log : Optional[List[Any]], optional
@@ -363,7 +363,7 @@ def deduplicate_images_internal(
         enable_bbox_dedup = params.get("enable_bbox_dedup", True)
 
         if enable_bbox_dedup:
-            iou_threshold = params.get("iou_threshold", 0.4)
+            iou_threshold = params.get("iou_threshold", 0.45)
 
             prefer_structured = params.get("bbox_dedup_prefer_structured", True)
 

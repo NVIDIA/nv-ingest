@@ -993,7 +993,7 @@ class Ingestor:
             - content_type: str, content type to deduplicate (default "text")
             - filter: bool, legacy filter parameter (default False)
             - enable_bbox_dedup: bool, enable bounding box deduplication (default True)
-            - iou_threshold: float, IoU threshold for bbox dedup (default 0.4)
+            - iou_threshold: float, IoU threshold for bbox dedup (default 0.45)
             - prefer_structured: bool, keep structured elements over images (default True)
 
         Returns
