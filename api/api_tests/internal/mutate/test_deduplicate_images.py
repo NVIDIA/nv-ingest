@@ -14,6 +14,7 @@ from nv_ingest_api.internal.mutate.deduplicate import _hash_content, deduplicate
 class DummyContentTypeEnum:
     IMAGE = "IMAGE"
     INFO_MSG = "INFO_MSG"
+    STRUCTURED = "STRUCTURED"
 
 
 # Patch the global ContentTypeEnum in the deduplicate module.
