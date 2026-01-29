@@ -274,6 +274,9 @@ DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 | `e2e_with_llm_summary` | E2E with LLM summarization via UDF | `active` section only | ✅ Available (YAML config) |
 | `recall` | Recall evaluation against existing collections | `active` + `recall` sections | ✅ Available (YAML config) |
 | `e2e_recall` | Fresh ingestion + recall evaluation | `active` + `recall` sections | ✅ Available (YAML config) |
+| `page_elements` | nemotron-page-elements-v3 model benchmarking (PyPi) | None | ✅ Available |
+| `graphic_elements` | nemotron-graphic-elements-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `table_structure` | nemotron-table-structure-v1 model benchmarking (PyPi) | None | ✅ Available |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
