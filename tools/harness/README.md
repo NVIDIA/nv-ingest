@@ -277,6 +277,7 @@ DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 | `page_elements` | nemotron-page-elements-v3 model benchmarking (PyPi) | None | ✅ Available |
 | `graphic_elements` | nemotron-graphic-elements-v1 model benchmarking (PyPi) | None | ✅ Available |
 | `table_structure` | nemotron-table-structure-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `nemotron_ocr` | nemotron-ocr model benchmarking (PyPi) | None | ✅ Available |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
@@ -517,6 +518,7 @@ The harness includes benchmark test cases for Nemotron document analysis models.
 | `page_elements` | [Nemotron Page Element v3](https://huggingface.co/nvidia/nemotron-page-elements-v3) | nemotron-page_elements-v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
 | `table_structure` | [Nemotron Table Structure v1](https://huggingface.co/nvidia/nemotron-table-structure-v1) | nemotron-table-structure-v1 | Table cell, row, and column detection |
 | `graphic_elements` | [Nemotron Graphic Element v1](https://huggingface.co/nvidia/nemotron-graphic-elements-v1) | nemotron-graphic-elements-v1 | Chart and graphic element detection |
+| `nemotron_ocr` | [Nemotron OCR v1](https://huggingface.co/nvidia/nemotron-ocr-v1) | nemotron_ocr | Optical character recognition (text extraction with bounding boxes) |
 
 ### Usage
 
@@ -531,6 +533,9 @@ uv run nv-ingest-harness-run --case=table_structure --dataset=/path/to/table_ima
 
 # Graphic elements benchmark
 uv run nv-ingest-harness-run --case=graphic_elements --dataset=/path/to/chart_images
+
+# Nemotron OCR benchmark
+uv run nv-ingest-harness-run --case=nemotron_ocr --dataset=/path/to/images
 ```
 
 ### Configuration
@@ -555,7 +560,7 @@ Results are written to `results.json`:
 | Metric | Description |
 |--------|-------------|
 | `num_images` | Total images processed |
-| `total_detections` | Sum of all detections across images |
+| `total_detections` | Sum of all detections across images (or `total_text_regions` for OCR) |
 | `mean_inference_time_ms` | Mean inference time per image |
 | `std_inference_time_ms` | Standard deviation of inference times |
 | `min_inference_time_ms` | Fastest inference time |
