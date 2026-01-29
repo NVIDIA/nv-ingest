@@ -206,8 +206,6 @@ envVars:
   # To use the NGC hosted NIM (Build API), manually set this value to "https://integrate.api.nvidia.com/v1/chat/completions".
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
-  VLM_CAPTION_PROMPT: "Caption the content of this image:"
-  VLM_CAPTION_SYSTEM_PROMPT: "/no_think"
 
 
   # "ready" check configuration.
@@ -787,9 +785,9 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "3072"
+        value: "2048"
       - name: OMP_NUM_THREADS
-        value: "8"
+        value: "1"
 
   ## @param embedqa [object] Configuration for EmbedQA NIM
   ## @param embedqa.enabled [bool] Enable the EmbedQA service
@@ -845,8 +843,8 @@ nimOperator:
   nemoretriever_ocr_v1:
     enabled: true
     image:
-      repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-      tag: 1.1.0
+      repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
+      tag: 1.2.1
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -872,10 +870,6 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
-      - name: NIM_TRITON_RATE_LIMIT
-        value: "3"
-      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "8192"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
       - name: NIM_TRITON_ENABLE_MODEL_CONTROL
@@ -913,7 +907,11 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
-    env: []
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
 
   ## @param nemotron_nano_12b_v2_vl [object] Configuration for Nemotron Nano 12B v2 VL NIM
   ## @param nemotron_nano_12b_v2_vl.enabled [bool] Enable this NIM
@@ -953,6 +951,11 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
 
   ## @param nemotron_parse [object] Configuration for Nemotron Parse NIM
   ## @param nemotron_parse.enabled [bool] Enable or disable the Nemotron Parse NIM deployment.
