@@ -34,7 +34,7 @@ PDFIUM_PAGEOBJ_MAPPING = {
 }
 
 
-def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
+def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap, skip_channel_swap: bool = False) -> np.ndarray:
     """
     Converts a PdfBitmap to a correctly formatted NumPy array, handling any necessary
     channel swapping based on the bitmap's mode.
@@ -43,6 +43,10 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     ----------
     bitmap : pdfium.PdfBitmap
         The bitmap object rendered from a PDF page.
+    skip_channel_swap : bool, optional
+        If True, skip BGR to RGB channel swapping. This is useful when the bitmap
+        was rendered with rev_byteorder=True, which already outputs RGB format.
+        Defaults to False.
 
     Returns
     -------
@@ -54,11 +58,12 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     # Convert to a NumPy array using the built-in method
     img_arr = bitmap.to_numpy().copy()
 
-    # Automatically handle channel swapping if necessary
-    if mode in {"BGRA", "BGRX"}:
-        img_arr = img_arr[..., [2, 1, 0, 3]]  # Swap BGR(A) to RGB(A)
-    elif mode == "BGR":
-        img_arr = img_arr[..., [2, 1, 0]]  # Swap BGR to RGB
+    # Automatically handle channel swapping if necessary (unless skipped)
+    if not skip_channel_swap:
+        if mode in {"BGRA", "BGRX"}:
+            img_arr = img_arr[..., [2, 1, 0, 3]]  # Swap BGR(A) to RGB(A)
+        elif mode == "BGR":
+            img_arr = img_arr[..., [2, 1, 0]]  # Swap BGR to RGB
 
     return img_arr
 
@@ -126,6 +131,7 @@ def pdfium_pages_to_numpy(
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
+    render_rev_byteorder: bool = False,
 ) -> tuple[list[ndarray | ndarray[Any, dtype[Any]]], list[tuple[int, int]]]:
     """
     Converts a list of PdfPage objects to a list of NumPy arrays, where each array
@@ -147,7 +153,11 @@ def pdfium_pages_to_numpy(
         Defaults to None.
     padding_tuple : Optional[Tuple[int, int]], optional
         A tuple (width, height) to pad the image to. Defaults to None.
-    rotation:
+    rotation : int, optional
+        Page rotation in degrees (0, 90, 180, 270). Defaults to 0.
+    render_rev_byteorder : bool, optional
+        If True, output RGB instead of BGR byte order, avoiding the need for channel
+        swapping during numpy conversion. Defaults to False.
 
     Returns
     -------
@@ -175,8 +185,8 @@ def pdfium_pages_to_numpy(
 
     for idx, page in enumerate(pages):
         # Render the page as a bitmap with the specified scale and rotation
-        page_bitmap = page.render(scale=scale, rotation=rotation)
-        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
+        page_bitmap = page.render(scale=scale, rotation=rotation, rev_byteorder=render_rev_byteorder)
+        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap, skip_channel_swap=render_rev_byteorder)
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
             img_arr = scale_numpy_image(img_arr, scale_tuple)
@@ -388,6 +398,7 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
             [page],  # A batch with a single image.
             render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
             rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
+            render_rev_byteorder=True,
         )
         image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge, **kwargs)
         shape_bboxes = extract_merged_shapes_from_pdfium_page(page, merge=merge, **kwargs)
