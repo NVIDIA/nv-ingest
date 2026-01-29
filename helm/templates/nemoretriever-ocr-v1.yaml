@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}:{{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "nemoretriever_ocr_v1") }}"
       pullSecret: "{{ index .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: nemoretriever-ocr-v1
 spec:
   image:
-    repository: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}
-    tag: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "nemoretriever_ocr_v1") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "nemoretriever_ocr_v1") }}
     pullPolicy: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.pullPolicy }}
     pullSecrets: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets | nindent 6 }}
   authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}

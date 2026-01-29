@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.nemotron_parse.image.repository }}:{{ .Values.nimOperator.nemotron_parse.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "nemotron_parse") }}"
       pullSecret: "{{ index .Values.nimOperator.nemotron_parse.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.nemotron_parse.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: nemotron-parse
 spec:
   image:
-    repository: {{ .Values.nimOperator.nemotron_parse.image.repository }}
-    tag: {{ .Values.nimOperator.nemotron_parse.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "nemotron_parse") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "nemotron_parse") }}
     pullPolicy: IfNotPresent
     pullSecrets:
 {{ toYaml .Values.nimOperator.nemotron_parse.image.pullSecrets | nindent 6 }}

@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.audio.image.repository }}:{{ .Values.nimOperator.audio.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "audio") }}"
       pullSecret: "{{ index .Values.nimOperator.audio.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.audio.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: audio
 spec:
   image:
-    repository: {{ .Values.nimOperator.audio.image.repository }}
-    tag: {{ .Values.nimOperator.audio.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "audio") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "audio") }}
     pullPolicy: IfNotPresent
     pullSecrets:
 {{ toYaml .Values.nimOperator.audio.image.pullSecrets | nindent 6 }}
@@ -33,7 +33,7 @@ spec:
   storage:
     nimCache:
       name: audio
-  replicas: {{ .Values.nimOperator.nemotron_parse.replicas }}
+  replicas: {{ .Values.nimOperator.audio.replicas }}
   resources:
 {{ toYaml .Values.nimOperator.audio.resources | nindent 4 }}
   tolerations:

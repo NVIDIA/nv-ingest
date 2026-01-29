@@ -23,6 +23,7 @@ class DockerComposeManager(ServiceManager):
         """
         super().__init__(config, repo_root)
         self.compose_file = str(repo_root / "docker-compose.yaml")
+        self.release_file = str(repo_root / "release.yaml")
         self.sku = sku
         self.override_file = None
 
@@ -46,6 +47,13 @@ class DockerComposeManager(ServiceManager):
             Command list with -f flags for compose file(s)
         """
         cmd = base_cmd + ["-f", self.compose_file]
+
+        # Always include release.yaml so NIM images stay in sync with Helm.
+        if Path(self.release_file).exists():
+            cmd += ["-f", self.release_file]
+        else:
+            print(f"Warning: release.yaml not found at {self.release_file} (NIM images may be unset)")
+
         if self.override_file:
             cmd += ["-f", self.override_file]
         return cmd

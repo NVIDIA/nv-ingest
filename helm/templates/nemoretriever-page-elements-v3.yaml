@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.page_elements.image.repository }}:{{ .Values.nimOperator.page_elements.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "page_elements") }}"
       pullSecret: "{{ index .Values.nimOperator.page_elements.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
   storage:
@@ -25,8 +25,8 @@ metadata:
   name: nemoretriever-page-elements-v3
 spec:
   image:
-    repository: {{ .Values.nimOperator.page_elements.image.repository }}
-    tag: {{ .Values.nimOperator.page_elements.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "page_elements") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "page_elements") }}
     pullPolicy: {{ .Values.nimOperator.page_elements.image.pullPolicy }}
     pullSecrets: {{ toYaml .Values.nimOperator.page_elements.image.pullSecrets | nindent 6 }}
   authSecret: {{ .Values.nimOperator.page_elements.authSecret }}
