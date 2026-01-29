@@ -514,9 +514,9 @@ The harness includes benchmark test cases for Nemotron document analysis models.
 
 | Case | Model | Package | Description |
 |------|-------|---------|-------------|
-| `page_elements` | page_element_v3 | nemotron_page_elements_v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
-| `table_structure` | table_structure_v1 | nemotron_table_structure_v1 | Table cell, row, and column detection |
-| `graphic_elements` | graphic_element_v1 | nemotron_graphic_elements_v1 | Chart and graphic element detection |
+| `page_elements` | [Nemotron Page Element v3](https://huggingface.co/nvidia/nemotron-page-elements-v3) | nemotron-page_elements-v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
+| `table_structure` | [Nemotron Table Structure v1](https://huggingface.co/nvidia/nemotron-table-structure-v1) | nemotron-table-structure-v1 | Table cell, row, and column detection |
+| `graphic_elements` | [Nemotron Graphic Element v1](https://huggingface.co/nvidia/nemotron-graphic-elements-v1) | nemotron-graphic-elements-v1 | Chart and graphic element detection |
 
 ### Usage
 
