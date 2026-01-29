@@ -9,11 +9,44 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.cases import get_repo_root
+
+
+def _get_retrieval_func(
+    vdb_backend: str,
+    table_path: Optional[str] = None,
+    table_name: Optional[str] = None,
+):
+    """
+    Get the retrieval function for the specified VDB backend.
+
+    For LanceDB, returns a partial of lancedb_retrieval with table_path pre-filled.
+    For Milvus, returns nvingest_retrieval directly.
+
+    Args:
+        vdb_backend: "milvus" or "lancedb"
+        table_path: Path to LanceDB database directory (required for lancedb)
+        table_name: Table/collection name (optional, can be passed at call time)
+
+    Returns:
+        Retrieval function that accepts (queries, **kwargs) and returns results.
+    """
+    if vdb_backend == "lancedb":
+        if not table_path:
+            raise ValueError("table_path required for lancedb backend")
+        from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
+
+        kwargs = {"table_path": table_path}
+        if table_name:
+            kwargs["table_name"] = table_name
+        return partial(lancedb_retrieval, **kwargs)
+
+    return nvingest_retrieval
 
 
 def get_recall_scores(
@@ -25,10 +58,15 @@ def get_recall_scores(
     top_k: int = 10,
     gpu_search: bool = False,
     nv_ranker: bool = False,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
     ground_truth_dir: Optional[str] = None,
+    batch_size: int = 100,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
-    Calculate recall@k scores for queries against a Milvus collection.
+    Calculate recall@k scores for queries against a VDB collection.
 
     Matches the notebook evaluation pattern: extracts pdf_page identifiers from retrieved
     results and checks if the expected pdf_page appears in the top-k results.
@@ -36,51 +74,76 @@ def get_recall_scores(
     Args:
         query_df: DataFrame with required columns 'query' and 'pdf_page'.
                   pdf_page format: '{pdf_id}_{page_number}' (1-indexed page numbers).
-        collection_name: Milvus collection name to query.
+        collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
-        nv_ranker: Enable NVIDIA reranker for result reranking.
+        nv_ranker: Enable NVIDIA reranker for result reranking (Milvus only).
         ground_truth_dir: Unused parameter (kept for API compatibility).
+        batch_size: Number of queries to process per batch (prevents gRPC size limit errors).
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
 
     Returns:
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
+    queries = query_df["query"].to_list()
+    pdf_pages = query_df["pdf_page"].to_list()
+    num_queries = len(queries)
+    num_batches = (num_queries + batch_size - 1) // batch_size
 
-    all_answers = nvingest_retrieval(
-        query_df["query"].to_list(),
-        collection_name,
-        hybrid=sparse,
-        embedding_endpoint=f"http://{hostname}:8012/v1",
-        model_name=model_name,
-        top_k=top_k,
-        gpu_search=gpu_search,
-        nv_ranker=nv_ranker,
-    )
+    # Create retrieval function once, outside the batch loop
+    if vdb_backend == "lancedb":
+        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+    else:
+        retrieval_func = None  # Use nvingest_retrieval directly
 
-    for i in range(len(query_df)):
-        expected_pdf_page = query_df["pdf_page"].iloc[i]
-        retrieved_answers = all_answers[i]
+    for batch_idx in range(num_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, num_queries)
+        batch_queries = queries[start_idx:end_idx]
+        batch_pdf_pages = pdf_pages[start_idx:end_idx]
 
-        retrieved_pdf_pages = []
-        for result in retrieved_answers:
-            source_id = result.get("entity", {}).get("source", {}).get("source_id", "")
-            content_metadata = result.get("entity", {}).get("content_metadata", {})
-            page_number = content_metadata.get("page_number", "")
+        if num_batches > 1:
+            print(f"  Processing batch {batch_idx + 1}/{num_batches} ({len(batch_queries)} queries)")
 
-            # Extract PDF name from source_id (V2 API normalizes source_id during aggregation,
-            # so it should be the original path without #page_X suffixes)
-            pdf_name = os.path.basename(source_id).split(".")[0]
-            page_str = str(page_number)
-            retrieved_pdf_pages.append(f"{pdf_name}_{page_str}")
+        if vdb_backend == "lancedb":
+            batch_answers = retrieval_func(
+                batch_queries,
+                embedding_endpoint=f"http://{hostname}:8012/v1",
+                model_name=model_name,
+                top_k=top_k,
+                nv_ranker=nv_ranker,
+                nv_ranker_endpoint=nv_ranker_endpoint,
+                nv_ranker_model_name=nv_ranker_model_name,
+            )
+        else:
+            batch_answers = nvingest_retrieval(
+                batch_queries,
+                collection_name,
+                hybrid=sparse,
+                embedding_endpoint=f"http://{hostname}:8012/v1",
+                model_name=model_name,
+                top_k=top_k,
+                gpu_search=gpu_search,
+                nv_ranker=nv_ranker,
+            )
 
-        for k in [1, 3, 5, 10]:
-            if k <= top_k:
-                hits[k].append(expected_pdf_page in retrieved_pdf_pages[:k])
+        for expected_pdf_page, retrieved_answers in zip(batch_pdf_pages, batch_answers):
+            retrieved_pdf_pages = []
+            for result in retrieved_answers:
+                source_id = result.get("entity", {}).get("source", {}).get("source_id", "")
+                content_metadata = result.get("entity", {}).get("content_metadata", {})
+                page_number = content_metadata.get("page_number", "")
+                pdf_name = os.path.basename(source_id).split(".")[0]
+                retrieved_pdf_pages.append(f"{pdf_name}_{page_number}")
+
+            for k in [1, 3, 5, 10]:
+                if k <= top_k:
+                    hits[k].append(expected_pdf_page in retrieved_pdf_pages[:k])
 
     recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
 
@@ -99,9 +162,12 @@ def get_recall_scores_pdf_only(
     nv_ranker_endpoint: Optional[str] = None,
     nv_ranker_model_name: Optional[str] = None,
     ground_truth_dir: Optional[str] = None,
+    batch_size: int = 100,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
-    Calculate recall@k scores for queries against a Milvus collection using PDF-only matching.
+    Calculate recall@k scores for queries against a VDB collection using PDF-only matching.
 
     Matches only PDF filenames (no page numbers), used for datasets like finance_bench where
     ground truth is at document level rather than page level.
@@ -109,24 +175,25 @@ def get_recall_scores_pdf_only(
     Args:
         query_df: DataFrame with required columns 'query' and 'expected_pdf'.
                   expected_pdf format: PDF filename without extension (e.g., '3M_2018_10K').
-        collection_name: Milvus collection name to query.
+        collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Default False for finance_bench.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
-        nv_ranker: Enable NVIDIA reranker for result reranking.
+        nv_ranker: Enable NVIDIA reranker for result reranking (Milvus only).
         nv_ranker_endpoint: Optional custom reranker endpoint URL.
         nv_ranker_model_name: Optional custom reranker model name.
         ground_truth_dir: Unused parameter (kept for API compatibility).
+        batch_size: Number of queries to process per batch (prevents gRPC size limit errors).
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
 
     Returns:
         Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
 
-    # Prepare reranker kwargs if custom endpoint/model provided
     reranker_kwargs = {}
     if nv_ranker:
         if nv_ranker_endpoint:
@@ -134,32 +201,62 @@ def get_recall_scores_pdf_only(
         if nv_ranker_model_name:
             reranker_kwargs["nv_ranker_model_name"] = nv_ranker_model_name
 
-    all_answers = nvingest_retrieval(
-        query_df["query"].to_list(),
-        collection_name,
-        hybrid=sparse,
-        embedding_endpoint=f"http://{hostname}:8012/v1",
-        model_name=model_name,
-        top_k=top_k,
-        gpu_search=gpu_search,
-        nv_ranker=nv_ranker,
-        **reranker_kwargs,
-    )
+    queries = query_df["query"].to_list()
+    expected_pdfs = query_df["expected_pdf"].to_list()
 
-    for i in range(len(query_df)):
-        expected_pdf = query_df["expected_pdf"].iloc[i]
-        retrieved_answers = all_answers[i]
+    # Process queries in batches to avoid gRPC message size limits
+    num_queries = len(queries)
+    num_batches = (num_queries + batch_size - 1) // batch_size
 
-        # Extract PDF names only (no page numbers)
-        retrieved_pdfs = [
-            os.path.basename(result.get("entity", {}).get("source", {}).get("source_id", "")).split(".")[0]
-            for result in retrieved_answers
-        ]
+    # Create retrieval function once, outside the batch loop
+    if vdb_backend == "lancedb":
+        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+    else:
+        retrieval_func = None  # Use nvingest_retrieval directly
 
-        # Finance_bench uses k values [1, 5, 10]
-        for k in [1, 5, 10]:
-            if k <= top_k:
-                hits[k].append(expected_pdf in retrieved_pdfs[:k])
+    for batch_idx in range(num_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, num_queries)
+        batch_queries = queries[start_idx:end_idx]
+        batch_expected_pdfs = expected_pdfs[start_idx:end_idx]
+
+        if num_batches > 1:
+            print(f"  Processing batch {batch_idx + 1}/{num_batches} ({len(batch_queries)} queries)")
+
+        if vdb_backend == "lancedb":
+            batch_answers = retrieval_func(
+                batch_queries,
+                embedding_endpoint=f"http://{hostname}:8012/v1",
+                model_name=model_name,
+                top_k=top_k,
+                nv_ranker=nv_ranker,
+                nv_ranker_endpoint=nv_ranker_endpoint,
+                nv_ranker_model_name=nv_ranker_model_name,
+            )
+        else:
+            batch_answers = nvingest_retrieval(
+                batch_queries,
+                collection_name,
+                hybrid=sparse,
+                embedding_endpoint=f"http://{hostname}:8012/v1",
+                model_name=model_name,
+                top_k=top_k,
+                gpu_search=gpu_search,
+                nv_ranker=nv_ranker,
+                **reranker_kwargs,
+            )
+
+        for expected_pdf, retrieved_answers in zip(batch_expected_pdfs, batch_answers):
+            # Extract PDF names only (no page numbers)
+            retrieved_pdfs = [
+                os.path.basename(result.get("entity", {}).get("source", {}).get("source_id", "")).split(".")[0]
+                for result in retrieved_answers
+            ]
+
+            # Finance_bench uses k values [1, 5, 10]
+            for k in [1, 5, 10]:
+                if k <= top_k:
+                    hits[k].append(expected_pdf in retrieved_pdfs[:k])
 
     recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
 
@@ -177,39 +274,40 @@ def evaluate_recall_orchestrator(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
     **scorer_kwargs,
 ) -> Dict[int, float]:
     """
     Generic orchestrator for recall evaluation.
 
-    Centralizes the common pattern: load ground truth → score → return results.
-    All parameters are passed through to the scorer function, preserving config-driven behavior.
-
     Args:
-        loader_func: Function that loads ground truth DataFrame from optional directory.
-        scorer_func: Function that calculates recall scores (get_recall_scores or get_recall_scores_pdf_only).
-        collection_name: Milvus collection name to query.
+        loader_func: Function that loads ground truth DataFrame.
+        scorer_func: Function that calculates recall scores.
+        collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
-        model_name: Embedding model name for query encoding.
-        top_k: Maximum number of results to retrieve and evaluate.
-        gpu_search: Use GPU acceleration for Milvus search.
-        nv_ranker: Enable NVIDIA reranker for result reranking.
-        ground_truth_dir: Directory containing ground truth files (optional).
-        **scorer_kwargs: Additional kwargs to pass to scorer_func (e.g., nv_ranker_endpoint, nv_ranker_model_name).
+        sparse: Enable hybrid retrieval (Milvus only).
+        model_name: Embedding model name.
+        top_k: Maximum results to retrieve.
+        gpu_search: Use GPU for search (Milvus only).
+        nv_ranker: Enable reranker.
+        ground_truth_dir: Directory containing ground truth files.
+        vdb_backend: VDB backend ("milvus" or "lancedb").
+        table_path: Path to LanceDB database.
+        **scorer_kwargs: Additional kwargs for scorer_func.
 
     Returns:
-        Dictionary mapping k values to recall scores (float 0.0-1.0).
+        Dictionary mapping k values to recall scores.
     """
-    # 1. Load ground truth using dataset-specific loader
     query_df = loader_func(ground_truth_dir)
 
-    # 2. Calculate recall scores using dataset-specific scorer
     scores = scorer_func(
         query_df,
         collection_name,
         hostname=hostname,
         sparse=sparse,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -260,22 +358,30 @@ def bo767_recall(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
     Evaluate recall@k for bo767 dataset (multimodal-only).
 
     Loads ground truth queries from bo767_query_gt.csv and evaluates recall
-    against the specified Milvus collection.
+    against the specified VDB collection.
 
     Args:
-        collection_name: Milvus collection name to query.
+        collection_name: VDB collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
         nv_ranker: Enable NVIDIA reranker for result reranking.
         ground_truth_dir: Directory containing bo767_query_gt.csv (optional).
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
 
     Returns:
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
@@ -292,6 +398,10 @@ def bo767_recall(
         gpu_search=gpu_search,
         nv_ranker=nv_ranker,
         ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
     )
 
 
@@ -345,7 +455,7 @@ def finance_bench_load_ground_truth(ground_truth_dir: Optional[str] = None) -> p
 def finance_bench_recall(
     collection_name: str,
     hostname: str = "localhost",
-    sparse: bool = False,  # Default False (hybrid=False) for finance_bench
+    sparse: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -353,6 +463,8 @@ def finance_bench_recall(
     ground_truth_dir: Optional[str] = None,
     nv_ranker_endpoint: Optional[str] = None,
     nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
     Evaluate recall@k for finance_bench dataset (multimodal-only).
@@ -361,9 +473,9 @@ def finance_bench_recall(
     using PDF-only matching (document level, not page level).
 
     Args:
-        collection_name: Milvus collection name to query.
+        collection_name: VDB collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
@@ -371,6 +483,8 @@ def finance_bench_recall(
         ground_truth_dir: Directory containing financebench_train.json (optional).
         nv_ranker_endpoint: Optional custom reranker endpoint URL.
         nv_ranker_model_name: Optional custom reranker model name.
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
 
     Returns:
         Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
@@ -389,6 +503,8 @@ def finance_bench_recall(
         ground_truth_dir=ground_truth_dir,
         nv_ranker_endpoint=nv_ranker_endpoint,
         nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
     )
 
 
@@ -446,6 +562,10 @@ def earnings_recall(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """
     Evaluate recall@k for earnings dataset (multimodal-only).
@@ -454,14 +574,18 @@ def earnings_recall(
     using PDF+page matching.
 
     Args:
-        collection_name: Milvus collection name to query.
+        collection_name: VDB collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
         nv_ranker: Enable NVIDIA reranker for result reranking.
         ground_truth_dir: Directory containing earnings_consulting_multimodal.csv (optional).
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
 
     Returns:
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
@@ -478,6 +602,10 @@ def earnings_recall(
         gpu_search=gpu_search,
         nv_ranker=nv_ranker,
         ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
     )
 
 
@@ -497,6 +625,61 @@ def audio_recall(
     TODO: Implement audio-specific ground truth loading and evaluation.
     """
     raise NotImplementedError("audio_recall not yet implemented")
+
+
+def bo10k_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
+    """Load bo10k ground truth from digital_corpora_10k_annotations.csv."""
+    if ground_truth_dir is None:
+        ground_truth_dir = os.path.join(get_repo_root(), "data")
+
+    csv_path = os.path.join(ground_truth_dir, "digital_corpora_10k_annotations.csv")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"digital_corpora_10k_annotations.csv not found at {csv_path}")
+
+    df = pd.read_csv(csv_path)
+
+    required_cols = ["query", "pdf", "page"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"bo10k CSV missing required columns: {missing_cols}")
+
+    df["pdf"] = df["pdf"].astype(str).apply(lambda x: x.replace(".pdf", ""))
+    df["pdf_page"] = df.apply(lambda x: f"{x.pdf}_{x.page + 1}", axis=1)
+
+    return df.reset_index(drop=True)
+
+
+def bo10k_recall(
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = True,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+) -> Dict[int, float]:
+    """Evaluate recall@k for bo10k dataset."""
+    return evaluate_recall_orchestrator(
+        loader_func=bo10k_load_ground_truth,
+        scorer_func=get_recall_scores,
+        collection_name=collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
+    )
 
 
 def get_recall_collection_name(test_name: str) -> str:
@@ -532,6 +715,7 @@ def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
         "finance_bench": finance_bench_recall,
         "earnings": earnings_recall,
         "audio": audio_recall,
+        "bo10k": bo10k_recall,
     }
 
     return evaluators.get(dataset_name.lower())

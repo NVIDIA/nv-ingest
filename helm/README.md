@@ -9,20 +9,8 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-> Starting with version 26.0.0, the [NVIDIA NIM Operator](https://docs.nvidia.com/nim-operator/latest/install.html) is **required**. All NIM services are now deployed via NIM Operator CRDs (NIMCache and NIMService), not Helm subcharts.
->
-> **Upgrading from 25.9.0:**
-> 1. Install NIM Operator before upgrading
-> 2. Update your values file with the new configuration keys:
->
-> | 25.9.0 | 26.x |
-> |--------|------|
-> | `nim-vlm-image-captioning.deployed=true` | `nimOperator.nemotron_nano_12b_v2_vl.enabled=true` |
-> | `paddleocr-nim.deployed=true` | `nimOperator.paddleocr.enabled=true` |
-> | `riva-nim.deployed=true` | Not yet available |
-> | `nim-vlm-text-extraction.deployed=true` | Not yet available |
-
-The [Nvidia GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html) must also be installed and configured in your cluster.
+The [Nvidia nim-operator](https://docs.nvidia.com/nim-operator/latest/install.html) must also be installed and configured in your cluster to ensure that
+the Nvidia NIMs are properly deployed.
 
 ## Initial Environment Setup
 
@@ -57,7 +45,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.9.0.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-26.1.2.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -66,7 +54,7 @@ helm upgrade \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="25.9.0"
+    --set image.tag="26.1.2"
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
@@ -117,7 +105,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==25.9.0
+pip install nv-ingest-client==26.1.2
 ```
 
 #### Rest Endpoint Ingress
@@ -359,7 +347,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.9.0"` |  |
+| image.tag | string | `"26.1.2"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -428,7 +416,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.audio.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.audio.storage.pvc.create | bool | `true` |  |
 | nimOperator.audio.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.audio.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.audio.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.embedqa.authSecret | string | `"ngc-api"` |  |
 | nimOperator.embedqa.enabled | bool | `true` |  |
 | nimOperator.embedqa.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -445,12 +433,12 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.embedqa.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.embedqa.image.pullSecrets[0] | string | `"ngc-secret"` |  |
 | nimOperator.embedqa.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
-| nimOperator.embedqa.image.tag | string | `"1.10.0"` |  |
+| nimOperator.embedqa.image.tag | string | `"1.10.1"` |  |
 | nimOperator.embedqa.replicas | int | `1` |  |
 | nimOperator.embedqa.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.embedqa.storage.pvc.create | bool | `true` |  |
 | nimOperator.embedqa.storage.pvc.size | string | `"50Gi"` |  |
-| nimOperator.embedqa.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.embedqa.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.graphic_elements.authSecret | string | `"ngc-api"` |  |
 | nimOperator.graphic_elements.enabled | bool | `true` |  |
 | nimOperator.graphic_elements.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -476,7 +464,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.graphic_elements.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.graphic_elements.storage.pvc.create | bool | `true` |  |
 | nimOperator.graphic_elements.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.graphic_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.graphic_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.authSecret | string | `"ngc-api"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled | bool | `false` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.env | list | `[]` |  |
@@ -491,7 +479,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.create | bool | `true` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.size | string | `"50Gi"` |  |
-| nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.llama_3_2_nv_rerankqa_1b_v2.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nemoretriever_ocr_v1.authSecret | string | `"ngc-api"` |  |
 | nimOperator.nemoretriever_ocr_v1.enabled | bool | `true` |  |
 | nimOperator.nemoretriever_ocr_v1.env[0].name | string | `"OMP_NUM_THREADS"` |  |
@@ -519,7 +507,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemoretriever_ocr_v1.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.nemoretriever_ocr_v1.storage.pvc.create | bool | `true` |  |
 | nimOperator.nemoretriever_ocr_v1.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.nemoretriever_ocr_v1.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nemoretriever_ocr_v1.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.authSecret | string | `"ngc-api"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.enabled | bool | `false` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.expose.service.grpcPort | int | `8001` |  |
@@ -533,7 +521,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_nano_12b_v2_vl.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.create | bool | `true` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.size | string | `"300Gi"` |  |
-| nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nemotron_parse.authSecret | string | `"ngc-api"` |  |
 | nimOperator.nemotron_parse.enabled | bool | `false` |  |
 | nimOperator.nemotron_parse.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -551,11 +539,11 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_parse.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.nemotron_parse.storage.pvc.create | bool | `true` |  |
 | nimOperator.nemotron_parse.storage.pvc.size | string | `"100Gi"` |  |
-| nimOperator.nemotron_parse.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nemotron_parse.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nimCache.pvc.create | bool | `true` |  |
 | nimOperator.nimCache.pvc.size | string | `"25Gi"` |  |
 | nimOperator.nimCache.pvc.storageClass | string | `"default"` |  |
-| nimOperator.nimCache.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.nimCache.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nimService.namespaces | list | `[]` |  |
 | nimOperator.nimService.resources | object | `{}` |  |
 | nimOperator.page_elements.authSecret | string | `"ngc-api"` |  |
@@ -603,7 +591,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.page_elements.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.page_elements.storage.pvc.create | bool | `true` |  |
 | nimOperator.page_elements.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.page_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.page_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.table_structure.authSecret | string | `"ngc-api"` |  |
 | nimOperator.table_structure.enabled | bool | `true` |  |
 | nimOperator.table_structure.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -629,7 +617,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.table_structure.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.table_structure.storage.pvc.create | bool | `true` |  |
 | nimOperator.table_structure.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.table_structure.storage.pvc.volumeAccessMode | string | `"ReadWriteMany"` |  |
+| nimOperator.table_structure.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nodeSelector | object | `{}` |  |
 | opentelemetry-collector.config.exporters.debug.verbosity | string | `"detailed"` |  |
 | opentelemetry-collector.config.exporters.zipkin.endpoint | string | `"http://nv-ingest-zipkin:9411/api/v2/spans"` |  |
@@ -682,7 +670,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | prometheus.alertmanager.enabled | bool | `false` |  |
 | prometheus.enabled | bool | `false` |  |
 | prometheus.server.enabled | bool | `false` |  |
-| readinessProbe.enabled | bool | `false` |  |
+| readinessProbe.enabled | bool | `true` |  |
 | readinessProbe.failureThreshold | int | `220` |  |
 | readinessProbe.httpGet.path | string | `"/v1/health/ready"` |  |
 | readinessProbe.httpGet.port | string | `"http"` |  |

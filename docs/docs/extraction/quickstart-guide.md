@@ -43,25 +43,14 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
-
-
-5. (Optional) For faster OCR performance, you can use the [nemoretriever-ocr-v1](https://build.nvidia.com/nvidia/nemoretriever-ocr-v1) container. [Configure Helm](https://github.com/nvidia/nv-ingest/tree/main/helm) to deploy nemoretriever-ocr-v1 and then set these values in your .env file:
-
-    ```
-    OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-    OCR_TAG=latest
-    OCR_MODEL_NAME=scene_text_ensemble
-    ```
-        
-   Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
    
-6. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+6. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
-    `docker compose --profile retrieval --profile table-structure up`
+    `docker compose --profile retrieval up`
 
     !!! tip
 
@@ -79,10 +68,10 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     docker compose \
       -f docker-compose.yaml \
       -f docker-compose.a100-40gb.yaml \
-      --profile retrieval --profile table-structure up
+      --profile retrieval up
     ```
 
-8. When core services have fully started, `nvidia-smi` should show processes like the following:
+7. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -100,7 +89,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-9. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
+8. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
@@ -130,7 +119,7 @@ To interact from the host, you'll need a Python environment and install the clie
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
+pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 ```
 
 !!! tip
@@ -432,11 +421,37 @@ You can specify multiple `--profile` options.
 | Profile               | Type     | Description                                                       | 
 |-----------------------|----------|-------------------------------------------------------------------| 
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
-| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
+
+## Specify MIG slices for NIM models
+
+When you deploy NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md%E2%80%8B).​
+
+To target a specific MIG profile—for example, a 3g.20gb slice on an A100, which is a hardware-partitioned virtual GPU instance that gives your workload a fixed mid-sized share of the A100’s compute plus 20 GB of dedicated GPU memory and behaves like a smaller independent GPU—for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
+
+The following example shows the pattern. Paths vary by NIM, such as `nvingest.nvidiaNim.nemoretrieverPageElements` instead of the generic `nvingest.nim` placeholder. For details refer to [catalog.ngc.nvidia](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nv-ingest)​.
+Set `resources.requests` and `resources.limits` to the name of the MIG resource that you want (for example, `nvidia.com/mig-3g.20gb`).
+```shell
+nvingest:
+  nvidiaNim:
+    nemoretrieverPageElements:
+      modelName: "meta/llama3-8b-instruct"        # Example NIM model
+      resources:
+        limits:
+          nvidia.com/mig-3g.20gb: 1               # MIG profile resource
+        requests:
+          nvidia.com/mig-3g.20gb: 1
+      nodeSelector:
+        nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb
+```
+Key points:
+* Use the appropriate NIM‑specific values path (for example, `nvingest.nvidiaNim.nemoretrieverPageElements.resources`) rather than the generic `nvingest.nim` placeholder.
+* Set `resources.requests` and `resources.limits` to the desired MIG resource name (for example, `nvidia.com/mig-3g.20gb`).
+* Use `nodeSelector` (or tolerations/affinity, if you prefer) to target nodes labeled with the corresponding MIG‑enabled GPU product (for example, `nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb`).
+This syntax and structure can be repeated for each NIM model used by CAS, ensuring that each NV-Ingest NIM pod is mapped to the correct MIG slice type and scheduled onto compatible nodes.
 
 !!! important
 

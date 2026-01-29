@@ -72,7 +72,7 @@ Ensure your deployment environment meets these specifications before running the
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Troubleshooting](troubleshooting.md)
+- [Troubleshooting](troubleshoot.md)
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
 - [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
 - [Deploy With Helm](helm.md)

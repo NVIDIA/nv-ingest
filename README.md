@@ -46,18 +46,24 @@ NeMo Retriever Extraction is a library and microservice service that does the fo
 
 NeMo Retriever Extraction supports the following file types:
 
+- `avi` (early access)
 - `bmp`
 - `docx`
 - `html` (converted to markdown format)
 - `jpeg`
 - `json` (treated as text)
 - `md` (treated as text)
+- `mkv` (early access)
+- `mov` (early access)
+- `mp3`
+- `mp4` (early access)
 - `pdf`
 - `png`
 - `pptx`
 - `sh` (treated as text)
 - `tiff`
 - `txt`
+- `wav`
 
 
 ### What NeMo Retriever Extraction Isn't
@@ -93,7 +99,7 @@ Create a fresh Python environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
+  uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
 ```
 
 Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -377,8 +383,7 @@ https://pypi.org/project/pdfservices-sdk/
     pdfservices-sdk before enabling this option.
 - **Built With Llama**:
   - **Description**: The NV-Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded so 
-    that the split task can use it for token-based splitting without making a network request. Please review the 
-    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials.
+    that the split task can use it for token-based splitting without making a network request. The [Llama 3.2 Community License Agreement](https://huggingface.co/meta-llama/Llama-3.2-1B/blob/main/LICENSE.txt) governs your use of these Llama materials.
     
     If you're building the container yourself and want to pre-download this model, you'll first need to set 
     `DOWNLOAD_LLAMA_TOKENIZER` to `True`. Because this is a gated model, you'll also need to 

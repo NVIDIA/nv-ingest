@@ -239,7 +239,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:latest
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:26.1.2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
@@ -276,7 +276,7 @@ services:
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
-      - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
+      - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-true}
       # Ray internals configuration
       - RAY_num_grpc_threads=1
       - RAY_num_server_call_thread=1

@@ -14,14 +14,52 @@ active:
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
-  profiles:
-    - retrieval
-    - table-structure
+
+  # Docker Compose configuration
+  compose:
+    profiles:
+      - retrieval
+      - reranker  # Required for recall evaluation
+
+  # Helm configuration
+  helm:
+    bin: microk8s helm  # Helm binary command (e.g., "helm", "microk8s helm", "k3s helm")
+    sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
+    kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
+    kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
+    chart: nemo-microservices/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
+    chart_version: 26.1.2  # Chart version (required for remote charts)
+    release: nv-ingest
+    namespace: nv-ingest
+    values_file: .helm-env  # Optional: path to values file
+    # Multiple port forwards for Helm services
+    port_forwards:
+      - service: nv-ingest
+        local_port: 7670
+        remote_port: 7670
+      - service: nv-ingest-milvus
+        local_port: 19530
+        remote_port: 19530
+      - service: nv-ingest-milvus
+        local_port: 9091
+        remote_port: 9091
+      - service: nv-ingest-minio
+        local_port: 9000
+        remote_port: 9000
+      - service: "*embed*"  # Wildcard pattern to match embedding services
+        local_port: 8012
+        remote_port: 8000
+      - service: "*rerank*"  # Wildcard pattern to match reranker services
+        local_port: 8020
+        remote_port: 8000
+    values:  # inline Helm values
+      nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled: true
 
   # Runtime configuration
   sparse: false  # Use sparse embeddings
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
+  vdb_backend: milvus  # milvus or lancedb
 
   # Extraction configuration
   extract_text: true
@@ -35,7 +73,7 @@ active:
   # Optional pipeline steps
   enable_caption: false  # Enable image captioning (ensure vlm profile is enabled)
   caption_prompt: null  # Override caption user prompt (null = service default)
-  caption_system_prompt: null  # Set "/think" or "/no_think" to control reasoning (null = service default)
+  caption_reasoning: null  # Enable reasoning: true = enable, false = disable, null = service default (default is false)
 
   enable_split: false  # Enable text chunking
   split_chunk_size: 1024  # Chunk size for text splitting
@@ -51,6 +89,8 @@ active:
   llm_summarization_model: nvdev/nvidia/llama-3.1-nemotron-70b-instruct  # LLM for summarization - this does NOT propagate to the UDF, but useful for artifact storage.
 
 # Recall configuration (only used when running recall or e2e_recall tests)
+# Remember to start the reranker service before running recall tests:
+# docker compose --profile reranker up -d
 recall:
   recall_dataset: null
   reranker_mode: none  # Options: "none", "with", "both"
@@ -70,7 +110,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: bo767  # Evaluator for recall testing
+    recall_dataset: bo767
 
   earnings:
     path: /path/to/earnings_consulting
@@ -79,7 +119,7 @@ datasets:
     extract_charts: true
     extract_images: false
     extract_infographics: false
-    recall_dataset: earnings  # Evaluator for recall testing
+    recall_dataset: earnings
 
   bo20:
     path: /path/to/bo20
@@ -88,16 +128,16 @@ datasets:
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: null  # bo20 does not have recall
+    recall_dataset: null
 
   financebench:
-    path: /path/to/financebench_full
+    path: /path/to/financebench
     extract_text: true
     extract_tables: true
     extract_charts: true
     extract_images: true
     extract_infographics: true
-    recall_dataset: finance_bench  # Evaluator for recall testing
+    recall_dataset: finance_bench
 
   # Single file example
   single:
@@ -118,3 +158,12 @@ datasets:
     extract_images: true
     extract_infographics: true
     recall_dataset: null  # No recall evaluator for single file
+
+  bo10k:
+    path: /path/to/bo10k
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: bo10k

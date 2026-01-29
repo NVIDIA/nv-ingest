@@ -415,7 +415,7 @@ def create_nvingest_collection(
     graph_degree: int = 100,
     m: int = 64,
     ef_construction: int = 512,
-    collection_alias: str = None,
+    alias: str = None,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -450,8 +450,14 @@ def create_nvingest_collection(
     """
 
     local_index = False
+    connection_details = {
+        "uri": milvus_uri,
+        "token": f"{username}:{password}",
+    }
+    if alias is not None:
+        connection_details["alias"] = alias
     if urlparse(milvus_uri).scheme:
-        connections.connect(collection_alias, uri=milvus_uri, token=f"{username}:{password}")
+        connections.connect(**connection_details)
         server_version = utility.get_server_version()
         if "lite" in server_version:
             gpu_index = False
@@ -460,7 +466,7 @@ def create_nvingest_collection(
         if milvus_uri.endswith(".db"):
             local_index = True
 
-    client = MilvusClient(alias=collection_alias, uri=milvus_uri, token=f"{username}:{password}")
+    client = MilvusClient(**connection_details)
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse, local_index=local_index)
     index_params = create_nvingest_index_params(
         sparse=sparse,
@@ -1010,7 +1016,14 @@ def write_to_nvingest_collection(
         Milvus password.
     """
     local_index = False
-    connections.connect(uri=milvus_uri, token=f"{username}:{password}")
+    connection_details = {
+        "uri": milvus_uri,
+        "token": f"{username}:{password}",
+    }
+    alias = kwargs.get("alias", None)
+    if alias is not None:
+        connection_details["alias"] = alias
+    connections.connect(**connection_details)
     if urlparse(milvus_uri).scheme:
         server_version = utility.get_server_version()
         if "lite" in server_version:
@@ -1033,7 +1046,8 @@ def write_to_nvingest_collection(
     elif local_index and sparse:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(bm25_save_path)
-    client = MilvusClient(milvus_uri, token=f"{username}:{password}", alias=kwargs.get("alias", None))
+
+    client = MilvusClient(**connection_details)
     schema = Collection(collection_name).schema
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
@@ -1531,10 +1545,26 @@ def nv_rerank(
         "passages": texts,
         "truncate": truncate,
     }
-    start = time.time()
-    response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
-    logger.debug(f"RERANKER time: {time.time() - start}")
-    if response.status_code != 200:
+
+    max_retries = 3
+    for attempt in range(max_retries + 1):
+        start = time.time()
+        try:
+            response = requests.post(reranker_endpoint, headers=headers, json=payload, timeout=120)
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries:
+                time.sleep(2**attempt)
+                continue
+            raise ValueError(f"Reranker connection failed after {max_retries + 1} attempts: {e}")
+
+        logger.debug(f"RERANKER time: {time.time() - start}")
+
+        if response.status_code == 200:
+            break
+        if response.status_code in {500, 502, 503, 504} and attempt < max_retries:
+            logger.warning(f"Reranker {response.status_code}, retry {attempt + 1}/{max_retries + 1}")
+            time.sleep(2**attempt)
+            continue
         raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []
     for rank_vals in response.json()["rankings"]:
