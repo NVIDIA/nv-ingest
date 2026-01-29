@@ -137,32 +137,28 @@ class HelmManager(ServiceManager):
         if self.chart_version:
             cmd += ["--version", self.chart_version]
 
-        # Parse and add values from YAML file if specified
+        # Values files
+        # - Always include release.yaml (if present) so NIM image versions match docker-compose.
+        # - Include helm/values.yaml by default when using the local chart.
+        local_chart_path = (self.repo_root / "helm").resolve()
+        is_local_chart = Path(self.chart_ref).resolve() == local_chart_path if Path(self.chart_ref).exists() else False
+
+        # User-specified values file (relative to repo root)
         if self.values_file:
             values_path = self.repo_root / self.values_file
             if values_path.exists():
-                try:
-                    print(f"Loading values from {values_path}...")
-                    with open(values_path, "r") as f:
-                        values_data = yaml.safe_load(f)
-
-                    if values_data:
-                        # Flatten the YAML structure
-                        flattened_values = self._flatten_dict(values_data)
-                        print(f"Parsed {len(flattened_values)} value(s) from {self.values_file}")
-
-                        # Add to command using --set and --set-json
-                        cmd = self._add_values_to_command(cmd, flattened_values)
-                    else:
-                        print(f"Warning: Values file {values_path} is empty")
-                except yaml.YAMLError as e:
-                    print(f"Error: Failed to parse YAML file {values_path}: {e}")
-                    return 1
-                except Exception as e:
-                    print(f"Error: Failed to read values file {values_path}: {e}")
-                    return 1
+                cmd += ["-f", str(values_path)]
             else:
                 print(f"Warning: Values file {values_path} not found, skipping")
+        elif is_local_chart:
+            # Default for local chart
+            cmd += ["-f", str(local_chart_path / "values.yaml")]
+
+        release_values_path = self.repo_root / "release.yaml"
+        if release_values_path.exists():
+            cmd += ["-f", str(release_values_path)]
+        else:
+            print(f"Warning: release.yaml not found at {release_values_path} (NIM images may be unset)")
 
         # Add inline values from config
         if hasattr(self.config, "helm_values") and self.config.helm_values:

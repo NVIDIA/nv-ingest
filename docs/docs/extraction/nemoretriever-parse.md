@@ -37,7 +37,7 @@ Use the following procedure to run the NIM locally.
     - The --profile nemotron-parse flag ensures that vision-language retrieval services are launched.  For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
     ```shell
-    docker compose --profile nemotron-parse up
+    docker compose -f docker-compose.yaml -f release.yaml --profile nemotron-parse up
     ```
 
 2. After the services are running, you can interact with nv-ingest by using Python.

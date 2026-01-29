@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.table_structure.image.repository }}:{{ .Values.nimOperator.table_structure.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "table_structure") }}"
       pullSecret: "{{ index .Values.nimOperator.table_structure.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.table_structure.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: nemoretriever-table-structure-v1
 spec:
   image:
-    repository: {{ .Values.nimOperator.table_structure.image.repository }}
-    tag: {{ .Values.nimOperator.table_structure.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "table_structure") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "table_structure") }}
     pullPolicy: {{ .Values.nimOperator.table_structure.image.pullPolicy }}
     pullSecrets:
 {{ toYaml .Values.nimOperator.table_structure.image.pullSecrets | nindent 6 }}

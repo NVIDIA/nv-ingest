@@ -8,7 +8,7 @@ metadata:
 spec:
   source:
     ngc:
-      modelPuller: "{{ .Values.nimOperator.graphic_elements.image.repository }}:{{ .Values.nimOperator.graphic_elements.image.tag }}"
+      modelPuller: "{{ include "nv-ingest.release.nimRef" (dict "root" . "key" "graphic_elements") }}"
       pullSecret: "{{ index .Values.nimOperator.graphic_elements.image.pullSecrets 0 }}"
       authSecret: {{ .Values.nimOperator.graphic_elements.authSecret }}
   storage:
@@ -24,8 +24,8 @@ metadata:
   name: nemoretriever-graphic-elements-v1
 spec:
   image:
-    repository: {{ .Values.nimOperator.graphic_elements.image.repository }}
-    tag: {{ .Values.nimOperator.graphic_elements.image.tag }}
+    repository: {{ include "nv-ingest.release.nimRepository" (dict "root" . "key" "graphic_elements") }}
+    tag: {{ include "nv-ingest.release.nimTag" (dict "root" . "key" "graphic_elements") }}
     pullPolicy: {{ .Values.nimOperator.graphic_elements.image.pullPolicy }}
     pullSecrets:
 {{ toYaml .Values.nimOperator.graphic_elements.image.pullSecrets | nindent 6 }}

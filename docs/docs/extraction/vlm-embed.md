@@ -17,18 +17,30 @@ The model supports images that contain text, tables, charts, and infographics.
 
 Use the following procedure to configure and run the multimodal embedding NIM locally.
 
-1. Set the embedding model in your .env file. This tells NeMo Retriever extraction to use the Llama 3.2 Multimodal model instead of the default text-only embedding model.
+1. Set the embedding model name in your `.env` file. This tells NeMo Retriever extraction to use the Llama 3.2 Multimodal model instead of the default text-only embedding model.
 
     ```
-    EMBEDDING_IMAGE=nvcr.io/nvidia/nemo-microservices/llama-3.2-nemoretriever-1b-vlm-embed-v1
-    EMBEDDING_TAG=1.7.0
     EMBEDDING_NIM_MODEL_NAME=nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1
     ```
 
-2. Start the NeMo Retriever extraction services. The multimodal embedding service is included by default.
+2. Create a Docker Compose override file to swap the embedding NIM image.
+
+    Create `docker-compose.vlm-embed.yaml` with the following contents:
+
+    ```yaml
+    services:
+      embedding:
+        image: nvcr.io/nvidia/nemo-microservices/llama-3.2-nemoretriever-1b-vlm-embed-v1:1.7.0
+    ```
+
+3. Start the NeMo Retriever extraction services.
 
     ```
-    docker compose --profile retrieval up
+    docker compose \
+      -f docker-compose.yaml \
+      -f release.yaml \
+      -f docker-compose.vlm-embed.yaml \
+      --profile retrieval up
     ```
 
 
