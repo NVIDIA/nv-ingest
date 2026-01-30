@@ -21,7 +21,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-import torch
 from torch.utils.benchmark import Timer
 from tqdm import tqdm
 
