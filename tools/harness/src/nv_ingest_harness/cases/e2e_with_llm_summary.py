@@ -12,11 +12,11 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_harness.utils.cases import get_repo_root
 from nv_ingest_harness.utils.interact import (
     embed_info,
-    milvus_chunks,
     segment_results,
     kv_event_log,
-    pdf_page_count,
 )  # noqa: E402
+from nv_ingest_harness.utils.milvus import milvus_chunks
+from nv_ingest_harness.utils.pdf import pdf_page_count
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 

@@ -6,17 +6,24 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "docker>=7.1.0",
-    "milvus-lite==2.4.12",
-    "nv-ingest",
-    "nv-ingest-api",
-    "nv-ingest-client",
     "pyyaml>=6.0",
     "requests>=2.31.0",
     "pynvml>=11.5.0",
+]
+
+[project.optional-dependencies]
+ingest = [
+    "nv-ingest",
+    "nv-ingest-api",
+    "nv-ingest-client",
+    "milvus-lite==2.4.12",
+    "pypdfium2",
+]
+nemotron-hf = [
     "nemotron-page-elements-v3",
     "nemotron-graphic-elements-v1",
     "nemotron-table-structure-v1",
-    "matplotlib",
+    "nemotron-ocr",
 ]
 
 [project.scripts]

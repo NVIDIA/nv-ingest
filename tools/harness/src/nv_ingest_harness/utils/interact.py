@@ -10,9 +10,6 @@ import urllib.error
 
 from pathlib import Path
 
-from pymilvus import MilvusClient
-
-import pypdfium2 as pdfium
 import subprocess
 import datetime
 import socket
@@ -268,129 +265,6 @@ def kv_event_log(key, val, log_path: str = "test_results"):
     # Write back as simple JSON object
     with open(log_file, "w") as fp:
         json.dump(data, fp, indent=2)
-
-
-def unload_collection(milvus_uri: str, collection_name: str):
-    """Unload/release a Milvus collection from memory.
-
-    This function connects to a Milvus instance and releases the specified
-    collection from memory, freeing up resources.
-
-    Args:
-      milvus_uri (str): The URI connection string for the Milvus instance.
-      collection_name (str): The name of the collection to unload.
-    """
-    try:
-        client = MilvusClient(uri=milvus_uri)
-        client.release_collection(collection_name=collection_name)
-    except Exception as e:
-        kv_event_log(f"{collection_name}_unload_error", str(e))
-        print(f"Error unloading collection {collection_name}: {e}")
-
-
-def load_collection(milvus_uri: str, collection_name: str):
-    """Load a Milvus collection into memory.
-
-    This function connects to a Milvus instance and loads the specified
-    collection into memory for querying and operations.
-
-    Args:
-      milvus_uri (str): The URI connection string for the Milvus instance.
-      collection_name (str): The name of the collection to load.
-    """
-    try:
-        client = MilvusClient(uri=milvus_uri)
-        client.load_collection(collection_name)
-    except Exception as e:
-        kv_event_log(f"{collection_name}_load_error", str(e))
-        print(f"Error loading collection {collection_name}: {e}")
-
-
-def milvus_chunks(milvus_uri: str, collection_name: str):
-    """Get and log statistics about chunks in a Milvus collection.
-
-    This function connects to a Milvus instance, retrieves collection statistics,
-    logs the chunk information using the event logging system, and closes the connection.
-
-    Args:
-      milvus_uri (str): The URI connection string for the Milvus instance.
-      collection_name (str): The name of the collection to get statistics for.
-
-    Returns:
-      dict: A dictionary containing the collection statistics.
-    """
-    try:
-        client = MilvusClient(uri=milvus_uri)
-        stats = client.get_collection_stats(collection_name)
-        kv_event_log(f"{collection_name}_chunks", f"{stats}")
-        client.close()
-    except Exception as e:
-        kv_event_log(f"{collection_name}_chunks_error", str(e))
-        print(f"Error getting collection stats for {collection_name}: {e}")
-        stats = {}
-    return stats
-
-
-def pdf_page_count_glob(pattern: str) -> int:
-    """Count the total number of pages in all PDF files matching a glob pattern.
-
-    This function searches for PDF files using a glob pattern and counts the total
-    number of pages across all matching files.
-
-    Args:
-        pattern (str): A glob pattern to match PDF files (supports recursive search).
-
-    Returns:
-        int: The total number of pages across all matching PDF files.
-    """
-    total_pages = 0
-    for filepath in glob.glob(pattern, recursive=True):
-        if filepath.lower().endswith(".pdf"):
-            pdf = pdfium.PdfDocument(filepath)
-            total_pages += len(pdf)
-    return total_pages
-
-
-def pdf_page_count(path: str) -> int:
-    """Count the total number of pages in PDF file(s).
-
-    This function handles both single PDF files and directories containing PDFs.
-    For a file path, it counts pages in that specific PDF.
-    For a directory path, it recursively scans for all PDF files and counts total pages.
-    If a PDF file cannot be processed, an error message is printed and the file is skipped.
-
-    Args:
-        path (str): Path to a PDF file or directory containing PDF files.
-
-    Returns:
-        int: The total number of pages across all PDF files.
-    """
-    total_pages = 0
-
-    # Handle single file
-    if os.path.isfile(path):
-        if path.lower().endswith(".pdf"):
-            try:
-                pdf = pdfium.PdfDocument(path)
-                total_pages = len(pdf)
-            except Exception as e:
-                print(f"{path} failed: {e}")
-        return total_pages
-
-    # Handle directory - recursively search for PDFs
-    if os.path.isdir(path):
-        for root, _, files in os.walk(path):
-            for filename in files:
-                if filename.lower().endswith(".pdf"):
-                    filepath = os.path.join(root, filename)
-                    try:
-                        pdf = pdfium.PdfDocument(filepath)
-                        total_pages += len(pdf)
-                    except Exception as e:
-                        print(f"{filepath} failed: {e}")
-                        continue
-
-    return total_pages
 
 
 def segment_results(results):
