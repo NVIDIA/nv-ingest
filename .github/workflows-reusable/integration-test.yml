@@ -1,0 +1,115 @@
+name: Reusable Integration Tests
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: 'GitHub runner to use'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      python-version:
+        description: 'Python version'
+        required: false
+        type: string
+        default: '3.12.11'
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        required: false
+        type: number
+        default: 60
+    secrets:
+      AUDIO_FUNCTION_ID:
+        required: true
+      EMBEDDING_NIM_MODEL_NAME:
+        required: true
+      NEMOTRON_PARSE_MODEL_NAME:
+        required: true
+      NGC_API_KEY:
+        required: true
+      NVIDIA_API_KEY:
+        required: true
+      PADDLE_HTTP_ENDPOINT:
+        required: true
+      VLM_CAPTION_ENDPOINT:
+        required: true
+      VLM_CAPTION_MODEL_NAME:
+        required: true
+      YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT:
+        required: true
+      YOLOX_HTTP_ENDPOINT:
+        required: true
+      YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT:
+        required: true
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: test_artifacts
+        continue-on-error: true
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+
+      - name: Install Conda Packages & Dependencies
+        shell: bash -el {0}
+        run: |
+          conda create -y --name nvingest python=${{ inputs.python-version }}
+          conda activate nvingest
+
+          # Install from the downloaded local channel first
+          conda install -y \
+            -c ./conda/output_conda_channel \
+            -c rapidsai \
+            -c conda-forge \
+            -c nvidia \
+            nv_ingest nv_ingest_api nv_ingest_client
+
+          # Install other dependencies
+          conda install -y -c conda-forge librosa
+
+          # Install pip dependencies
+          $CONDA/envs/nvingest/bin/python -m pip install \
+            opencv-python \
+            llama-index-embeddings-nvidia \
+            pymilvus \
+            'pymilvus[bulk_writer, model]' \
+            'milvus-lite==2.4.12' \
+            'nvidia-riva-client==2.20.0' \
+            unstructured-client \
+            tritonclient \
+            markitdown \
+            glom
+
+      - name: Run integration tests
+        env:
+          AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
+          AUDIO_INFER_PROTOCOL: http
+          EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
+          NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          OCR_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+          OCR_INFER_PROTOCOL: http
+          VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
+          VLM_CAPTION_MODEL_NAME: ${{ secrets.VLM_CAPTION_MODEL_NAME }}
+          YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
+          YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: http
+          YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
+          YOLOX_INFER_PROTOCOL: http
+          YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
+          YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
+          NV_INGEST_PIPELINE_CONFIG_PATH: ./config/default_pipeline.yaml
+        shell: bash -el {0}
+        run: |
+          echo 'Running integration tests...'
+          unset LD_LIBRARY_PATH  # https://github.com/pytorch/pytorch/issues/111469
+          $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
