@@ -45,12 +45,12 @@ def get_image_paths(input_path: str, extensions: tuple = (".png", ".jpg", ".jpeg
 def benchmark_inference(ocr, img_path: str, num_repeats: int = 1) -> tuple[list, float]:
     """
     Run OCR inference on a single image using torch.utils.benchmark.Timer.
-    
+
     Args:
         ocr: The loaded NemotronOCR model
         img_path: Path to the image file
         num_repeats: Number of times to run inference for timing (default: 1)
-    
+
     Returns:
         Tuple of (predictions list, mean inference time in seconds)
     """
@@ -60,13 +60,13 @@ def benchmark_inference(ocr, img_path: str, num_repeats: int = 1) -> tuple[list,
         globals={"ocr": ocr, "img_path": img_path},
         num_threads=1,
     )
-    
+
     # Run timed inference
     measurement = timer.timeit(num_repeats)
-    
+
     # Run once more to get the actual predictions
     predictions = ocr(img_path)
-    
+
     return predictions, measurement.mean
 
 
