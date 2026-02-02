@@ -1,9 +1,6 @@
 name: Release - Conda
 
 on:
-  create:
-    branches:
-      - 'release/*'
   workflow_dispatch:
     inputs:
       version:
