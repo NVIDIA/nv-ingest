@@ -33,7 +33,7 @@ class TestConfig:
     # Infrastructure
     hostname: str = "localhost"
     readiness_timeout: int = 600
-    profiles: List[str] = field(default_factory=lambda: ["retrieval", "table-structure"])  # Docker Compose only
+    profiles: List[str] = field(default_factory=lambda: ["retrieval", "reranker"])  # Docker Compose only
 
     # Deployment configuration
     deployment_type: str = "compose"  # Options: compose, helm

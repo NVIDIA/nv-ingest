@@ -28,7 +28,14 @@ def test_dedup_task_default_initialization():
 
 def test_dedup_task_str_representation():
     task = DedupTask(content_type="image", filter=True)
-    expected_str = "Dedup Task:\n" "  content_type: image\n" "  filter: True\n"
+    expected_str = (
+        "Dedup Task:\n"
+        "  content_type: image\n"
+        "  filter: True\n"
+        "  enable_bbox_dedup: True\n"
+        "  iou_threshold: 0.45\n"
+        "  prefer_structured: True\n"
+    )
     assert str(task) == expected_str
 
 
@@ -57,7 +64,12 @@ def test_dedup_task_to_dict(content_type, filter_val, expected_content_type):
         "type": "dedup",
         "task_properties": {
             "content_type": expected_content_type,
-            "params": {"filter": filter_val},
+            "params": {
+                "filter": filter_val,
+                "enable_bbox_dedup": True,
+                "iou_threshold": 0.45,
+                "bbox_dedup_prefer_structured": True,
+            },
         },
     }
 
@@ -79,7 +91,12 @@ def test_dedup_task_default_params():
         "type": "dedup",
         "task_properties": {
             "content_type": "image",
-            "params": {"filter": False},
+            "params": {
+                "filter": False,
+                "enable_bbox_dedup": True,
+                "iou_threshold": 0.45,
+                "bbox_dedup_prefer_structured": True,
+            },
         },
     }
     assert task_dict == expected_dict
