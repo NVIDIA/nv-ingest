@@ -4,9 +4,6 @@ on:
   schedule:
     # Nightly at 03:17 UTC
     - cron: "17 3 * * *"
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       upload_to:

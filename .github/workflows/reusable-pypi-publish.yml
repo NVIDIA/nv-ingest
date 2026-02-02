@@ -2,11 +2,6 @@ name: Reusable PyPI Publish
 
 on:
   workflow_call:
-    inputs:
-      repository-url:
-        description: 'PyPI repository URL'
-        required: true
-        type: string
     secrets:
       ARTIFACTORY_URL:
         required: true
