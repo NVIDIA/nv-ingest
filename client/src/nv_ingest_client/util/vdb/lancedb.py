@@ -395,7 +395,6 @@ def lancedb_retrieval(
         )
 
     return results
-    return results
 
 
 def lancedb_hybrid_retrieval(
