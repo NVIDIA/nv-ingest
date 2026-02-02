@@ -1,0 +1,107 @@
+name: Main Branch CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Pre-commit checks
+  pre-commit:
+    name: Pre-commit Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v3
+
+      - uses: pre-commit/action@v3.0.1
+
+  # Build standard Docker image
+  docker-build:
+    name: Build Docker Image (amd64)
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      platform: 'linux/amd64'
+      target: 'runtime'
+      push: false
+      tags: 'nv-ingest:main-${{ github.sha }}'
+      base-image: 'ubuntu'
+      base-image-tag: 'jammy-20250415.1'
+      runner: 'linux-large-disk'
+    secrets:
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+  # Test Docker image
+  docker-test:
+    name: Test Docker Image
+    needs: docker-build
+    uses: ./.github/workflows/reusable-docker-test.yml
+    with:
+      image-tag: 'nv-ingest:main-${{ github.sha }}'
+      platform: 'linux/amd64'
+      test-selection: 'full'
+      pytest-markers: 'not integration'
+      coverage: true
+      runner: 'linux-large-disk'
+
+  # Build ARM64 image (long-running, non-blocking)
+  docker-build-arm:
+    name: Build Docker Image (arm64)
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      platform: 'linux/arm64'
+      target: 'runtime'
+      push: false
+      tags: 'nv-ingest:main-arm64-${{ github.sha }}'
+      base-image: 'ubuntu'
+      base-image-tag: 'jammy-20250415.1'
+      runner: 'linux-large-disk'
+      use-qemu: true
+    secrets:
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+  # Test ARM64 image with random subset
+  docker-test-arm:
+    name: Test Docker Image (arm64)
+    needs: docker-build-arm
+    uses: ./.github/workflows/reusable-docker-test.yml
+    with:
+      image-tag: 'nv-ingest:main-arm64-${{ github.sha }}'
+      platform: 'linux/arm64'
+      test-selection: 'random'
+      random-count: '100'
+      pytest-markers: 'not integration'
+      coverage: false
+      runner: 'linux-large-disk'
+
+  # Build library mode packages
+  library-mode-build:
+    name: Build Library Mode Packages
+    uses: ./.github/workflows/reusable-conda-build.yml
+    with:
+      source-ref: 'main'
+      runner: 'linux-large-disk'
+      upload-artifacts: true
+
+  # Test library mode
+  library-mode-test:
+    name: Test Library Mode
+    needs: library-mode-build
+    uses: ./.github/workflows/reusable-integration-test.yml
+    with:
+      runner: 'ubuntu-latest'
+      timeout-minutes: 60
+    secrets:
+      AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
+      EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
+      NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
+      NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      PADDLE_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+      VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
+      VLM_CAPTION_MODEL_NAME: ${{ secrets.VLM_CAPTION_MODEL_NAME }}
+      YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
+      YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
+      YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
