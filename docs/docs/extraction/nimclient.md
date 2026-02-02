@@ -552,11 +552,11 @@ def robust_nim_udf(control_message: IngestControlMessage) -> IngestControlMessag
 
 ### Common Issues
 
-* **Connection Errors**: Verify NIM service is running and endpoints are correct
-* **Authentication Failures**: Check NGC_API_KEY is valid and properly set
-* **Timeout Errors**: Increase timeout values or check NIM service performance
-* **Format Errors**: Ensure your ModelInterface formats data correctly for your NIM
-* **Memory Issues**: Use appropriate batch sizes to avoid memory exhaustion
+* **Connection Errors** – Verify NIM service is running and endpoints are correct
+* **Authentication Failures** – Check NGC_API_KEY is valid and properly set
+* **Timeout Errors** – Increase timeout values or check NIM service performance
+* **Format Errors** – Ensure your ModelInterface formats data correctly for your NIM
+* **Memory Issues** – Use appropriate batch sizes to avoid memory exhaustion
 
 ### NIM Triton Limit Memory
 
