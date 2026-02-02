@@ -562,7 +562,7 @@ def robust_nim_udf(control_message: IngestControlMessage) -> IngestControlMessag
 
 If you encounter memory issues, try increasing the `NIM_TRITON_CUDA_MEMORY_POOL_MB` parameter. This adjustment typically does not affect performance.
 
-If memory issues persist, you can reduce the `NIM_TRITON_RATE_LIMIT` value — even down to 1. However, lowering this parameter will affect performance.
+If memory issues persist, you can reduce the `NIM_TRITON_RATE_LIMIT` value — even down to 1. However, lowering this parameter affects performance.
 
 ### Debugging Tips
 
