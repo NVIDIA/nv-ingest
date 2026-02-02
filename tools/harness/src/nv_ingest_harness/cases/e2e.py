@@ -203,6 +203,11 @@ def main(config=None, log_path: str = "test_results") -> int:
     vdb_backend = config.vdb_backend
     lancedb_path = None
     if vdb_backend == "lancedb":
+        timing_path = os.path.join(log_path, "lancedb_timings.jsonl")
+        os.environ["NV_INGEST_LANCEDB_TIMING_PATH"] = timing_path
+        if os.path.exists(timing_path):
+            os.remove(timing_path)
+        print(f"LanceDB timings: {timing_path}")
         lancedb_path = get_lancedb_path(config, collection_name)
         ingestor = ingestor.vdb_upload(
             vdb_op="lancedb",
@@ -335,6 +340,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             "retrieval_time_s": retrieval_time,
         },
     }
+    if vdb_backend == "lancedb":
+        test_results["results"]["lancedb_timings_file"] = "lancedb_timings.jsonl"
 
     # Add split config if enabled
     if enable_split:

@@ -1,4 +1,7 @@
+import json
 import logging
+import os
+import time
 
 from datetime import timedelta
 from functools import partial
@@ -13,6 +16,22 @@ from nv_ingest_client.util.vdb.adt_vdb import VDB
 from nv_ingest_client.util.vdb.milvus import nv_rerank
 
 logger = logging.getLogger(__name__)
+
+
+def _record_timing(event: str, duration_s: float, extra: dict | None = None):
+    timing_path = os.getenv("NV_INGEST_LANCEDB_TIMING_PATH")
+    if not timing_path:
+        return
+    payload = {
+        "event": event,
+        "duration_s": duration_s,
+        "timestamp_s": time.time(),
+    }
+    if extra:
+        payload.update(extra)
+    os.makedirs(os.path.dirname(timing_path), exist_ok=True)
+    with open(timing_path, "a") as f:
+        f.write(json.dumps(payload) + "\n")
 
 
 def _get_text_for_element(element):
@@ -123,7 +142,9 @@ class LanceDB(VDB):
 
     def create_index(self, records=None, table_name="nv-ingest", **kwargs):
         """Create a LanceDB table and populate it with transformed records."""
+        connect_start = time.perf_counter()
         db = lancedb.connect(uri=self.uri)
+        _record_timing("lancedb.connect", time.perf_counter() - connect_start)
         results = create_lancedb_results(records)
         schema = pa.schema(
             [
@@ -133,8 +154,14 @@ class LanceDB(VDB):
                 pa.field("source", pa.string()),
             ]
         )
+        create_start = time.perf_counter()
         table = db.create_table(
             table_name, data=results, schema=schema, mode="overwrite" if self.overwrite else "append"
+        )
+        _record_timing(
+            "lancedb.create_table",
+            time.perf_counter() - create_start,
+            {"rows": len(results)},
         )
         return table
 
@@ -154,6 +181,7 @@ class LanceDB(VDB):
         hybrid = hybrid if hybrid is not None else self.hybrid
         fts_language = fts_language or self.fts_language
 
+        vector_index_start = time.perf_counter()
         table.create_index(
             index_type=index_type,
             metric=metric,
@@ -163,12 +191,15 @@ class LanceDB(VDB):
         )
         for index_stub in table.list_indices():
             table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
+        _record_timing("lancedb.vector_index_ready", time.perf_counter() - vector_index_start)
 
         if hybrid:
+            fts_index_start = time.perf_counter()
             table.create_fts_index("text", language=fts_language)
             for index_stub in table.list_indices():
                 if "text" in index_stub.name.lower() or "fts" in index_stub.name.lower():
                     table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
+            _record_timing("lancedb.fts_index_ready", time.perf_counter() - fts_index_start)
 
     def run(self, records):
         """Orchestrate index creation and data ingestion."""
@@ -284,6 +315,7 @@ def lancedb_retrieval(
     if result_fields is None:
         result_fields = ["text", "metadata", "source"]
 
+    embed_start = time.perf_counter()
     embed_model = partial(
         infer_microservice,
         model_name=model_name,
@@ -293,12 +325,19 @@ def lancedb_retrieval(
         output_names=["embeddings"],
         grpc=not ("http" in urlparse(embedding_endpoint).scheme),
     )
+    query_embeddings = embed_model(queries)
+    _record_timing(
+        "lancedb.embed_queries",
+        time.perf_counter() - embed_start,
+        {"query_count": len(queries)},
+    )
 
     search_top_k = nv_ranker_top_k if nv_ranker else top_k
 
     results = []
-    query_embeddings = embed_model(queries)
+    search_durations = []
     for query_embed in query_embeddings:
+        search_start = time.perf_counter()
         search_results = (
             table.search([query_embed], vector_column_name="vector")
             .select(result_fields)
@@ -307,6 +346,7 @@ def lancedb_retrieval(
             .nprobes(n_probe)
             .to_list()
         )
+        search_durations.append(time.perf_counter() - search_start)
         formatted = []
         for r in search_results:
             formatted.append(
@@ -319,8 +359,20 @@ def lancedb_retrieval(
                 }
             )
         results.append(formatted)
+    if search_durations:
+        total_search = sum(search_durations)
+        _record_timing(
+            "lancedb.vector_search",
+            total_search,
+            {
+                "query_count": len(search_durations),
+                "avg_query_s": total_search / len(search_durations),
+                "max_query_s": max(search_durations),
+            },
+        )
 
     if nv_ranker:
+        rerank_start = time.perf_counter()
         rerank_results = []
         num_queries = len(queries)
         for idx, (query, candidates) in enumerate(zip(queries, results), 1):
@@ -336,6 +388,11 @@ def lancedb_retrieval(
                 )
             )
         results = rerank_results
+        _record_timing(
+            "lancedb.nv_rerank",
+            time.perf_counter() - rerank_start,
+            {"query_count": num_queries},
+        )
 
     return results
 
@@ -373,6 +430,7 @@ def lancedb_hybrid_retrieval(
     if result_fields is None:
         result_fields = ["text", "metadata", "source"]
 
+    embed_start = time.perf_counter()
     embed_model = partial(
         infer_microservice,
         model_name=model_name,
@@ -382,14 +440,20 @@ def lancedb_hybrid_retrieval(
         output_names=["embeddings"],
         grpc=not ("http" in urlparse(embedding_endpoint).scheme),
     )
+    query_embeddings = embed_model(queries)
+    _record_timing(
+        "lancedb.embed_queries",
+        time.perf_counter() - embed_start,
+        {"query_count": len(queries)},
+    )
 
     search_top_k = nv_ranker_top_k if nv_ranker else top_k
     reranker = RRFReranker()
 
     results = []
-    query_embeddings = embed_model(queries)
-
+    search_durations = []
     for query_text, query_embed in zip(queries, query_embeddings):
+        search_start = time.perf_counter()
         search_results = (
             table.search(query_type="hybrid")
             .vector(query_embed)
@@ -401,6 +465,7 @@ def lancedb_hybrid_retrieval(
             .rerank(reranker)
             .to_list()
         )
+        search_durations.append(time.perf_counter() - search_start)
         formatted = []
         for r in search_results:
             formatted.append(
@@ -413,8 +478,20 @@ def lancedb_hybrid_retrieval(
                 }
             )
         results.append(formatted)
+    if search_durations:
+        total_search = sum(search_durations)
+        _record_timing(
+            "lancedb.hybrid_search",
+            total_search,
+            {
+                "query_count": len(search_durations),
+                "avg_query_s": total_search / len(search_durations),
+                "max_query_s": max(search_durations),
+            },
+        )
 
     if nv_ranker:
+        rerank_start = time.perf_counter()
         rerank_results = []
         num_queries = len(queries)
         for idx, (query, candidates) in enumerate(zip(queries, results), 1):
@@ -430,5 +507,10 @@ def lancedb_hybrid_retrieval(
                 )
             )
         results = rerank_results
+        _record_timing(
+            "lancedb.nv_rerank",
+            time.perf_counter() - rerank_start,
+            {"query_count": num_queries},
+        )
 
     return results
