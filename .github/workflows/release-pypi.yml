@@ -1,9 +1,6 @@
 name: Release - PyPI
 
 on:
-  create:
-    branches:
-      - 'release/*'
   workflow_dispatch:
     inputs:
       version:

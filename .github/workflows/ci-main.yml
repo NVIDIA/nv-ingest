@@ -46,36 +46,6 @@ jobs:
       coverage: true
       runner: 'linux-large-disk'
 
-  # Build ARM64 image (long-running, non-blocking)
-  docker-build-arm:
-    name: Build Docker Image (arm64)
-    uses: ./.github/workflows/reusable-docker-build.yml
-    with:
-      platform: 'linux/arm64'
-      target: 'runtime'
-      push: false
-      tags: 'nv-ingest:main-arm64-${{ github.sha }}'
-      base-image: 'ubuntu'
-      base-image-tag: 'jammy-20250415.1'
-      runner: 'linux-large-disk'
-      use-qemu: true
-    secrets:
-      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
-
-  # Test ARM64 image with random subset
-  docker-test-arm:
-    name: Test Docker Image (arm64)
-    needs: docker-build-arm
-    uses: ./.github/workflows/reusable-docker-test.yml
-    with:
-      image-tag: 'nv-ingest:main-arm64-${{ github.sha }}'
-      platform: 'linux/arm64'
-      test-selection: 'random'
-      random-count: '100'
-      pytest-markers: 'not integration'
-      coverage: false
-      runner: 'linux-large-disk'
-
   # Build library mode packages
   library-mode-build:
     name: Build Library Mode Packages

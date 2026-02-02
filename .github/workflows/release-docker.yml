@@ -1,9 +1,6 @@
 name: Release - Docker
 
 on:
-  create:
-    branches:
-      - 'release/*'
   workflow_dispatch:
     inputs:
       version:
