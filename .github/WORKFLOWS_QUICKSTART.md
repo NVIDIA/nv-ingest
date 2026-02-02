@@ -193,7 +193,7 @@ Actions → Workflow run → Cancel workflow
 
 **Cause:** Reusable workflow not in correct location
 
-**Fix:** Ensure `.github/workflows-reusable/*.yml` exists
+**Fix:** Ensure reusable workflows exist in `.github/workflows/` (files prefixed with `reusable-`)
 
 ### "Secret not found" error
 

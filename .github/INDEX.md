@@ -20,15 +20,15 @@ Located in: `.github/workflows/`
 7. **`docs-deploy.yml`** - Documentation deployment
 
 ### ♻️ Reusable Workflows (7 files)
-Located in: `.github/workflows-reusable/`
+Located in: `.github/workflows/` (prefixed with `reusable-`)
 
-1. **`docker-build.yml`** - Flexible Docker image building
-2. **`docker-test.yml`** - Container-based testing
-3. **`conda-build.yml`** - Conda package building
-4. **`conda-publish.yml`** - Conda publishing to channels
-5. **`pypi-build.yml`** - Python wheel building
-6. **`pypi-publish.yml`** - PyPI publishing
-7. **`integration-test.yml`** - Library mode integration tests
+1. **`reusable-docker-build.yml`** - Flexible Docker image building
+2. **`reusable-docker-test.yml`** - Container-based testing
+3. **`reusable-conda-build.yml`** - Conda package building
+4. **`reusable-conda-publish.yml`** - Conda publishing to channels
+5. **`reusable-pypi-build.yml`** - Python wheel building
+6. **`reusable-pypi-publish.yml`** - PyPI publishing
+7. **`reusable-integration-test.yml`** - Library mode integration tests
 
 ### 🔧 Composite Actions (3 directories)
 Located in: `.github/actions/`
@@ -170,7 +170,7 @@ All secrets must be configured in repository settings:
 | Task | Location | Action |
 |------|----------|--------|
 | View workflows | `.github/workflows/` | Browse main triggers |
-| Understand logic | `.github/workflows-reusable/` | See business logic |
+| Understand logic | `.github/workflows/` | See reusable workflows (`reusable-*.yml`) |
 | Check common operations | `.github/actions/` | Review composite actions |
 | Quick help | `.github/WORKFLOWS_QUICKSTART.md` | Read guide |
 | Complete reference | `.github/WORKFLOWS_REFERENCE.md` | Deep dive |
@@ -226,8 +226,7 @@ All secrets must be configured in repository settings:
 ### Workflow Files
 ```
 .github/
-├── workflows/                    ← Main trigger workflows (7)
-├── workflows-reusable/           ← Reusable components (7)
+├── workflows/                    ← Workflows (including `reusable-*.yml`)
 └── actions/                      ← Composite actions (3)
 ```
 

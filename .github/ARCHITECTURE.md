@@ -445,7 +445,7 @@ Workflows that can be called from other workflows:
 ```yaml
 jobs:
   build:
-    uses: ./.github/workflows-reusable/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       platform: 'linux/amd64'
       push: false

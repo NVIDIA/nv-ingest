@@ -308,7 +308,7 @@ Actions → Release - PyPI → Run workflow
 
 ## Reusable Workflows
 
-### `docker-build.yml`
+### `reusable-docker-build.yml`
 
 **Purpose**: Reusable Docker image build logic
 
@@ -338,7 +338,7 @@ Actions → Release - PyPI → Run workflow
 
 ---
 
-### `docker-test.yml`
+### `reusable-docker-test.yml`
 
 **Purpose**: Run tests in Docker containers
 
@@ -358,7 +358,7 @@ Actions → Release - PyPI → Run workflow
 **Usage Example**:
 ```yaml
 test-arm:
-  uses: ./.github/workflows-reusable/docker-test.yml
+  uses: ./.github/workflows/reusable-docker-test.yml
   with:
     image-tag: 'nv-ingest:test'
     platform: 'linux/arm64'
@@ -368,7 +368,7 @@ test-arm:
 
 ---
 
-### `conda-build.yml`
+### `reusable-conda-build.yml`
 
 **Purpose**: Build conda packages
 
@@ -387,7 +387,7 @@ test-arm:
 
 ---
 
-### `conda-publish.yml`
+### `reusable-conda-publish.yml`
 
 **Purpose**: Publish conda packages
 
@@ -403,7 +403,7 @@ test-arm:
 
 ---
 
-### `pypi-build.yml`
+### `reusable-pypi-build.yml`
 
 **Purpose**: Build Python wheels
 
@@ -425,7 +425,7 @@ test-arm:
 
 ---
 
-### `pypi-publish.yml`
+### `reusable-pypi-publish.yml`
 
 **Purpose**: Publish Python wheels to Artifactory
 
@@ -444,7 +444,7 @@ test-arm:
 
 ---
 
-### `integration-test.yml`
+### `reusable-integration-test.yml`
 
 **Purpose**: Run integration tests with conda environment
 

@@ -71,7 +71,7 @@ jobs:
   build:
     name: Build Conda Packages
     needs: determine-version
-    uses: ./.github/workflows-reusable/conda-build.yml
+    uses: ./.github/workflows/reusable-conda-build.yml
     with:
       version: ${{ needs.determine-version.outputs.version }}
       source-ref: ${{ needs.determine-version.outputs.source-ref }}
@@ -83,7 +83,7 @@ jobs:
     needs:
       - determine-version
       - build
-    uses: ./.github/workflows-reusable/conda-publish.yml
+    uses: ./.github/workflows/reusable-conda-publish.yml
     with:
       channel: ${{ needs.determine-version.outputs.channel }}
       force-upload: true

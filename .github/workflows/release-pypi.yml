@@ -71,7 +71,7 @@ jobs:
   build:
     name: Build Python Wheels
     needs: determine-version
-    uses: ./.github/workflows-reusable/pypi-build.yml
+    uses: ./.github/workflows/reusable-pypi-build.yml
     with:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: ${{ needs.determine-version.outputs.release-type }}
@@ -83,7 +83,7 @@ jobs:
     needs:
       - determine-version
       - build
-    uses: ./.github/workflows-reusable/pypi-publish.yml
+    uses: ./.github/workflows/reusable-pypi-publish.yml
     with:
       repository-url: ${{ secrets.ARTIFACTORY_URL }}
     secrets:

@@ -6,8 +6,7 @@ This directory contains all GitHub Actions workflows, reusable components, and d
 
 ```
 .github/
-├── workflows/              # Main trigger workflows (7 files)
-├── workflows-reusable/     # Reusable workflow components (7 files)
+├── workflows/              # Workflows (including reusable workflows)
 ├── actions/                # Composite actions (3 actions)
 ├── ISSUE_TEMPLATE/         # Issue templates
 ├── CODEOWNERS             # Code ownership
@@ -63,15 +62,15 @@ Read: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 
 ## 🔧 Reusable Components
 
-### Workflows (in `workflows-reusable/`)
+### Workflows (in `workflows/`, prefixed with `reusable-`)
 
-- `docker-build.yml` - Flexible Docker image building
-- `docker-test.yml` - Container-based testing
-- `conda-build.yml` - Conda package building
-- `conda-publish.yml` - Conda package publishing
-- `pypi-build.yml` - Python wheel building
-- `pypi-publish.yml` - PyPI publishing
-- `integration-test.yml` - Library mode testing
+- `reusable-docker-build.yml` - Flexible Docker image building
+- `reusable-docker-test.yml` - Container-based testing
+- `reusable-conda-build.yml` - Conda package building
+- `reusable-conda-publish.yml` - Conda package publishing
+- `reusable-pypi-build.yml` - Python wheel building
+- `reusable-pypi-publish.yml` - PyPI publishing
+- `reusable-integration-test.yml` - Library mode testing
 
 ### Actions (in `actions/`)
 
@@ -193,7 +192,7 @@ Actions → Select workflow → View logs → Expand steps
 
 | Issue | Solution |
 |-------|----------|
-| Workflow not found | Check path: `.github/workflows-reusable/` |
+| Workflow not found | Check path: `.github/workflows/` (reusable workflows are `reusable-*.yml`) |
 | Secret not available | Verify in Settings → Secrets → Actions |
 | Build timeout | Use `linux-large-disk` runner |
 | Integration tests fail | Check NIM endpoints and credentials |
@@ -220,4 +219,4 @@ See [`CODEOWNERS`](./CODEOWNERS) for ownership information.
 
 **Architecture**: Reusable workflows + Composite actions  
 **Documentation**: 4 comprehensive guides  
-**Total Components**: 17 (7 workflows + 7 reusable + 3 actions)
+**Total Components**: Workflows + reusable workflows + composite actions

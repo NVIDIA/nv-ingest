@@ -82,7 +82,7 @@ jobs:
   conda-build:
     name: Conda Nightly Build
     if: ${{ !inputs.skip-conda }}
-    uses: ./.github/workflows-reusable/conda-build.yml
+    uses: ./.github/workflows/reusable-conda-build.yml
     with:
       source-ref: 'main'
       runner: 'linux-large-disk'
@@ -92,7 +92,7 @@ jobs:
     name: Conda Nightly Publish
     if: ${{ !inputs.skip-conda }}
     needs: conda-build
-    uses: ./.github/workflows-reusable/conda-publish.yml
+    uses: ./.github/workflows/reusable-conda-publish.yml
     with:
       channel: 'dev'
       force-upload: true
@@ -104,7 +104,7 @@ jobs:
     name: PyPI Nightly Build
     if: ${{ !inputs.skip-pypi }}
     needs: determine-version
-    uses: ./.github/workflows-reusable/pypi-build.yml
+    uses: ./.github/workflows/reusable-pypi-build.yml
     with:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: 'dev'
@@ -115,7 +115,7 @@ jobs:
     name: PyPI Nightly Publish
     if: ${{ !inputs.skip-pypi }}
     needs: pypi-build
-    uses: ./.github/workflows-reusable/pypi-publish.yml
+    uses: ./.github/workflows/reusable-pypi-publish.yml
     with:
       repository-url: ${{ secrets.ARTIFACTORY_URL }}
     secrets:
