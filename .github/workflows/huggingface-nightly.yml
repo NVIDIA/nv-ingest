@@ -107,7 +107,7 @@ jobs:
             skip_existing_flag="--skip-existing"
           fi
 
-          python scripts/nightly_build_publish.py \
+          python ci/scripts/nightly_build_publish.py \
             --repo-id "${{ matrix.repo.id }}" \
             --repo-url "${{ matrix.repo.url }}" \
             --work-dir ".work" \
@@ -197,7 +197,7 @@ jobs:
             skip_existing_flag="--skip-existing"
           fi
 
-          python3 scripts/nightly_build_publish.py \
+          python3 ci/scripts/nightly_build_publish.py \
             --repo-id "nemotron-ocr-v1" \
             --repo-url "https://huggingface.co/nvidia/nemotron-ocr-v1" \
             --work-dir ".work" \
