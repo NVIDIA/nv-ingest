@@ -649,6 +649,21 @@ def bo10k_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFr
     return df.reset_index(drop=True)
 
 
+def jp20_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
+    """Load bo10k ground truth filtered to jp20 documents."""
+    df = bo10k_load_ground_truth(ground_truth_dir=ground_truth_dir)
+
+    dataset_dir = os.environ.get("JP20_DATASET_DIR") or os.path.join(get_repo_root(), "data", "jp20")
+    jp20_pdfs = {
+        os.path.splitext(name)[0]
+        for name in os.listdir(dataset_dir)
+        if name.lower().endswith(".pdf")
+    }
+    filtered = df[df["pdf"].isin(jp20_pdfs)].reset_index(drop=True)
+
+    return filtered
+
+
 def bo10k_recall(
     collection_name: str,
     hostname: str = "localhost",
@@ -666,6 +681,39 @@ def bo10k_recall(
     """Evaluate recall@k for bo10k dataset."""
     return evaluate_recall_orchestrator(
         loader_func=bo10k_load_ground_truth,
+        scorer_func=get_recall_scores,
+        collection_name=collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
+    )
+
+
+def jp20_recall(
+    collection_name: str,
+    hostname: str = "localhost",
+    sparse: bool = True,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+) -> Dict[int, float]:
+    """Evaluate recall@k for jp20 dataset (bo10k subset)."""
+    return evaluate_recall_orchestrator(
+        loader_func=jp20_load_ground_truth,
         scorer_func=get_recall_scores,
         collection_name=collection_name,
         hostname=hostname,
@@ -716,6 +764,7 @@ def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
         "earnings": earnings_recall,
         "audio": audio_recall,
         "bo10k": bo10k_recall,
+        "jp20": jp20_recall,
     }
 
     return evaluators.get(dataset_name.lower())
