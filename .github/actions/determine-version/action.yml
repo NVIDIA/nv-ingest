@@ -28,23 +28,26 @@ runs:
       shell: bash
       run: |
         VERSION=""
+        INPUT_VERSION="${{ inputs.version }}"
+        INPUT_BRANCH_NAME="${{ inputs.branch-name }}"
+        INPUT_DATE_FORMAT="${{ inputs.date-format }}"
 
         # Priority 1: Explicit version input
-        if [ -n "${{ inputs.version }}" ]; then
-          VERSION="${{ inputs.version }}"
+        if [ -n "${INPUT_VERSION}" ]; then
+          VERSION="${INPUT_VERSION}"
           echo "Using explicit version: $VERSION"
 
         # Priority 2: Extract from branch name (for release/* branches)
-        elif [ -n "${{ inputs.branch-name }}" ]; then
-          if [[ "${{ inputs.branch-name }}" == release/* ]]; then
-            VERSION="${{ inputs.branch-name }#release/}"
+        elif [ -n "${INPUT_BRANCH_NAME}" ]; then
+          if [[ "${INPUT_BRANCH_NAME}" == release/* ]]; then
+            VERSION="${INPUT_BRANCH_NAME#release/}"
             echo "Extracted version from branch: $VERSION"
           fi
         fi
 
         # Priority 3: Generate from date
         if [ -z "$VERSION" ]; then
-          VERSION=$(date +'${{ inputs.date-format }}')
+          VERSION="$(date +"${INPUT_DATE_FORMAT}")"
           echo "Generated version from date: $VERSION"
         fi
 
