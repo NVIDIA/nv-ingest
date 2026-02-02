@@ -79,10 +79,44 @@ jobs:
 
           TAGS="${{ inputs.tags }}"
           TAG_ARGS=""
+
+          sanitize_image_ref() {
+            local ref="$1"
+            local after_slash="${ref##*/}"
+
+            # Only sanitize the *tag* portion (after the last ':', and only if
+            # that ':' occurs after the last '/'). This avoids breaking
+            # registries with ports like "registry:5000/repo:tag".
+            if [[ "$after_slash" == *:* ]]; then
+              local name="${ref%:*}"
+              local tag="${ref##*:}"
+
+              # Docker tags must match [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+              # Replace common offenders (like '/' from refs/heads/...) with '-'.
+              local safe_tag="${tag//\//-}"
+              safe_tag="${safe_tag// /-}"
+              safe_tag="${safe_tag//:/-}"
+              safe_tag="${safe_tag//[^A-Za-z0-9_.-]/-}"
+              safe_tag="${safe_tag#[-.]}" # strip leading '-' or '.'
+              safe_tag="${safe_tag:0:128}"
+
+              if [[ -z "$safe_tag" ]]; then
+                safe_tag="sha-${GITHUB_SHA}"
+                safe_tag="${safe_tag:0:128}"
+              fi
+
+              printf '%s:%s' "$name" "$safe_tag"
+              return 0
+            fi
+
+            printf '%s' "$ref"
+          }
+
           IFS=',' read -ra TAG_ARR <<< "$TAGS"
           for t in "${TAG_ARR[@]}"; do
             t="$(echo "$t" | xargs)"
             if [ -n "$t" ]; then
+              t="$(sanitize_image_ref "$t")"
               TAG_ARGS="$TAG_ARGS -t $t"
             fi
           done
