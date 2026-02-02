@@ -84,8 +84,6 @@ jobs:
       - determine-version
       - build
     uses: ./.github/workflows/reusable-pypi-publish.yml
-    with:
-      repository-url: ${{ secrets.ARTIFACTORY_URL }}
     secrets:
       ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
       ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}

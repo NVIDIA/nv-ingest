@@ -116,8 +116,6 @@ jobs:
     if: ${{ !inputs.skip-pypi }}
     needs: pypi-build
     uses: ./.github/workflows/reusable-pypi-publish.yml
-    with:
-      repository-url: ${{ secrets.ARTIFACTORY_URL }}
     secrets:
       ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
       ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
