@@ -66,8 +66,11 @@ def main(config=None, log_path: str = "test_results") -> int:
     extract_charts = config.extract_charts
     extract_images = config.extract_images
     extract_infographics = config.extract_infographics
+    extract_page_as_image = config.extract_page_as_image
+    extract_method = config.extract_method
     text_depth = config.text_depth
     table_output_format = config.table_output_format
+    image_elements_modality = config.image_elements_modality
 
     # Optional pipeline steps
     enable_caption = config.enable_caption
@@ -155,15 +158,20 @@ def main(config=None, log_path: str = "test_results") -> int:
         ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
 
     # Extraction step
-    ingestor = ingestor.extract(
-        extract_text=extract_text,
-        extract_tables=extract_tables,
-        extract_charts=extract_charts,
-        extract_images=extract_images,
-        text_depth=text_depth,
-        table_output_format=table_output_format,
-        extract_infographics=extract_infographics,
-    )
+    extract_kwargs = {
+        "extract_text": extract_text,
+        "extract_tables": extract_tables,
+        "extract_charts": extract_charts,
+        "extract_images": extract_images,
+        "text_depth": text_depth,
+        "table_output_format": table_output_format,
+        "extract_infographics": extract_infographics,
+    }
+    if extract_page_as_image:
+        extract_kwargs["extract_page_as_image"] = True
+    if extract_method:
+        extract_kwargs["extract_method"] = extract_method
+    ingestor = ingestor.extract(**extract_kwargs)
 
     # Optional pipeline steps
     if enable_caption:
@@ -181,7 +189,10 @@ def main(config=None, log_path: str = "test_results") -> int:
         )
 
     # Embed (must come before storage per pipeline ordering)
-    ingestor = ingestor.embed(model_name=model_name)
+    embed_kwargs = {"model_name": model_name}
+    if image_elements_modality:
+        embed_kwargs["image_elements_modality"] = image_elements_modality
+    ingestor = ingestor.embed(**embed_kwargs)
 
     # Store images to disk (server-side image storage) - optional
     # Note: Supports both MinIO (s3://) and local disk (file://) via storage_uri

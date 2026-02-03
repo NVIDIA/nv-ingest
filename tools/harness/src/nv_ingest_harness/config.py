@@ -65,8 +65,11 @@ class TestConfig:
     extract_charts: bool = True
     extract_images: bool = False
     extract_infographics: bool = True
+    extract_page_as_image: bool = False
+    extract_method: Optional[str] = None
     text_depth: str = "page"
     table_output_format: str = "markdown"
+    image_elements_modality: Optional[str] = None
 
     # Optional pipeline steps
     enable_caption: bool = False
@@ -329,7 +332,10 @@ def _load_env_overrides() -> dict:
         "EXTRACT_CHARTS": ("extract_charts", parse_bool),
         "EXTRACT_IMAGES": ("extract_images", parse_bool),
         "EXTRACT_INFOGRAPHICS": ("extract_infographics", parse_bool),
+        "EXTRACT_PAGE_AS_IMAGE": ("extract_page_as_image", parse_bool),
+        "EXTRACT_METHOD": ("extract_method", str),
         "TEXT_DEPTH": ("text_depth", str),
+        "IMAGE_ELEMENTS_MODALITY": ("image_elements_modality", str),
         "TABLE_OUTPUT_FORMAT": ("table_output_format", str),
         "ENABLE_CAPTION": ("enable_caption", parse_bool),
         "CAPTION_PROMPT": ("caption_prompt", str),
