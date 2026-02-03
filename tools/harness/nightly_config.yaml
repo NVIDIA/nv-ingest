@@ -34,6 +34,8 @@ sinks:
   slack:
     enabled: true
     # webhook_url: Set via SLACK_WEBHOOK_URL environment variable
+    # users_to_tag: List of user names to tag in Slack notifications (must match PIC_DICT keys)
+    users_to_tag: [randy]
 
   history:
     enabled: true

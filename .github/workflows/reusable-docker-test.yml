@@ -37,6 +37,11 @@ on:
         required: false
         type: string
         default: 'ubuntu-latest'
+      image-artifact-name:
+        description: 'If set, download this artifact and docker load it before running tests'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   test:
@@ -45,6 +50,23 @@ jobs:
       - name: Set up QEMU (for cross-arch runs)
         if: ${{ inputs.platform != 'linux/amd64' }}
         uses: docker/setup-qemu-action@v3
+
+      - name: Download built image artifact
+        if: ${{ inputs.image-artifact-name != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.image-artifact-name }}
+
+      - name: Load Docker image from artifact
+        if: ${{ inputs.image-artifact-name != '' }}
+        run: |
+          set -euo pipefail
+          if [ ! -f docker-image.tar.gz ]; then
+            echo "Error: docker-image.tar.gz not found after downloading artifact '${{ inputs.image-artifact-name }}'"
+            ls -la
+            exit 1
+          fi
+          gunzip -c docker-image.tar.gz | docker load
 
       - name: Run tests inside Docker container
         run: |
