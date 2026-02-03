@@ -30,32 +30,22 @@ jobs:
 
       - uses: pre-commit/action@v3.0.1
 
-  # Docker build and test for x86_64
-  docker-build-test:
+  # Docker build + test for x86_64 (single job so built image is available locally)
+  docker-build-and-test:
     name: Build & Test Docker (amd64)
-    uses: ./.github/workflows/reusable-docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build-and-test.yml
     with:
       platform: 'linux/amd64'
       target: 'runtime'
-      push: false
       tags: 'nv-ingest:pr-${{ github.event.pull_request.number }}'
       base-image: 'ubuntu'
       base-image-tag: 'jammy-20250415.1'
-      runner: 'linux-large-disk'
-    secrets:
-      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
-
-  docker-test:
-    name: Run Tests
-    needs: docker-build-test
-    uses: ./.github/workflows/reusable-docker-test.yml
-    with:
-      image-tag: 'nv-ingest:pr-${{ github.event.pull_request.number }}'
-      platform: 'linux/amd64'
       test-selection: 'full'
       pytest-markers: 'not integration'
       coverage: true
       runner: 'linux-large-disk'
+    secrets:
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
 
   # Library mode integration tests (requires approval for external contributors)
   library-mode-check-access:
@@ -114,14 +104,14 @@ jobs:
     name: PR Validation Complete
     needs:
       - pre-commit
-      - docker-test
+      - docker-build-and-test
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check job results
         run: |
           if [[ "${{ needs.pre-commit.result }}" != "success" ]] || \
-             [[ "${{ needs.docker-test.result }}" != "success" ]]; then
+             [[ "${{ needs.docker-build-and-test.result }}" != "success" ]]; then
             echo "One or more required jobs failed"
             exit 1
           fi
