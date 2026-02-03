@@ -76,6 +76,14 @@ NeMo Retriever extraction does not do the following:
 
 For more information, see the [full NeMo Retriever Extraction documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
+## Documentation Resources
+
+- **[Official Documentation](https://docs.nvidia.com/nemo/retriever/extraction/)** - Complete user guides, API references, and deployment instructions
+- **[Getting Started Guide](https://docs.nvidia.com/nemo/retriever/extraction/overview/)** - Overview and prerequisites for production deployments
+- **[Benchmarking Guide](https://docs.nvidia.com/nemo/retriever/extraction/benchmarking/)** - Performance testing and recall evaluation framework
+- **[MIG Deployment](https://docs.nvidia.com/nemo/retriever/extraction/mig-benchmarking/)** - Multi-Instance GPU configurations for Kubernetes
+- **[API Documentation](https://docs.nvidia.com/nemo/retriever/extraction/api/)** - Python client and API reference
+
 
 ## Prerequisites
 
@@ -99,7 +107,7 @@ Create a fresh Python environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
+  uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
 ```
 
 Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).

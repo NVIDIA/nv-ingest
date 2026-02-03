@@ -34,7 +34,7 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0 milvus-lite==2.4.12
+         uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
     ```
 
     !!! tip
@@ -481,4 +481,4 @@ The `run_pipeline` throws the following errors:
 - [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
 - [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
-- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
+- [Enterprise RAG Blueprint](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

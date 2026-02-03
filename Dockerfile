@@ -199,6 +199,7 @@ COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_sour
 COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
 RUN  --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=secret,id=hf_token,required=false \
     source activate nv_ingest_runtime \
     && python3 /workspace/docker/post_build_triggers.py
 
@@ -225,12 +226,14 @@ CMD ["/bin/bash"]
 FROM nv_ingest_install AS docs
 
 # Install dependencies needed for docs generation
-# Clear stale apt lists and use --fix-missing to handle repository issues
-RUN rm -rf /var/lib/apt/lists/* \
-    && apt-get update --fix-missing \
-    && apt-get install -y --no-install-recommends make \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+#
+# NOTE: The nv_ingest_install base image may carry a broken apt/dpkg state
+# (e.g., partially-installed libreoffice dependencies). Installing `make`
+# via conda avoids apt entirely and is more reliable on CI runners.
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    source activate nv_ingest_runtime \
+    && mamba install -y make \
+    && mamba clean -afy
 
 COPY docs docs
 

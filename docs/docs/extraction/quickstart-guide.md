@@ -1,28 +1,28 @@
 # Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
 
-Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
+This guide helps you get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
 
-## Step 1: Starting Containers
+## Step 1: Start Containers
 
-This example demonstrates how to use the provided [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) to start all needed services with a few commands.
+Use the provided [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) to start all needed services with a few commands.
 
 !!! warning
 
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you might want to configure.
+If you prefer, you can run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you can configure.
 
-1. Git clone the repo:
+a. Git clone the repo:
 
     `git clone https://github.com/nvidia/nv-ingest`
 
-2. Change the directory to the cloned repo
+b. Change the directory to the cloned repo by running the following code.
    
     `cd nv-ingest`.
 
-3. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+c. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `docker login` command.
 
     ```shell
     # This is required to access pre-built containers and NIM microservices
@@ -31,7 +31,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     Password: <Your Key>
     ```
    
-4. Create a .env file that contains your NVIDIA Build API key.
+d. Create a .env file that contains your NVIDIA Build API key.
 
     !!! note
 
@@ -44,11 +44,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
    
-5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+e. Make sure that NVIDIA is set as your default container runtime before you run the docker compose command by running the following code.
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
+f. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval up`
 
@@ -71,7 +71,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
       --profile retrieval up
     ```
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+g. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -89,7 +89,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
+h. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
@@ -113,13 +113,13 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
 You can interact with the NV-Ingest service from the host, or by using `docker exec` to run commands in the NV-Ingest container.
 
-To interact from the host, you'll need a Python environment and install the client dependencies:
+To interact from the host, you'll need a Python environment that has the client dependencies installed. For example, you can use a Conda environment.
 
 ```
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.12.11
 conda activate nv-ingest-dev
-pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
+pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 ```
 
 !!! tip
@@ -129,15 +129,27 @@ pip install nv-ingest==25.9.0 nv-ingest-api==25.9.0 nv-ingest-client==25.9.0
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L265). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the [nv-ingest-cli](#ingest_cli_example) and [Python](#ingest_python_example) examples described below.
-    Because various service URIs default to `localhost`, running within the NV-Ingest container will also require URIs to be manually specified in order for services to be accessed between containers on the internal Docker network. See the [code below](#ingest_python_example) for an example specifying `milvus_uri`.
+Interaction from the host requires the appropriate port to be exposed from the `nv-ingest` container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the NV-Ingest service from within its container.
 
+To work inside the container, run the following code.
 
-## Step 3: Ingesting Documents
+```bash
+docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
+```
+This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment includes all necessary Python client libraries. You should see a prompt similar to the following.
+
+```bash
+(nv_ingest_runtime) root@your-computer-name:/workspace#
+```
+From this prompt, you can run the `nv-ingest` CLI and Python examples.
+
+Because many service URIs default to localhost, running inside the `nv-ingest` container also requires that you specify URIs manually so that services can communicate across containers on the internal Docker network. See the example following for how to set the `milvus_uri`.
+
+## Step 3: Ingest Documents
 
 You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
-In the following examples, we do text, chart, table, and image extraction.
+The following examples demonstrate how to extract text, charts, tables, and images:
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
@@ -409,7 +421,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 !!! tip
 
-    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [Enterprise RAG Blueprint on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
 
 
 
@@ -426,6 +438,33 @@ You can specify multiple `--profile` options.
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
 
 
+## Specify MIG slices for NIM models
+
+When you deploy NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md%E2%80%8B).​
+
+To target a specific MIG profile—for example, a 3g.20gb slice on an A100, which is a hardware-partitioned virtual GPU instance that gives your workload a fixed mid-sized share of the A100’s compute plus 20 GB of dedicated GPU memory and behaves like a smaller independent GPU—for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
+
+The following example shows the pattern. Paths vary by NIM, such as `nvingest.nvidiaNim.nemoretrieverPageElements` instead of the generic `nvingest.nim` placeholder. For details refer to [catalog.ngc.nvidia](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/helm-charts/nv-ingest)​.
+Set `resources.requests` and `resources.limits` to the name of the MIG resource that you want (for example, `nvidia.com/mig-3g.20gb`).
+```shell
+nvingest:
+  nvidiaNim:
+    nemoretrieverPageElements:
+      modelName: "meta/llama3-8b-instruct"        # Example NIM model
+      resources:
+        limits:
+          nvidia.com/mig-3g.20gb: 1               # MIG profile resource
+        requests:
+          nvidia.com/mig-3g.20gb: 1
+      nodeSelector:
+        nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb
+```
+Key points:
+* Use the appropriate NIM‑specific values path (for example, `nvingest.nvidiaNim.nemoretrieverPageElements.resources`) rather than the generic `nvingest.nim` placeholder.
+* Set `resources.requests` and `resources.limits` to the desired MIG resource name (for example, `nvidia.com/mig-3g.20gb`).
+* Use `nodeSelector` (or tolerations/affinity, if you prefer) to target nodes labeled with the corresponding MIG‑enabled GPU product (for example, `nvidia.com/gpu.product: A100-SXM4-40GB-MIG-3g.20gb`).
+This syntax and structure can be repeated for each NIM model used by CAS, ensuring that each NV-Ingest NIM pod is mapped to the correct MIG slice type and scheduled onto compatible nodes.
+
 !!! important
 
     Advanced features require additional GPU support and disk space. For more information, refer to [Support Matrix](support-matrix.md).
@@ -440,4 +479,4 @@ You can specify multiple `--profile` options.
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
 - [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
-- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
+- [Enterprise RAG Blueprint](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

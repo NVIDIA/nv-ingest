@@ -1,0 +1,115 @@
+name: Reusable Docker Test
+
+on:
+  workflow_call:
+    inputs:
+      image-tag:
+        description: 'Docker image tag to test (e.g., nv-ingest:pr-123)'
+        required: true
+        type: string
+      platform:
+        description: 'Target platform for docker run (e.g., linux/amd64, linux/arm64)'
+        required: false
+        type: string
+        default: 'linux/amd64'
+      test-selection:
+        description: 'Test selection strategy (full or random)'
+        required: false
+        type: string
+        default: 'full'
+      random-count:
+        description: 'Number of tests to run when test-selection=random'
+        required: false
+        type: string
+        default: '100'
+      pytest-markers:
+        description: 'Pytest markers expression'
+        required: false
+        type: string
+        default: 'not integration'
+      coverage:
+        description: 'Collect coverage.xml and upload it'
+        required: false
+        type: boolean
+        default: true
+      runner:
+        description: 'GitHub runner to use'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      image-artifact-name:
+        description: 'If set, download this artifact and docker load it before running tests'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Set up QEMU (for cross-arch runs)
+        if: ${{ inputs.platform != 'linux/amd64' }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Download built image artifact
+        if: ${{ inputs.image-artifact-name != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.image-artifact-name }}
+
+      - name: Load Docker image from artifact
+        if: ${{ inputs.image-artifact-name != '' }}
+        run: |
+          set -euo pipefail
+          if [ ! -f docker-image.tar.gz ]; then
+            echo "Error: docker-image.tar.gz not found after downloading artifact '${{ inputs.image-artifact-name }}'"
+            ls -la
+            exit 1
+          fi
+          gunzip -c docker-image.tar.gz | docker load
+
+      - name: Run tests inside Docker container
+        run: |
+          set -euo pipefail
+
+          IMAGE="${{ inputs.image-tag }}"
+          PLATFORM="${{ inputs.platform }}"
+          MARKERS="${{ inputs.pytest-markers }}"
+          TEST_PATHS="tests/service_tests client/client_tests api/api_tests"
+
+          if [ "${{ inputs.test-selection }}" != "full" ] && [ "${{ inputs.test-selection }}" != "random" ]; then
+            echo "Error: test-selection must be 'full' or 'random'"
+            exit 1
+          fi
+
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            COV_ARGS="--cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:/tmp/coverage.xml"
+          else
+            COV_ARGS=""
+          fi
+
+          if [ "${{ inputs.test-selection }}" = "full" ]; then
+            CMD="python -m pytest -rs -m \"$MARKERS\" $COV_ARGS $TEST_PATHS"
+          else
+            N="${{ inputs.random-count }}"
+            CMD="set -euo pipefail; \
+              python -m pytest --collect-only -q $TEST_PATHS | grep '::' | shuf -n \"$N\" > /tmp/selected-tests.txt; \
+              python -m pytest -rs -m \"$MARKERS\" $COV_ARGS \$(cat /tmp/selected-tests.txt)"
+          fi
+
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            CID="$(docker create --platform "$PLATFORM" "$IMAGE" bash -lc "$CMD")"
+            docker start -a "$CID"
+            docker cp "$CID":/tmp/coverage.xml coverage.xml || true
+            docker rm -f "$CID"
+          else
+            docker run --rm --platform "$PLATFORM" "$IMAGE" bash -lc "$CMD"
+          fi
+
+      - name: Upload coverage report
+        if: ${{ inputs.coverage }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn

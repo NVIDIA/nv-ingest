@@ -1,0 +1,118 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast pre-commit checks (runs first)
+  pre-commit:
+    name: Pre-commit Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v3
+
+      - uses: pre-commit/action@v3.0.1
+
+  # Docker build + test for x86_64 (single job so built image is available locally)
+  docker-build-and-test:
+    name: Build & Test Docker (amd64)
+    uses: ./.github/workflows/reusable-docker-build-and-test.yml
+    with:
+      platform: 'linux/amd64'
+      target: 'runtime'
+      tags: 'nv-ingest:pr-${{ github.event.pull_request.number }}'
+      base-image: 'ubuntu'
+      base-image-tag: 'jammy-20250415.1'
+      test-selection: 'full'
+      pytest-markers: 'not integration'
+      coverage: true
+      runner: 'linux-large-disk'
+    secrets:
+      HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+  # Library mode integration tests (requires approval for external contributors)
+  library-mode-check-access:
+    name: Check Library Mode Test Access
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    outputs:
+      has-access: ${{ steps.check.outputs.has-access }}
+    steps:
+      - name: Check access
+        id: check
+        run: |
+          HAS_ACCESS="false"
+          if [[ "${{ github.event.pull_request.author_association }}" == "MEMBER" ]] || \
+             [[ "${{ github.event.pull_request.author_association }}" == "COLLABORATOR" ]] || \
+             [[ "${{ github.event.pull_request.author_association }}" == "OWNER" ]] || \
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'ok-to-test') }}" == "true" ]]; then
+            HAS_ACCESS="true"
+          fi
+          echo "has-access=$HAS_ACCESS" >> $GITHUB_OUTPUT
+
+  library-mode-build:
+    name: Build Library Mode Packages
+    needs: library-mode-check-access
+    if: |
+      github.event_name == 'pull_request_target' &&
+      needs.library-mode-check-access.outputs.has-access == 'true'
+    uses: ./.github/workflows/reusable-conda-build.yml
+    with:
+      source-ref: ${{ github.event.pull_request.head.sha }}
+      runner: 'linux-large-disk'
+      upload-artifacts: true
+
+  library-mode-test:
+    name: Test Library Mode
+    needs: library-mode-build
+    uses: ./.github/workflows/reusable-integration-test.yml
+    with:
+      runner: 'ubuntu-latest'
+      timeout-minutes: 60
+    secrets:
+      AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
+      EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
+      NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
+      NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      PADDLE_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+      VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
+      VLM_CAPTION_MODEL_NAME: ${{ secrets.VLM_CAPTION_MODEL_NAME }}
+      YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
+      YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
+      YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
+
+  # Summary job
+  pr-validation-complete:
+    name: PR Validation Complete
+    needs:
+      - pre-commit
+      - docker-build-and-test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.pre-commit.result }}" != "success" ]] || \
+             [[ "${{ needs.docker-build-and-test.result }}" != "success" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All required PR checks passed!"

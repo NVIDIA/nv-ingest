@@ -1,0 +1,40 @@
+name: Reusable PyPI Publish
+
+on:
+  workflow_call:
+    secrets:
+      ARTIFACTORY_URL:
+        required: true
+      ARTIFACTORY_USERNAME:
+        required: true
+      ARTIFACTORY_PASSWORD:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-wheels
+          path: ./dist
+
+      - name: Install twine
+        run: pip install twine
+
+      - name: Publish wheels to Artifactory
+        env:
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+        run: |
+          # Publish all wheels
+          twine upload \
+            --repository-url $ARTIFACTORY_URL \
+            -u $ARTIFACTORY_USERNAME \
+            -p $ARTIFACTORY_PASSWORD \
+            ./dist/api/dist/* \
+            ./dist/client/dist/* \
+            ./dist/src/dist/*

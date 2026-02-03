@@ -131,6 +131,7 @@ celerybeat-schedule
 
 # Environments
 .env
+.helm-env
 .venv
 env/
 venv/
@@ -226,7 +227,7 @@ conda/output_conda_channel
 docs/site
 
 # Ignore "private_local" scripts that users might have in their local copy of nv-ingest they don't want to commit
-scripts/private_local/*
+scripts/private_local/
 
 # Test results should go to artifacts directory managed by nv-ingest-harness
 test_results/
@@ -235,3 +236,13 @@ artifacts/
 
 # Ignore cursor rules
 .cursor
+tools/private_local/*
+
+# LanceDB artifacts
+lancedb_*/
+tools/harness/lancedb/
+
+# Harness history database
+history.db
+history.db-shm
+history.db-wal
