@@ -1,4 +1,4 @@
-name: Reusable Docker Build
+name: Reusable Docker Build and Test
 
 on:
   workflow_call:
@@ -12,13 +12,8 @@ on:
         required: false
         type: string
         default: 'runtime'
-      push:
-        description: 'Push image to registry'
-        required: false
-        type: boolean
-        default: false
       tags:
-        description: 'Docker image tag(s), comma-separated'
+        description: 'Docker image tag(s), comma-separated (first tag is used for running tests)'
         required: true
         type: string
       base-image:
@@ -37,7 +32,7 @@ on:
         type: string
         default: 'ubuntu-latest'
       use-qemu:
-        description: 'Enable QEMU emulation (for cross-arch builds)'
+        description: 'Enable QEMU emulation (for cross-arch builds/runs)'
         required: false
         type: boolean
         default: false
@@ -46,22 +41,32 @@ on:
         required: false
         type: boolean
         default: true
-      export-image-artifact:
-        description: 'Save the built image and upload as a workflow artifact (for use in later jobs)'
-        required: false
-        type: boolean
-        default: false
-      image-artifact-name:
-        description: 'Artifact name to upload the image tarball under'
+      test-selection:
+        description: 'Test selection strategy (full or random)'
         required: false
         type: string
-        default: 'docker-image'
+        default: 'full'
+      random-count:
+        description: 'Number of tests to run when test-selection=random'
+        required: false
+        type: string
+        default: '100'
+      pytest-markers:
+        description: 'Pytest markers expression'
+        required: false
+        type: string
+        default: 'not integration'
+      coverage:
+        description: 'Collect coverage.xml and upload it'
+        required: false
+        type: boolean
+        default: true
     secrets:
       HF_ACCESS_TOKEN:
         required: false
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout code
@@ -83,7 +88,7 @@ jobs:
             printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
           fi
 
-      - name: Build Docker image
+      - name: Build Docker image (load locally)
         run: |
           set -euo pipefail
 
@@ -136,11 +141,6 @@ jobs:
             SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
           fi
 
-          OUTPUT_FLAG="--load"
-          if [ "${{ inputs.push }}" = "true" ]; then
-            OUTPUT_FLAG="--push"
-          fi
-
           DOWNLOAD_LLAMA="True"
           if [ "${{ inputs.download-llama-tokenizer }}" != "true" ]; then
             DOWNLOAD_LLAMA="False"
@@ -148,7 +148,7 @@ jobs:
 
           docker buildx build \
             --platform "${{ inputs.platform }}" \
-            $OUTPUT_FLAG \
+            --load \
             --target "${{ inputs.target }}" \
             --build-arg GIT_COMMIT=${GITHUB_SHA} \
             --build-arg BASE_IMG="${{ inputs.base-image }}" \
@@ -158,40 +158,34 @@ jobs:
             $TAG_ARGS \
             .
 
-      - name: Save built image to tarball
-        if: ${{ inputs.export-image-artifact && inputs.push == false }}
+      - name: Run tests inside Docker container
         run: |
           set -euo pipefail
 
           TAGS="${{ inputs.tags }}"
+          PLATFORM="${{ inputs.platform }}"
+          MARKERS="${{ inputs.pytest-markers }}"
+          TEST_PATHS="tests/service_tests client/client_tests api/api_tests"
 
           sanitize_image_ref() {
             local ref="$1"
             local after_slash="${ref##*/}"
-
-            # Only sanitize the *tag* portion (after the last ':', and only if
-            # that ':' occurs after the last '/'). This avoids breaking
-            # registries with ports like "registry:5000/repo:tag".
             if [[ "$after_slash" == *:* ]]; then
               local name="${ref%:*}"
               local tag="${ref##*:}"
-
               local safe_tag="${tag//\//-}"
               safe_tag="${safe_tag// /-}"
               safe_tag="${safe_tag//:/-}"
               safe_tag="${safe_tag//[^A-Za-z0-9_.-]/-}"
-              safe_tag="${safe_tag#[-.]}" # strip leading '-' or '.'
+              safe_tag="${safe_tag#[-.]}"
               safe_tag="${safe_tag:0:128}"
-
               if [[ -z "$safe_tag" ]]; then
                 safe_tag="sha-${GITHUB_SHA}"
                 safe_tag="${safe_tag:0:128}"
               fi
-
               printf '%s:%s' "$name" "$safe_tag"
               return 0
             fi
-
             printf '%s' "$ref"
           }
 
@@ -204,23 +198,47 @@ jobs:
               break
             fi
           done
-
           if [ -z "$IMAGE" ]; then
-            echo "Error: no image tag found to save (inputs.tags was empty)"
+            echo "Error: no image tag found to run tests (inputs.tags was empty)"
             exit 1
           fi
 
-          echo "Saving image: $IMAGE"
-          docker save "$IMAGE" | gzip -1 > docker-image.tar.gz
-          ls -lh docker-image.tar.gz
+          if [ "${{ inputs.test-selection }}" != "full" ] && [ "${{ inputs.test-selection }}" != "random" ]; then
+            echo "Error: test-selection must be 'full' or 'random'"
+            exit 1
+          fi
 
-      - name: Upload built image artifact
-        if: ${{ inputs.export-image-artifact && inputs.push == false }}
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            COV_ARGS="--cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:/tmp/coverage.xml"
+          else
+            COV_ARGS=""
+          fi
+
+          if [ "${{ inputs.test-selection }}" = "full" ]; then
+            CMD="python -m pytest -rs -m \"$MARKERS\" $COV_ARGS $TEST_PATHS"
+          else
+            N="${{ inputs.random-count }}"
+            CMD="set -euo pipefail; \
+              python -m pytest --collect-only -q $TEST_PATHS | grep '::' | shuf -n \"$N\" > /tmp/selected-tests.txt; \
+              python -m pytest -rs -m \"$MARKERS\" $COV_ARGS \$(cat /tmp/selected-tests.txt)"
+          fi
+
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            CID="$(docker create --platform "$PLATFORM" "$IMAGE" bash -lc "$CMD")"
+            docker start -a "$CID"
+            docker cp "$CID":/tmp/coverage.xml coverage.xml || true
+            docker rm -f "$CID"
+          else
+            docker run --rm --platform "$PLATFORM" "$IMAGE" bash -lc "$CMD"
+          fi
+
+      - name: Upload coverage report
+        if: ${{ inputs.coverage }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.image-artifact-name }}
-          path: docker-image.tar.gz
-          if-no-files-found: error
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
 
       - name: Cleanup HF token file
         if: always()
