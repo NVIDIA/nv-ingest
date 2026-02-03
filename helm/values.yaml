@@ -667,12 +667,8 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
-      - name: NIM_TRITON_RATE_LIMIT
-        value: "3"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
-      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "2048"
       - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
         value: "2"
       - name: OMP_NUM_THREADS
@@ -872,8 +868,6 @@ nimOperator:
         value: "1"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
-      - name: NIM_TRITON_ENABLE_MODEL_CONTROL
-        value: "1"
 
   ## @param llama_3_2_nv_rerankqa_1b_v2 [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
   ## @param llama_3_2_nv_rerankqa_1b_v2.enabled [bool] Enable this NIM
