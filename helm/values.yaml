@@ -105,13 +105,13 @@ tmpDirSize: 50Gi
 ## @param envVars.INGEST_LOG_LEVEL [default: "DEFAULT"] Log level for the ingest service
 ## @param envVars.INGEST_EDGE_BUFFER_SIZE [default: "64"] Size of the edge buffer for ingestion
 ## @param envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD [default: "0.80"] Dynamic memory threshold for ingestion
-## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
+## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "32"] Maximum Ingestion worker processes
 ## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differing REST endpoint host
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port
 ## @param envVars.MESSAGE_CLIENT_TYPE [default: "redis"] Type of message client to use
 ## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"] Name of the Redis queue for ingest tasks
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests
-## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
+## @param envVars.NV_INGEST_MAX_UTIL [default: "32"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
@@ -149,8 +149,8 @@ envVars:
   OMP_NUM_THREADS: 1
   RAY_num_grpc_threads: 1
 
-  MAX_INGEST_PROCESS_WORKERS: 16
-  NV_INGEST_MAX_UTIL: 48
+  MAX_INGEST_PROCESS_WORKERS: 32
+  NV_INGEST_MAX_UTIL: 32
   INGEST_DYNAMIC_MEMORY_THRESHOLD: 0.80
   INGEST_EDGE_BUFFER_SIZE: 64
   INGEST_DISABLE_DYNAMIC_SCALING: true

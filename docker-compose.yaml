@@ -267,7 +267,7 @@ services:
       - CUDA_VISIBLE_DEVICES=-1
       # Optional: Load custom pipeline YAML (uncomment and mount ./config volume above)
       #- INGEST_CONFIG_PATH=/workspace/config/custom_summarization_pipeline.yaml
-      - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-16}
+      - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-32}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
@@ -305,7 +305,7 @@ services:
       - NEMOTRON_PARSE_MODEL_NAME=nvidia/nemotron-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
+      - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-32}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
