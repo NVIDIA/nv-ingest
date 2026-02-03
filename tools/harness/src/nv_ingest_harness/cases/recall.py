@@ -65,6 +65,7 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     hostname = config.hostname
     sparse = config.sparse
+    hybrid = config.hybrid
     gpu_search = config.gpu_search
     model_name, dense_dim = embed_info()
 
@@ -107,6 +108,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Test Name: {test_name}")
     print(f"Collection: {collection_name}")
     print(f"VDB Backend: {vdb_backend}")
+    if vdb_backend == "lancedb":
+        print(f"Hybrid: {hybrid}")
     if lancedb_path:
         print(f"LanceDB Path: {lancedb_path}")
     print(f"Reranker Mode: {reranker_mode}")
@@ -131,6 +134,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "hostname": hostname,
             "sparse": sparse,
             "model_name": model_name,
+            "hybrid": hybrid,
             "top_k": recall_top_k,
             "gpu_search": gpu_search,
             "ground_truth_dir": ground_truth_dir,
@@ -139,7 +143,6 @@ def main(config=None, log_path: str = "test_results") -> int:
             "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
         }
         if vdb_backend == "lancedb":
-            evaluation_params["sparse"] = False  # LanceDB doesn't support hybrid search
             evaluation_params["table_path"] = lancedb_path
 
         # Run without reranker (if mode is "none" or "both")
