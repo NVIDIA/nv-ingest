@@ -374,6 +374,10 @@ This can be used to describe images extracted from documents.
 
     The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`.
 
+!!! tip
+
+    You can configure and use other vision language models for image captioning by specifying a different `model_name` and `endpoint_url` in the `caption` method. Choose a VLM that best fits your specific use case requirements.
+
 ```python
 ingestor = ingestor.caption()
 ```
