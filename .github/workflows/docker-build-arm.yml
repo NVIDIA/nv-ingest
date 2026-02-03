@@ -1,12 +1,7 @@
 name: Build NV-Ingest Runtime Image (arm64)
 
 on:
-  # Trigger only for pushing to main since build may take > 1 hour.
-  push:
-    branches:
-      - main
-
-  # Allows you to run this workflow manually from the Actions tab
+  # Manual-only: arm64 builds run in scheduled nightly workflow.
   workflow_dispatch:
 
 jobs:

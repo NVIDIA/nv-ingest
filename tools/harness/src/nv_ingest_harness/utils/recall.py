@@ -9,6 +9,7 @@ import json
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+from functools import partial
 from typing import Dict, Optional, Callable
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
@@ -20,17 +21,18 @@ def _get_retrieval_func(
     vdb_backend: str,
     table_path: Optional[str] = None,
     table_name: Optional[str] = None,
+    hybrid: bool = False,
 ):
     """
     Get the retrieval function for the specified VDB backend.
 
-    For LanceDB, creates a single client instance that is reused across all
-    retrieval calls, avoiding repeated database/table opens.
+    For LanceDB, returns a partial of lancedb_retrieval with table_path pre-filled.
+    For Milvus, returns nvingest_retrieval directly.
 
     Args:
         vdb_backend: "milvus" or "lancedb"
         table_path: Path to LanceDB database directory (required for lancedb)
-        table_name: Table/collection name (used to pre-initialize LanceDB client)
+        table_name: Table/collection name (optional, can be passed at call time)
 
     Returns:
         Retrieval function that accepts (queries, **kwargs) and returns results.
@@ -38,16 +40,16 @@ def _get_retrieval_func(
     if vdb_backend == "lancedb":
         if not table_path:
             raise ValueError("table_path required for lancedb backend")
-        from nv_ingest_client.util.vdb.lancedb import LanceDB
+        if hybrid:
+            from nv_ingest_client.util.vdb.lancedb import lancedb_hybrid_retrieval as lancedb_retrieval
+        else:
+            from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
 
-        # Create client once, reuse for all retrieval calls
-        lancedb_client = LanceDB(uri=table_path, table_name=table_name or "nv-ingest")
+        kwargs = {"table_path": table_path}
+        if table_name:
+            kwargs["table_name"] = table_name
+        return partial(lancedb_retrieval, **kwargs)
 
-        def lancedb_retrieval(queries, **kwargs):
-            # table_name already set on client, but can be overridden via kwargs
-            return lancedb_client.retrieval(queries, **kwargs)
-
-        return lancedb_retrieval
     return nvingest_retrieval
 
 
@@ -56,6 +58,7 @@ def get_recall_scores(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -90,7 +93,6 @@ def get_recall_scores(
 
     Returns:
         Dictionary mapping k values (1, 3, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
     queries = query_df["query"].to_list()
@@ -100,7 +102,12 @@ def get_recall_scores(
 
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
-        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+        retrieval_func = _get_retrieval_func(
+            "lancedb",
+            table_path,
+            table_name=collection_name,
+            hybrid=hybrid,
+        )
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
 
@@ -158,6 +165,7 @@ def get_recall_scores_pdf_only(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -180,7 +188,7 @@ def get_recall_scores_pdf_only(
                   expected_pdf format: PDF filename without extension (e.g., '3M_2018_10K').
         collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Default False for finance_bench.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
         model_name: Embedding model name for query encoding.
         top_k: Maximum number of results to retrieve and evaluate.
         gpu_search: Use GPU acceleration for Milvus search.
@@ -194,11 +202,9 @@ def get_recall_scores_pdf_only(
 
     Returns:
         Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
-        Only includes k values where k <= top_k.
     """
     hits = defaultdict(list)
 
-    # Prepare reranker kwargs if custom endpoint/model provided
     reranker_kwargs = {}
     if nv_ranker:
         if nv_ranker_endpoint:
@@ -215,7 +221,12 @@ def get_recall_scores_pdf_only(
 
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
-        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+        retrieval_func = _get_retrieval_func(
+            "lancedb",
+            table_path,
+            table_name=collection_name,
+            hybrid=hybrid,
+        )
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
 
@@ -274,44 +285,47 @@ def evaluate_recall_orchestrator(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
     **scorer_kwargs,
 ) -> Dict[int, float]:
     """
     Generic orchestrator for recall evaluation.
 
-    Centralizes the common pattern: load ground truth → score → return results.
-    All parameters are passed through to the scorer function, preserving config-driven behavior.
-
     Args:
-        loader_func: Function that loads ground truth DataFrame from optional directory.
-        scorer_func: Function that calculates recall scores (get_recall_scores or get_recall_scores_pdf_only).
-        collection_name: Milvus collection name to query.
+        loader_func: Function that loads ground truth DataFrame.
+        scorer_func: Function that calculates recall scores.
+        collection_name: Collection/table name to query.
         hostname: Service hostname for embedding endpoint.
-        sparse: Enable hybrid sparse-dense retrieval if True. Passed from config.
-        model_name: Embedding model name for query encoding.
-        top_k: Maximum number of results to retrieve and evaluate.
-        gpu_search: Use GPU acceleration for Milvus search.
-        nv_ranker: Enable NVIDIA reranker for result reranking.
-        ground_truth_dir: Directory containing ground truth files (optional).
-        **scorer_kwargs: Additional kwargs to pass to scorer_func (e.g., nv_ranker_endpoint, nv_ranker_model_name).
+        sparse: Enable hybrid retrieval (Milvus only).
+        model_name: Embedding model name.
+        top_k: Maximum results to retrieve.
+        gpu_search: Use GPU for search (Milvus only).
+        nv_ranker: Enable reranker.
+        ground_truth_dir: Directory containing ground truth files.
+        vdb_backend: VDB backend ("milvus" or "lancedb").
+        table_path: Path to LanceDB database.
+        **scorer_kwargs: Additional kwargs for scorer_func.
 
     Returns:
-        Dictionary mapping k values to recall scores (float 0.0-1.0).
+        Dictionary mapping k values to recall scores.
     """
-    # 1. Load ground truth using dataset-specific loader
     query_df = loader_func(ground_truth_dir)
 
-    # 2. Calculate recall scores using dataset-specific scorer
     scores = scorer_func(
         query_df,
         collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -357,6 +371,7 @@ def bo767_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -397,6 +412,7 @@ def bo767_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -459,7 +475,8 @@ def finance_bench_load_ground_truth(ground_truth_dir: Optional[str] = None) -> p
 def finance_bench_recall(
     collection_name: str,
     hostname: str = "localhost",
-    sparse: bool = False,  # Default False (hybrid=False) for finance_bench
+    sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -500,6 +517,7 @@ def finance_bench_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -561,6 +579,7 @@ def earnings_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -601,6 +620,7 @@ def earnings_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -657,6 +677,7 @@ def bo10k_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -674,6 +695,7 @@ def bo10k_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,

@@ -18,7 +18,7 @@ To get started with the basics, try one of the following notebooks:
 For more advanced scenarios, try one of the following notebooks:
 
 - [Build a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb)
-- [Try out the NVIDIA Multimodal PDF Data Extraction Blueprint](https://github.com/NVIDIA/nv-ingest/blob/main/deploy/pdf-blueprint.ipynb)
+- [Try Enterprise RAG Blueprint](https://github.com/NVIDIA/nv-ingest/blob/main/deploy/pdf-blueprint.ipynb)
 - [Evaluate bo767 retrieval recall accuracy with NV-Ingest and Milvus](https://github.com/NVIDIA/nv-ingest/blob/main/evaluation/bo767_recall.ipynb)
 - [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb)
 - [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb)

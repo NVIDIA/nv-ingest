@@ -1,0 +1,106 @@
+name: Release - PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: false
+        type: string
+      release-type:
+        description: 'Release type'
+        required: false
+        type: choice
+        default: 'release'
+        options:
+          - dev
+          - release
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+
+jobs:
+  determine-version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release-type: ${{ steps.release-type.outputs.release-type }}
+      source-ref: ${{ steps.source.outputs.source-ref }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Extract from branch name (release/X.Y.Z -> X.Y.Z)
+            VERSION="${GITHUB_REF#refs/heads/release/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.release-type }}" ]; then
+            RELEASE_TYPE="${{ inputs.release-type }}"
+          else
+            # Default to release type for release branches
+            RELEASE_TYPE="release"
+          fi
+          echo "release-type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "Release type: $RELEASE_TYPE"
+
+      - name: Determine source ref
+        id: source
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SOURCE_REF="${{ inputs.source-ref }}"
+          else
+            SOURCE_REF="${GITHUB_REF}"
+          fi
+          echo "source-ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+          echo "Building from: $SOURCE_REF"
+
+  build:
+    name: Build Python Wheels
+    needs: determine-version
+    uses: ./.github/workflows/reusable-pypi-build.yml
+    with:
+      version: ${{ needs.determine-version.outputs.version }}
+      release-type: ${{ needs.determine-version.outputs.release-type }}
+      source-ref: ${{ needs.determine-version.outputs.source-ref }}
+      runner: 'linux-large-disk'
+
+  publish:
+    name: Publish Python Wheels
+    needs:
+      - determine-version
+      - build
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+  summary:
+    name: Release Summary
+    needs:
+      - determine-version
+      - publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "Published Python wheels:"
+          echo "  Version: ${{ needs.determine-version.outputs.version }}"
+          echo "  Release Type: ${{ needs.determine-version.outputs.release-type }}"
+          echo "  Source: ${{ needs.determine-version.outputs.source-ref }}"
+          echo ""
+          echo "Packages:"
+          echo "  - nv-ingest-api"
+          echo "  - nv-ingest-client"
+          echo "  - nv-ingest"

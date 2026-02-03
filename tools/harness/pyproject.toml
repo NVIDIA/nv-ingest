@@ -23,13 +23,6 @@ nv-ingest-harness-nightly = "nv_ingest_harness.cli.nightly:main"
 nv-ingest-harness-compare = "nv_ingest_harness.cli.compare:main"
 nv-ingest-harness-stats = "nv_ingest_harness.cli.stats:main"
 
-[dependency-groups]
-dev = [
-    "nv-ingest",
-    "nv-ingest-api",
-    "nv-ingest-client",
-]
-
 [tool.uv]
 package = true
 
