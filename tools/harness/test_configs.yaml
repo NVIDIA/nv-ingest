@@ -59,7 +59,7 @@ active:
   sparse: false  # Use sparse embeddings (Milvus only)
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
-  vdb_backend: lancedb  # milvus or lancedb
+  vdb_backend: milvus  # milvus or lancedb
   hybrid: false  # LanceDB hybrid retrieval (FTS + vector)
 
   # Extraction configuration
@@ -94,7 +94,7 @@ active:
 # docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: both  # Options: "none", "with", "both"
+  reranker_mode: none  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
@@ -275,3 +275,33 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_finance_fr
+
+# Dataset groups for running multiple datasets together
+# Use: uv run nv-ingest-harness-run --case=e2e_recall --dataset=vidore
+dataset_groups:
+  # All Vidore V3 datasets
+  vidore:
+    - vidore_v3_finance_en
+    - vidore_v3_industrial
+    - vidore_v3_computer_science
+    - vidore_v3_pharmaceuticals
+    - vidore_v3_hr
+    - vidore_v3_energy
+    - vidore_v3_physics
+    - vidore_v3_finance_fr
+
+  # Vidore English-only (excludes finance_fr)
+  vidore_english:
+    - vidore_v3_finance_en
+    - vidore_v3_industrial
+    - vidore_v3_computer_science
+    - vidore_v3_pharmaceuticals
+    - vidore_v3_hr
+    - vidore_v3_energy
+    - vidore_v3_physics
+
+  # Vidore quick test (smallest datasets)
+  vidore_quick:
+    # - vidore_v3_hr
+    # - vidore_v3_industrial
+    - vidore_v3_computer_science

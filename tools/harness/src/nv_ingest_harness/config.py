@@ -365,14 +365,55 @@ def _load_env_overrides() -> dict:
     return overrides
 
 
+def expand_dataset_names(yaml_data: dict, dataset_input: str) -> List[str]:
+    """
+    Expand a dataset input string to a list of dataset names.
+
+    Handles:
+    - Single dataset name: "bo767" -> ["bo767"]
+    - Comma-separated: "bo767,earnings" -> ["bo767", "earnings"]
+    - Group name: "vidore" -> ["vidore_v3_finance_en", "vidore_v3_industrial", ...]
+    - Mixed: "vidore_quick,bo767" -> ["vidore_v3_hr", "vidore_v3_industrial", "bo767"]
+
+    Args:
+        yaml_data: Parsed YAML data containing datasets and dataset_groups
+        dataset_input: Raw dataset input string
+
+    Returns:
+        List of individual dataset names (expanded from groups)
+    """
+    dataset_groups = yaml_data.get("dataset_groups", {})
+
+    raw_names = [name.strip() for name in dataset_input.split(",") if name.strip()]
+
+    expanded = []
+    for name in raw_names:
+        if name in dataset_groups:
+            expanded.extend(dataset_groups[name])
+        else:
+            expanded.append(name)
+
+    seen = set()
+    result = []
+    for name in expanded:
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+
+    return result
+
+
 def list_datasets(config_file: str = "test_configs.yaml") -> dict:
-    """List available dataset shortcuts"""
-    config_path = Path(__file__).parent / config_file
+    """List available dataset shortcuts and groups"""
+    config_path = Path(__file__).resolve().parents[2] / config_file
 
     with open(config_path) as f:
         yaml_data = yaml.safe_load(f)
 
-    return yaml_data.get("datasets", {})
+    return {
+        "datasets": yaml_data.get("datasets", {}),
+        "groups": yaml_data.get("dataset_groups", {}),
+    }
 
 
 def list_presets(config_file: str = "test_configs.yaml") -> List[str]:
