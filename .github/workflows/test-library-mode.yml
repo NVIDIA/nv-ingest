@@ -21,7 +21,7 @@ jobs:
     container:
       image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     steps:
-      - name: Check access
+      - name: Check access (foo)
         if:
           ${{
             github.event_name == 'pull_request_target' &&
