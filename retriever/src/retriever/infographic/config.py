@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict
+
+from retriever._local_deps import ensure_nv_ingest_api_importable
+from retriever.config_utils import endpoints_from_yaml
+
+ensure_nv_ingest_api_importable()
+
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
+
+
+def load_infographic_extractor_schema_from_dict(cfg: Dict[str, Any]) -> InfographicExtractorSchema:
+    cfg = dict(cfg or {})
+    endpoint_cfg = cfg.get("endpoint_config")
+    if isinstance(endpoint_cfg, dict) and "ocr_endpoints" in endpoint_cfg:
+        endpoint_cfg = dict(endpoint_cfg)
+        endpoint_cfg["ocr_endpoints"] = endpoints_from_yaml(endpoint_cfg.get("ocr_endpoints"))
+        cfg["endpoint_config"] = endpoint_cfg
+    return InfographicExtractorSchema(**cfg)
+
+
+@dataclass(frozen=True)
+class InfographicExtractionStageConfig:
+    batch_size: int = 64
+    stage_name: str = "infographic_extraction"
+

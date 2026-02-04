@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+managed = true
+package = true
+
+[project]
+name = "retriever"
+version = "0.1.0"
+description = "A modern RAG ingestion pipeline from Nvidia"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+  { name = "Jeremy Dyer", email = "jdyer@nvidia.com" },
+]
+license = { text = "Apache-2.0" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "ray[data]>=2.49.0",
+  "pypdfium2==4.30.0",
+  "pandas>=2.0",
+  "tqdm>=4.66.0",
+  "typer>=0.12.0",
+  "lancedb",
+  "nv-ingest-api==26.1.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.2",
+  "pytest>=8.0.2",
+]
+
+[project.scripts]
+retriever = "retriever.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

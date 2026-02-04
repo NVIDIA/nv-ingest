@@ -1641,23 +1641,47 @@ def postprocess_included_texts(boxes, confs, labels, classes):
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
+    # If a gRPC endpoint isn't provided (common when using HTTP-only NIM endpoints),
+    # skip Triton repository introspection entirely.
+    if not yolox_grpc_endpoint:
+        return default_model_name
+
+    # Guard against accidentally passing an HTTP URL into the gRPC Triton client.
+    if isinstance(yolox_grpc_endpoint, str) and (yolox_grpc_endpoint.startswith("http://") or yolox_grpc_endpoint.startswith("https://")):
+        return default_model_name
+
     try:
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
-        model_names = [x["name"] for x in model_index.get("models", [])]
-        if "pipeline" in model_names:
-            yolox_model_name = "pipeline"
-        elif "yolox_ensemble" in model_names:
-            yolox_model_name = "yolox_ensemble"
-        else:
-            yolox_model_name = default_model_name
-    except Exception:
-        logger.warning(
-            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_model_name}'."
-        )
-        yolox_model_name = default_model_name
+        model_names = [x.get("name") for x in model_index.get("models", []) if isinstance(x, dict)]
 
-    return yolox_model_name
+        # Prefer explicit known orchestrations first.
+        for preferred in (
+            "pipeline",  # BLS pipeline
+            "yolox_ensemble",
+            "yolox",
+            "yolox-page-elements",
+            "page-elements",
+            "nemoretriever-page-elements-v3",
+            "nemoretriever-page-elements-v2",
+        ):
+            if preferred in model_names:
+                return preferred
+
+        # Otherwise pick a best-effort match for newer model names.
+        candidates = [m for m in model_names if isinstance(m, str) and ("yolox" in m or "page-elements" in m)]
+        if candidates:
+            return sorted(candidates)[0]
+
+        return default_model_name
+    except Exception as e:
+        logger.warning(
+            "Failed to inspect YOLOX model repository at '%s' (%s). Falling back to '%s'.",
+            yolox_grpc_endpoint,
+            type(e).__name__,
+            default_model_name,
+        )
+        return default_model_name
 
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
