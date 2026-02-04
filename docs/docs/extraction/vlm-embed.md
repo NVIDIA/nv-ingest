@@ -207,10 +207,6 @@ ingestor = (
 results = ingestor.ingest()
 ```
 
-!!! tip
-
-    Use VLM captioning for infographics when you need searchable text descriptions of complex visual content. Use image embedding when you want to preserve the visual characteristics for similarity search.
-
 
 ## Related Topics
 
