@@ -25,7 +25,10 @@ Use the [Digital Corpora Download Notebook](https://github.com/NVIDIA/nv-ingest/
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose running
+
+Before you use this documentation, you need the following:
+
+- Docker and Docker Compose are running
 - Python environment with nv-ingest-client
 - **Benchmark datasets downloaded** (see [Dataset Prerequisites](#dataset-prerequisites) above)
 
