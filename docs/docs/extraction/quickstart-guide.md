@@ -440,7 +440,9 @@ You can specify multiple `--profile` options.
 
 ### Example: Using the VLM Profile for Infographic Captioning
 
-To use vision-language model (VLM) captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles:
+Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
+
+To VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
 
 ```shell
 docker compose --profile retrieval --profile vlm up
