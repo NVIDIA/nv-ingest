@@ -435,7 +435,54 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for image captioning of unstructured images and infographics. This profile enables the `.caption()` method in the Python API to generate text descriptions of visual content. For more information, refer to [Use Multimodal Embedding](vlm-embed.md) and [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). |
+
+
+### Example: Using the VLM Profile for Infographic Captioning
+
+To use vision-language model (VLM) captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles:
+
+```shell
+docker compose --profile retrieval --profile vlm up
+```
+
+Then, in your Python code, extract and caption infographics:
+
+```python
+from nv_ingest_client.client import Ingestor, NvIngestClient
+
+client = NvIngestClient(
+    message_client_port=7670,
+    message_client_hostname="localhost"
+)
+
+ingestor = (
+    Ingestor(client=client)
+    .files("data/document_with_infographics.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,  # Extract infographics
+        extract_images=False,
+    )
+    .caption(
+        prompt="Describe the content and key information in this infographic:",
+        reasoning=True,  # Enable reasoning for better captions
+    )
+    .embed()
+    .vdb_upload(
+        collection_name="test",
+        dense_dim=2048,
+    )
+)
+
+results = ingestor.ingest(show_progress=True)
+```
+
+!!! tip
+
+    Infographics often combine text, charts, and diagrams into complex visuals. VLM captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
 
 
 ## Specify MIG slices for NIM models

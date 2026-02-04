@@ -55,7 +55,7 @@ The following table describes the `extract_method` options.
 
 ### Caption images and control reasoning
 
-The caption task can call a VLM with optional prompt and reasoning controls:
+The caption task can call a vision-language model (VLM) with optional prompt and reasoning controls:
 
 - `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
 - `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
@@ -367,12 +367,14 @@ with (
 
 ## Extract Captions from Images
 
-The `caption` method generates image captions by using a vision-language model. 
-This can be used to describe images extracted from documents.
+The `caption` method generates image captions by using a VLM. 
+This can be used to describe unstructured images, infographics, and other visual content extracted from documents.
 
 !!! note
 
-    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`.
+    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. The `vlm` profile must be enabled when starting NeMo Retriever extraction services. For more information, refer to [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information).
+
+### Basic Usage
 
 ```python
 ingestor = ingestor.caption()
@@ -387,6 +389,36 @@ ingestor = ingestor.caption(
     api_key="nvapi-"
 )
 ```
+
+### Captioning Infographics
+
+Infographics are complex visual elements that combine text, charts, diagrams, and images to convey information.
+VLMs are particularly effective at generating descriptive captions for infographics because they can understand and summarize the visual content.
+
+The following example extracts and captions infographics from a document:
+
+```python
+ingestor = (
+    Ingestor()
+    .files("document_with_infographics.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,  # Extract infographics for captioning
+        extract_images=False,
+    )
+    .caption(
+        prompt="Describe the content and key information in this infographic:",
+        reasoning=True,  # Enable reasoning for more detailed captions
+    )
+)
+results = ingestor.ingest()
+```
+
+!!! tip
+
+    For more information about working with infographics and multimodal content, refer to [Use Multimodal Embedding](vlm-embed.md).
 
 ### Caption Images and Control Reasoning
 
