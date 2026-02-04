@@ -162,8 +162,10 @@ results = ingestor.ingest()
 
 ### Approach 2: Extract and Embed Infographics as Images
 
-This approach treats infographics as visual elements and embeds them using the multimodal embedding model,
+This approach treats infographics as visual elements and embeds them using the multimodal embedding model, 
 preserving their spatial and visual characteristics without generating text captions.
+
+Use this approach when you want to preserve the visual characteristics for similarity search.
 
 ```python
 ingestor = (
