@@ -25,6 +25,46 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PA
 
 logger = logging.getLogger(__name__)
 
+
+def _compute_render_scale_to_fit(
+    page: pdfium.PdfPage,
+    target_wh: Tuple[int, int],
+    rotation: int = 0,
+) -> float:
+    """
+    Compute a PDFium render scale that fits the rotated page within target pixel bounds.
+
+    Uses the standard fit-to-box formula: min(target_w/page_w, target_h/page_h)
+
+    Parameters
+    ----------
+    page : pdfium.PdfPage
+        The PDF page to compute scale for.
+    target_wh : Tuple[int, int]
+        Target (width, height) in pixels.
+    rotation : int, optional
+        Page rotation in degrees (0, 90, 180, 270). Defaults to 0.
+
+    Returns
+    -------
+    float
+        The scale factor to use for rendering.
+    """
+    target_w, target_h = target_wh
+    if target_w <= 0 or target_h <= 0:
+        return 1.0
+
+    page_w, page_h = float(page.get_width()), float(page.get_height())
+    if page_w <= 0.0 or page_h <= 0.0:
+        return 1.0
+
+    # Swap dimensions if rotated 90 or 270 degrees
+    if (rotation % 180) != 0:
+        page_w, page_h = page_h, page_w
+
+    return max(min(target_w / page_w, target_h / page_h), 1e-3)
+
+
 PDFIUM_PAGEOBJ_MAPPING = {
     pdfium_c.FPDF_PAGEOBJ_TEXT: "TEXT",
     pdfium_c.FPDF_PAGEOBJ_PATH: "PATH",
@@ -181,15 +221,21 @@ def pdfium_pages_to_numpy(
 
     images = []
     padding_offsets = []
-    scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
+    base_scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
 
     for idx, page in enumerate(pages):
-        # Render the page as a bitmap with the specified scale and rotation
-        page_bitmap = page.render(scale=scale, rotation=rotation, rev_byteorder=render_rev_byteorder)
-        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap, skip_channel_swap=render_rev_byteorder)
-        # Apply scaling using the thumbnail approach if specified
+        # Render at target scale directly when scale_tuple specified to avoid large intermediate bitmaps
+        render_scale = base_scale
         if scale_tuple:
+            render_scale = min(base_scale, _compute_render_scale_to_fit(page, scale_tuple, rotation))
+
+        page_bitmap = page.render(scale=render_scale, rotation=rotation, rev_byteorder=render_rev_byteorder)
+        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap, skip_channel_swap=render_rev_byteorder)
+
+        # Safety fallback for rounding edge cases - only scale down if needed
+        if scale_tuple and (img_arr.shape[1] > scale_tuple[0] or img_arr.shape[0] > scale_tuple[1]):
             img_arr = scale_numpy_image(img_arr, scale_tuple)
+
         # Apply padding if specified
         if padding_tuple:
             img_arr, (pad_width, pad_height) = pad_image(
