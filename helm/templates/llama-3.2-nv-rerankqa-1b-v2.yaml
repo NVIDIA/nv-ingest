@@ -36,8 +36,14 @@ spec:
   replicas: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.nodeSelector | nindent 4 }}
+{{- if .Values.nimOperator.draResources.enabled }}
+  draResources:
+{{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.draResources | nindent 4 }}
+{{- end }}
+{{- if not .Values.nimOperator.draResources.enabled }}
   resources:
 {{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources | nindent 4 }}
+{{- end }}
   tolerations:
 {{ toYaml .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.tolerations | nindent 4 }}
   expose:
