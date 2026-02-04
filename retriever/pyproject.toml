@@ -29,7 +29,28 @@ dependencies = [
   "tqdm>=4.66.0",
   "typer>=0.12.0",
   "lancedb",
-  "nv-ingest-api==26.1.2",
+  #"nv-ingest-api==26.1.2",
+  "fastapi>=0.114.0",
+  "uvicorn[standard]>=0.30.0",
+  "httpx>=0.27.0",
+  "requests>=2.31.0",
+  "pydantic>=2.8.0",
+  "typer>=0.12.0",
+  "rich>=13.7.0",
+  "pillow>=12.0.0",
+  "numpy>=1.26.0",
+  "python-multipart>=0.0.9",
+  "transformers>=4.49.0",
+  "tokenizers>=0.20.3",
+  # TensorRT support (keep Torch/TorchVision versions aligned; mismatch breaks torchvision C++ ops like nms)
+  "torch~=2.9.0",
+  "torchvision>=0.24,<0.25",
+  "einops",
+  "easydict",
+  "addict",
+  "nemotron-page-elements-v3==3.0.1",
+  "nemotron-graphic-elements-v1==1.0.0",
+  "nemotron-table-structure-v1==1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -39,7 +60,7 @@ dev = [
 ]
 
 [project.scripts]
-retriever = "retriever.cli:main"
+retriever = "retriever.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

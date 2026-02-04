@@ -15,8 +15,10 @@ import typer
 from tqdm import tqdm
 
 from ._io import coerce_embedding_to_vector, iter_images, normalize_l2, read_json
+
 # import slimgest.model.local.llama_nemotron_embed_1b_v2_embedder as llama_nemotron_embed_1b_v2
 import numpy as np
+
 # from slimgest.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 import llama_nemotron_embed_1b_v2
 import torch.nn.functional as F
@@ -29,6 +31,7 @@ app = typer.Typer(
 
 DEFAULT_INPUT_DIR = Path("./data/pages")
 
+
 def average_pool(last_hidden_states, attention_mask):
     """Average pooling with attention mask."""
     last_hidden_states_masked = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
@@ -36,8 +39,10 @@ def average_pool(last_hidden_states, attention_mask):
     embedding = F.normalize(embedding, dim=-1)
     return embedding
 
+
 def _stage5_json_for_image(img_path: Path) -> Path:
     return img_path.with_name(img_path.name + ".nemotron_ocr_v1.json")
+
 
 def _pdfium_text_for_image(img_path: Path) -> Path:
     """
@@ -70,28 +75,28 @@ def _embed_via_remote_endpoint(
     """
     Embed texts using a remote OpenAI-compatible embedding endpoint.
     Returns list of numpy arrays (one per text).
-    
+
     Configured for NVIDIA NeMo Retriever Llama 3.2 embedding model:
     - Max context length: 8192 tokens
     - Embedding dimensions: 384, 512, 768, 1024, or 2048 (default: 2048)
     - Input type: "passage" for documents, "query" for questions
     """
     all_embeddings: List[np.ndarray] = []
-    
+
     # Process in batches
     for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
-        
+        batch = texts[i : i + batch_size]
+
         # Build payload - don't use extra_body, put parameters directly in the request
         payload = {
             "input": batch,
             "encoding_format": "float",
             "input_type": "passage",  # For embedding documents/passages
-            "truncate": "NONE"
+            "truncate": "NONE",
         }
         if model_name:
             payload["model"] = model_name
-        
+
         try:
             response = requests.post(
                 endpoint_url,
@@ -107,32 +112,32 @@ def _embed_via_remote_endpoint(
                 error_detail = f" Response: {response.text}"
             except Exception:
                 pass
-            raise requests.exceptions.HTTPError(
-                f"{str(e)}{error_detail}", response=response
-            )
-        
+            raise requests.exceptions.HTTPError(f"{str(e)}{error_detail}", response=response)
+
         result = response.json()
-        
+
         # Extract embeddings from response
         # OpenAI format: {"data": [{"embedding": [...], "index": 0}, ...]}
         embeddings_data = result.get("data", [])
         # Sort by index to ensure correct order
         embeddings_data = sorted(embeddings_data, key=lambda x: x.get("index", 0))
-        
+
         for item in embeddings_data:
             embedding = item.get("embedding", [])
             all_embeddings.append(np.array(embedding, dtype=np.float32))
-    
+
     return all_embeddings
 
 
 def _out_path_for_image(img_path: Path) -> Path:
     return img_path.with_name(img_path.name + ".embeddings.pt")
 
+
 def _embedder_input_path_for_image(img_path: Path) -> Path:
     # Intentionally uses a "double extension" so it's easy to spot in a pages dir.
     # Example: foo_page0001.png.embedder-input.txt
     return img_path.with_name(img_path.name + ".embedder-input.txt")
+
 
 def _write_embedder_input_txt(
     path: Path,
@@ -210,7 +215,7 @@ def run(
 
     # Track all skipped items with reasons
     skip_records: List[Dict[str, str]] = []
-    
+
     chunks_created = 0
     processed = 0
     skipped = 0
@@ -225,17 +230,19 @@ def run(
         out_path = _out_path_for_image(img_path)
         if out_path.exists() and not overwrite:
             skipped += 1
-            skip_records.append({
-                "image_path": str(img_path),
-                "reason": "already_exists",
-                "details": f"Output file {out_path.name} already exists and --overwrite not set"
-            })
+            skip_records.append(
+                {
+                    "image_path": str(img_path),
+                    "reason": "already_exists",
+                    "details": f"Output file {out_path.name} already exists and --overwrite not set",
+                }
+            )
             continue
 
         s5_path = _stage5_json_for_image(img_path)
         pdfium_text_path = _pdfium_text_for_image(img_path)
         pdfium_text = ""
-        
+
         # Read pdfium text if available
         if pdfium_text_path.exists():
             pdfium_text = _read_text_file_best_effort(pdfium_text_path)
@@ -258,15 +265,17 @@ def run(
             missing_stage5 += 1
             stage5_status = "missing"
             # Continue with empty regions - we may still have pdfium_text
-        
+
         # If we have neither stage5 regions nor pdfium_text, skip this image
         if not regions and not pdfium_text:
             skipped += 1
-            skip_records.append({
-                "image_path": str(img_path),
-                "reason": "no_content",
-                "details": f"No stage5 regions ({stage5_status}) and no pdfium_text"
-            })
+            skip_records.append(
+                {
+                    "image_path": str(img_path),
+                    "reason": "no_content",
+                    "details": f"No stage5 regions ({stage5_status}) and no pdfium_text",
+                }
+            )
             continue
         texts: List[str] = []
         bboxes: List[List[float]] = []
@@ -279,7 +288,6 @@ def run(
             bboxes.append([0.0, 0.0, 1.0, 1.0])
             text_kinds.append("pdfium_page_text")
             texts_added += 1
-
 
         for r in regions:
             txt = (r.get("ocr_text") or "").strip()
@@ -298,7 +306,7 @@ def run(
         try:
             if texts:
                 raw_texts = list(texts)
-                
+
                 if embedding_endpoint:
                     # Use remote endpoint for embeddings (don't prepend "passage: ")
                     # The input_type is specified in the API call's extra_body parameter
@@ -313,13 +321,15 @@ def run(
                     # Use local model for embeddings (prepend "passage: " for local model)
                     embedder_texts = ["passage: " + text for text in raw_texts]
                     with torch.inference_mode():
-                        tokenized_inputs = tokenizer(embedder_texts, return_tensors="pt", padding=True, truncation=True).to(dev)
+                        tokenized_inputs = tokenizer(
+                            embedder_texts, return_tensors="pt", padding=True, truncation=True
+                        ).to(dev)
                         embed_model_results = embed_model(**tokenized_inputs)
                         emb = average_pool(embed_model_results.last_hidden_state, tokenized_inputs["attention_mask"])
 
                         for i in range(int(emb.shape[0])):
                             vectors.append(emb[i].cpu().numpy().astype(np.float32))
-                
+
                 # Write embedder input for debugging/inspection
                 if write_embedder_input:
                     _write_embedder_input_txt(
@@ -329,11 +339,13 @@ def run(
         except requests.exceptions.RequestException as e:
             # Handle remote endpoint errors
             remote_endpoint_errors += 1
-            skip_records.append({
-                "image_path": str(img_path),
-                "reason": "remote_endpoint_error",
-                "details": f"Remote endpoint error: {str(e)}"
-            })
+            skip_records.append(
+                {
+                    "image_path": str(img_path),
+                    "reason": "remote_endpoint_error",
+                    "details": f"Remote endpoint error: {str(e)}",
+                }
+            )
             console.print(
                 f"[bold red]Remote Endpoint Error[/bold red] while embedding {img_path} "
                 f"(skipping this page and continuing): {e}"
@@ -341,14 +353,11 @@ def run(
             continue
         except torch.cuda.OutOfMemoryError as e:
             oom_errors += 1
-            skip_records.append({
-                "image_path": str(img_path),
-                "reason": "cuda_oom",
-                "details": f"CUDA OutOfMemoryError: {str(e)}"
-            })
+            skip_records.append(
+                {"image_path": str(img_path), "reason": "cuda_oom", "details": f"CUDA OutOfMemoryError: {str(e)}"}
+            )
             console.print(
-                f"[bold red]CUDA OOM[/bold red] while embedding {img_path} "
-                f"(skipping this page and continuing): {e}"
+                f"[bold red]CUDA OOM[/bold red] while embedding {img_path} " f"(skipping this page and continuing): {e}"
             )
             # Best-effort cleanup so we can continue.
             try:
@@ -362,11 +371,13 @@ def run(
             msg = str(e)
             if "CUDA out of memory" in msg or "cuda out of memory" in msg:
                 oom_errors += 1
-                skip_records.append({
-                    "image_path": str(img_path),
-                    "reason": "cuda_oom_runtime",
-                    "details": f"RuntimeError CUDA OOM: {str(e)}"
-                })
+                skip_records.append(
+                    {
+                        "image_path": str(img_path),
+                        "reason": "cuda_oom_runtime",
+                        "details": f"RuntimeError CUDA OOM: {str(e)}",
+                    }
+                )
                 console.print(
                     f"[bold red]CUDA OOM[/bold red] while embedding {img_path} "
                     f"(skipping this page and continuing): {e}"
@@ -440,4 +451,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

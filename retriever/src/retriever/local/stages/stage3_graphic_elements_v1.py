@@ -10,7 +10,7 @@ import torch
 import typer
 from tqdm import tqdm
 
-from slimgest.model.local.nemotron_graphic_elements_v1 import NemotronGraphicElementsV1
+from retriever.model.local.nemotron_graphic_elements_v1 import NemotronGraphicElementsV1
 
 from ._io import (
     bbox_region_to_page,
@@ -158,19 +158,21 @@ def validate_input(
     expected_table: Optional[int] = typer.Option(None, "--expected-table", help="Expected number of table detections."),
     expected_chart: Optional[int] = typer.Option(None, "--expected-chart", help="Expected number of chart detections."),
     expected_text: Optional[int] = typer.Option(None, "--expected-text", help="Expected number of text detections."),
-    expected_infographic: Optional[int] = typer.Option(None, "--expected-infographic", help="Expected number of infographic detections."),
+    expected_infographic: Optional[int] = typer.Option(
+        None, "--expected-infographic", help="Expected number of infographic detections."
+    ),
     expected_title: Optional[int] = typer.Option(None, "--expected-title", help="Expected number of title detections."),
 ):
     """
     Validate all .page_elements_v3.json files in input_dir: count detections by label type.
-    
+
     This command scans the input directory for .page_elements_v3.json files and generates a validation report showing:
     - Total number of detections for each label type (table, chart, text, infographic, title)
     - Comparison against expected counts (if provided)
     - List of files with detections
     """
     console.print(f"[bold cyan]Validating page_elements_v3 inputs[/bold cyan] in {input_dir}")
-    
+
     # Initialize counters for each label type
     label_counts: Dict[str, int] = {
         "table": 0,
@@ -181,10 +183,10 @@ def validate_input(
         "header_footer": 0,
         "unknown": 0,
     }
-    
+
     # Track files with detections
     files_with_detections: List[Tuple[Path, Dict[str, int]]] = []
-    
+
     # Find all .page_elements_v3.json files
     images = iter_images(input_dir)
     json_files: List[Path] = []
@@ -192,31 +194,31 @@ def validate_input(
         json_path = _stage2_json_for_image(img_path)
         if json_path.exists():
             json_files.append(json_path)
-    
+
     console.print(f"Found {len(json_files)} .page_elements_v3.json files")
-    
+
     if len(json_files) == 0:
         console.print("[yellow]Warning: No .page_elements_v3.json files found in input directory.[/yellow]")
         raise typer.Exit(code=1)
-    
+
     # Process each JSON file
     pbar = tqdm(json_files, desc="Scanning JSON files", unit="file")
     for json_path in pbar:
         file_name = json_path.name[:50] + "..." if len(json_path.name) > 50 else json_path.name
         pbar.set_postfix({"current": file_name})
-        
+
         try:
             data = read_json(json_path)
-            
+
             if not isinstance(data, dict):
                 console.print(f"[yellow]Warning: {json_path.name} does not contain a valid JSON object[/yellow]")
                 continue
-            
+
             detections = data.get("detections", [])
             if not isinstance(detections, list):
                 console.print(f"[yellow]Warning: {json_path.name} detections field is not a list[/yellow]")
                 continue
-            
+
             # Count detections by label type for this file
             file_label_counts: Dict[str, int] = {
                 "table": 0,
@@ -227,11 +229,11 @@ def validate_input(
                 "header_footer": 0,
                 "unknown": 0,
             }
-            
+
             for det in detections:
                 if not isinstance(det, dict):
                     continue
-                
+
                 # Try to get label_name first (preferred), then fall back to label
                 label_name = det.get("label_name")
                 if isinstance(label_name, str):
@@ -268,32 +270,32 @@ def validate_input(
                         except (ValueError, TypeError):
                             file_label_counts["unknown"] += 1
                             label_counts["unknown"] += 1
-            
+
             # Only track files that have at least one detection
             if sum(file_label_counts.values()) > 0:
                 files_with_detections.append((json_path, file_label_counts))
-        
+
         except Exception as e:
             console.print(f"[red]Error processing {json_path.name}: {str(e)}[/red]")
             continue
-    
+
     pbar.close()
-    
+
     # Print summary report
     console.print("\n" + "=" * 80)
     console.print("[bold]Validation Report: Page Elements V3[/bold]")
     console.print("=" * 80)
-    
+
     # Detection counts summary
     console.print(f"\n[bold cyan]Detection Counts by Label Type:[/bold cyan]")
     from rich.table import Table
-    
+
     table = Table(show_header=True)
     table.add_column("Label Type", style="cyan")
     table.add_column("Count", justify="right", style="green")
     table.add_column("Expected", justify="right", style="yellow")
     table.add_column("Status", justify="center")
-    
+
     expected_map = {
         "table": expected_table,
         "chart": expected_chart,
@@ -301,12 +303,12 @@ def validate_input(
         "infographic": expected_infographic,
         "title": expected_title,
     }
-    
+
     validation_passed = True
     for label_type in ["table", "chart", "text", "infographic", "title", "header_footer", "unknown"]:
         count = label_counts[label_type]
         expected = expected_map.get(label_type)
-        
+
         status = ""
         if expected is not None:
             if count == expected:
@@ -314,26 +316,26 @@ def validate_input(
             else:
                 status = f"[red]✗ (diff: {count - expected:+d})[/red]"
                 validation_passed = False
-        
+
         table.add_row(
             label_type,
             str(count),
             str(expected) if expected is not None else "N/A",
             status,
         )
-    
+
     console.print(table)
-    
+
     # Total detections
     total_detections = sum(label_counts.values())
     console.print(f"\n[bold]Total detections across all files: {total_detections}[/bold]")
     console.print(f"[bold]Files with detections: {len(files_with_detections)} / {len(json_files)}[/bold]")
-    
+
     # Show sample of files with most detections
     if files_with_detections:
         console.print(f"\n[bold cyan]Top 10 Files by Detection Count:[/bold cyan]")
         files_with_detections.sort(key=lambda x: sum(x[1].values()), reverse=True)
-        
+
         detail_table = Table(show_header=True)
         detail_table.add_column("File", style="cyan", max_width=40)
         detail_table.add_column("Table", justify="right")
@@ -342,7 +344,7 @@ def validate_input(
         detail_table.add_column("Infographic", justify="right")
         detail_table.add_column("Title", justify="right")
         detail_table.add_column("Total", justify="right", style="bold green")
-        
+
         for json_path, file_counts in files_with_detections[:10]:
             detail_table.add_row(
                 json_path.name,
@@ -353,11 +355,11 @@ def validate_input(
                 str(file_counts["title"]),
                 str(sum(file_counts.values())),
             )
-        
+
         console.print(detail_table)
-    
+
     console.print("\n" + "=" * 80)
-    
+
     # Exit with appropriate code
     exit_code = 0
     if not validation_passed:
@@ -365,7 +367,7 @@ def validate_input(
         exit_code = 1
     else:
         console.print("[bold green]Validation passed![/bold green]")
-    
+
     raise typer.Exit(code=exit_code)
 
 
@@ -420,7 +422,7 @@ def run(
         except Exception:
             bad_stage2 += 1
             continue
-        dets: Sequence[Dict[str, Any]] = (s2.get("detections") or [])
+        dets: Sequence[Dict[str, Any]] = s2.get("detections") or []
 
         t, (h, w) = load_image_rgb_chw_u8(img_path, dev)
 
@@ -531,4 +533,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

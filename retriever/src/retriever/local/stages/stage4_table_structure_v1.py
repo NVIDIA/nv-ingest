@@ -10,7 +10,7 @@ import torch
 import typer
 from tqdm import tqdm
 
-from slimgest.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1
+from retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1
 
 from ._io import (
     bbox_region_to_page,
@@ -129,7 +129,7 @@ def run(
         except Exception:
             bad_stage2 += 1
             continue
-        dets: Sequence[Dict[str, Any]] = (s2.get("detections") or [])
+        dets: Sequence[Dict[str, Any]] = s2.get("detections") or []
 
         t, (h, w) = load_image_rgb_chw_u8(img_path, dev)
 
@@ -239,4 +239,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

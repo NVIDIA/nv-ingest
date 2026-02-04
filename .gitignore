@@ -250,3 +250,4 @@ history.db-wal
 
 lancedb/
 outputs/
+models/

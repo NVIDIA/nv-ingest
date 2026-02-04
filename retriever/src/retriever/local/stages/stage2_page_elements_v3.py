@@ -12,9 +12,18 @@ import typer
 from tqdm import tqdm
 from PIL import Image
 
-from slimgest.model.local.nemotron_page_elements_v3 import NemotronPageElementsV3
+from retriever.model.local.nemotron_page_elements_v3 import NemotronPageElementsV3
 
-from ._io import PAGE_ELEMENT_LABELS, IMAGE_EXTS, iter_images, load_image_rgb_chw_u8, to_bbox_list, to_scalar_float, to_scalar_int, write_json
+from ._io import (
+    PAGE_ELEMENT_LABELS,
+    IMAGE_EXTS,
+    iter_images,
+    load_image_rgb_chw_u8,
+    to_bbox_list,
+    to_scalar_float,
+    to_scalar_int,
+    write_json,
+)
 
 
 install(show_locals=False)
@@ -181,21 +190,21 @@ def validate_input(
 ):
     """
     Validate all images in input_dir: check format, dimensions, and count.
-    
+
     This command scans the input directory and generates a validation report showing:
     - Total number of image files found
     - Total bytes of all image files
     - List of non-compliant files (wrong format, wrong dimensions)
     """
     console.print(f"[bold cyan]Validating inputs[/bold cyan] in {input_dir}")
-    
+
     # Collect all files in the directory
     all_files = [p for p in sorted(input_dir.iterdir()) if p.is_file()]
-    
+
     # Separate image files from non-image files
     image_files = iter_images(input_dir)
     non_image_files = [p for p in all_files if p not in image_files]
-    
+
     # Track statistics
     total_bytes = 0
     non_compliant_files: List[Dict[str, Any]] = []
@@ -206,130 +215,146 @@ def validate_input(
     empty_text_files = 0
     missing_image_only_files = 0
     empty_image_only_files = 0
-    
+
     # Create progress bar with detailed information
     pbar = tqdm(image_files, desc="Validating", unit="file")
-    
+
     for img_path in pbar:
         file_size = img_path.stat().st_size
         total_bytes += file_size
         is_compliant = True
-        
+
         # Update progress bar with current file info
         file_name = img_path.name[:40] + "..." if len(img_path.name) > 40 else img_path.name
-        pbar.set_postfix({
-            "current": file_name,
-            "compliant": compliant_count,
-            "issues": len(non_compliant_files),
-        })
-        
+        pbar.set_postfix(
+            {
+                "current": file_name,
+                "compliant": compliant_count,
+                "issues": len(non_compliant_files),
+            }
+        )
+
         try:
             # Check if extension is valid
             ext = img_path.suffix.lower()
             if ext not in IMAGE_EXTS:
-                non_compliant_files.append({
-                    "path": str(img_path.relative_to(input_dir)),
-                    "reason": f"Invalid extension: {ext}",
-                    "size_bytes": file_size,
-                })
+                non_compliant_files.append(
+                    {
+                        "path": str(img_path.relative_to(input_dir)),
+                        "reason": f"Invalid extension: {ext}",
+                        "size_bytes": file_size,
+                    }
+                )
                 is_compliant = False
                 continue
-            
+
             # Track format statistics
             format_stats[ext] = format_stats.get(ext, 0) + 1
-            
+
             # Check for corresponding pdfium_text.txt file
             text_file_path = img_path.with_name(img_path.name + ".pdfium_text.txt")
             if not text_file_path.exists():
-                non_compliant_files.append({
-                    "path": str(img_path.relative_to(input_dir)),
-                    "reason": "Missing pdfium_text.txt file",
-                    "size_bytes": file_size,
-                    "text_file": str(text_file_path.name),
-                })
+                non_compliant_files.append(
+                    {
+                        "path": str(img_path.relative_to(input_dir)),
+                        "reason": "Missing pdfium_text.txt file",
+                        "size_bytes": file_size,
+                        "text_file": str(text_file_path.name),
+                    }
+                )
                 missing_text_files += 1
                 is_compliant = False
             else:
                 # Check if text file is empty
                 text_file_size = text_file_path.stat().st_size
                 if text_file_size == 0:
-                    non_compliant_files.append({
-                        "path": str(img_path.relative_to(input_dir)),
-                        "reason": "Empty pdfium_text.txt file (0 bytes)",
-                        "size_bytes": file_size,
-                        "text_file": str(text_file_path.name),
-                    })
+                    non_compliant_files.append(
+                        {
+                            "path": str(img_path.relative_to(input_dir)),
+                            "reason": "Empty pdfium_text.txt file (0 bytes)",
+                            "size_bytes": file_size,
+                            "text_file": str(text_file_path.name),
+                        }
+                    )
                     empty_text_files += 1
                     is_compliant = False
-            
+
             # Check for corresponding pdfium_image_only.txt file
             image_only_file_path = img_path.with_name(img_path.name + ".pdfium_image_only.txt")
             if not image_only_file_path.exists():
-                non_compliant_files.append({
-                    "path": str(img_path.relative_to(input_dir)),
-                    "reason": "Missing pdfium_image_only.txt file",
-                    "size_bytes": file_size,
-                    "text_file": str(image_only_file_path.name),
-                })
+                non_compliant_files.append(
+                    {
+                        "path": str(img_path.relative_to(input_dir)),
+                        "reason": "Missing pdfium_image_only.txt file",
+                        "size_bytes": file_size,
+                        "text_file": str(image_only_file_path.name),
+                    }
+                )
                 missing_image_only_files += 1
                 is_compliant = False
             else:
                 # Check if image_only file is empty
                 image_only_file_size = image_only_file_path.stat().st_size
                 if image_only_file_size == 0:
-                    non_compliant_files.append({
-                        "path": str(img_path.relative_to(input_dir)),
-                        "reason": "Empty pdfium_image_only.txt file (0 bytes)",
-                        "size_bytes": file_size,
-                        "text_file": str(image_only_file_path.name),
-                    })
+                    non_compliant_files.append(
+                        {
+                            "path": str(img_path.relative_to(input_dir)),
+                            "reason": "Empty pdfium_image_only.txt file (0 bytes)",
+                            "size_bytes": file_size,
+                            "text_file": str(image_only_file_path.name),
+                        }
+                    )
                     empty_image_only_files += 1
                     is_compliant = False
-            
+
             # Load and check dimensions
             with Image.open(img_path) as im:
                 width, height = im.size
-                
+
                 # Track dimension statistics
                 dimension_stats[(height, width)] = dimension_stats.get((height, width), 0) + 1
-                
+
                 # Check if dimensions match expected values
                 dimension_issues = []
                 if expected_width is not None and width != expected_width:
                     dimension_issues.append(f"width={width} (expected {expected_width})")
                 if expected_height is not None and height != expected_height:
                     dimension_issues.append(f"height={height} (expected {expected_height})")
-                
+
                 if dimension_issues:
-                    non_compliant_files.append({
-                        "path": str(img_path.relative_to(input_dir)),
-                        "reason": f"Dimension mismatch: {', '.join(dimension_issues)}",
-                        "size_bytes": file_size,
-                        "dimensions": f"{height}x{width}",
-                    })
+                    non_compliant_files.append(
+                        {
+                            "path": str(img_path.relative_to(input_dir)),
+                            "reason": f"Dimension mismatch: {', '.join(dimension_issues)}",
+                            "size_bytes": file_size,
+                            "dimensions": f"{height}x{width}",
+                        }
+                    )
                     is_compliant = False
-            
+
             if is_compliant:
                 compliant_count += 1
-        
+
         except Exception as e:
-            non_compliant_files.append({
-                "path": str(img_path.relative_to(input_dir)),
-                "reason": f"Error loading image: {str(e)}",
-                "size_bytes": file_size,
-            })
-    
+            non_compliant_files.append(
+                {
+                    "path": str(img_path.relative_to(input_dir)),
+                    "reason": f"Error loading image: {str(e)}",
+                    "size_bytes": file_size,
+                }
+            )
+
     pbar.close()
-    
+
     # Add non-image files to total bytes
     for p in non_image_files:
         total_bytes += p.stat().st_size
-    
+
     # Print summary report
     console.print("\n" + "=" * 80)
     console.print("[bold]Validation Report[/bold]")
     console.print("=" * 80)
-    
+
     # Basic statistics
     console.print(f"\n[bold cyan]Summary:[/bold cyan]")
     console.print(f"  Total files in directory: {len(all_files)}")
@@ -338,7 +363,7 @@ def validate_input(
     console.print(f"  Total bytes (all files): {total_bytes:,} ({total_bytes / (1024**2):.2f} MB)")
     console.print(f"  Compliant images: {compliant_count}")
     console.print(f"  Non-compliant images: {len(non_compliant_files)}")
-    
+
     # Text file statistics
     total_text_issues = missing_text_files + empty_text_files
     console.print(f"\n[bold cyan]pdfium_text.txt Validation:[/bold cyan]")
@@ -349,7 +374,7 @@ def validate_input(
         console.print(f"  [green]✓[/green] All images have valid pdfium_text.txt files")
     else:
         console.print(f"  [red]✗[/red] {total_text_issues} images missing or have empty pdfium_text.txt files")
-    
+
     # Image only file statistics
     total_image_only_issues = missing_image_only_files + empty_image_only_files
     console.print(f"\n[bold cyan]pdfium_image_only.txt Validation:[/bold cyan]")
@@ -359,21 +384,23 @@ def validate_input(
     if total_image_only_issues == 0:
         console.print(f"  [green]✓[/green] All images have valid pdfium_image_only.txt files")
     else:
-        console.print(f"  [red]✗[/red] {total_image_only_issues} images missing or have empty pdfium_image_only.txt files")
-    
+        console.print(
+            f"  [red]✗[/red] {total_image_only_issues} images missing or have empty pdfium_image_only.txt files"
+        )
+
     # Expected count check
     if expected_count is not None:
         if len(image_files) == expected_count:
             console.print(f"\n  [green]✓[/green] File count matches expected: {expected_count}")
         else:
             console.print(f"\n  [red]✗[/red] File count mismatch: found {len(image_files)}, expected {expected_count}")
-    
+
     # Format statistics
     if format_stats:
         console.print(f"\n[bold cyan]File Formats:[/bold cyan]")
         for ext, count in sorted(format_stats.items()):
             console.print(f"  {ext}: {count} files")
-    
+
     # Dimension statistics
     if dimension_stats:
         console.print(f"\n[bold cyan]Image Dimensions:[/bold cyan]")
@@ -381,16 +408,16 @@ def validate_input(
         table.add_column("Height", style="cyan")
         table.add_column("Width", style="cyan")
         table.add_column("Count", justify="right", style="green")
-        
+
         for (h, w), count in sorted(dimension_stats.items(), key=lambda x: x[1], reverse=True):
             expected_marker = ""
             if expected_height is not None and expected_width is not None:
                 if h == expected_height and w == expected_width:
                     expected_marker = " ✓"
             table.add_row(str(h), str(w), f"{count}{expected_marker}")
-        
+
         console.print(table)
-    
+
     # Non-compliant files
     if non_compliant_files:
         console.print(f"\n[bold red]Non-Compliant Files ({len(non_compliant_files)}):[/bold red]")
@@ -400,7 +427,7 @@ def validate_input(
         table.add_column("Size", justify="right")
         table.add_column("Dimensions", style="cyan")
         table.add_column("Text File", style="magenta")
-        
+
         for item in non_compliant_files:
             table.add_row(
                 item["path"],
@@ -409,11 +436,11 @@ def validate_input(
                 item.get("dimensions", "N/A"),
                 item.get("text_file", "N/A"),
             )
-        
+
         console.print(table)
     else:
         console.print(f"\n[bold green]✓ All files are compliant![/bold green]")
-    
+
     # Non-image files list
     if non_image_files:
         console.print(f"\n[bold yellow]Non-Image Files ({len(non_image_files)}):[/bold yellow]")
@@ -421,21 +448,21 @@ def validate_input(
             console.print(f"  {p.relative_to(input_dir)}")
         if len(non_image_files) > 20:
             console.print(f"  ... and {len(non_image_files) - 20} more")
-    
+
     console.print("\n" + "=" * 80)
-    
+
     # Exit with error code if there are issues
     exit_code = 0
     if expected_count is not None and len(image_files) != expected_count:
         exit_code = 1
     if non_compliant_files:
         exit_code = 1
-    
+
     if exit_code == 0:
         console.print("[bold green]Validation passed![/bold green]")
     else:
         console.print("[bold red]Validation failed - see issues above.[/bold red]")
-    
+
     raise typer.Exit(code=exit_code)
 
 
@@ -445,4 +472,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

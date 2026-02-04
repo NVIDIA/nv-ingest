@@ -11,14 +11,12 @@ import typer
 from tqdm import tqdm
 import glob
 
-from slimgest.local.vdb.lancedb import LanceDB
+from retriever.local.vdb.lancedb import LanceDB
 
 
 install(show_locals=False)
 console = Console()
-app = typer.Typer(
-    help="Stage 7: load results from stage6, upload embeddings to VDB"
-)
+app = typer.Typer(help="Stage 7: load results from stage6, upload embeddings to VDB")
 
 DEFAULT_INPUT_DIR = Path("./data/pages")
 
@@ -27,7 +25,6 @@ DEFAULT_INPUT_DIR = Path("./data/pages")
 def run(
     input_dir: Path = typer.Option(DEFAULT_INPUT_DIR, "--input-dir", exists=True, file_okay=False),
     device: str = typer.Option("cuda" if torch.cuda.is_available() else "cpu", help="Device for embedding model."),
-
 ):
     # Use the shared embedder wrapper; if endpoint is set, it runs remotely.
 
@@ -82,4 +79,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

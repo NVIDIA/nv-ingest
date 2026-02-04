@@ -268,8 +268,7 @@ def run(
         f" table_structure_total_detections={total_s4_dets}"
     )
     console.print(
-        "nemotron_ocr estimate (stage5 filter page_element.label in {0,1,3}): "
-        f"estimated_ocr_calls={eligible_total}"
+        "nemotron_ocr estimate (stage5 filter page_element.label in {0,1,3}): " f"estimated_ocr_calls={eligible_total}"
     )
     if s3_missing_regions or s4_missing_regions:
         console.print(
@@ -314,4 +313,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -21,6 +21,7 @@ PAGE_ELEMENT_LABELS = {
     5: "header_footer",
 }
 
+
 def iter_images(input_dir: Path) -> List[Path]:
     paths: List[Path] = []
     for p in sorted(input_dir.iterdir()):
@@ -198,4 +199,3 @@ def iter_detection_dicts(preds: Any) -> Iterable[Dict[str, Any]]:
     if isinstance(preds, list):
         return preds
     return []
-

@@ -1,7 +1,16 @@
 from __future__ import annotations
 
-from .cli import main
+import typer
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+from .image import app as image_app
+from .pdf import app as pdf_app
+from .local import app as local_app
 
+app = typer.Typer(help="Retriever")
+app.add_typer(image_app, name="image")
+app.add_typer(pdf_app, name="pdf")
+app.add_typer(local_app, name="local")
+
+
+def main():
+    app()

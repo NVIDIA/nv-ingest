@@ -424,7 +424,16 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, final_score=None, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        running_v3 = annotation_dicts and set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
+        # Decide v2 vs v3 post-processing.
+        #
+        # IMPORTANT: Do not infer v3 purely from output keys.
+        # It's common for model outputs (especially gRPC JSON) to omit classes that had no detections
+        # on a given page, which would incorrectly skip v3 post-processing for v3 models.
+        running_v3 = bool(getattr(self, "version", "")).endswith("-v3")
+        if (not running_v3) and annotation_dicts:
+            # Back-compat / best-effort auto-detect if version string isn't v3.
+            # Treat presence of any v3-only classes as v3.
+            running_v3 = any(k in annotation_dicts[0] for k in ("paragraph", "header_footer"))
 
         if not final_score:
             if running_v3:
@@ -1647,7 +1656,9 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         return default_model_name
 
     # Guard against accidentally passing an HTTP URL into the gRPC Triton client.
-    if isinstance(yolox_grpc_endpoint, str) and (yolox_grpc_endpoint.startswith("http://") or yolox_grpc_endpoint.startswith("https://")):
+    if isinstance(yolox_grpc_endpoint, str) and (
+        yolox_grpc_endpoint.startswith("http://") or yolox_grpc_endpoint.startswith("https://")
+    ):
         return default_model_name
 
     try:

@@ -5,8 +5,6 @@ from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
 
-from retriever.metrics import LoggingMetrics, Metrics
-
 from .stage import embed_text_from_primitives_df
 
 logger = logging.getLogger(__name__)
@@ -18,24 +16,17 @@ def embed_text_ray_data(
     transform_config: Any,
     task_config: Optional[Dict[str, Any]] = None,
     batch_size: int = 256,
-    metrics_factory: Optional[Callable[[], Metrics]] = None,
 ) -> "ray.data.Dataset":
     """Ray Data adapter for text embedding (mutates metadata in-place)."""
     import ray.data  # type: ignore
 
-    if metrics_factory is None:
-        metrics_factory = lambda: LoggingMetrics(extra={"runner": "ray_data"})  # noqa: E731
-
     def _map_batch(batch: pd.DataFrame) -> pd.DataFrame:
-        metrics = metrics_factory()
         out, _info = embed_text_from_primitives_df(
             batch,
             transform_config=transform_config,
             task_config=task_config,
-            metrics=metrics,
         )
         return out
 
     logger.info("Running Ray Data text embedding: batch_size=%s", batch_size)
     return ds.map_batches(_map_batch, batch_format="pandas", batch_size=batch_size)
-

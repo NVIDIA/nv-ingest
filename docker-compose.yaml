@@ -99,7 +99,7 @@ services:
     image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-1.2.1}
     shm_size: 16gb
     ports:
-      - "8009:8000"
+      - "8019:8000"
       - "8010:8001"
       - "8011:8002"
     environment:

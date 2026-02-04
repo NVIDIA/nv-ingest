@@ -19,12 +19,16 @@ from ._io import crop_tensor_normalized_xyxy, load_image_rgb_chw_u8, read_json, 
 
 install(show_locals=False)
 console = Console()
-app = typer.Typer(help="Stage 5: run nemotron_ocr_v1 over stage2 table/chart/infographic detections; save JSON per image.")
+app = typer.Typer(
+    help="Stage 5: run nemotron_ocr_v1 over stage2 table/chart/infographic detections; save JSON per image."
+)
 
 DEFAULT_INPUT_DIR = Path("./data/pages")
 
 
-def _resize_pad_tensor(img: torch.Tensor, target_hw: Tuple[int, int] = (1024, 1024), pad_value: float = 114.0) -> torch.Tensor:
+def _resize_pad_tensor(
+    img: torch.Tensor, target_hw: Tuple[int, int] = (1024, 1024), pad_value: float = 114.0
+) -> torch.Tensor:
     """
     Resize+pad CHW image tensor to fixed size (preserve aspect ratio).
     Returns uint8 CHW tensor.
@@ -199,12 +203,18 @@ def _out_path(output_dir: Path, img_path: Path) -> Path:
 @app.command()
 def run(
     input_dir: Path = typer.Option(DEFAULT_INPUT_DIR, "--input-dir", exists=True, file_okay=False),
-    output_dir: Optional[Path] = typer.Option(None, "--output-dir", file_okay=False, help="Directory to write stage5 JSON outputs."),
-    device: str = typer.Option("cuda" if torch.cuda.is_available() else "cpu", help="Device for tensors/model (single-device only)."),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output-dir", file_okay=False, help="Directory to write stage5 JSON outputs."
+    ),
+    device: str = typer.Option(
+        "cuda" if torch.cuda.is_available() else "cpu", help="Device for tensors/model (single-device only)."
+    ),
     batch_size: int = typer.Option(16, "--batch-size", min=1, help="Target number of crops per OCR batch."),
     ocr_model_dir: Path = typer.Option(
         # Path("/raid/jdyer/slimgest/models/nemotron-ocr-v1/checkpoints"),
-        Path("/raid/slimgest/models/models--nvidia--nemotron-ocr-v1/snapshots/90015d3b851ba898ca842f18e948690af49c2427/checkpoints"),
+        Path(
+            "/raid/slimgest/models/models--nvidia--nemotron-ocr-v1/snapshots/90015d3b851ba898ca842f18e948690af49c2427/checkpoints"
+        ),
         "--ocr-model-dir",
         help="Local nemotron-ocr-v1 checkpoints directory (ignored if --ocr-endpoint is set).",
     ),
@@ -213,8 +223,12 @@ def run(
         "--ocr-endpoint",
         help="Optional OCR NIM endpoint URL. If set, OCR runs remotely and local weights are not loaded.",
     ),
-    remote_batch_size: int = typer.Option(32, "--remote-batch-size", help="Remote OCR internal chunk size when using --ocr-endpoint."),
-    resize_to_1024: bool = typer.Option(True, "--resize-to-1024/--no-resize-to-1024", help="Resize+pad crops to 1024x1024 before OCR."),
+    remote_batch_size: int = typer.Option(
+        32, "--remote-batch-size", help="Remote OCR internal chunk size when using --ocr-endpoint."
+    ),
+    resize_to_1024: bool = typer.Option(
+        True, "--resize-to-1024/--no-resize-to-1024", help="Resize+pad crops to 1024x1024 before OCR."
+    ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing JSON outputs."),
     limit: Optional[int] = typer.Option(None, "--limit", help="Optionally limit number of images processed."),
 ):
@@ -340,7 +354,7 @@ def run(
             try:
                 with timers.timed("06_load_image"):
                     page_tensor, (h, w) = load_image_rgb_chw_u8(img_path, dev)
-                
+
                 payload: Dict[str, Any] = {
                     "schema_version": 1,
                     "stage": 5,
@@ -358,7 +372,7 @@ def run(
                 }
                 with timers.timed("11_write_json"):
                     write_json(out_path, payload)
-                
+
                 processed_images += 1
             except Exception as e:
                 failed_images += 1
@@ -426,7 +440,9 @@ def run(
                     )
 
             if len(ocr_raw_outs) != len(tasks):
-                raise RuntimeError(f"OCR output count mismatch: got {len(ocr_raw_outs)} outputs for {len(tasks)} crops.")
+                raise RuntimeError(
+                    f"OCR output count mismatch: got {len(ocr_raw_outs)} outputs for {len(tasks)} crops."
+                )
 
             with timers.timed("10_postprocess"):
                 regions_out: List[Dict[str, Any]] = []
@@ -527,4 +543,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

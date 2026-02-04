@@ -14,7 +14,6 @@ from retriever.infographic.config import (
 from retriever.infographic.stage import extract_infographic_data_from_primitives_df
 from retriever.pdf.config import PDFExtractionStageConfig, load_pdf_extractor_schema_from_dict
 from retriever.pdf.io import pdf_files_to_ledger_df
-from retriever.metrics import LoggingMetrics, Metrics
 from retriever.pdf.stage import extract_pdf_primitives_from_ledger_df, make_pdf_task_config
 from retriever.table.config import TableExtractionStageConfig, load_table_extractor_schema_from_dict
 from retriever.table.stage import extract_table_data_from_primitives_df
@@ -39,7 +38,6 @@ def run_pdf_extraction(
     stage_cfg: PDFExtractionStageConfig = PDFExtractionStageConfig(),
     extractor_cfg_dict: Dict[str, Any],
     task_cfg: Optional[Dict[str, Any]] = None,
-    metrics: Optional[Metrics] = None,
 ) -> PDFPipelineResult:
     """Run the PDF extraction stage over local PDF files.
 
@@ -52,15 +50,11 @@ def run_pdf_extraction(
     if task_cfg is None:
         task_cfg = make_pdf_task_config(method="pdfium")
 
-    if metrics is None:
-        metrics = LoggingMetrics(extra={"runner": runner})
-
     if runner == "python":
         extracted_df, info = extract_pdf_primitives_from_ledger_df(
             df_ledger,
             task_config=task_cfg,
             extractor_config=extractor_schema,
-            metrics=metrics,
         )
         return PDFPipelineResult(extracted_df=extracted_df, info=info)
 
@@ -123,7 +117,6 @@ def run_full_pipeline(
     pdf_task_cfg: Optional[Dict[str, Any]] = None,
     embed_task_cfg: Optional[Dict[str, Any]] = None,
     lancedb: Optional[LanceDBConfig] = None,
-    metrics: Optional[Metrics] = None,
     progress: bool = False,
 ) -> FullPipelineResult:
     """Run PDF extraction + (infographic/table/chart) enrichment + embedding.
@@ -133,9 +126,6 @@ def run_full_pipeline(
       If there are no candidates of a given subtype, the stage is effectively a no-op.
     - Ray must be initialized by the caller when runner="ray-data".
     """
-    if metrics is None:
-        metrics = LoggingMetrics(extra={"runner": runner})
-
     # Build validated schemas once up-front.
     pdf_schema = load_pdf_extractor_schema_from_dict(pdf_extractor_cfg_dict)
     infographic_schema = load_infographic_extractor_schema_from_dict(infographic_extractor_cfg_dict)
@@ -164,7 +154,7 @@ def run_full_pipeline(
                 for i, (p, n_pages) in enumerate(zip(pdf_paths_list, page_counts)):
                     df_ledger = pdf_files_to_ledger_df([p], start_index=i)
                     df_one, info_pdf_last = extract_pdf_primitives_from_ledger_df(
-                        df_ledger, task_config=pdf_task_cfg, extractor_config=pdf_schema, metrics=metrics
+                        df_ledger, task_config=pdf_task_cfg, extractor_config=pdf_schema
                     )
                     if not df_one.empty:
                         extracted_chunks.append(df_one)
@@ -178,24 +168,19 @@ def run_full_pipeline(
         else:
             df_ledger = pdf_files_to_ledger_df(pdf_paths_list)
             df, info_pdf = extract_pdf_primitives_from_ledger_df(
-                df_ledger, task_config=pdf_task_cfg, extractor_config=pdf_schema, metrics=metrics
+                df_ledger, task_config=pdf_task_cfg, extractor_config=pdf_schema
             )
 
         df, info_info = extract_infographic_data_from_primitives_df(
-            df, extractor_config=infographic_schema, task_config={}, metrics=metrics
+            df, extractor_config=infographic_schema, task_config={}
         )
-        df, info_table = extract_table_data_from_primitives_df(
-            df, extractor_config=table_schema, task_config={}, metrics=metrics
-        )
-        df, info_chart = extract_chart_data_from_primitives_df(
-            df, extractor_config=chart_schema, task_config={}, metrics=metrics
-        )
+        df, info_table = extract_table_data_from_primitives_df(df, extractor_config=table_schema, task_config={})
+        df, info_chart = extract_chart_data_from_primitives_df(df, extractor_config=chart_schema, task_config={})
         df, info_embed = embed_text_from_primitives_df(
             df,
             transform_config=embed_schema,
             task_config=embed_task_cfg,
             lancedb=lancedb,
-            metrics=metrics,
         )
 
         return FullPipelineResult(
@@ -256,4 +241,3 @@ def run_full_pipeline(
         return FullPipelineResult(df=ds.to_pandas(), info={"runner": "ray-data"})
 
     raise ValueError(f"Unknown runner: {runner!r}")
-

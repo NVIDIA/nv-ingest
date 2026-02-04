@@ -59,6 +59,7 @@ class QueryRow:
 @dataclass(frozen=True)
 class RecallResult:
     """Recall hit information for a query."""
+
     hit_at_1: bool
     hit_at_3: bool
     hit_at_5: bool
@@ -206,29 +207,31 @@ def _load_recall_results(recall_csv_path: Path) -> Dict[str, RecallResult]:
     Returns a dict mapping golden_answer (pdf_page) to RecallResult.
     """
     recall_map: Dict[str, RecallResult] = {}
-    
+
     if not recall_csv_path.exists():
         return recall_map
-    
+
     try:
         import pandas as pd
+
         df = pd.read_csv(recall_csv_path)
-        
+
         for _, row in df.iterrows():
             golden = str(row.get("golden_answer", "")).strip()
             if not golden:
                 continue
-            
+
             # Parse top_10_retrieved - it's stored as a string representation of a list
             top_10_str = str(row.get("top_10_retrieved", "[]"))
             try:
                 import ast
+
                 top_10 = ast.literal_eval(top_10_str)
                 if not isinstance(top_10, list):
                     top_10 = []
             except Exception:
                 top_10 = []
-            
+
             recall_map[golden] = RecallResult(
                 hit_at_1=bool(row.get("hit@1", False)),
                 hit_at_3=bool(row.get("hit@3", False)),
@@ -242,7 +245,7 @@ def _load_recall_results(recall_csv_path: Path) -> Dict[str, RecallResult]:
             )
     except Exception as e:
         console.print(f"[yellow]Warning: Could not load recall results from {recall_csv_path}: {e}[/yellow]")
-    
+
     return recall_map
 
 
@@ -380,7 +383,7 @@ def _compute_global_metrics(examples: Sequence[ResolvedExample]) -> Dict[str, An
         "present": {"stage2": 0, "stage3": 0, "stage4": 0, "stage5": 0, "pdfium_text": 0, "overlay": 0},
         "counts": {"stage2_detections": 0, "stage3_detections": 0, "stage4_detections": 0, "stage5_regions": 0},
     }
-    
+
     # Add recall metrics if available
     recall_available = sum(1 for ex in examples if ex.recall is not None)
     if recall_available > 0:
@@ -528,7 +531,12 @@ def _export_report_pdf(
             with Image.open(paths["img_overlay"]) as im2:
                 right = _fit(im2, col_w, img_area_h)
             canvas.paste(right, (margin + col_w + gutter, y))
-            draw.text((margin + col_w + gutter, y + right.size[1] + 6), "page_element_detections", fill=(0, 0, 0), font=font_small)
+            draw.text(
+                (margin + col_w + gutter, y + right.size[1] + 6),
+                "page_element_detections",
+                fill=(0, 0, 0),
+                font=font_small,
+            )
         else:
             draw.text((margin + col_w + gutter, y), "(no overlay image found)", fill=(120, 120, 120), font=font_small)
 
@@ -694,18 +702,18 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
     from rich.table import Table
     from rich.panel import Panel
     from rich import box
-    
+
     # Display global metrics
     console.print("\n[bold cyan]═══ Global Metrics ═══[/bold cyan]\n")
-    
+
     metrics_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
     metrics_table.add_column("Metric", style="cyan")
     metrics_table.add_column("Value", style="green")
-    
+
     metrics_table.add_row("Total CSV Rows", str(len(examples)))
     metrics_table.add_row("Unique Pages", str(global_metrics.get("unique_pages", 0)))
     metrics_table.add_row("Missing Images", str(global_metrics.get("missing_images", 0)))
-    
+
     present = global_metrics.get("present", {})
     metrics_table.add_row("", "")  # separator
     metrics_table.add_row("Stage 2 (page_elements_v3)", str(present.get("stage2", 0)))
@@ -714,7 +722,7 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
     metrics_table.add_row("Stage 5 (nemotron_ocr_v1)", str(present.get("stage5", 0)))
     metrics_table.add_row("PDFium Text Files", str(present.get("pdfium_text", 0)))
     metrics_table.add_row("Overlay Images", str(present.get("overlay", 0)))
-    
+
     counts = global_metrics.get("counts", {})
     if counts:
         metrics_table.add_row("", "")  # separator
@@ -722,32 +730,44 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
         metrics_table.add_row("Stage 3 Detections", str(counts.get("stage3_detections", 0)))
         metrics_table.add_row("Stage 4 Detections", str(counts.get("stage4_detections", 0)))
         metrics_table.add_row("Stage 5 Regions", str(counts.get("stage5_regions", 0)))
-    
+
     # Add recall metrics if available
     recall = global_metrics.get("recall")
     if recall:
         metrics_table.add_row("", "")  # separator
         metrics_table.add_row("[bold yellow]Recall Metrics[/bold yellow]", "")
         metrics_table.add_row("Total Queries with Recall", str(recall.get("total_queries", 0)))
-        metrics_table.add_row("Recall@1", f"{recall.get('recall_at_1', 0):.4f} ({recall.get('hits_at_1', 0)}/{recall.get('total_queries', 0)})")
-        metrics_table.add_row("Recall@3", f"{recall.get('recall_at_3', 0):.4f} ({recall.get('hits_at_3', 0)}/{recall.get('total_queries', 0)})")
-        metrics_table.add_row("Recall@5", f"{recall.get('recall_at_5', 0):.4f} ({recall.get('hits_at_5', 0)}/{recall.get('total_queries', 0)})")
-        metrics_table.add_row("Recall@10", f"{recall.get('recall_at_10', 0):.4f} ({recall.get('hits_at_10', 0)}/{recall.get('total_queries', 0)})")
-    
+        metrics_table.add_row(
+            "Recall@1",
+            f"{recall.get('recall_at_1', 0):.4f} ({recall.get('hits_at_1', 0)}/{recall.get('total_queries', 0)})",
+        )
+        metrics_table.add_row(
+            "Recall@3",
+            f"{recall.get('recall_at_3', 0):.4f} ({recall.get('hits_at_3', 0)}/{recall.get('total_queries', 0)})",
+        )
+        metrics_table.add_row(
+            "Recall@5",
+            f"{recall.get('recall_at_5', 0):.4f} ({recall.get('hits_at_5', 0)}/{recall.get('total_queries', 0)})",
+        )
+        metrics_table.add_row(
+            "Recall@10",
+            f"{recall.get('recall_at_10', 0):.4f} ({recall.get('hits_at_10', 0)}/{recall.get('total_queries', 0)})",
+        )
+
     console.print(metrics_table)
-    
+
     # Display sample of resolved examples
     console.print("\n[bold cyan]═══ Sample Pages (first 20) ═══[/bold cyan]\n")
-    
+
     samples_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, show_lines=True)
     samples_table.add_column("PDF Page", style="cyan", width=18)
     samples_table.add_column("Status", style="yellow", width=12)
     samples_table.add_column("Query", style="white", width=60)
     samples_table.add_column("Stages", style="green", width=15)
-    
+
     for i, ex in enumerate(examples[:20]):
         row = ex.row
-        
+
         # Determine status based on recall results if available
         if ex.recall is not None:
             if ex.recall.hit_at_10:
@@ -762,9 +782,9 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
         else:
             # Fallback to image existence check
             status = "[green]✓ OK[/green]" if ex.image_path is not None else "[red]✗ MISS[/red]"
-        
+
         query = row.query[:57] + "..." if len(row.query) > 60 else row.query
-        
+
         if ex.image_path is not None and ex.image_path.exists():
             paths = _paths_for_image(ex.image_path)
             stages = []
@@ -779,36 +799,37 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
             stages_str = ",".join(stages) if stages else "none"
         else:
             stages_str = "n/a"
-        
+
         samples_table.add_row(row.pdf_page, status, query, stages_str)
-    
+
     if len(examples) > 20:
         console.print(samples_table)
         console.print(f"\n[dim]... and {len(examples) - 20} more entries[/dim]\n")
     else:
         console.print(samples_table)
         console.print()
-    
+
     # Display detailed stats for a few random pages
     console.print("[bold cyan]═══ Detailed Analysis (3 random pages) ═══[/bold cyan]\n")
-    
+
     import random
+
     # Filter to pages that actually exist
     existing_examples = [ex for ex in examples if ex.image_path is not None and ex.image_path.exists()]
-    
+
     if existing_examples:
         sample_count = min(3, len(existing_examples))
         sampled = random.sample(existing_examples, sample_count)
-        
+
         for ex in sampled:
             summary = _format_summary_for_page(ex.image_path, ex.row)
-            
+
             # Create a panel for each page
             details_lines = []
             details_lines.append(f"[bold]PDF Page:[/bold] {ex.row.pdf_page}")
             details_lines.append(f"[bold]Query:[/bold] {ex.row.query}")
             details_lines.append(f"[bold]Image:[/bold] {ex.image_path}")
-            
+
             # Add recall information if available
             if ex.recall:
                 details_lines.append("")
@@ -823,45 +844,55 @@ def _run_headless(*, examples: Sequence[ResolvedExample], global_metrics: Dict[s
                 details_lines.append(f"  • Hit@10: {hit10} (rank: {ex.recall.rank_at_10 or 'N/A'})")
                 if ex.recall.top_10_retrieved:
                     details_lines.append(f"  • Top 3 Retrieved: {', '.join(ex.recall.top_10_retrieved[:3])}")
-            
+
             details_lines.append("")
-            
+
             s2 = summary["stage2"]
             s3 = summary["stage3"]
             s4 = summary["stage4"]
             s5 = summary["stage5"]
-            
+
             details_lines.append("[bold]Stage Presence:[/bold]")
-            details_lines.append(f"  • Stage 2: {'✓' if s2.get('present') else '✗'} ({s2.get('num_detections', 0)} detections)")
-            details_lines.append(f"  • Stage 3: {'✓' if s3.get('present') else '✗'} ({s3.get('num_regions', 0)} regions, {s3.get('num_detections', 0)} detections)")
-            details_lines.append(f"  • Stage 4: {'✓' if s4.get('present') else '✗'} ({s4.get('num_regions', 0)} regions, {s4.get('num_detections', 0)} detections)")
-            details_lines.append(f"  • Stage 5: {'✓' if s5.get('present') else '✗'} ({s5.get('num_regions', 0)} regions, {s5.get('num_nonempty', 0)} with text)")
-            
+            details_lines.append(
+                f"  • Stage 2: {'✓' if s2.get('present') else '✗'} ({s2.get('num_detections', 0)} detections)"
+            )
+            details_lines.append(
+                f"  • Stage 3: {'✓' if s3.get('present') else '✗'} ({s3.get('num_regions', 0)} regions, {s3.get('num_detections', 0)} detections)"
+            )
+            details_lines.append(
+                f"  • Stage 4: {'✓' if s4.get('present') else '✗'} ({s4.get('num_regions', 0)} regions, {s4.get('num_detections', 0)} detections)"
+            )
+            details_lines.append(
+                f"  • Stage 5: {'✓' if s5.get('present') else '✗'} ({s5.get('num_regions', 0)} regions, {s5.get('num_nonempty', 0)} with text)"
+            )
+
             if s5.get("sample_texts"):
                 details_lines.append("")
                 details_lines.append("[bold]OCR Sample Texts:[/bold]")
                 for t in s5["sample_texts"][:3]:
                     truncated = t[:80] + "..." if len(t) > 80 else t
                     details_lines.append(f"  • {truncated}")
-            
+
             pdfium = summary.get("pdfium_text", "")
             if pdfium:
                 details_lines.append("")
                 details_lines.append("[bold]PDFium Text (preview):[/bold]")
                 preview = pdfium[:200] + "..." if len(pdfium) > 200 else pdfium
                 details_lines.append(f"  {preview}")
-            
-            panel = Panel("\n".join(details_lines), title=f"[bold yellow]{ex.row.pdf_page}[/bold yellow]", border_style="blue")
+
+            panel = Panel(
+                "\n".join(details_lines), title=f"[bold yellow]{ex.row.pdf_page}[/bold yellow]", border_style="blue"
+            )
             console.print(panel)
             console.print()
     else:
         console.print("[yellow]No existing pages found to analyze in detail.[/yellow]\n")
-    
+
     # Summary at the end
     console.print("[bold green]═══ Analysis Complete ═══[/bold green]\n")
     console.print(f"Processed {len(examples)} rows from CSV")
     console.print(f"Successfully resolved {len(existing_examples)} pages with images")
-    
+
     if global_metrics.get("recall"):
         recall = global_metrics["recall"]
         console.print(f"\n[bold cyan]Recall Summary:[/bold cyan]")
@@ -883,19 +914,21 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
         import uvicorn
         import base64
     except ImportError:
-        console.print("[red]Error:[/red] FastAPI and uvicorn are required for --web-ui. Install with: pip install fastapi uvicorn")
+        console.print(
+            "[red]Error:[/red] FastAPI and uvicorn are required for --web-ui. Install with: pip install fastapi uvicorn"
+        )
         raise typer.Exit(1)
-    
+
     app_fastapi = FastAPI(title="Slimgest Stage999 Post-Mortem Analysis")
-    
+
     # Helper to get summary data for a specific index
     def _get_example_data(idx: int) -> Dict[str, Any]:
         if idx < 0 or idx >= len(examples):
             return None
-        
+
         ex = examples[idx]
         row = ex.row
-        
+
         result = {
             "index": idx,
             "pdf_page": row.pdf_page,
@@ -903,7 +936,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             "modality": row.modality,
             "status": "ok" if ex.image_path is not None else "missing",
         }
-        
+
         # Add recall information if available
         if ex.recall:
             result["recall"] = {
@@ -917,28 +950,32 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                 "rank_at_10": ex.recall.rank_at_10,
                 "top_10_retrieved": ex.recall.top_10_retrieved,
             }
-        
+
         if ex.image_path is None or not ex.image_path.exists():
             return result
-        
+
         summary = _format_summary_for_page(ex.image_path, row)
         paths = summary["paths"]
-        
-        result.update({
-            "image_path": str(ex.image_path),
-            "has_overlay": paths["img_overlay"].exists(),
-            "has_pdfium": paths["pdfium_text"].exists(),
-            "pdfium_text": summary.get("pdfium_text", ""),
-            "embedder_input": _read_text_best_effort(paths["embedder_input"]) if paths["embedder_input"].exists() else "",
-            "stage2": summary["stage2"],
-            "stage3": summary["stage3"],
-            "stage4": summary["stage4"],
-            "stage5": summary["stage5"],
-            "raw": summary["raw"],
-        })
-        
+
+        result.update(
+            {
+                "image_path": str(ex.image_path),
+                "has_overlay": paths["img_overlay"].exists(),
+                "has_pdfium": paths["pdfium_text"].exists(),
+                "pdfium_text": summary.get("pdfium_text", ""),
+                "embedder_input": (
+                    _read_text_best_effort(paths["embedder_input"]) if paths["embedder_input"].exists() else ""
+                ),
+                "stage2": summary["stage2"],
+                "stage3": summary["stage3"],
+                "stage4": summary["stage4"],
+                "stage5": summary["stage5"],
+                "raw": summary["raw"],
+            }
+        )
+
         return result
-    
+
     @app_fastapi.get("/", response_class=HTMLResponse)
     async def index():
         html = """
@@ -954,7 +991,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: #f5f5f5;
@@ -962,7 +999,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             height: 100vh;
             overflow: hidden;
         }
-        
+
         .sidebar {
             width: 450px;
             background: white;
@@ -971,18 +1008,18 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             flex-direction: column;
             overflow: hidden;
         }
-        
+
         .sidebar-header {
             padding: 20px;
             border-bottom: 1px solid #ddd;
         }
-        
+
         .sidebar-header h1 {
             font-size: 18px;
             margin-bottom: 15px;
             color: #333;
         }
-        
+
         .search-box {
             width: 100%;
             padding: 10px;
@@ -990,7 +1027,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             border-radius: 4px;
             font-size: 14px;
         }
-        
+
         .metrics {
             padding: 15px 20px;
             background: #f9f9f9;
@@ -998,46 +1035,46 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             font-size: 12px;
             color: #666;
         }
-        
+
         .metrics-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
-        
+
         .metric-item {
             display: flex;
             justify-content: space-between;
         }
-        
+
         .list-container {
             flex: 1;
             overflow-y: auto;
         }
-        
+
         .list-item {
             padding: 12px 20px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
             transition: background 0.2s;
         }
-        
+
         .list-item:hover {
             background: #f9f9f9;
         }
-        
+
         .list-item.selected {
             background: #e3f2fd;
             border-left: 3px solid #2196F3;
         }
-        
+
         .list-item-title {
             font-size: 13px;
             font-weight: 600;
             color: #333;
             margin-bottom: 4px;
         }
-        
+
         .list-item-query {
             font-size: 12px;
             color: #666;
@@ -1045,7 +1082,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
+
         .list-item-status {
             display: inline-block;
             padding: 2px 6px;
@@ -1054,87 +1091,87 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             font-weight: 600;
             margin-left: 8px;
         }
-        
+
         .list-item-status.ok {
             background: #c8e6c9;
             color: #2e7d32;
         }
-        
+
         .list-item-status.missing {
             background: #ffcdd2;
             color: #c62828;
         }
-        
+
         .main-content {
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
-        
+
         .content-header {
             padding: 20px;
             background: white;
             border-bottom: 1px solid #ddd;
         }
-        
+
         .content-title {
             font-size: 16px;
             font-weight: 600;
             color: #333;
             margin-bottom: 8px;
         }
-        
+
         .content-subtitle {
             font-size: 13px;
             color: #666;
         }
-        
+
         .content-body {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
         }
-        
+
         .images-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 20px;
         }
-        
+
         .image-container {
             background: white;
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .image-container img {
             width: 100%;
             height: auto;
             border-radius: 4px;
         }
-        
+
         .image-label {
             font-size: 12px;
             color: #666;
             margin-top: 8px;
             text-align: center;
         }
-        
+
         .tabs {
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             overflow: hidden;
         }
-        
+
         .tab-header {
             display: flex;
             border-bottom: 1px solid #ddd;
         }
-        
+
         .tab-btn {
             padding: 12px 20px;
             border: none;
@@ -1146,27 +1183,27 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             border-bottom: 3px solid transparent;
             transition: all 0.2s;
         }
-        
+
         .tab-btn:hover {
             background: #f9f9f9;
         }
-        
+
         .tab-btn.active {
             color: #2196F3;
             border-bottom-color: #2196F3;
         }
-        
+
         .tab-content {
             display: none;
             padding: 20px;
             max-height: 400px;
             overflow-y: auto;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         .tab-content pre {
             font-size: 12px;
             line-height: 1.5;
@@ -1174,23 +1211,23 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             word-wrap: break-word;
             color: #333;
         }
-        
+
         .stage-summary {
             font-size: 13px;
             line-height: 1.8;
             color: #333;
         }
-        
+
         .stage-summary strong {
             color: #2196F3;
         }
-        
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
             color: #999;
         }
-        
+
         .empty-state-icon {
             font-size: 48px;
             margin-bottom: 16px;
@@ -1212,7 +1249,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             <!-- List items will be populated here -->
         </div>
     </div>
-    
+
     <div class="main-content">
         <div class="content-header">
             <div class="content-title" id="contentTitle">Select an item to view details</div>
@@ -1225,22 +1262,22 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
             </div>
         </div>
     </div>
-    
+
     <script>
         let allExamples = [];
         let filteredExamples = [];
         let selectedIndex = -1;
-        
+
         async function init() {
             try {
                 const response = await fetch('/api/list');
                 const data = await response.json();
                 allExamples = data.examples;
                 filteredExamples = [...allExamples];
-                
+
                 renderMetrics(data.global_metrics);
                 renderList();
-                
+
                 if (filteredExamples.length > 0) {
                     selectItem(0);
                 }
@@ -1248,13 +1285,13 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                 console.error('Failed to load data:', error);
             }
         }
-        
+
         function renderMetrics(metrics) {
             const grid = document.getElementById('metricsGrid');
             const present = metrics.present || {};
             const counts = metrics.counts || {};
             const recall = metrics.recall || null;
-            
+
             let metricsHTML = `
                 <div class="metric-item"><span>Total Rows:</span><strong>${allExamples.length}</strong></div>
                 <div class="metric-item"><span>Unique Pages:</span><strong>${metrics.unique_pages}</strong></div>
@@ -1263,7 +1300,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                 <div class="metric-item"><span>Stage 4:</span><strong>${present.stage4 || 0}</strong></div>
                 <div class="metric-item"><span>Stage 5:</span><strong>${present.stage5 || 0}</strong></div>
             `;
-            
+
             if (recall) {
                 metricsHTML += `
                     <div class="metric-item" style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
@@ -1275,19 +1312,19 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     <div class="metric-item"><span>Recall@10:</span><strong>${(recall.recall_at_10 * 100).toFixed(1)}%</strong></div>
                 `;
             }
-            
+
             grid.innerHTML = metricsHTML;
         }
-        
+
         function renderList() {
             const container = document.getElementById('listContainer');
             container.innerHTML = '';
-            
+
             filteredExamples.forEach((ex, i) => {
                 const item = document.createElement('div');
                 item.className = 'list-item' + (i === selectedIndex ? ' selected' : '');
                 item.onclick = () => selectItem(i);
-                
+
                 // Determine status based on recall if available
                 let statusClass, statusText;
                 if (ex.recall) {
@@ -1311,7 +1348,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     statusClass = ex.status === 'ok' ? 'ok' : 'missing';
                     statusText = ex.status === 'ok' ? 'OK' : 'MISS';
                 }
-                
+
                 item.innerHTML = `
                     <div class="list-item-title">
                         ${ex.pdf_page}
@@ -1319,20 +1356,20 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     </div>
                     <div class="list-item-query">${ex.query}</div>
                 `;
-                
+
                 container.appendChild(item);
             });
         }
-        
+
         async function selectItem(index) {
             selectedIndex = index;
             renderList();
-            
+
             const ex = filteredExamples[index];
-            
+
             document.getElementById('contentTitle').textContent = ex.query;
             document.getElementById('contentSubtitle').textContent = `${ex.pdf_page}`;
-            
+
             if (ex.status !== 'ok') {
                 document.getElementById('contentBody').innerHTML = `
                     <div class="empty-state">
@@ -1342,20 +1379,20 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                 `;
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/details/${ex.index}`);
                 const data = await response.json();
-                
+
                 renderDetails(data);
             } catch (error) {
                 console.error('Failed to load details:', error);
             }
         }
-        
+
         function renderDetails(data) {
             const body = document.getElementById('contentBody');
-            
+
             const imagesHTML = `
                 <div class="images-row">
                     <div class="image-container">
@@ -1377,12 +1414,12 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     `}
                 </div>
             `;
-            
+
             const s2 = data.stage2 || {};
             const s3 = data.stage3 || {};
             const s4 = data.stage4 || {};
             const s5 = data.stage5 || {};
-            
+
             const summaryHTML = `
                 <div class="stage-summary">
                     ${data.recall ? `
@@ -1399,36 +1436,36 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                             ` : ''}
                         </div>
                     ` : ''}
-                
-                    <strong>Stage 2 (page_elements_v3):</strong> 
-                    ${s2.present ? '✓' : '✗'} 
+
+                    <strong>Stage 2 (page_elements_v3):</strong>
+                    ${s2.present ? '✓' : '✗'}
                     ${s2.num_detections || 0} detections
                     ${s2.timing_s ? ` (${s2.timing_s.toFixed(2)}s)` : ''}<br>
-                    
-                    <strong>Stage 3 (graphic_elements_v1):</strong> 
-                    ${s3.present ? '✓' : '✗'} 
-                    ${s3.num_regions || 0} regions, 
+
+                    <strong>Stage 3 (graphic_elements_v1):</strong>
+                    ${s3.present ? '✓' : '✗'}
+                    ${s3.num_regions || 0} regions,
                     ${s3.num_detections || 0} detections
                     ${s3.timing_s ? ` (${s3.timing_s.toFixed(2)}s)` : ''}<br>
-                    
-                    <strong>Stage 4 (table_structure_v1):</strong> 
-                    ${s4.present ? '✓' : '✗'} 
-                    ${s4.num_regions || 0} regions, 
+
+                    <strong>Stage 4 (table_structure_v1):</strong>
+                    ${s4.present ? '✓' : '✗'}
+                    ${s4.num_regions || 0} regions,
                     ${s4.num_detections || 0} detections
                     ${s4.timing_s ? ` (${s4.timing_s.toFixed(2)}s)` : ''}<br>
-                    
-                    <strong>Stage 5 (nemotron_ocr_v1):</strong> 
-                    ${s5.present ? '✓' : '✗'} 
-                    ${s5.num_regions || 0} regions, 
+
+                    <strong>Stage 5 (nemotron_ocr_v1):</strong>
+                    ${s5.present ? '✓' : '✗'}
+                    ${s5.num_regions || 0} regions,
                     ${s5.num_nonempty || 0} with text<br>
-                    
+
                     ${s5.sample_texts && s5.sample_texts.length > 0 ? `
                         <br><strong>OCR Samples:</strong><br>
                         ${s5.sample_texts.map(t => `• ${t}`).join('<br>')}
                     ` : ''}
                 </div>
             `;
-            
+
             // Build recall HTML
             const recallHTML = data.recall ? `
                 <div style="padding: 15px; font-family: monospace; line-height: 1.6;">
@@ -1436,35 +1473,35 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                         <strong style="font-size: 16px;">PDF Page:</strong> ${data.pdf_page}<br>
                         <strong style="font-size: 16px;">Query:</strong> ${data.query}
                     </div>
-                    
+
                     <div style="border-top: 2px solid #333; padding-top: 15px; margin-bottom: 15px;">
                         <strong style="font-size: 18px; display: block; margin-bottom: 10px;">RECALL RESULTS</strong>
                     </div>
-                    
+
                     <div style="margin-bottom: 20px;">
                         <strong style="display: block; margin-bottom: 8px;">Hit Status:</strong>
                         <div style="margin-left: 20px;">
-                            • Hit@1:  <strong style="color: ${data.recall.hit_at_1 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_1 ? '✓ YES' : '✗ NO'}</strong>  
+                            • Hit@1:  <strong style="color: ${data.recall.hit_at_1 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_1 ? '✓ YES' : '✗ NO'}</strong>
                             (Rank: ${data.recall.rank_at_1 || 'N/A'})<br>
-                            • Hit@3:  <strong style="color: ${data.recall.hit_at_3 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_3 ? '✓ YES' : '✗ NO'}</strong>  
+                            • Hit@3:  <strong style="color: ${data.recall.hit_at_3 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_3 ? '✓ YES' : '✗ NO'}</strong>
                             (Rank: ${data.recall.rank_at_3 || 'N/A'})<br>
-                            • Hit@5:  <strong style="color: ${data.recall.hit_at_5 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_5 ? '✓ YES' : '✗ NO'}</strong>  
+                            • Hit@5:  <strong style="color: ${data.recall.hit_at_5 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_5 ? '✓ YES' : '✗ NO'}</strong>
                             (Rank: ${data.recall.rank_at_5 || 'N/A'})<br>
-                            • Hit@10: <strong style="color: ${data.recall.hit_at_10 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_10 ? '✓ YES' : '✗ NO'}</strong>  
+                            • Hit@10: <strong style="color: ${data.recall.hit_at_10 ? '#2e7d32' : '#c62828'};">${data.recall.hit_at_10 ? '✓ YES' : '✗ NO'}</strong>
                             (Rank: ${data.recall.rank_at_10 || 'N/A'})
                         </div>
                     </div>
-                    
-                    <div style="padding: 12px; background: ${data.recall.hit_at_1 ? '#c8e6c9' : data.recall.hit_at_10 ? '#fff3cd' : '#ffcdd2'}; 
+
+                    <div style="padding: 12px; background: ${data.recall.hit_at_1 ? '#c8e6c9' : data.recall.hit_at_10 ? '#fff3cd' : '#ffcdd2'};
                                 border-radius: 4px; margin-bottom: 20px; border-left: 4px solid ${data.recall.hit_at_1 ? '#2e7d32' : data.recall.hit_at_10 ? '#f57c00' : '#c62828'};">
-                        <strong>VERDICT:</strong> 
-                        ${data.recall.hit_at_1 ? '✓ Perfect hit at rank 1' : 
+                        <strong>VERDICT:</strong>
+                        ${data.recall.hit_at_1 ? '✓ Perfect hit at rank 1' :
                           data.recall.hit_at_3 ? '⚠ Good hit in top 3' :
                           data.recall.hit_at_5 ? '⚠ Acceptable hit in top 5' :
                           data.recall.hit_at_10 ? '⚠ Weak hit in top 10' :
                           '✗ MISS - Not found in top 10 results'}
                     </div>
-                    
+
                     ${data.recall.top_10_retrieved && data.recall.top_10_retrieved.length > 0 ? `
                         <div style="border-top: 2px solid #333; padding-top: 15px; margin-bottom: 15px;">
                             <strong style="font-size: 18px; display: block; margin-bottom: 10px;">TOP 10 RETRIEVED PAGES</strong>
@@ -1477,7 +1514,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                             `).join('')}
                         </div>
                         <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-                            ${data.pdf_page && data.recall.top_10_retrieved.includes(data.pdf_page) ? 
+                            ${data.pdf_page && data.recall.top_10_retrieved.includes(data.pdf_page) ?
                                 `Correct answer '<strong>${data.pdf_page}</strong>' found at rank <strong>${data.recall.top_10_retrieved.indexOf(data.pdf_page) + 1}</strong>` :
                                 `Correct answer '<strong>${data.pdf_page}</strong>' <span style="color: #c62828;">NOT in top 10</span>`
                             }
@@ -1490,7 +1527,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     <p style="margin-top: 10px; font-size: 14px;">Provide a recall results CSV file using --recall-results-csv option to see recall analysis.</p>
                 </div>
             `;
-            
+
             const tabsHTML = `
                 <div class="tabs">
                     <div class="tab-header">
@@ -1507,38 +1544,38 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                     <div class="tab-content"><pre>${JSON.stringify(data.raw, null, 2)}</pre></div>
                 </div>
             `;
-            
+
             body.innerHTML = imagesHTML + tabsHTML;
         }
-        
+
         function switchTab(index) {
             const btns = document.querySelectorAll('.tab-btn');
             const contents = document.querySelectorAll('.tab-content');
-            
+
             btns.forEach((btn, i) => {
                 btn.classList.toggle('active', i === index);
             });
-            
+
             contents.forEach((content, i) => {
                 content.classList.toggle('active', i === index);
             });
         }
-        
+
         function filterList() {
             const query = document.getElementById('searchBox').value.toLowerCase();
-            
+
             if (!query) {
                 filteredExamples = [...allExamples];
             } else {
-                filteredExamples = allExamples.filter(ex => 
+                filteredExamples = allExamples.filter(ex =>
                     ex.pdf_page.toLowerCase().includes(query) ||
                     ex.query.toLowerCase().includes(query)
                 );
             }
-            
+
             selectedIndex = -1;
             renderList();
-            
+
             if (filteredExamples.length > 0) {
                 selectItem(0);
             } else {
@@ -1550,33 +1587,37 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
                 `;
             }
         }
-        
+
         document.getElementById('searchBox').addEventListener('input', filterList);
-        
+
         init();
     </script>
 </body>
 </html>
         """
         return HTMLResponse(content=html)
-    
+
     @app_fastapi.get("/api/list")
     async def api_list():
         """Return list of all examples with basic info"""
         examples_list = []
         for i, ex in enumerate(examples):
-            examples_list.append({
-                "index": i,
-                "pdf_page": ex.row.pdf_page,
-                "query": ex.row.query,
-                "status": "ok" if ex.image_path is not None else "missing",
-            })
-        
-        return JSONResponse({
-            "examples": examples_list,
-            "global_metrics": global_metrics,
-        })
-    
+            examples_list.append(
+                {
+                    "index": i,
+                    "pdf_page": ex.row.pdf_page,
+                    "query": ex.row.query,
+                    "status": "ok" if ex.image_path is not None else "missing",
+                }
+            )
+
+        return JSONResponse(
+            {
+                "examples": examples_list,
+                "global_metrics": global_metrics,
+            }
+        )
+
     @app_fastapi.get("/api/details/{index}")
     async def api_details(index: int):
         """Return detailed data for a specific example"""
@@ -1584,35 +1625,35 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
         if data is None:
             raise HTTPException(status_code=404, detail="Example not found")
         return JSONResponse(data)
-    
+
     @app_fastapi.get("/api/image/{index}/{image_type}")
     async def api_image(index: int, image_type: str):
         """Serve the image file for a specific example"""
         if index < 0 or index >= len(examples):
             raise HTTPException(status_code=404, detail="Example not found")
-        
+
         ex = examples[index]
         if ex.image_path is None or not ex.image_path.exists():
             raise HTTPException(status_code=404, detail="Image not found")
-        
+
         paths = _paths_for_image(ex.image_path)
-        
+
         if image_type == "main":
             image_path = paths["img"]
         elif image_type == "overlay":
             image_path = paths["img_overlay"]
         else:
             raise HTTPException(status_code=400, detail="Invalid image type")
-        
+
         if not image_path.exists():
             raise HTTPException(status_code=404, detail="Image file not found")
-        
+
         return FileResponse(image_path)
-    
+
     console.print(f"[bold green]Starting web UI server on port {port}...[/bold green]")
     console.print(f"[cyan]Open your browser to: http://localhost:{port}[/cyan]")
     console.print("[yellow]Press Ctrl+C to stop the server[/yellow]\n")
-    
+
     uvicorn.run(app_fastapi, host="0.0.0.0", port=port, log_level="info")
 
 
@@ -1679,16 +1720,16 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
         f"s4={gm.get('present', {}).get('stage4')} s5={gm.get('present', {}).get('stage5')} "
         f"pdfium={gm.get('present', {}).get('pdfium_text')} overlay={gm.get('present', {}).get('overlay')}"
     )
-    
+
     # Add recall metrics if available
-    recall = gm.get('recall')
+    recall = gm.get("recall")
     if recall:
         gm_text += (
             f"\n\nRecall Metrics ({recall.get('total_queries')} queries):\n"
             f"R@1={recall.get('recall_at_1', 0):.3f} R@3={recall.get('recall_at_3', 0):.3f} "
             f"R@5={recall.get('recall_at_5', 0):.3f} R@10={recall.get('recall_at_10', 0):.3f}"
         )
-    
+
     ttk.Label(left, text=gm_text, justify="left").grid(row=3, column=0, sticky="ew", pady=(8, 0))
 
     # Listbox with scrollbar
@@ -1797,7 +1838,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
         lines.append(f"image: {paths['img']}")
         lines.append(f"overlay present: {paths['img_overlay'].exists()}")
         lines.append(f"pdfium_text file: {paths['pdfium_text']} (exists={paths['pdfium_text'].exists()})")
-        
+
         # Add recall information if available
         if ex.recall:
             lines.append("")
@@ -1812,7 +1853,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
             lines.append(f"- Hit@10: {hit10} (rank: {ex.recall.rank_at_10 or 'N/A'})")
             if ex.recall.top_10_retrieved:
                 lines.append(f"- Top 3 Retrieved: {', '.join(ex.recall.top_10_retrieved[:3])}")
-        
+
         lines.append("")
 
         s2 = summary["stage2"]
@@ -1820,14 +1861,24 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
         s4 = summary["stage4"]
         s5 = summary["stage5"]
         lines.append("Model / stage summary:")
-        lines.append(f"- stage2 page_elements_v3: present={s2.get('present')} dets={s2.get('num_detections', 0)} timing_s={s2.get('timing_s')}")
+        lines.append(
+            f"- stage2 page_elements_v3: present={s2.get('present')} dets={s2.get('num_detections', 0)} timing_s={s2.get('timing_s')}"
+        )
         if s2.get("by_label"):
             lines.append("  label counts: " + ", ".join([f"{k}={v}" for k, v in list(s2["by_label"].items())[:12]]))
-        lines.append(f"- stage3 graphic_elements_v1: present={s3.get('present')} regions={s3.get('num_regions', 0)} dets={s3.get('num_detections', 0)} timing_s={s3.get('timing_s')}")
-        lines.append(f"- stage4 table_structure_v1: present={s4.get('present')} regions={s4.get('num_regions', 0)} dets={s4.get('num_detections', 0)} timing_s={s4.get('timing_s')}")
-        lines.append(f"- stage5 nemotron_ocr_v1: present={s5.get('present')} regions={s5.get('num_regions', 0)} nonempty={s5.get('num_nonempty', 0)}")
+        lines.append(
+            f"- stage3 graphic_elements_v1: present={s3.get('present')} regions={s3.get('num_regions', 0)} dets={s3.get('num_detections', 0)} timing_s={s3.get('timing_s')}"
+        )
+        lines.append(
+            f"- stage4 table_structure_v1: present={s4.get('present')} regions={s4.get('num_regions', 0)} dets={s4.get('num_detections', 0)} timing_s={s4.get('timing_s')}"
+        )
+        lines.append(
+            f"- stage5 nemotron_ocr_v1: present={s5.get('present')} regions={s5.get('num_regions', 0)} nonempty={s5.get('num_nonempty', 0)}"
+        )
         if s5.get("by_label_name"):
-            lines.append("  region kinds: " + ", ".join([f"{k}={v}" for k, v in list(s5["by_label_name"].items())[:12]]))
+            lines.append(
+                "  region kinds: " + ", ".join([f"{k}={v}" for k, v in list(s5["by_label_name"].items())[:12]])
+            )
         if s5.get("sample_texts"):
             lines.append("")
             lines.append("OCR sample texts:")
@@ -1905,7 +1956,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
             return
         _set_text(pdfium_text, s.get("pdfium_text") or "")
         _set_text(det_text, _summary_text(s, ex))
-        
+
         # Populate recall tab
         if ex.recall:
             recall_lines = []
@@ -1916,15 +1967,23 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
             recall_lines.append("RECALL RESULTS")
             recall_lines.append("=" * 80)
             recall_lines.append("")
-            
+
             # Hit status with visual indicators
             recall_lines.append("Hit Status:")
-            recall_lines.append(f"  • Hit@1:  {'✓ YES' if ex.recall.hit_at_1 else '✗ NO':10}  (Rank: {ex.recall.rank_at_1 if ex.recall.rank_at_1 else 'N/A'})")
-            recall_lines.append(f"  • Hit@3:  {'✓ YES' if ex.recall.hit_at_3 else '✗ NO':10}  (Rank: {ex.recall.rank_at_3 if ex.recall.rank_at_3 else 'N/A'})")
-            recall_lines.append(f"  • Hit@5:  {'✓ YES' if ex.recall.hit_at_5 else '✗ NO':10}  (Rank: {ex.recall.rank_at_5 if ex.recall.rank_at_5 else 'N/A'})")
-            recall_lines.append(f"  • Hit@10: {'✓ YES' if ex.recall.hit_at_10 else '✗ NO':10}  (Rank: {ex.recall.rank_at_10 if ex.recall.rank_at_10 else 'N/A'})")
+            recall_lines.append(
+                f"  • Hit@1:  {'✓ YES' if ex.recall.hit_at_1 else '✗ NO':10}  (Rank: {ex.recall.rank_at_1 if ex.recall.rank_at_1 else 'N/A'})"
+            )
+            recall_lines.append(
+                f"  • Hit@3:  {'✓ YES' if ex.recall.hit_at_3 else '✗ NO':10}  (Rank: {ex.recall.rank_at_3 if ex.recall.rank_at_3 else 'N/A'})"
+            )
+            recall_lines.append(
+                f"  • Hit@5:  {'✓ YES' if ex.recall.hit_at_5 else '✗ NO':10}  (Rank: {ex.recall.rank_at_5 if ex.recall.rank_at_5 else 'N/A'})"
+            )
+            recall_lines.append(
+                f"  • Hit@10: {'✓ YES' if ex.recall.hit_at_10 else '✗ NO':10}  (Rank: {ex.recall.rank_at_10 if ex.recall.rank_at_10 else 'N/A'})"
+            )
             recall_lines.append("")
-            
+
             # Summary verdict
             if ex.recall.hit_at_1:
                 recall_lines.append("✓ VERDICT: Perfect hit at rank 1")
@@ -1937,7 +1996,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
             else:
                 recall_lines.append("✗ VERDICT: MISS - Not found in top 10 results")
             recall_lines.append("")
-            
+
             # Top 10 retrieved pages
             if ex.recall.top_10_retrieved:
                 recall_lines.append("=" * 80)
@@ -1948,18 +2007,21 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
                     marker = "→" if page == ex.row.pdf_page else " "
                     recall_lines.append(f"  {marker} Rank {i:2d}: {page}")
                 recall_lines.append("")
-                
+
                 # Highlight where the correct answer is
                 if ex.row.pdf_page in ex.recall.top_10_retrieved:
                     rank = ex.recall.top_10_retrieved.index(ex.row.pdf_page) + 1
                     recall_lines.append(f"Correct answer '{ex.row.pdf_page}' found at rank {rank}")
                 else:
                     recall_lines.append(f"Correct answer '{ex.row.pdf_page}' NOT in top 10")
-            
+
             _set_text(recall_text, "\n".join(recall_lines))
         else:
-            _set_text(recall_text, "No recall results available for this query.\n\nProvide a recall results CSV file using --recall-results-csv option to see recall analysis.")
-        
+            _set_text(
+                recall_text,
+                "No recall results available for this query.\n\nProvide a recall results CSV file using --recall-results-csv option to see recall analysis.",
+            )
+
         embed_path = paths.get("embedder_input")
         if isinstance(embed_path, Path) and embed_path.exists():
             _set_text(embedder_input_text, _read_text_best_effort(embed_path) + "\n")
@@ -2061,9 +2123,9 @@ def run(
     Default behavior: open an interactive UI viewer over pages referenced in the CSV.
 
     If --export-pdf is provided, creates a shareable report PDF containing the same information.
-    
+
     If --headless is provided, runs without GUI and displays analysis in CLI format.
-    
+
     If --web-ui is provided, starts a FastAPI web server for browser-based viewing.
     """
     input_dir = Path(input_dir)
@@ -2134,12 +2196,13 @@ def run(
         _run_web_ui(examples=resolved, global_metrics=global_metrics, port=port)
     elif not headless:
         import os
+
         # If no DISPLAY variable is set and headless not explicitly requested,
         # automatically use headless mode
         if not os.environ.get("DISPLAY"):
             console.print("[yellow]No DISPLAY detected - automatically using headless mode[/yellow]")
             headless = True
-    
+
     if headless and not web_ui:
         _run_headless(examples=resolved, global_metrics=global_metrics)
     elif not web_ui:
@@ -2152,4 +2215,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -325,16 +325,9 @@ class TestYoloxPageElementsV3Interface(unittest.TestCase):
         self.expand_chart_patcher.stop()
 
     def test_postprocess_annotations_v3_path_is_taken(self):
-        v3_annotations = [
-            {
-                "table": [],
-                "chart": [],
-                "title": [],
-                "infographic": [],
-                "paragraph": [[0.1, 0.1, 0.2, 0.2, 0.9]],
-                "header_footer": [],
-            }
-        ]
+        # Even if a page has no v3-only detections (e.g., no paragraph/header_footer),
+        # v3 post-processing must still run when the interface is configured for a v3 model.
+        v3_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
 
         self.model_interface.postprocess_annotations(v3_annotations)
 
@@ -343,9 +336,12 @@ class TestYoloxPageElementsV3Interface(unittest.TestCase):
         self.mock_expand_chart.assert_not_called()
 
     def test_postprocess_annotations_v2_fallback_path_is_taken(self):
+        # A v2-configured interface should use the legacy expansion functions.
+        model_v2 = YoloxPageElementsModelInterface(version="nemoretriever-page-elements-v2")
+        model_v2.transform_normalized_coordinates_to_original = MagicMock(side_effect=lambda x, y: x)
         v2_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
 
-        self.model_interface.postprocess_annotations(v2_annotations)
+        model_v2.postprocess_annotations(v2_annotations)
 
         self.mock_postprocess_v3.assert_not_called()
         self.mock_expand_table.assert_called_once()

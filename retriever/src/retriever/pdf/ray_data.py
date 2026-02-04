@@ -11,7 +11,6 @@ ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 
-from retriever.metrics import LoggingMetrics, Metrics
 from .stage import extract_pdf_primitives_from_ledger_df
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,6 @@ def extract_pdf_primitives_ray_data(
     task_config: Dict[str, Any],
     extractor_config: PDFExtractorSchema,
     batch_size: int = 16,
-    metrics_factory: Optional[Callable[[], Metrics]] = None,
 ) -> "ray.data.Dataset":
     """Ray Data adapter around the shared `nv-ingest-api` PDF extraction logic.
 
@@ -36,16 +34,11 @@ def extract_pdf_primitives_ray_data(
     # Import lazily so the pure-python path doesn't require Ray to be installed/initialized.
     import ray.data  # type: ignore
 
-    if metrics_factory is None:
-        metrics_factory = lambda: LoggingMetrics(extra={"runner": "ray_data"})  # noqa: E731
-
     def _map_batch(batch: pd.DataFrame) -> pd.DataFrame:
-        metrics = metrics_factory()
         extracted_df, _info = extract_pdf_primitives_from_ledger_df(
             batch,
             task_config=task_config,
             extractor_config=extractor_config,
-            metrics=metrics,
         )
         return extracted_df
 
@@ -60,4 +53,3 @@ def extract_pdf_primitives_ray_data(
         batch_format="pandas",
         batch_size=batch_size,
     )
-
