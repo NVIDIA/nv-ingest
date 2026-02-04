@@ -368,7 +368,7 @@ with (
 ## Extract Captions from Images
 
 The `caption` method generates image captions by using a VLM. 
-This can be used to describe unstructured images, infographics, and other visual content extracted from documents.
+You can use this to generate descriptions of unstructured images, infographics, and other visual content extracted from documents.
 
 !!! note
 
