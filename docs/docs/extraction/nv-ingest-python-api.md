@@ -55,7 +55,7 @@ The following table describes the `extract_method` options.
 
 ### Caption images and control reasoning
 
-The caption task can call a vision-language model (VLM) with optional prompt and reasoning controls:
+The caption task can call a vision-language model (VLM) with the following optional controls:
 
 - `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
 - `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
