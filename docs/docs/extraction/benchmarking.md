@@ -30,7 +30,7 @@ Before you use this documentation, you need the following:
 
 - Docker and Docker Compose are running
 - A Python environment with nv-ingest-client installed
-- **Benchmark datasets downloaded** (see [Dataset Prerequisites](#dataset-prerequisites) above)
+- The [benchmark datasets are downloaded](#dataset-prerequisites)
 
 ### Run Your First Test
 
