@@ -435,7 +435,7 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. Refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images) for more information. | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
 
 
 ## Specify MIG slices for NIM models
