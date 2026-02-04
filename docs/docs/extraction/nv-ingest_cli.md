@@ -119,7 +119,7 @@ nv-ingest-cli \
 
 !!! tip
 
-  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. Refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images) for more information.
+  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
 
 Alternatively, you can use an environment variable to set the API version:
 
