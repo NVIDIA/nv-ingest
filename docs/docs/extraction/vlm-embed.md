@@ -136,6 +136,8 @@ The following example demonstrates two different approaches for processing infog
 This approach extracts infographics from the document and generates text captions for them using a VLM.
 The captions describe the content and meaning of each infographic.
 
+Use this approach when you need searchable text descriptions of complex visual content. 
+
 - The `extract` method is configured with `extract_infographics=True` to identify and extract infographics.
 - The `caption` method calls a VLM to generate descriptive text for each infographic.
 
