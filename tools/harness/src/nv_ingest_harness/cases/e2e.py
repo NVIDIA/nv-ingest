@@ -5,7 +5,6 @@ import shutil
 import time
 
 from nv_ingest_client.client import Ingestor
-from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
@@ -250,6 +249,8 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     # Document-level analysis
     if os.getenv("DOC_ANALYSIS", "false").lower() == "true":
+        from nv_ingest_client.util.document_analysis import analyze_document_chunks
+
         print("\nDocument Analysis:")
         document_breakdown = analyze_document_chunks(results)
 
