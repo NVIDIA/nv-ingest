@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
+import yaml
 
 from retriever._local_deps import ensure_nv_ingest_api_importable
+from retriever.pdf.config import load_pdf_extractor_schema_from_dict
+from retriever.pdf.io import pdf_files_to_ledger_df
 from rich.console import Console
 import typer
 
@@ -23,6 +27,124 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 app = typer.Typer(help="Extract PDF primitives from PDF files.")
+
+
+def _argv_has_any(flags: Iterable[str]) -> bool:
+    """
+    Return True if any of the given flags appear in sys.argv.
+
+    Supports `--flag value` and `--flag=value` forms.
+    """
+    argv = sys.argv[1:]
+    for f in flags:
+        if f in argv:
+            return True
+        prefix = f + "="
+        if any(a.startswith(prefix) for a in argv):
+            return True
+    return False
+
+
+def _read_yaml_config(path: Path) -> Dict[str, Any]:
+    try:
+        text = path.read_text(encoding="utf-8")
+        data = yaml.safe_load(text)
+    except Exception as e:
+        raise typer.BadParameter(f"Failed reading YAML config {path}: {e}") from e
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise typer.BadParameter(f"YAML config must be a mapping/object at top-level: {path}")
+    return data
+
+
+def _cfg_get(raw: Dict[str, Any], *keys: str) -> Any:
+    """
+    Return the first present key among `keys` from raw, else None.
+    """
+    for k in keys:
+        if k in raw:
+            return raw.get(k)
+    return None
+
+
+def _normalize_page_elements_config(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize YAML config into flat keys matching CLI parameter names.
+
+    Supports either flat keys (e.g. `yolox_grpc_endpoint`) or nested keys under:
+      endpoints.yolox.{grpc,http}
+      endpoints.nemotron_parse.{grpc,http,model_name}
+      extract.{text,images,tables,charts,infographics,page_as_image,text_depth}
+      outputs.{write_json,json_output_dir}
+    """
+    raw = dict(raw or {})
+
+    endpoints = raw.get("endpoints") if isinstance(raw.get("endpoints"), dict) else {}
+    yolox = endpoints.get("yolox") if isinstance(endpoints.get("yolox"), dict) else {}
+    nemo = endpoints.get("nemotron_parse") if isinstance(endpoints.get("nemotron_parse"), dict) else {}
+
+    extract = raw.get("extract") if isinstance(raw.get("extract"), dict) else {}
+    outputs = raw.get("outputs") if isinstance(raw.get("outputs"), dict) else {}
+
+    out: Dict[str, Any] = {}
+    out["input_dir"] = _cfg_get(raw, "input_dir", "input-dir")
+    out["method"] = _cfg_get(raw, "method")
+    out["auth_token"] = _cfg_get(raw, "auth_token", "auth-token")
+
+    out["yolox_grpc_endpoint"] = _cfg_get(raw, "yolox_grpc_endpoint", "yolox-grpc-endpoint") or _cfg_get(
+        yolox, "grpc", "grpc_endpoint", "grpc-endpoint"
+    )
+    out["yolox_http_endpoint"] = _cfg_get(raw, "yolox_http_endpoint", "yolox-http-endpoint") or _cfg_get(
+        yolox, "http", "http_endpoint", "http-endpoint"
+    )
+
+    out["nemotron_parse_grpc_endpoint"] = _cfg_get(
+        raw, "nemotron_parse_grpc_endpoint", "nemotron-parse-grpc-endpoint"
+    ) or _cfg_get(nemo, "grpc", "grpc_endpoint", "grpc-endpoint")
+    out["nemotron_parse_http_endpoint"] = _cfg_get(
+        raw, "nemotron_parse_http_endpoint", "nemotron-parse-http-endpoint"
+    ) or _cfg_get(nemo, "http", "http_endpoint", "http-endpoint")
+    out["nemotron_parse_model_name"] = _cfg_get(
+        raw, "nemotron_parse_model_name", "nemotron-parse-model-name"
+    ) or _cfg_get(nemo, "model_name", "model-name")
+
+    out["extract_text"] = (
+        _cfg_get(raw, "extract_text", "extract-text") if "extract_text" in raw else _cfg_get(extract, "text")
+    )
+    out["extract_images"] = (
+        _cfg_get(raw, "extract_images", "extract-images") if "extract_images" in raw else _cfg_get(extract, "images")
+    )
+    out["extract_tables"] = (
+        _cfg_get(raw, "extract_tables", "extract-tables") if "extract_tables" in raw else _cfg_get(extract, "tables")
+    )
+    out["extract_charts"] = (
+        _cfg_get(raw, "extract_charts", "extract-charts") if "extract_charts" in raw else _cfg_get(extract, "charts")
+    )
+    out["extract_infographics"] = (
+        _cfg_get(raw, "extract_infographics", "extract-infographics")
+        if "extract_infographics" in raw
+        else _cfg_get(extract, "infographics")
+    )
+    out["extract_page_as_image"] = (
+        _cfg_get(raw, "extract_page_as_image", "extract-page-as-image")
+        if "extract_page_as_image" in raw
+        else _cfg_get(extract, "page_as_image", "page-as-image", "page_as_image")
+    )
+    out["text_depth"] = _cfg_get(raw, "text_depth", "text-depth") or _cfg_get(extract, "text_depth", "text-depth")
+
+    out["write_json_outputs"] = (
+        _cfg_get(raw, "write_json_outputs", "write-json-outputs")
+        if "write_json_outputs" in raw
+        else _cfg_get(outputs, "write_json", "write-json", "write_json_outputs")
+    )
+    out["json_output_dir"] = _cfg_get(raw, "json_output_dir", "json-output-dir") or _cfg_get(
+        outputs, "json_output_dir", "json-output-dir"
+    )
+    out["limit"] = _cfg_get(raw, "limit")
+
+    # Drop Nones so "not specified" stays not specified.
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def _atomic_write_json(path: Path, obj: Any) -> None:
@@ -288,11 +410,209 @@ def extract_pdf_primitives_from_ledger_df(
 
 @app.command("page-elements")
 def render_page_elements(
-    input_dir: Path = typer.Option(..., "--input-dir", exists=True, file_okay=False, dir_okay=True),
-    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing .page_element_detections.png files."),
-    min_score: float = typer.Option(0.0, "--min-score", help="Only draw detections with score >= min_score."),
-    line_width: int = typer.Option(3, "--line-width", min=1, help="Bounding box line width in pixels."),
-    draw_labels: bool = typer.Option(True, "--draw-labels/--no-draw-labels", help="Draw label + score text."),
-    limit: Optional[int] = typer.Option(None, "--limit", help="Optionally limit number of images processed."),
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        help="Optional YAML config file. If set, values are loaded from YAML; explicitly passed CLI flags override YAML.",
+    ),
+    input_dir: Optional[Path] = typer.Option(
+        None,
+        "--input-dir",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        help="Directory to scan recursively for *.pdf (can be provided via --config).",
+    ),
+    method: str = typer.Option(
+        "pdfium",
+        "--method",
+        help="PDF extraction method (e.g. 'pdfium', 'pdfium_hybrid', 'ocr', 'nemotron_parse', 'tika').",
+    ),
+    auth_token: Optional[str] = typer.Option(
+        None,
+        "--auth-token",
+        help="Auth token for NIM-backed services (e.g. YOLOX / Nemotron Parse).",
+    ),
+    yolox_grpc_endpoint: Optional[str] = typer.Option(
+        None,
+        "--yolox-grpc-endpoint",
+        help="YOLOX gRPC endpoint (e.g. 'page-elements:8001'). Required for method 'pdfium' family.",
+    ),
+    yolox_http_endpoint: Optional[str] = typer.Option(
+        None,
+        "--yolox-http-endpoint",
+        help="YOLOX HTTP endpoint (e.g. 'http://page-elements:8000/v1/infer'). Required for method 'pdfium' family.",
+    ),
+    nemotron_parse_grpc_endpoint: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-grpc-endpoint",
+        help="Nemotron Parse gRPC endpoint (required for method 'nemotron_parse').",
+    ),
+    nemotron_parse_http_endpoint: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-http-endpoint",
+        help="Nemotron Parse HTTP endpoint (required for method 'nemotron_parse').",
+    ),
+    nemotron_parse_model_name: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-model-name",
+        help="Nemotron Parse model name (optional; defaults to schema default).",
+    ),
+    extract_text: bool = typer.Option(True, "--extract-text/--no-extract-text", help="Extract text primitives."),
+    extract_images: bool = typer.Option(
+        False, "--extract-images/--no-extract-images", help="Extract image primitives."
+    ),
+    extract_tables: bool = typer.Option(
+        False, "--extract-tables/--no-extract-tables", help="Extract table primitives."
+    ),
+    extract_charts: bool = typer.Option(
+        False, "--extract-charts/--no-extract-charts", help="Extract chart primitives."
+    ),
+    extract_infographics: bool = typer.Option(
+        False, "--extract-infographics/--no-extract-infographics", help="Extract infographic primitives."
+    ),
+    extract_page_as_image: bool = typer.Option(
+        False, "--extract-page-as-image/--no-extract-page-as-image", help="Extract full page images as primitives."
+    ),
+    text_depth: str = typer.Option(
+        "page",
+        "--text-depth",
+        help="Text depth for extracted text primitives: 'page' or 'document'.",
+    ),
+    write_json_outputs: bool = typer.Option(
+        True,
+        "--write-json-outputs/--no-write-json-outputs",
+        help="Write one <pdf>.pdf_extraction.json sidecar per input PDF.",
+    ),
+    json_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--json-output-dir",
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory to write JSON outputs into (instead of next to PDFs).",
+    ),
+    limit: Optional[int] = typer.Option(None, "--limit", help="Optionally limit number of PDFs processed."),
 ) -> None:
-    print("something")
+    """
+    Scan `input_dir` for PDFs and run nv-ingest-api PDF extraction, writing primitives JSON sidecars.
+
+    This command is intentionally "directory-first" so you can point it at a folder of PDFs
+    and get per-PDF outputs without having to build a ledger by hand.
+    """
+    cfg_raw: Dict[str, Any] = {}
+    if config is not None:
+        cfg_raw = _normalize_page_elements_config(_read_yaml_config(config))
+
+        # Merge: YAML provides defaults; explicit CLI flags override YAML.
+        if not _argv_has_any(["--input-dir"]):
+            if "input_dir" in cfg_raw:
+                input_dir = Path(str(cfg_raw["input_dir"]))
+
+        if not _argv_has_any(["--method"]):
+            method = str(cfg_raw.get("method", method))
+        if not _argv_has_any(["--auth-token"]):
+            auth_token = cfg_raw.get("auth_token", auth_token)
+
+        if not _argv_has_any(["--yolox-grpc-endpoint"]):
+            yolox_grpc_endpoint = cfg_raw.get("yolox_grpc_endpoint", yolox_grpc_endpoint)
+        if not _argv_has_any(["--yolox-http-endpoint"]):
+            yolox_http_endpoint = cfg_raw.get("yolox_http_endpoint", yolox_http_endpoint)
+
+        if not _argv_has_any(["--nemotron-parse-grpc-endpoint"]):
+            nemotron_parse_grpc_endpoint = cfg_raw.get("nemotron_parse_grpc_endpoint", nemotron_parse_grpc_endpoint)
+        if not _argv_has_any(["--nemotron-parse-http-endpoint"]):
+            nemotron_parse_http_endpoint = cfg_raw.get("nemotron_parse_http_endpoint", nemotron_parse_http_endpoint)
+        if not _argv_has_any(["--nemotron-parse-model-name"]):
+            nemotron_parse_model_name = cfg_raw.get("nemotron_parse_model_name", nemotron_parse_model_name)
+
+        if not _argv_has_any(["--extract-text", "--no-extract-text"]):
+            extract_text = bool(cfg_raw.get("extract_text", extract_text))
+        if not _argv_has_any(["--extract-images", "--no-extract-images"]):
+            extract_images = bool(cfg_raw.get("extract_images", extract_images))
+        if not _argv_has_any(["--extract-tables", "--no-extract-tables"]):
+            extract_tables = bool(cfg_raw.get("extract_tables", extract_tables))
+        if not _argv_has_any(["--extract-charts", "--no-extract-charts"]):
+            extract_charts = bool(cfg_raw.get("extract_charts", extract_charts))
+        if not _argv_has_any(["--extract-infographics", "--no-extract-infographics"]):
+            extract_infographics = bool(cfg_raw.get("extract_infographics", extract_infographics))
+        if not _argv_has_any(["--extract-page-as-image", "--no-extract-page-as-image"]):
+            extract_page_as_image = bool(cfg_raw.get("extract_page_as_image", extract_page_as_image))
+
+        if not _argv_has_any(["--text-depth"]):
+            text_depth = str(cfg_raw.get("text_depth", text_depth))
+
+        if not _argv_has_any(["--write-json-outputs", "--no-write-json-outputs"]):
+            write_json_outputs = bool(cfg_raw.get("write_json_outputs", write_json_outputs))
+        if not _argv_has_any(["--json-output-dir"]):
+            if "json_output_dir" in cfg_raw and cfg_raw["json_output_dir"] is not None:
+                json_output_dir = Path(str(cfg_raw["json_output_dir"]))
+
+        if not _argv_has_any(["--limit"]):
+            limit = cfg_raw.get("limit", limit)
+
+    if input_dir is None:
+        raise typer.BadParameter("Missing --input-dir (or set input_dir in --config YAML).")
+
+    pdfs = sorted(str(p) for p in input_dir.rglob("*.pdf"))
+    if not pdfs:
+        console.print(f"[red]No PDFs found[/red] under: {input_dir}")
+        raise typer.Exit(code=2)
+
+    if limit is not None:
+        pdfs = pdfs[: int(limit)]
+
+    method = str(method or "pdfium")
+
+    extractor_cfg: Dict[str, Any] = {}
+    if method in {"pdfium", "pdfium_hybrid", "ocr"}:
+        if not (yolox_grpc_endpoint or yolox_http_endpoint):
+            raise typer.BadParameter(
+                "YOLOX endpoint required for methods 'pdfium', 'pdfium_hybrid', and 'ocr'. "
+                "Set --yolox-grpc-endpoint or --yolox-http-endpoint."
+            )
+        extractor_cfg["pdfium_config"] = {
+            "auth_token": auth_token,
+            "yolox_endpoints": [yolox_grpc_endpoint, yolox_http_endpoint],
+        }
+    elif method == "nemotron_parse":
+        if not (nemotron_parse_grpc_endpoint or nemotron_parse_http_endpoint):
+            raise typer.BadParameter(
+                "Nemotron Parse endpoint required for method 'nemotron_parse'. "
+                "Set --nemotron-parse-grpc-endpoint or --nemotron-parse-http-endpoint."
+            )
+        extractor_cfg["nemotron_parse_config"] = {
+            "auth_token": auth_token,
+            # Nemotron Parse may still rely on YOLOX for region proposals depending on config.
+            "yolox_endpoints": [yolox_grpc_endpoint, yolox_http_endpoint],
+            "nemotron_parse_endpoints": [nemotron_parse_grpc_endpoint, nemotron_parse_http_endpoint],
+            "nemotron_parse_model_name": nemotron_parse_model_name,
+        }
+
+    extractor_schema = load_pdf_extractor_schema_from_dict(extractor_cfg)
+    task_cfg = make_pdf_task_config(
+        method=method,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
+        extract_page_as_image=extract_page_as_image,
+        text_depth=text_depth,
+    )
+
+    df_ledger = pdf_files_to_ledger_df(pdfs)
+
+    extracted_df, info = extract_pdf_primitives_from_ledger_df(
+        df_ledger,
+        task_config=task_cfg,
+        extractor_config=extractor_schema,
+        write_json_outputs=bool(write_json_outputs),
+        json_output_dir=json_output_dir,
+    )
+
+    wrote = info.get("json_outputs")
+    wrote_n = len(wrote) if isinstance(wrote, list) else 0
+    console.print(f"[green]Done[/green] pdfs={len(pdfs)} primitives={len(extracted_df)} wrote_json={wrote_n}")
