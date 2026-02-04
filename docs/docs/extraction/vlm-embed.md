@@ -127,7 +127,7 @@ This is particularly useful for infographics because they often contain complex 
 
 !!! note
 
-The VLM captioning feature requires the `vlm` profile to be enabled when starting NeMo Retriever extraction services. Refer to the [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information) for more information.
+To use VLM captioning feature, enable the `vlm` profile when you start the NeMo Retriever extraction services. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
 The following example demonstrates two different approaches for processing infographics:
 
