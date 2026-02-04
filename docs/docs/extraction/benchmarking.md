@@ -2,12 +2,34 @@
 
 A configurable, dataset-agnostic testing framework for end-to-end validation of nv-ingest pipelines. This framework uses structured YAML configuration for type safety, validation, and parameter management.
 
+## Dataset Prerequisites
+
+!!! important "Required: Download Benchmark Datasets First"
+    
+    Before running any benchmarking or evaluation tests, you must first download the benchmark datasets. The three primary datasets used in nv-ingest benchmarking and evaluations are:
+    
+    - **Bo20** - 20 PDFs for quick testing
+    - **Bo767** - 767 PDFs for comprehensive benchmarking
+    - **Bo10k** - 10,000 PDFs for large-scale evaluations
+    
+    ### How to Download the Datasets
+    
+    Use the [Digital Corpora Download Notebook](https://github.com/NVIDIA/nv-ingest/blob/main/evaluation/digital_corpora_download.ipynb) to download these datasets from the public Digital Corpora source.
+    
+    This notebook provides automated download functions that:
+    
+    - Download PDFs directly from Digital Corpora's public repository
+    - Support all three dataset sizes (Bo20, Bo767, Bo10k)
+    - Handle the extraction and organization of files automatically
+    
+    **Important:** These datasets are prerequisites for all benchmarking operations described in this guide. Complete the dataset download before proceeding with any test scenarios below.
+
 ## Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose running
 - Python environment with nv-ingest-client
-- Access to test datasets
+- **Benchmark datasets downloaded** (see [Dataset Prerequisites](#dataset-prerequisites) above)
 
 ### Run Your First Test
 
