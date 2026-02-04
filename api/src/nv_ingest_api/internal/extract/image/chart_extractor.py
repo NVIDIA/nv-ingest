@@ -98,7 +98,7 @@ def _run_chart_inference(
             model_name="paddle",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
-    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+    elif ocr_model_name in {"pipeline", "scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
         future_ocr_kwargs.update(
             model_name=ocr_model_name,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
@@ -241,7 +241,7 @@ def _create_ocr_client(
 ) -> NimClient:
     ocr_model_interface = (
         NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        if ocr_model_name in {"pipeline", "scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
         else PaddleOCRModelInterface()
     )
 

@@ -20,10 +20,10 @@ from nv_ingest_api.internal.primitives.nim.model_interface.decorators import mul
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
-DEFAULT_OCR_MODEL_NAME = "scene_text_ensemble"
-NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
-NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
-NEMORETRIEVER_OCR_BLS_MODEL_NAME = "scene_text_python"
+DEFAULT_OCR_MODEL_NAME = "pipeline"
+NEMORETRIEVER_OCR_MODEL_NAME = "pipeline"
+NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "pipeline"
+NEMORETRIEVER_OCR_BLS_MODEL_NAME = "pipeline"
 
 
 logger = logging.getLogger(__name__)
@@ -202,64 +202,57 @@ class OCRModelInterfaceBase(ModelInterface):
         model_name: str = DEFAULT_OCR_MODEL_NAME,
     ) -> List[Tuple[str, str]]:
         """
-        Parse a gRPC response for one or more images. The response can have two possible shapes:
-          - (3,) for batch_size=1
-          - (3, n) for batch_size=n
+        Parse a gRPC response for one or more images from the BLS pipeline.
 
-        In either case:
-          response[0, i]: byte string containing bounding box data
-          response[1, i]: byte string containing text prediction data
-          response[2, i]: (Optional) additional data/metadata (ignored here)
+        For BLS pipeline, output shape is [1, N*3] which gets reshaped to [N, 3] where:
+          - response[i, 0]: byte string containing bounding box data
+          - response[i, 1]: byte string containing text prediction data
+          - response[i, 2]: byte string containing confidence scores
 
         Parameters
         ----------
         response : np.ndarray
-            The raw NumPy array from gRPC. Expected shape: (3,) or (3, n).
-        table_content_format : str
-            The format of the output text content, e.g. 'simple' or 'pseudo_markdown'.
-        dims : list of dict, optional
+            The raw NumPy array from gRPC. Expected shape: (1, N*3) for BLS pipeline.
+        model_name : str
+            The name of the model used for inference.
+        dimensions : list of dict, optional
             A list of dict for each corresponding image, used for bounding box scaling.
 
         Returns
         -------
-        list of (str, str)
-            A list of (content, table_content_format) for each image.
+        list of [bounding_boxes, text_predictions, conf_scores]
+            A list of results for each image.
 
         Raises
         ------
         ValueError
-            If the response is not a NumPy array or has an unexpected shape,
-            or if the `table_content_format` is unrecognized.
+            If the response is not a NumPy array or has an unexpected shape.
         """
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name in [
-            NEMORETRIEVER_OCR_MODEL_NAME,
-            NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME,
-            NEMORETRIEVER_OCR_BLS_MODEL_NAME,
-        ]:
-            response = response.transpose((1, 0))
+        # BLS pipeline returns shape [1, N*3] - flatten and reshape to [N, 3]
+        # Each row contains [bboxes_json, texts_json, scores_json] as byte strings
+        flat_response = response.flatten()
+        if flat_response.size % 3 != 0:
+            raise ValueError(f"Unexpected response size: {flat_response.size}. Expected multiple of 3.")
 
-        # If we have shape (3,), convert to (3, 1)
-        if response.ndim == 1 and response.shape == (3,):
-            response = response.reshape(3, 1)
-        elif response.ndim != 2 or response.shape[0] != 3:
-            raise ValueError(f"Unexpected response shape: {response.shape}. Expecting (3,) or (3, n).")
-        batch_size = response.shape[1]
+        num_images = flat_response.size // 3
+        response = flat_response.reshape(num_images, 3)
+
         results: List[Tuple[str, str]] = []
 
-        for i in range(batch_size):
+        for i in range(num_images):
             # 1) Parse bounding boxes
-            bboxes_bytestr: bytes = response[0, i]
+            bboxes_bytestr: bytes = response[i, 0]
             bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))
 
             # 2) Parse text predictions
-            texts_bytestr: bytes = response[1, i]
+            texts_bytestr: bytes = response[i, 1]
             text_predictions = json.loads(texts_bytestr.decode("utf8"))
 
             # 3) Parse confidence scores
-            confs_bytestr: bytes = response[2, i]
+            confs_bytestr: bytes = response[i, 2]
             conf_scores = json.loads(confs_bytestr.decode("utf8"))
 
             # Some gRPC responses nest single-item lists; flatten them if needed
@@ -699,25 +692,26 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
         merge_level = kwargs.get("merge_level", "paragraph")
 
         if protocol == "grpc":
-            logger.debug("Formatting input for gRPC OCR model (batched).")
-            processed: List[np.ndarray] = []
+            logger.debug("Formatting input for gRPC OCR BLS pipeline model (batched).")
 
+            # Build image URLs with data URL prefix as expected by NIM BLS pipeline
+            image_urls = []
             for img, shape in zip(batch_images, batch_dims):
                 _dims = {"new_width": shape[1], "new_height": shape[0]}
                 dims.append(_dims)
+                image_url = f"data:image/png;base64,{img}"
+                image_urls.append(image_url)
 
-                arr = np.array([img], dtype=np.object_)
-                arr = np.expand_dims(arr, axis=0)
-                processed.append(arr)
+            # Create input arrays with shape [1, N] for BLS pipeline
+            # This matches the NIM's expected format: batch of 1 request containing N images
+            num_images = len(image_urls)
+            image_array = np.array(image_urls, dtype=np.object_).reshape(1, num_images)
 
-            batched_input = np.concatenate(processed, axis=0)
+            # Merge levels with shape [1, N] for BLS pipeline
+            merge_levels_list = [merge_level] * num_images
+            merge_levels_array = np.array(merge_levels_list, dtype=np.object_).reshape(1, num_images)
 
-            batch_size = batched_input.shape[0]
-
-            merge_levels_list = [[merge_level] for _ in range(batch_size)]
-            merge_levels = np.array(merge_levels_list, dtype="object")
-
-            final_batch = [batched_input, merge_levels]
+            final_batch = [image_array, merge_levels_array]
             batch_data = {"image_dims": dims}
 
             return final_batch, batch_data
@@ -768,7 +762,14 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MO
         client = grpcclient.InferenceServerClient(ocr_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
-        ocr_model_name = model_names[0]
+
+        # Prefer 'pipeline' model if available (BLS model)
+        if "pipeline" in model_names:
+            ocr_model_name = "pipeline"
+        elif "scene_text_ensemble" in model_names:
+            ocr_model_name = "scene_text_ensemble"
+        else:
+            ocr_model_name = model_names[0] if model_names else default_model_name
     except Exception:
         logger.warning(f"Failed to get ocr model name after 30 seconds. Falling back to '{default_model_name}'.")
         ocr_model_name = default_model_name
