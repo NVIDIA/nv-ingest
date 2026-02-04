@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  http-upload:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: http-upload-test
+    ports:
+      - "18080:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 24
+    restart: unless-stopped
