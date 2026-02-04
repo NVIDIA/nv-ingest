@@ -480,9 +480,6 @@ ingestor = (
 results = ingestor.ingest(show_progress=True)
 ```
 
-!!! tip
-
-    Infographics often combine text, charts, and diagrams into complex visuals. VLM captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
 
 
 ## Specify MIG slices for NIM models
