@@ -98,6 +98,7 @@ class TestConfig:
     recall_top_k: int = 10
     ground_truth_dir: Optional[str] = None
     recall_dataset: Optional[str] = None
+    enable_beir: bool = False  # Enable BEIR metrics (NDCG, MAP, Precision)
 
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
@@ -352,6 +353,7 @@ def _load_env_overrides() -> dict:
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
         "RECALL_DATASET": ("recall_dataset", str),
+        "ENABLE_BEIR": ("enable_beir", parse_bool),
     }
 
     overrides = {}

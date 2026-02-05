@@ -10,11 +10,65 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from functools import partial
-from typing import Dict, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any, Union
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.cases import get_repo_root
+
+
+def _compute_beir_metrics(
+    all_retrieved: List[List[Dict]],
+    query_df: pd.DataFrame,
+    k_values: List[int] = [1, 5, 10],
+) -> Optional[Dict[str, Dict[str, float]]]:
+    """
+    Compute BEIR metrics from retrieval results.
+
+    Args:
+        all_retrieved: List of retrieval results per query. Each result is a list of
+                      dicts with 'entity' containing source info.
+        query_df: DataFrame with 'query' and 'expected_pdf' columns, optionally 'query_id'.
+        k_values: Cutoff values for evaluation (default [1, 5, 10]).
+
+    Returns:
+        Dict with keys 'ndcg', 'map', 'recall', 'precision', each containing
+        metric values like {'NDCG@1': 0.17, 'NDCG@5': 0.35, ...}, or None if BEIR unavailable.
+    """
+    try:
+        from beir.retrieval.evaluation import EvaluateRetrieval
+    except ImportError:
+        return None
+
+    # Build results dict: {query_id: {doc_id: score}}
+    results = {}
+    for idx, answers in enumerate(all_retrieved):
+        if "query_id" in query_df.columns:
+            query_id = str(query_df.iloc[idx]["query_id"])
+        else:
+            query_id = str(idx)
+
+        results[query_id] = {}
+        num_results = len(answers)
+        for rank, r in enumerate(answers):
+            source_id = r.get("entity", {}).get("source", {}).get("source_id", "")
+            doc_id = os.path.basename(source_id).split(".")[0]
+            score = (num_results - rank) / num_results if num_results > 0 else 0
+            results[query_id][doc_id] = score
+
+    # Build qrels dict: {query_id: {doc_id: relevance}}
+    qrels = {}
+    for idx, row in query_df.iterrows():
+        if "query_id" in query_df.columns:
+            query_id = str(row["query_id"])
+        else:
+            query_id = str(idx)
+        qrels[query_id] = {str(row["expected_pdf"]): 1}
+
+    # Evaluate
+    ndcg, _map, recall, precision = EvaluateRetrieval.evaluate(qrels, results, k_values, ignore_identical_ids=True)
+
+    return {"ndcg": ndcg, "map": _map, "recall": recall, "precision": precision}
 
 
 def _get_retrieval_func(
@@ -176,7 +230,8 @@ def get_recall_scores_pdf_only(
     batch_size: int = 100,
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
-) -> Dict[int, float]:
+    enable_beir: bool = False,
+) -> Union[Dict[int, float], Dict[str, Any]]:
     """
     Calculate recall@k scores for queries against a VDB collection using PDF-only matching.
 
@@ -199,11 +254,14 @@ def get_recall_scores_pdf_only(
         batch_size: Number of queries to process per batch (prevents gRPC size limit errors).
         vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
         table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
+        enable_beir: If True, also compute BEIR metrics (NDCG, MAP, Precision).
 
     Returns:
-        Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
+        If enable_beir=False: Dictionary mapping k values (1, 5, 10) to recall scores.
+        If enable_beir=True: Dictionary with 'recall' and 'beir' keys containing metrics.
     """
     hits = defaultdict(list)
+    all_retrieved = []  # Collect for BEIR computation
 
     reranker_kwargs = {}
     if nv_ranker:
@@ -262,6 +320,10 @@ def get_recall_scores_pdf_only(
                 **reranker_kwargs,
             )
 
+        # Collect results for BEIR if enabled
+        if enable_beir:
+            all_retrieved.extend(batch_answers)
+
         for expected_pdf, retrieved_answers in zip(batch_expected_pdfs, batch_answers):
             # Extract PDF names only (no page numbers)
             retrieved_pdfs = [
@@ -275,6 +337,11 @@ def get_recall_scores_pdf_only(
                     hits[k].append(expected_pdf in retrieved_pdfs[:k])
 
     recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
+
+    # Compute BEIR metrics if enabled
+    if enable_beir:
+        beir_metrics = _compute_beir_metrics(all_retrieved, query_df, k_values=[1, 5, 10])
+        return {"recall": recall_scores, "beir": beir_metrics}
 
     return recall_scores
 
@@ -792,7 +859,8 @@ def vidore_recall(
     nv_ranker_model_name: Optional[str] = None,
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
-) -> Dict[int, float]:
+    enable_beir: bool = False,
+) -> Union[Dict[int, float], Dict[str, Any]]:
     """
     Evaluate recall@k for Vidore V3 dataset using PDF-only matching.
 
@@ -814,9 +882,11 @@ def vidore_recall(
         nv_ranker_model_name: Optional custom reranker model name.
         vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
         table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
+        enable_beir: If True, also compute BEIR metrics (NDCG, MAP, Precision).
 
     Returns:
-        Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
+        If enable_beir=False: Dictionary mapping k values (1, 5, 10) to recall scores.
+        If enable_beir=True: Dictionary with 'recall' and 'beir' keys containing metrics.
     """
     loader = partial(
         vidore_load_ground_truth,
@@ -840,6 +910,7 @@ def vidore_recall(
         nv_ranker_model_name=nv_ranker_model_name,
         vdb_backend=vdb_backend,
         table_path=table_path,
+        enable_beir=enable_beir,
     )
 
 
