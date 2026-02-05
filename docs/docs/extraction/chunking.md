@@ -87,7 +87,7 @@ By default, the NV Ingest container includes this tokenizer pre-downloaded at bu
 - Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`.
 - Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
 
-For details on how these environment variables, see [Environment Variables](environment-config.md).
+For details on how to set environment variables, refer to [Environment Variables](environment-config.md).
 
 ### Split Parameters
 
