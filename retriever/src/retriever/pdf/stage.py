@@ -250,6 +250,11 @@ def _write_pdf_extraction_json_outputs(
 
     The JSON payload mirrors the stage2 family shape:
       {schema_version, stage, model, <input>, <outputs>, timing}
+
+    Additionally, it includes `extracted_df_records`, a JSON-friendly list of dicts
+    with the same columns as the raw `extracted_df` output:
+      [{"document_type": ..., "metadata": ..., "uuid": ...}, ...]
+    so downstream stages can reconstruct a `pandas.DataFrame` directly.
     """
     out_paths: List[Path] = []
 
@@ -265,7 +270,9 @@ def _write_pdf_extraction_json_outputs(
         if uuid is None:
             uuid = row.get("uuid") or f"row:{i}"
 
-        prim = {
+        # Keep a DataFrame-shaped record so downstream stages can do:
+        #   df = pd.DataFrame(payload["extracted_df_records"])
+        record = {
             "uuid": str(uuid),
             "document_type": row.get("document_type"),
             "metadata": _to_jsonable(meta),
@@ -273,11 +280,11 @@ def _write_pdf_extraction_json_outputs(
 
         sid = _primitive_source_id(meta)
         if sid:
-            prims_by_source_id.setdefault(sid, []).append(prim)
+            prims_by_source_id.setdefault(sid, []).append(record)
 
         p = _primitive_pdf_path(meta)
         if p:
-            prims_by_pdf_path.setdefault(p, []).append(prim)
+            prims_by_pdf_path.setdefault(p, []).append(record)
 
     out_base_dir: Optional[Path] = None
     if output_dir is not None:
@@ -292,7 +299,7 @@ def _write_pdf_extraction_json_outputs(
             continue
 
         # Prefer source_id mapping; fall back to path mapping.
-        prims = prims_by_source_id.get(source_id) or prims_by_pdf_path.get(pdf_path_str) or []
+        records = prims_by_source_id.get(source_id) or prims_by_pdf_path.get(pdf_path_str) or []
 
         pdf_path = Path(pdf_path_str)
         out_path = (
@@ -307,7 +314,10 @@ def _write_pdf_extraction_json_outputs(
             "model": method,
             "pdf": {"path": str(pdf_path), "source_id": source_id, "source_name": source_name},
             "task": {"method": method, "params": _to_jsonable(params)},
-            "primitives": prims,
+            # Back-compat: keep the old key.
+            "primitives": records,
+            # New: explicitly labeled as the raw extracted_df rows.
+            "extracted_df_records": records,
             "timing": {"seconds": float(elapsed_seconds)},
         }
         _atomic_write_json(out_path, payload)

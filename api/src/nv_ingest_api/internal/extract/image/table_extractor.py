@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Union
 from typing import Dict
@@ -268,6 +269,331 @@ def _create_ocr_client(
     return ocr_client
 
 
+def _local_nemotron_ocr_boxes_texts(
+    base64_images: List[str],
+    *,
+    merge_level: str = "word",
+    trace_info: Optional[Dict] = None,
+) -> List[Tuple[str, Any, Any, Any]]:
+    """
+    Local OCR fallback using the Nemotron OCR v1 pipeline via:
+      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+
+    Returns a list aligned with base64_images:
+      (base64_image, cell_predictions=None, bounding_boxes, text_predictions)
+
+    Where:
+      - bounding_boxes: List[List[List[float]]] (quadrilateral boxes [[x,y] * 4])
+      - text_predictions: List[str]
+    """
+    # Preserve the same "skip tiny images" behavior as the NIM path.
+    valid_images, valid_arrays, valid_indices = _filter_valid_images(base64_images)
+
+    # Initialize defaults for all images (including those skipped).
+    results: List[Tuple[str, Any, Any, Any]] = [(img, None, None, None) for img in base64_images]
+    if not valid_images:
+        return results
+
+    model_dir = (
+        os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+        or os.getenv("SLIMGEST_NEMOTRON_OCR_MODEL_DIR", "").strip()
+    )
+    if not model_dir:
+        raise ValueError(
+            "Local table OCR requested but no model directory was configured. "
+            "Set $NEMOTRON_OCR_MODEL_DIR (or $NEMOTRON_OCR_V1_MODEL_DIR) to the Nemotron OCR model directory."
+        )
+
+    # Lazy import to avoid hard dependency when running pure API package.
+    try:
+        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "Local table OCR fallback requires the `retriever` package to be importable "
+            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+        ) from e
+
+    if trace_info is not None:
+        trace_info.setdefault("ocr", {})
+        trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
+        trace_info["ocr"]["model_dir"] = model_dir
+
+    # Instantiate local OCR model once per call.
+    ocr = NemotronOCRV1(model_dir=model_dir, endpoint=None)
+
+    def _xyxy_to_quad(xyxy: List[float]) -> List[List[float]]:
+        x1, y1, x2, y2 = [float(v) for v in xyxy]
+        return [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+
+    for local_i, (b64, arr) in enumerate(zip(valid_images, valid_arrays)):
+        original_index = valid_indices[local_i]
+        try:
+            h, w = int(arr.shape[0]), int(arr.shape[1])
+            # Pass base64 directly; NemotronOCR supports base64 bytes.
+            preds = ocr.invoke(b64, merge_level=merge_level)
+
+            boxes: List[List[List[float]]] = []
+            texts: List[str] = []
+
+            # Common "packed" form: dict with boxes/texts.
+            if isinstance(preds, dict):
+                pb = preds.get("boxes") or preds.get("bboxes") or preds.get("bounding_boxes")
+                pt = preds.get("texts") or preds.get("text_predictions") or preds.get("text")
+                if isinstance(pb, list) and isinstance(pt, list):
+                    for b, txt in zip(pb, pt):
+                        if isinstance(txt, str) and txt.strip():
+                            texts.append(txt.strip())
+                            if isinstance(b, list):
+                                # b may be [[x,y]*4] or flat len 8 or xyxy len 4
+                                if len(b) == 4 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in b):
+                                    boxes.append([[float(x), float(y)] for x, y in b])  # type: ignore[misc]
+                                elif len(b) == 8 and all(isinstance(v, (int, float)) for v in b):
+                                    pts = [float(v) for v in b]
+                                    boxes.append([[pts[0], pts[1]], [pts[2], pts[3]], [pts[4], pts[5]], [pts[6], pts[7]]])
+                                elif len(b) == 4 and all(isinstance(v, (int, float)) for v in b):
+                                    boxes.append(_xyxy_to_quad([float(v) for v in b]))
+
+            # Per-region list form: list[dict]
+            if (not texts) and isinstance(preds, list):
+                for item in preds:
+                    if isinstance(item, str):
+                        if item.strip():
+                            texts.append(item.strip())
+                            boxes.append([[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]])
+                        continue
+                    if not isinstance(item, dict):
+                        continue
+
+                    # Nemotron OCR pipeline returns normalized coords: left/right/lower/upper in [0,1]
+                    if all(k in item for k in ("left", "right", "upper", "lower")) and isinstance(
+                        item.get("text"), str
+                    ):
+                        txt0 = str(item.get("text") or "").strip()
+                        if not txt0 or txt0 == "nan":
+                            continue
+                        try:
+                            x1 = float(item["left"]) * float(w)
+                            x2 = float(item["right"]) * float(w)
+                            y1 = float(item["lower"]) * float(h)
+                            y2 = float(item["upper"]) * float(h)
+                            quad = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+                        except Exception:
+                            quad = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]
+                        texts.append(txt0)
+                        boxes.append(quad)
+                        continue
+
+                    txt = (
+                        item.get("text")
+                        or item.get("ocr_text")
+                        or item.get("generated_text")
+                        or item.get("output_text")
+                    )
+                    if not isinstance(txt, str) or not txt.strip():
+                        continue
+                    txt = txt.strip()
+
+                    b = item.get("box") or item.get("bbox") or item.get("bounding_box") or item.get("bbox_points")
+                    quad: Optional[List[List[float]]] = None
+                    if isinstance(b, list):
+                        if len(b) == 4 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in b):
+                            quad = [[float(x), float(y)] for x, y in b]  # type: ignore[misc]
+                        elif len(b) == 8 and all(isinstance(v, (int, float)) for v in b):
+                            pts = [float(v) for v in b]
+                            quad = [[pts[0], pts[1]], [pts[2], pts[3]], [pts[4], pts[5]], [pts[6], pts[7]]]
+                        elif len(b) == 4 and all(isinstance(v, (int, float)) for v in b):
+                            quad = _xyxy_to_quad([float(v) for v in b])
+                    elif isinstance(b, dict):
+                        pts = b.get("points")
+                        if isinstance(pts, list) and len(pts) == 4:
+                            try:
+                                quad = [[float(p.get("x")), float(p.get("y"))] for p in pts]  # type: ignore[union-attr]
+                            except Exception:
+                                quad = None
+
+                    if quad is None:
+                        quad = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]
+
+                    texts.append(txt)
+                    boxes.append(quad)
+
+            # If we still didn't parse anything, best-effort stringify.
+            if not texts:
+                s = ""
+                try:
+                    s = str(preds).strip()
+                except Exception:
+                    s = ""
+                if s and s.lower() not in {"none", "null"}:
+                    texts = [s]
+                    boxes = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]  # type: ignore[assignment]
+
+            if texts and not boxes:
+                # Provide a dummy full-image box per text.
+                boxes = [[[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]] for _ in texts]
+
+            results[original_index] = (base64_images[original_index], None, boxes, texts)
+        except Exception:
+            logger.exception("Local Nemotron OCR failed for table image index=%s", original_index)
+            results[original_index] = (base64_images[original_index], None, None, None)
+
+    return results
+
+
+def _local_nemotron_table_structure_cell_predictions(
+    base64_images: List[str],
+    *,
+    trace_info: Optional[Dict] = None,
+) -> List[Optional[Dict[str, Any]]]:
+    """
+    Local table-structure fallback using:
+      `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`
+
+    Returns a list aligned with base64_images where each element is either:
+      - None (failed / skipped), or
+      - dict with keys {"cell","row","column"} mapping to lists of [x1,y1,x2,y2,score] in **pixel** coords.
+
+    This matches what `join_yolox_table_structure_and_ocr_output()` expects (it treats boxes as Nx4/Nx5).
+    """
+    valid_images, valid_arrays, valid_indices = _filter_valid_images(base64_images)
+    out: List[Optional[Dict[str, Any]]] = [None for _ in base64_images]
+    if not valid_images:
+        return out
+
+    # Lazy import to avoid hard dependency when running pure API package.
+    try:
+        from retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "Local table-structure fallback requires the `retriever` package to be importable "
+            "so we can use `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`."
+        ) from e
+
+    try:
+        import torch
+    except Exception as e:
+        raise RuntimeError("Local table-structure fallback requires PyTorch to be installed.") from e
+
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if trace_info is not None:
+        trace_info.setdefault("yolox", {})
+        trace_info["yolox"]["backend"] = "local_nemotron_table_structure_v1"
+        trace_info["yolox"]["device"] = str(dev)
+
+    model = NemotronTableStructureV1(endpoint=None)
+    # Best-effort: move underlying module to device if present.
+    try:
+        if hasattr(model, "_model") and model._model is not None:
+            model._model = model._model.to(dev)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    def _to_list(v: Any) -> Any:
+        try:
+            import numpy as _np
+
+            if isinstance(v, torch.Tensor):
+                return v.detach().cpu().tolist()
+            if isinstance(v, _np.ndarray):
+                return v.tolist()
+        except Exception:
+            pass
+        return v
+
+    # Label mapping fallback if model emits integer ids.
+    id_to_label = {0: "cell", 1: "row", 2: "column"}
+
+    for local_i, arr in enumerate(valid_arrays):
+        idx = valid_indices[local_i]
+        try:
+            # Ensure RGB uint8.
+            if arr.ndim == 2:
+                arr = arr[:, :, None]
+            if arr.shape[-1] == 1:
+                arr = np.repeat(arr, 3, axis=-1)
+            if arr.shape[-1] == 4:
+                arr = arr[:, :, :3]
+            if arr.dtype != np.uint8:
+                arr = (arr * 255).astype(np.uint8) if np.issubdtype(arr.dtype, np.floating) else arr.astype(np.uint8)
+
+            h, w = int(arr.shape[0]), int(arr.shape[1])
+            t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()
+            t = t.to(device=dev, dtype=torch.uint8, non_blocking=(dev.type == "cuda"))
+
+            x = model.preprocess(t, (h, w))
+            with torch.inference_mode():
+                preds = model.invoke(x, (h, w))
+
+            # Normalize to (boxes, labels, scores)
+            boxes = None
+            labels = None
+            scores = None
+
+            if isinstance(preds, dict) and all(k in preds for k in ("boxes", "labels", "scores")):
+                boxes = preds.get("boxes")
+                labels = preds.get("labels")
+                scores = preds.get("scores")
+            else:
+                try:
+                    b, l, s = model.postprocess(preds)  # type: ignore[arg-type]
+                    boxes, labels, scores = b, l, s
+                except Exception:
+                    boxes = None
+
+            if boxes is None or labels is None or scores is None:
+                out[idx] = None
+                continue
+
+            boxes_l = _to_list(boxes)
+            labels_l = _to_list(labels)
+            scores_l = _to_list(scores)
+
+            # Flatten labels/scores shapes.
+            if isinstance(labels_l, list) and labels_l and isinstance(labels_l[0], list):
+                labels_l = [x[0] if isinstance(x, list) and x else x for x in labels_l]
+            if isinstance(scores_l, list) and scores_l and isinstance(scores_l[0], list):
+                scores_l = [x[0] if isinstance(x, list) and x else x for x in scores_l]
+
+            # Detect normalized coordinates.
+            mx = 0.0
+            try:
+                mx = float(max(max(b) for b in boxes_l)) if isinstance(boxes_l, list) and boxes_l else 0.0
+            except Exception:
+                mx = 0.0
+            normalized = mx <= 1.5
+
+            preds_by_label: Dict[str, List[List[float]]] = {"cell": [], "row": [], "column": []}
+            for b, lab, sc in zip(boxes_l, labels_l, scores_l):
+                if not (isinstance(b, list) and len(b) >= 4):
+                    continue
+                x1, y1, x2, y2 = [float(v) for v in b[:4]]
+                if normalized:
+                    x1, x2 = x1 * w, x2 * w
+                    y1, y2 = y1 * h, y2 * h
+                score = float(sc) if sc is not None else 0.0
+
+                label_name = None
+                if isinstance(lab, str):
+                    label_name = lab
+                else:
+                    try:
+                        label_name = id_to_label.get(int(lab))
+                    except Exception:
+                        label_name = None
+                if label_name not in preds_by_label:
+                    # Ignore unknown classes for table markdown joining.
+                    continue
+                preds_by_label[label_name].append([x1, y1, x2, y2, score])
+
+            out[idx] = preds_by_label
+        except Exception:
+            logger.exception("Local Nemotron table-structure failed for index=%s", idx)
+            out[idx] = None
+
+    return out
+
+
 def extract_table_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Union[IngestTaskTableExtraction, Dict[str, Any]],
@@ -306,10 +632,6 @@ def extract_table_data_from_image_internal(
 
     endpoint_config = extraction_config.endpoint_config
 
-    # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-
     try:
         # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
         def meets_criteria(row):
@@ -346,36 +668,91 @@ def extract_table_data_from_image_internal(
         )
         enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
 
-        yolox_client = _create_yolox_client(
-            endpoint_config.yolox_endpoints,
-            endpoint_config.yolox_infer_protocol,
-            endpoint_config.auth_token,
-        )
-        ocr_client = _create_ocr_client(
-            endpoint_config.ocr_endpoints,
-            endpoint_config.ocr_infer_protocol,
-            ocr_model_name,
-            endpoint_config.auth_token,
-        )
+        # Extract endpoints (may be empty/None -> local fallback).
+        yolox_endpoints = (None, None)
+        yolox_protocol = "local"
+        ocr_endpoints = (None, None)
+        ocr_protocol = "local"
+        auth_token = ""
+        workers = 5
+        if endpoint_config is not None:
+            yolox_endpoints = getattr(endpoint_config, "yolox_endpoints", (None, None))
+            yolox_protocol = getattr(endpoint_config, "yolox_infer_protocol", "") or "local"
+            ocr_endpoints = getattr(endpoint_config, "ocr_endpoints", (None, None))
+            ocr_protocol = getattr(endpoint_config, "ocr_infer_protocol", "") or "local"
+            auth_token = getattr(endpoint_config, "auth_token", "") or ""
+            workers = int(getattr(endpoint_config, "workers_per_progress_engine", 5) or 5)
 
-        bulk_results = _update_table_metadata(
-            base64_images=base64_images,
-            yolox_client=yolox_client,
-            yolox_model_name=yolox_client.model_interface.model_name,
-            ocr_client=ocr_client,
-            ocr_model_name=ocr_model_name,
-            worker_pool_size=endpoint_config.workers_per_progress_engine,
-            enable_yolox=enable_yolox,
-            trace_info=execution_trace_log,
-        )
+        has_yolox_endpoint = bool((yolox_endpoints[0] or yolox_endpoints[1]))
+        has_ocr_endpoint = bool((ocr_endpoints[0] or ocr_endpoints[1]))
+
+        # If markdown format requested but no YOLOX endpoints, use local table-structure model.
+        local_yolox_preds: Optional[List[Optional[Dict[str, Any]]]] = None
+        if enable_yolox and not has_yolox_endpoint:
+            local_yolox_preds = _local_nemotron_table_structure_cell_predictions(
+                base64_images,
+                trace_info=execution_trace_log,
+            )
+
+        # If OCR endpoints are not configured (or protocol is local), use local Nemotron OCR.
+        use_local_ocr = (not has_ocr_endpoint) or str(ocr_protocol).lower() == "local"
+        if use_local_ocr:
+            bulk_results = _local_nemotron_ocr_boxes_texts(
+                base64_images,
+                merge_level="paragraph",
+                trace_info=execution_trace_log,
+            )
+            breakpoint()
+            print(bulk_results)
+        else:
+            # Get the grpc endpoint to determine the model if needed
+            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+
+            yolox_client = _create_yolox_client(
+                yolox_endpoints,
+                yolox_protocol,
+                auth_token,
+            )
+            ocr_client = _create_ocr_client(
+                ocr_endpoints,
+                ocr_protocol,
+                ocr_model_name,
+                auth_token,
+            )
+
+            bulk_results = _update_table_metadata(
+                base64_images=base64_images,
+                yolox_client=yolox_client,
+                yolox_model_name=yolox_client.model_interface.model_name,
+                ocr_client=ocr_client,
+                ocr_model_name=ocr_model_name,
+                worker_pool_size=workers,
+                enable_yolox=enable_yolox,
+                trace_info=execution_trace_log,
+            )
+
+        # If we ran local table-structure, splice its predictions into bulk_results.
+        if local_yolox_preds is not None:
+            merged: List[Tuple[str, Any, Any, Any]] = []
+            for i, rec in enumerate(bulk_results):
+                try:
+                    b64_img, _cell_preds, bbox, txts = rec
+                except Exception:
+                    merged.append(rec)
+                    continue
+                cell_preds = local_yolox_preds[i]
+                merged.append((b64_img, cell_preds, bbox, txts))
+            bulk_results = merged
 
         # 4) Write the results (bounding_boxes, text_predictions) back
         for row_id, idx in enumerate(valid_indices):
             # unpack (base64_image, (yolox_predictions, ocr_bounding boxes, ocr_text_predictions))
             _, cell_predictions, bounding_boxes, text_predictions = bulk_results[row_id]
+            breakpoint()
 
             if table_content_format == TableFormatEnum.SIMPLE:
-                table_content = " ".join(text_predictions)
+                table_content = " ".join(text_predictions) if text_predictions else ""
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 table_content = convert_ocr_response_to_psuedo_markdown(bounding_boxes, text_predictions)
             elif table_content_format == TableFormatEnum.MARKDOWN:

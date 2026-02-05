@@ -8,6 +8,8 @@ from nemotron_page_elements_v3.model import define_model as define_model_page_el
 from nemotron_page_elements_v3.model import resize_pad as resize_pad_page_elements
 from nemotron_page_elements_v3.utils import postprocess_preds_page_element as postprocess_preds_page_element
 
+from .http_utils import default_headers, normalize_endpoint
+
 
 class NemotronPageElementsV3(HuggingFaceModel):
     """

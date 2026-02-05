@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import base64
 import io
 import os
+from pathlib import Path
 
 import httpx
 import numpy as np
@@ -244,24 +245,55 @@ class NemotronOCRV1(BaseModel):
 
         return out
 
-    def invoke(self, input_data: torch.Tensor, merge_level: str = "paragraph") -> List[Dict[str, torch.Tensor]]:
+    def invoke(
+        self,
+        input_data: Union[torch.Tensor, str, bytes, np.ndarray, io.BytesIO],
+        merge_level: str = "paragraph",
+    ) -> Any:
+        """
+        Invoke OCR locally or remotely.
+
+        Local path (`endpoint is None`) supports:
+          - file path (str) **only if it exists**
+          - base64 (str/bytes) (str is treated as base64 unless it is an existing file path)
+          - NumPy array (HWC)
+          - io.BytesIO
+          - torch.Tensor (CHW/BCHW): converted to base64 PNG internally for compatibility
+
+        Remote path expects torch.Tensor input (CHW/BCHW).
+        """
         if self._endpoint is not None:
+            if not isinstance(input_data, torch.Tensor):
+                raise TypeError("Remote OCR requires torch.Tensor input (CHW/BCHW).")
             # Remote NIM invocation. Note: returns list[dict] (not torch tensors).
-            return self.invoke_remote(input_data, batch_size=self._remote_batch_size)  # type: ignore[return-value]
+            return self.invoke_remote(input_data, batch_size=self._remote_batch_size)
 
         if self._model is None:
             raise RuntimeError("Local OCR model was not initialized.")
 
-        # NemotronOCR expects a single image tensor (CHW). If a batch (BCHW) is
-        # provided, run per-image to keep behavior correct.
-        if isinstance(input_data, torch.Tensor) and input_data.ndim == 4:
-            out: List[Dict[str, torch.Tensor]] = []
-            for i in range(int(input_data.shape[0])):
-                out.extend(self._model(input_data[i]))
-            return out
+        # Convert torch tensors to base64 bytes (NemotronOCR expects file path/base64/ndarray/BytesIO).
+        if isinstance(input_data, torch.Tensor):
+            if input_data.ndim == 4:
+                out: List[Any] = []
+                for i in range(int(input_data.shape[0])):
+                    b64 = self._tensor_to_png_b64(input_data[i])
+                    out.extend(self._model(b64.encode("utf-8"), merge_level=merge_level))
+                return out
+            if input_data.ndim == 3:
+                b64 = self._tensor_to_png_b64(input_data)
+                return self._model(b64.encode("utf-8"), merge_level=merge_level)
+            raise ValueError(f"Unsupported torch tensor shape for OCR: {tuple(input_data.shape)}")
 
-        results = self._model(input_data, merge_level=merge_level)
-        return results
+        # Disambiguate str: existing file path vs base64 string.
+        if isinstance(input_data, str):
+            s = input_data.strip()
+            if s and Path(s).is_file():
+                return self._model(s, merge_level=merge_level)
+            # Treat as base64 string (nemotron_ocr expects bytes for base64).
+            return self._model(s.encode("utf-8"), merge_level=merge_level)
+
+        # bytes / ndarray / BytesIO are supported directly by nemotron_ocr.
+        return self._model(input_data, merge_level=merge_level)
 
     def postprocess(self, preds: List[Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         boxes, labels, scores = postprocess_preds_page_element(

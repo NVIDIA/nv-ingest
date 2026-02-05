@@ -6,6 +6,8 @@ from ..model import BaseModel, RunMode
 from nemotron_table_structure_v1.model import define_model as define_model_table_structure
 from nemotron_table_structure_v1.model import resize_pad as resize_pad_table_structure
 
+from .http_utils import default_headers, normalize_endpoint
+
 
 class NemotronTableStructureV1(BaseModel):
     """

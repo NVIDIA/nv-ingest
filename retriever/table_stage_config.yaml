@@ -1,0 +1,39 @@
+# Example config for:
+#   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`
+#   - `retriever local stage3 run --config <this.yaml> --input <primitives.parquet>`
+#
+# This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema`
+# via `retriever.table.config.load_table_extractor_schema_from_dict`.
+#
+# IMPORTANT:
+# `endpoint_config.yolox_endpoints` and `endpoint_config.ocr_endpoints` must each provide at least one
+# endpoint (gRPC or HTTP). Both cannot be null/empty for either entry.
+#
+
+# Optional worker settings
+max_queue_size: 1
+n_workers: 2
+raise_on_failure: false
+
+# Endpoint configuration for table extraction (YOLOX table-structure + OCR).
+endpoint_config:
+  # Optional auth token for secured services (NIM)
+  auth_token: null
+
+  # Tuple/list in the form: [grpc, http]
+  # YOLOX table-structure model endpoints
+  # yolox_endpoints: ["table-structure:8001", "http://table-structure:8000/v1/infer"]
+  yolox_endpoints: null
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # yolox_infer_protocol: grpc
+
+  # OCR model endpoints
+  # ocr_endpoints: ["ocr:8001", "http://ocr:8000/v1/infer"]
+  ocr_endpoints: null
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # ocr_infer_protocol: grpc
+
+  # Optional performance knobs
+  nim_batch_size: 2
+  workers_per_progress_engine: 5
+

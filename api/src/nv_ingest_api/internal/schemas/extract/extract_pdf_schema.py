@@ -90,7 +90,7 @@ class PDFiumConfigSchema(LowercaseProtocolMixin):
             protocol_name = f"{model_name}_infer_protocol"
             protocol_value = values.get(protocol_name)
             if not protocol_value:
-                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+                protocol_value = "http" if http_service else "grpc" if grpc_service else "local"
             values[protocol_name] = protocol_value
 
         return values

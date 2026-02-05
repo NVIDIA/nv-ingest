@@ -43,7 +43,7 @@ extract:
 
 outputs:
   write_json: true
-  json_output_dir: /home/jdyer/datasets/jp20-results/
+  json_output_dir: /home/jdyer/datasets/jd1-results-hf/
 
 # Optionally limit number of PDFs processed
 limit: null

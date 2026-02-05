@@ -1,0 +1,34 @@
+# Example config for:
+#   - `retriever infographic stage run --config <this.yaml> --input <primitives.parquet>`
+#   - `retriever local stage2 run --config <this.yaml> --input <primitives.parquet>`
+#
+# This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema`
+# via `retriever.infographic.config.load_infographic_extractor_schema_from_dict`.
+#
+# IMPORTANT:
+# `endpoint_config.ocr_endpoints` must provide at least one endpoint (gRPC or HTTP). Both cannot be null/empty.
+#
+
+# Optional worker settings
+max_queue_size: 1
+n_workers: 2
+raise_on_failure: false
+
+# Endpoint configuration for OCR used to enrich infographic primitives.
+endpoint_config:
+  # Tuple/list in the form: [grpc, http]
+  # - gRPC example: "ocr:8001"
+  # - HTTP example: "http://ocr:8000/v1/infer"
+  # ocr_endpoints: ["ocr:8001", "http://ocr:8000/v1/infer"]
+  ocr_endpoints: null
+
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # ocr_infer_protocol: grpc
+
+  # Optional auth token for secured services (NIM)
+  auth_token: null
+
+  # Optional performance knobs
+  nim_batch_size: 2
+  workers_per_progress_engine: 5
+
