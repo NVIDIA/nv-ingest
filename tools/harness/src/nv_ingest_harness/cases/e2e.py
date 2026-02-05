@@ -53,6 +53,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         collection_name = get_recall_collection_name(test_name)
     hostname = config.hostname
     sparse = config.sparse
+    hybrid = config.hybrid
     gpu_search = config.gpu_search
 
     # API version configuration
@@ -85,6 +86,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Collection: {collection_name}")
     print(f"Embed: {model_name} (dim={dense_dim}, sparse={sparse})")
     print(f"VDB Backend: {config.vdb_backend}")
+    if config.vdb_backend == "lancedb":
+        print(f"Hybrid: {hybrid}")
 
     extractions = []
     if extract_text:
@@ -211,11 +214,17 @@ def main(config=None, log_path: str = "test_results") -> int:
     vdb_backend = config.vdb_backend
     lancedb_path = None
     if vdb_backend == "lancedb":
+        timing_path = os.path.join(log_path, "lancedb_timings.jsonl")
+        os.environ["NV_INGEST_LANCEDB_TIMING_PATH"] = timing_path
+        if os.path.exists(timing_path):
+            os.remove(timing_path)
+        print(f"LanceDB timings: {timing_path}")
         lancedb_path = get_lancedb_path(config, collection_name)
         ingestor = ingestor.vdb_upload(
             vdb_op="lancedb",
             uri=lancedb_path,
             table_name=collection_name,
+            hybrid=hybrid,
             purge_results_after_upload=False,
         )
     else:
@@ -291,9 +300,10 @@ def main(config=None, log_path: str = "test_results") -> int:
         except ImportError as exc:
             print(f"Warning: LanceDB retrieval not available ({exc}). Skipping retrieval sanity check.")
         else:
-            lancedb_client = LanceDB(uri=lancedb_path, table_name=collection_name)
+            lancedb_client = LanceDB(uri=lancedb_path, table_name=collection_name, hybrid=hybrid)
             _ = lancedb_client.retrieval(
                 queries,
+                hybrid=hybrid,
                 embedding_endpoint=f"http://{hostname}:8012/v1",
                 model_name=model_name,
                 top_k=5,
@@ -355,6 +365,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             "retrieval_time_s": retrieval_time,
         },
     }
+    if vdb_backend == "lancedb":
+        test_results["results"]["lancedb_timings_file"] = "lancedb_timings.jsonl"
 
     # Add split config if enabled
     if enable_split:
