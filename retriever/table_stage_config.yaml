@@ -22,14 +22,14 @@ endpoint_config:
 
   # Tuple/list in the form: [grpc, http]
   # YOLOX table-structure model endpoints
-  # yolox_endpoints: ["table-structure:8001", "http://table-structure:8000/v1/infer"]
-  yolox_endpoints: null
+  yolox_endpoints: ["localhost:8007", "http://localhost:8006/v1/infer"]
+  # yolox_endpoints: null
   # Optional; if omitted it is inferred from which endpoint is present.
   # yolox_infer_protocol: grpc
 
   # OCR model endpoints
-  # ocr_endpoints: ["ocr:8001", "http://ocr:8000/v1/infer"]
-  ocr_endpoints: null
+  ocr_endpoints: ["localhost:8010", "http://localhost:8019/v1/infer"]
+  # ocr_endpoints: null
   # Optional; if omitted it is inferred from which endpoint is present.
   # ocr_infer_protocol: grpc
 

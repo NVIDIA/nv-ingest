@@ -357,7 +357,8 @@ def extract_text_data_from_image_internal(
 
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+    # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+    ocr_model_name = "scene_text_ensemble"
 
     try:
         # Identify rows that meet the text criteria.

@@ -707,7 +707,8 @@ def extract_table_data_from_image_internal(
         else:
             # Get the grpc endpoint to determine the model if needed
             ocr_grpc_endpoint = ocr_endpoints[0]
-            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+            # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+            ocr_model_name = "scene_text_ensemble"
 
             yolox_client = _create_yolox_client(
                 yolox_endpoints,
