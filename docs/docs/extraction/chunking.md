@@ -78,7 +78,7 @@ The default tokenizer for token-based splitting is **`meta-llama/Llama-3.2-1B`**
 
 !!! note
 
-    This tokenizer is gated on Hugging Face and requires an access token. For more information, see the [Hugging Face access token docs](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token` in your `split` params (for example, `"hf_***"`) in order to authenticate.
+    This tokenizer is gated on Hugging Face and requires an access token. For more information, refer to [User access tokens](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token` in your `split` params (for example, `"hf_***"`) to authenticate.
 
 By default, the NV Ingest container includes this tokenizer pre-downloaded at build time, so it does not need to be fetched at runtime. If you build the container yourself and want to pre-download it:
 
