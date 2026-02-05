@@ -464,7 +464,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             else:
                 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            model = NemotronPageElementsV3(endpoint=None)
+            model = NemotronPageElementsV3()
             # Best-effort: move underlying module to device if present.
             try:
                 if hasattr(model, "_model") and model._model is not None:

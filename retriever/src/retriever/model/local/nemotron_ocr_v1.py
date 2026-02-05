@@ -5,7 +5,6 @@ import io
 import os
 from pathlib import Path
 
-import httpx
 import numpy as np
 import torch
 from ..model import BaseModel, RunMode
@@ -26,39 +25,17 @@ class NemotronOCRV1(BaseModel):
     def __init__(
         self,
         model_dir: str,
-        *,
-        endpoint: Optional[str] = None,
-        timeout_seconds: float = 60.0,
-        headers: Optional[Dict[str, str]] = None,
-        remote_batch_size: int = 32,
     ) -> None:
         super().__init__()
-        self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
-        self._timeout_seconds = float(timeout_seconds)
-        self._headers = dict(headers or {})
-        self._remote_batch_size = int(remote_batch_size)
+        from nemotron_ocr.inference.pipeline import NemotronOCR  # local-only import
 
-        # If a remote endpoint is provided, skip loading local weights (saves GPU memory).
-        self._model = None
-        if self._endpoint is None:
-            from nemotron_ocr.inference.pipeline import NemotronOCR  # local-only import
-
-            self._model = NemotronOCR(model_dir=model_dir)
+        self._model = NemotronOCR(model_dir=model_dir)
         # NemotronOCR is a high-level pipeline (not an nn.Module). We can optionally
         # TensorRT-compile individual submodules (e.g. the detector backbone) but
         # must keep post-processing (NMS, box decoding, etc.) in eager PyTorch/C++.
         self._enable_trt = os.getenv("SLIMGEST_ENABLE_TORCH_TRT", "").strip().lower() in {"1", "true", "yes", "on"}
         if self._enable_trt and self._model is not None:
             self._maybe_compile_submodules()
-
-    @staticmethod
-    def _normalize_endpoint(endpoint: str) -> str:
-        ep = (endpoint or "").strip()
-        if not ep:
-            return ep
-        if "://" not in ep:
-            ep = "http://" + ep
-        return ep
 
     def _maybe_compile_submodules(self) -> None:
         """
@@ -173,101 +150,21 @@ class NemotronOCRV1(BaseModel):
                     return " ".join(parts).strip()
         return str(obj).strip()
 
-    def invoke_remote(
-        self,
-        input_data: Union[torch.Tensor, List[torch.Tensor]],
-        *,
-        batch_size: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Invoke the OCR NIM endpoint over HTTP.
-
-        Contract:
-          - If input is CHW: returns a list of length 1.
-          - If input is BCHW: returns a list of length B (one dict per image).
-        """
-        if not self._endpoint:
-            raise RuntimeError("invoke_remote() called but no endpoint was configured.")
-
-        bs = int(batch_size or self._remote_batch_size or 32)
-        if isinstance(input_data, list):
-            imgs = input_data
-        elif isinstance(input_data, torch.Tensor) and input_data.ndim == 4:
-            imgs = [input_data[i] for i in range(int(input_data.shape[0]))]
-        elif isinstance(input_data, torch.Tensor) and input_data.ndim == 3:
-            imgs = [input_data]
-        else:
-            raise ValueError(f"Unsupported input type/shape for remote OCR: {type(input_data)}")
-
-        headers = {"Accept": "application/json", **(self._headers or {})}
-
-        # If the user is hitting Nvidia hosted APIs, allow env-based key automatically.
-        # For local docker NIM you typically do not need this.
-        if "Authorization" not in headers:
-            api_key = os.getenv("NVIDIA_API_KEY", "").strip()
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-        out: List[Dict[str, Any]] = []
-        with httpx.Client(timeout=self._timeout_seconds) as client:
-            for i in range(0, len(imgs), bs):
-                chunk = imgs[i : i + bs]
-                chunk_b64 = [self._tensor_to_png_b64(t) for t in chunk]
-                payload = {"input": [{"type": "image_url", "url": f"data:image/png;base64,{b64}"} for b64 in chunk_b64]}
-
-                resp = client.post(self._endpoint, headers=headers, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-
-                per_image: Optional[List[Any]] = None
-                if isinstance(data, dict):
-                    for k in ("data", "output", "outputs", "results", "result"):
-                        v = data.get(k)
-                        if isinstance(v, list):
-                            per_image = v
-                            break
-
-                # If the API returns a single object, only accept it for single-image calls.
-                if per_image is None:
-                    if len(chunk) != 1:
-                        raise RuntimeError(
-                            f"Remote OCR response did not contain a per-image list for batch size {len(chunk)}."
-                        )
-                    per_image = [data]
-
-                if len(per_image) != len(chunk):
-                    raise RuntimeError(
-                        f"Remote OCR response size mismatch: got {len(per_image)} outputs for {len(chunk)} inputs."
-                    )
-
-                for item in per_image:
-                    out.append({"text": self._extract_text(item), "raw": item})
-
-        return out
-
     def invoke(
         self,
         input_data: Union[torch.Tensor, str, bytes, np.ndarray, io.BytesIO],
         merge_level: str = "paragraph",
     ) -> Any:
         """
-        Invoke OCR locally or remotely.
+        Invoke OCR locally.
 
-        Local path (`endpoint is None`) supports:
+        Supports:
           - file path (str) **only if it exists**
           - base64 (str/bytes) (str is treated as base64 unless it is an existing file path)
           - NumPy array (HWC)
           - io.BytesIO
           - torch.Tensor (CHW/BCHW): converted to base64 PNG internally for compatibility
-
-        Remote path expects torch.Tensor input (CHW/BCHW).
         """
-        if self._endpoint is not None:
-            if not isinstance(input_data, torch.Tensor):
-                raise TypeError("Remote OCR requires torch.Tensor input (CHW/BCHW).")
-            # Remote NIM invocation. Note: returns list[dict] (not torch tensors).
-            return self.invoke_remote(input_data, batch_size=self._remote_batch_size)
-
         if self._model is None:
             raise RuntimeError("Local OCR model was not initialized.")
 
@@ -286,20 +183,15 @@ class NemotronOCRV1(BaseModel):
 
         # Disambiguate str: existing file path vs base64 string.
         if isinstance(input_data, str):
-            s = input_data.strip()
-            if s and Path(s).is_file():
-                return self._model(s, merge_level=merge_level)
+            # s = input_data.strip()
+            # breakpoint()
+            # if s and Path(s).is_file():
+            #     return self._model(s, merge_level=merge_level)
             # Treat as base64 string (nemotron_ocr expects bytes for base64).
-            return self._model(s.encode("utf-8"), merge_level=merge_level)
+            return self._model(input_data.encode("utf-8"), merge_level=merge_level)
 
         # bytes / ndarray / BytesIO are supported directly by nemotron_ocr.
         return self._model(input_data, merge_level=merge_level)
-
-    def postprocess(self, preds: List[Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        boxes, labels, scores = postprocess_preds_page_element(
-            preds, self._model.thresholds_per_class, self._model.labels
-        )
-        return boxes, labels, scores
 
     @property
     def model_name(self) -> str:
@@ -314,7 +206,7 @@ class NemotronOCRV1(BaseModel):
     @property
     def model_runmode(self) -> RunMode:
         """Execution mode: local, NIM, or build-endpoint."""
-        return "NIM" if self._endpoint is not None else "local"
+        return "local"
 
     @property
     def input(self) -> Any:
@@ -364,4 +256,4 @@ class NemotronOCRV1(BaseModel):
     @property
     def input_batch_size(self) -> int:
         """Maximum or default input batch size."""
-        return 32 if self._endpoint is not None else 8
+        return 8

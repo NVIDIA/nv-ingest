@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
-import httpx
 import torch
-
-from ..nim.http_utils import default_headers, normalize_endpoint
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
@@ -16,79 +13,37 @@ def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
     return x / denom
 
 
-def _coerce_embeddings_from_response(obj: object) -> List[List[float]]:
-    """
-    Best-effort parsing of common embeddings response shapes.
-
-    Supports:
-      - OpenAI-style: {"data": [{"embedding": [...]}, ...]}
-      - Flat: {"embeddings": [[...], ...]} or {"embedding": [...]}
-      - Direct list: [[...], ...]
-    """
-    if isinstance(obj, list):
-        # Either [[...], ...] or [{"embedding": ...}, ...]
-        if obj and isinstance(obj[0], dict) and "embedding" in obj[0]:
-            return [list(map(float, x.get("embedding") or [])) for x in obj]  # type: ignore[arg-type]
-        return [list(map(float, x)) for x in obj]  # type: ignore[arg-type]
-
-    if not isinstance(obj, dict):
-        raise ValueError(f"Unrecognized embeddings response type: {type(obj)}")
-
-    if "data" in obj and isinstance(obj["data"], list):
-        out: List[List[float]] = []
-        for item in obj["data"]:
-            if isinstance(item, dict) and "embedding" in item:
-                out.append([float(v) for v in (item["embedding"] or [])])
-        if out:
-            return out
-
-    if "embeddings" in obj and isinstance(obj["embeddings"], list):
-        return [[float(v) for v in row] for row in obj["embeddings"]]
-
-    if "embedding" in obj and isinstance(obj["embedding"], list):
-        return [[float(v) for v in obj["embedding"]]]
-
-    raise ValueError(f"Could not parse embeddings from response keys: {list(obj.keys())[:10]}")
-
-
 @dataclass
 class LlamaNemotronEmbed1BV2Embedder:
     """
-    Minimal embedder wrapper that can run either:
-      - locally via `llama_nemotron_embed_1b_v2` (GPU/CPU), or
-      - remotely via an OpenAI-compatible embeddings endpoint.
+    Minimal embedder wrapper for local-only HuggingFace execution.
+
+    This intentionally contains **no remote invocation logic**.
     """
 
-    endpoint: Optional[str] = None
-    model_name: Optional[str] = None
-    timeout_seconds: float = 60.0
-    headers: Optional[Dict[str, str]] = None
+    device: Optional[str] = None
+    hf_cache_dir: Optional[str] = None
     normalize: bool = True
 
     def __post_init__(self) -> None:
-        self._endpoint = normalize_endpoint(self.endpoint) if self.endpoint else None
-        self._headers = default_headers(self.headers)
-        self._timeout_seconds = float(self.timeout_seconds)
-
         self._tokenizer = None
         self._model = None
         self._device = None
 
-        if self._endpoint is None:
-            import llama_nemotron_embed_1b_v2
+        import llama_nemotron_embed_1b_v2
 
-            dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            hf_cache_dir = str(Path.home() / ".cache" / "huggingface")
-            self._tokenizer = llama_nemotron_embed_1b_v2.load_tokenizer(cache_dir=hf_cache_dir, force_download=False)
-            self._model = llama_nemotron_embed_1b_v2.load_model(
-                device=str(dev), trust_remote_code=True, cache_dir=hf_cache_dir, force_download=False
-            )
-            self._model.eval()
-            self._device = dev
+        dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        hf_cache_dir = self.hf_cache_dir or str(Path.home() / ".cache" / "huggingface")
+        self._tokenizer = llama_nemotron_embed_1b_v2.load_tokenizer(cache_dir=hf_cache_dir, force_download=False)
+        self._model = llama_nemotron_embed_1b_v2.load_model(
+            device=str(dev), trust_remote_code=True, cache_dir=hf_cache_dir, force_download=False
+        )
+        self._model.eval()
+        self._device = dev
 
     @property
     def is_remote(self) -> bool:
-        return self._endpoint is not None
+        return False
 
     def embed(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
         """
@@ -98,8 +53,6 @@ class LlamaNemotronEmbed1BV2Embedder:
         if not texts_list:
             return torch.empty((0, 0), dtype=torch.float32)
 
-        if self._endpoint is not None:
-            return self._embed_remote(texts_list, batch_size=batch_size)
         return self._embed_local(texts_list, batch_size=batch_size)
 
     def _embed_local(self, texts: List[str], *, batch_size: int) -> torch.Tensor:
@@ -127,31 +80,4 @@ class LlamaNemotronEmbed1BV2Embedder:
 
         return torch.cat(outs, dim=0) if outs else torch.empty((0, 0), dtype=torch.float32)
 
-    def _embed_remote(self, texts: List[str], *, batch_size: int) -> torch.Tensor:
-        if not self._endpoint:
-            raise RuntimeError("Remote embedder has no endpoint configured.")
-
-        vecs: List[torch.Tensor] = []
-        bs = max(1, int(batch_size))
-        with httpx.Client(timeout=self._timeout_seconds) as client:
-            for i in range(0, len(texts), bs):
-                chunk = texts[i : i + bs]
-                payload = {"input": chunk}
-                # Many NIM endpoints are OpenAI-compatible and require/accept "model".
-                if self.model_name:
-                    payload["model"] = self.model_name
-
-                resp = client.post(self._endpoint, headers=self._headers, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-                emb = _coerce_embeddings_from_response(data)
-                if len(emb) != len(chunk):
-                    raise RuntimeError(
-                        f"Embedding response size mismatch: got {len(emb)} embeddings for {len(chunk)} inputs."
-                    )
-                t = torch.tensor(emb, dtype=torch.float32)
-                if self.normalize:
-                    t = _l2_normalize(t)
-                vecs.append(t)
-
-        return torch.cat(vecs, dim=0) if vecs else torch.empty((0, 0), dtype=torch.float32)
+    # Intentionally no remote embedding method.

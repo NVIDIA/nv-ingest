@@ -4,6 +4,7 @@
 
 import logging
 import os
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Union
 from typing import Dict
@@ -31,6 +32,75 @@ logger = logging.getLogger(__name__)
 
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
+
+
+def _maybe_dump_ocr_input_images(
+    *,
+    df_extraction_ledger: pd.DataFrame,
+    df_indices: List[Any],
+    base64_images: List[str],
+    backend_tag: str,
+) -> None:
+    """
+    Best-effort debug helper to write OCR input images to disk.
+
+    Controlled via env vars set by higher-level CLIs:
+      - NV_INGEST_DUMP_OCR_INPUT_IMAGES=1
+      - NV_INGEST_DUMP_OCR_INPUT_IMAGES_DIR=/path/to/dir
+      - NV_INGEST_DUMP_OCR_INPUT_IMAGES_PREFIX=<input_filename>
+
+    Filenames:
+      <prefix>.page_<PPPP>_<IIII>.<backend_tag>.png
+    where IIII is 1-based within each page (pages can have multiple structured images).
+    """
+    if os.getenv("NV_INGEST_DUMP_OCR_INPUT_IMAGES", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        return
+
+    out_dir = os.getenv("NV_INGEST_DUMP_OCR_INPUT_IMAGES_DIR", "").strip()
+    prefix = os.getenv("NV_INGEST_DUMP_OCR_INPUT_IMAGES_PREFIX", "").strip() or "input"
+    if not out_dir:
+        return
+
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        return
+
+    try:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return
+
+    per_page_counts: Dict[int, int] = {}
+
+    for df_idx, b64 in zip(df_indices, base64_images):
+        try:
+            meta = df_extraction_ledger.at[df_idx, "metadata"]
+            page = 0
+            if isinstance(meta, dict):
+                cm = meta.get("content_metadata") if isinstance(meta.get("content_metadata"), dict) else {}
+                p = cm.get("page_number")
+                try:
+                    page = int(p) if p is not None else 0
+                except Exception:
+                    page = 0
+
+            per_page_counts[page] = per_page_counts.get(page, 0) + 1
+            within_page_i = per_page_counts[page]
+
+            arr = base64_to_numpy(b64)
+            if arr.ndim == 2:
+                arr = np.stack([arr] * 3, axis=-1)
+            if arr.shape[2] == 4:
+                arr = arr[:, :, :3]
+            if arr.dtype != np.uint8:
+                arr = (arr * 255).astype(np.uint8) if np.issubdtype(arr.dtype, np.floating) else arr.astype(np.uint8)
+
+            img = Image.fromarray(arr, mode="RGB")
+            out_path = Path(out_dir) / f"{prefix}.page_{page:04d}_{within_page_i:04d}.{backend_tag}.png"
+            img.save(out_path, format="PNG")
+        except Exception:
+            continue
 
 
 def _filter_valid_images(
@@ -320,7 +390,7 @@ def _local_nemotron_ocr_boxes_texts(
         trace_info["ocr"]["model_dir"] = model_dir
 
     # Instantiate local OCR model once per call.
-    ocr = NemotronOCRV1(model_dir=model_dir, endpoint=None)
+    ocr = NemotronOCRV1(model_dir=model_dir)
 
     def _xyxy_to_quad(xyxy: List[float]) -> List[List[float]]:
         x1, y1, x2, y2 = [float(v) for v in xyxy]
@@ -330,7 +400,7 @@ def _local_nemotron_ocr_boxes_texts(
         original_index = valid_indices[local_i]
         try:
             h, w = int(arr.shape[0]), int(arr.shape[1])
-            # Pass base64 directly; NemotronOCR supports base64 bytes.
+
             preds = ocr.invoke(b64, merge_level=merge_level)
 
             boxes: List[List[List[float]]] = []
@@ -434,7 +504,7 @@ def _local_nemotron_ocr_boxes_texts(
                 boxes = [[[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]] for _ in texts]
 
             results[original_index] = (base64_images[original_index], None, boxes, texts)
-        except Exception:
+        except Exception as ex:
             logger.exception("Local Nemotron OCR failed for table image index=%s", original_index)
             results[original_index] = (base64_images[original_index], None, None, None)
 
@@ -697,14 +767,36 @@ def extract_table_data_from_image_internal(
         # If OCR endpoints are not configured (or protocol is local), use local Nemotron OCR.
         use_local_ocr = (not has_ocr_endpoint) or str(ocr_protocol).lower() == "local"
         if use_local_ocr:
+            # Dump the exact images we will pass to OCR (after size filtering).
+            try:
+                valid_imgs, _valid_arrs, valid_pos = _filter_valid_images(base64_images)
+                df_idxs_for_valid = [valid_indices[p] for p in valid_pos]
+                _maybe_dump_ocr_input_images(
+                    df_extraction_ledger=df_extraction_ledger,
+                    df_indices=df_idxs_for_valid,
+                    base64_images=valid_imgs,
+                    backend_tag="hf",
+                )
+            except Exception:
+                pass
             bulk_results = _local_nemotron_ocr_boxes_texts(
                 base64_images,
                 merge_level="paragraph",
                 trace_info=execution_trace_log,
             )
-            breakpoint()
-            print(bulk_results)
         else:
+            # Dump the exact images we will pass to OCR (after size filtering).
+            try:
+                valid_imgs, _valid_arrs, valid_pos = _filter_valid_images(base64_images)
+                df_idxs_for_valid = [valid_indices[p] for p in valid_pos]
+                _maybe_dump_ocr_input_images(
+                    df_extraction_ledger=df_extraction_ledger,
+                    df_indices=df_idxs_for_valid,
+                    base64_images=valid_imgs,
+                    backend_tag="nim",
+                )
+            except Exception:
+                pass
             # Get the grpc endpoint to determine the model if needed
             ocr_grpc_endpoint = ocr_endpoints[0]
             # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
@@ -750,7 +842,6 @@ def extract_table_data_from_image_internal(
         for row_id, idx in enumerate(valid_indices):
             # unpack (base64_image, (yolox_predictions, ocr_bounding boxes, ocr_text_predictions))
             _, cell_predictions, bounding_boxes, text_predictions = bulk_results[row_id]
-            breakpoint()
 
             if table_content_format == TableFormatEnum.SIMPLE:
                 table_content = " ".join(text_predictions) if text_predictions else ""
