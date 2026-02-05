@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 
@@ -40,6 +41,83 @@ def _safe_json(obj: Any) -> str:
         return json.dumps(obj, default=str, ensure_ascii=False)
     except Exception:
         return json.dumps({"_unserializable": str(type(obj))}, ensure_ascii=False)
+
+
+def _read_json_or_jsonl(path: Path) -> Any:
+    """
+    Read either:
+      - JSON (object or list)
+      - JSONL (one JSON object per line)
+    """
+    txt = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        return json.loads(txt)
+    except Exception:
+        # Fall back to jsonl.
+        recs = []
+        for line in txt.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                recs.append(json.loads(line))
+            except Exception:
+                # Skip malformed lines rather than failing the entire ingest.
+                continue
+        return recs
+
+
+def _extract_df_records(obj: Any) -> List[Dict[str, Any]]:
+    """
+    Extract DataFrame-shaped records from wrapper payloads.
+
+    Supports common wrapper keys:
+      - df_records (text embedding stage output)
+      - extracted_df_records / primitives (pdf extraction sidecars)
+    """
+    if isinstance(obj, dict):
+        for k in ("df_records", "extracted_df_records", "primitives"):
+            v = obj.get(k)
+            if isinstance(v, list):
+                return [x for x in v if isinstance(x, dict)]
+        # If it's already a "row-shaped" dict, allow it.
+        return [obj]
+
+    if isinstance(obj, list):
+        # If jsonl contains exactly one wrapper payload, unwrap it too.
+        if (
+            len(obj) == 1
+            and isinstance(obj[0], dict)
+            and not ("metadata" in obj[0] and ("document_type" in obj[0] or "uuid" in obj[0]))
+        ):
+            return _extract_df_records(obj[0])
+        return [x for x in obj if isinstance(x, dict)]
+
+    return []
+
+
+def primitives_df_from_embeddings_json(path: Union[str, Path]) -> pd.DataFrame:
+    """
+    Read an embedding-stage JSON artifact (e.g. `*.text_embeddings.json`) and reconstruct
+    a primitives DataFrame with a `metadata` column containing `embedding`.
+
+    Expected wrapper shape (from `retriever.text_embed.stage` CLI):
+      { ..., "df_records": [ {"document_type": ..., "metadata": {..., "embedding": [...]}, ...}, ... ] }
+    """
+    p = Path(path)
+    obj = _read_json_or_jsonl(p)
+    records = _extract_df_records(obj)
+    df = pd.DataFrame(records)
+    return df
+
+
+def write_embeddings_json_to_lancedb(path: Union[str, Path], *, cfg: LanceDBConfig) -> int:
+    """
+    Convenience wrapper: read `*.text_embeddings.json` (wrapper payload with `df_records`)
+    and write `metadata.embedding` vectors into LanceDB.
+    """
+    df = primitives_df_from_embeddings_json(path)
+    return write_embeddings_to_lancedb(df, cfg=cfg)
 
 
 def _iter_embedding_rows(df: pd.DataFrame) -> Iterable[Dict[str, Any]]:
@@ -158,4 +236,37 @@ def write_embeddings_to_lancedb(
         _ = db.create_table(cfg.table, data=rows, mode="create")
 
     return len(rows)
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description=(
+            "Ingest nv-ingest embedding JSON artifacts into LanceDB.\n\n"
+            "Reads wrapper payloads (e.g. '*.text_embeddings.json') and writes rows based on "
+            "`metadata.embedding` (stored as column 'vector')."
+        )
+    )
+    p.add_argument(
+        "--input",
+        required=True,
+        help="Path to embedding JSON artifact (e.g. '*.text_embeddings.json'). Supports JSON or JSONL.",
+    )
+    p.add_argument("--uri", required=True, help="LanceDB URI (e.g. './lancedb').")
+    p.add_argument("--table", default="embeddings", help="LanceDB table name.")
+    p.add_argument("--mode", default="append", choices=["append", "overwrite"], help="Write mode.")
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = _build_arg_parser().parse_args(list(argv) if argv is not None else None)
+    n = write_embeddings_json_to_lancedb(
+        args.input,
+        cfg=LanceDBConfig(uri=str(args.uri), table=str(args.table), mode=str(args.mode)),
+    )
+    print(n)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
