@@ -10,11 +10,65 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from functools import partial
-from typing import Dict, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any, Union
 
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.cases import get_repo_root
+
+
+def _compute_beir_metrics(
+    all_retrieved: List[List[Dict]],
+    query_df: pd.DataFrame,
+    k_values: List[int] = [1, 5, 10],
+) -> Optional[Dict[str, Dict[str, float]]]:
+    """
+    Compute BEIR metrics from retrieval results.
+
+    Args:
+        all_retrieved: List of retrieval results per query. Each result is a list of
+                      dicts with 'entity' containing source info.
+        query_df: DataFrame with 'query' and 'expected_pdf' columns, optionally 'query_id'.
+        k_values: Cutoff values for evaluation (default [1, 5, 10]).
+
+    Returns:
+        Dict with keys 'ndcg', 'map', 'recall', 'precision', each containing
+        metric values like {'NDCG@1': 0.17, 'NDCG@5': 0.35, ...}, or None if BEIR unavailable.
+    """
+    try:
+        from beir.retrieval.evaluation import EvaluateRetrieval
+    except ImportError:
+        return None
+
+    # Build results dict: {query_id: {doc_id: score}}
+    results = {}
+    for idx, answers in enumerate(all_retrieved):
+        if "query_id" in query_df.columns:
+            query_id = str(query_df.iloc[idx]["query_id"])
+        else:
+            query_id = str(idx)
+
+        results[query_id] = {}
+        num_results = len(answers)
+        for rank, r in enumerate(answers):
+            source_id = r.get("entity", {}).get("source", {}).get("source_id", "")
+            doc_id = os.path.basename(source_id).split(".")[0]
+            score = (num_results - rank) / num_results if num_results > 0 else 0
+            results[query_id][doc_id] = score
+
+    # Build qrels dict: {query_id: {doc_id: relevance}}
+    qrels = {}
+    for idx, row in query_df.iterrows():
+        if "query_id" in query_df.columns:
+            query_id = str(row["query_id"])
+        else:
+            query_id = str(idx)
+        qrels[query_id] = {str(row["expected_pdf"]): 1}
+
+    # Evaluate
+    ndcg, _map, recall, precision = EvaluateRetrieval.evaluate(qrels, results, k_values, ignore_identical_ids=True)
+
+    return {"ndcg": ndcg, "map": _map, "recall": recall, "precision": precision}
 
 
 def _get_retrieval_func(
@@ -176,7 +230,8 @@ def get_recall_scores_pdf_only(
     batch_size: int = 100,
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
-) -> Dict[int, float]:
+    enable_beir: bool = False,
+) -> Union[Dict[int, float], Dict[str, Any]]:
     """
     Calculate recall@k scores for queries against a VDB collection using PDF-only matching.
 
@@ -199,11 +254,14 @@ def get_recall_scores_pdf_only(
         batch_size: Number of queries to process per batch (prevents gRPC size limit errors).
         vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
         table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
+        enable_beir: If True, also compute BEIR metrics (NDCG, MAP, Precision).
 
     Returns:
-        Dictionary mapping k values (1, 5, 10) to recall scores (float 0.0-1.0).
+        If enable_beir=False: Dictionary mapping k values (1, 5, 10) to recall scores.
+        If enable_beir=True: Dictionary with 'recall' and 'beir' keys containing metrics.
     """
     hits = defaultdict(list)
+    all_retrieved = []  # Collect for BEIR computation
 
     reranker_kwargs = {}
     if nv_ranker:
@@ -262,6 +320,10 @@ def get_recall_scores_pdf_only(
                 **reranker_kwargs,
             )
 
+        # Collect results for BEIR if enabled
+        if enable_beir:
+            all_retrieved.extend(batch_answers)
+
         for expected_pdf, retrieved_answers in zip(batch_expected_pdfs, batch_answers):
             # Extract PDF names only (no page numbers)
             retrieved_pdfs = [
@@ -275,6 +337,11 @@ def get_recall_scores_pdf_only(
                     hits[k].append(expected_pdf in retrieved_pdfs[:k])
 
     recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
+
+    # Compute BEIR metrics if enabled
+    if enable_beir:
+        beir_metrics = _compute_beir_metrics(all_retrieved, query_df, k_values=[1, 5, 10])
+        return {"recall": recall_scores, "beir": beir_metrics}
 
     return recall_scores
 
@@ -708,6 +775,134 @@ def bo10k_recall(
     )
 
 
+def vidore_load_ground_truth(
+    ground_truth_dir: Optional[str] = None,
+    dataset_name: str = "vidore_v3_finance_en",
+    language_filter: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Load Vidore V3 ground truth from HuggingFace datasets.
+
+    Uses the industry-standard HuggingFace datasets API which provides:
+    - Automatic local caching (~/.cache/huggingface/datasets/)
+    - No redundant downloads on subsequent runs
+    - Always retrieves latest benchmark version
+
+    Args:
+        ground_truth_dir: Unused (kept for API compatibility with other loaders)
+        dataset_name: Vidore dataset name (e.g., "vidore_v3_finance_en")
+        language_filter: Optional language filter ("english" or None for all)
+
+    Returns:
+        DataFrame with columns: 'query', 'expected_pdf', 'query_id'
+        expected_pdf contains corpus_id as string (matches PDF filename without extension)
+    """
+    from datasets import load_dataset
+
+    hf_name = f"vidore/{dataset_name}"
+
+    # Load queries and qrels from HuggingFace (cached automatically)
+    queries_ds = load_dataset(hf_name, data_dir="queries", split="test")
+    qrels_ds = load_dataset(hf_name, data_dir="qrels", split="test")
+
+    # Build qrels lookup: query_id -> corpus_id
+    # Note: corpus_id is int in HuggingFace, but PDF filenames are {corpus_id}.pdf
+    qrels_map = {row["query_id"]: row["corpus_id"] for row in qrels_ds}
+
+    rows = []
+    for row in queries_ds:
+        query_id = row["query_id"]
+
+        # Apply language filter if specified
+        if language_filter and row.get("language", "").lower() != language_filter.lower():
+            continue
+
+        if query_id in qrels_map:
+            rows.append(
+                {
+                    "query": row["query"],
+                    "expected_pdf": str(qrels_map[query_id]),
+                    "query_id": str(query_id),
+                }
+            )
+
+    if not rows:
+        raise ValueError(f"No valid queries found for {dataset_name}")
+
+    return pd.DataFrame(rows)
+
+
+def vidore_recall(
+    collection_name: str,
+    dataset_name: str = "vidore_v3_finance_en",
+    language_filter: Optional[str] = None,
+    hostname: str = "localhost",
+    sparse: bool = False,
+    hybrid: bool = False,
+    model_name: str = None,
+    top_k: int = 10,
+    gpu_search: bool = False,
+    nv_ranker: bool = False,
+    ground_truth_dir: Optional[str] = None,
+    nv_ranker_endpoint: Optional[str] = None,
+    nv_ranker_model_name: Optional[str] = None,
+    vdb_backend: str = "milvus",
+    table_path: Optional[str] = None,
+    enable_beir: bool = False,
+) -> Union[Dict[int, float], Dict[str, Any]]:
+    """
+    Evaluate recall@k for Vidore V3 dataset using PDF-only matching.
+
+    Loads ground truth from HuggingFace datasets API and evaluates recall
+    against the specified VDB collection.
+
+    Args:
+        collection_name: VDB collection/table name to query.
+        dataset_name: Vidore dataset name (e.g., "vidore_v3_finance_en").
+        language_filter: Optional language filter ("english" or None for all).
+        hostname: Service hostname for embedding endpoint.
+        sparse: Enable hybrid sparse-dense retrieval if True (Milvus only).
+        model_name: Embedding model name for query encoding.
+        top_k: Maximum number of results to retrieve and evaluate.
+        gpu_search: Use GPU acceleration for Milvus search.
+        nv_ranker: Enable NVIDIA reranker for result reranking.
+        ground_truth_dir: Unused (kept for API compatibility).
+        nv_ranker_endpoint: Optional custom reranker endpoint URL.
+        nv_ranker_model_name: Optional custom reranker model name.
+        vdb_backend: VDB backend to use ("milvus" or "lancedb"). Default is "milvus".
+        table_path: Path to LanceDB database directory (required if vdb_backend="lancedb").
+        enable_beir: If True, also compute BEIR metrics (NDCG, MAP, Precision).
+
+    Returns:
+        If enable_beir=False: Dictionary mapping k values (1, 5, 10) to recall scores.
+        If enable_beir=True: Dictionary with 'recall' and 'beir' keys containing metrics.
+    """
+    loader = partial(
+        vidore_load_ground_truth,
+        dataset_name=dataset_name,
+        language_filter=language_filter,
+    )
+
+    return evaluate_recall_orchestrator(
+        loader_func=loader,
+        scorer_func=get_recall_scores_pdf_only,
+        collection_name=collection_name,
+        hostname=hostname,
+        sparse=sparse,
+        hybrid=hybrid,
+        model_name=model_name,
+        top_k=top_k,
+        gpu_search=gpu_search,
+        nv_ranker=nv_ranker,
+        ground_truth_dir=ground_truth_dir,
+        nv_ranker_endpoint=nv_ranker_endpoint,
+        nv_ranker_model_name=nv_ranker_model_name,
+        vdb_backend=vdb_backend,
+        table_path=table_path,
+        enable_beir=enable_beir,
+    )
+
+
 def get_recall_collection_name(test_name: str) -> str:
     """
     Generate collection name for recall evaluation.
@@ -731,7 +926,7 @@ def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
     Get the recall evaluator function for a given dataset.
 
     Args:
-        dataset_name: Name of the dataset (e.g., 'bo767', 'finance_bench')
+        dataset_name: Name of the dataset (e.g., 'bo767', 'finance_bench', 'vidore_v3_finance_en')
 
     Returns:
         Evaluator function or None if not found
@@ -744,4 +939,21 @@ def get_dataset_evaluator(dataset_name: str) -> Optional[Callable]:
         "bo10k": bo10k_recall,
     }
 
-    return evaluators.get(dataset_name.lower())
+    # Vidore V3 benchmark datasets
+    vidore_datasets = [
+        "vidore_v3_finance_en",
+        "vidore_v3_industrial",
+        "vidore_v3_computer_science",
+        "vidore_v3_pharmaceuticals",
+        "vidore_v3_hr",
+        "vidore_v3_energy",
+        "vidore_v3_physics",
+        "vidore_v3_finance_fr",
+    ]
+
+    dataset_lower = dataset_name.lower()
+    if dataset_lower in evaluators:
+        return evaluators[dataset_lower]
+    if dataset_lower in vidore_datasets:
+        return partial(vidore_recall, dataset_name=dataset_lower)
+    return None

@@ -18,7 +18,7 @@ def evaluate_recall_with_reranker(
     evaluation_params: Dict,
     use_reranker: bool,
     log_path: str = "test_results",
-) -> Tuple[Dict[int, float], float]:
+) -> Tuple[Dict, float]:
     """
     Run recall evaluation with specified reranker setting.
 
@@ -30,7 +30,8 @@ def evaluate_recall_with_reranker(
         log_path: Path for logging output
 
     Returns:
-        Tuple of (scores_dict, elapsed_time)
+        Tuple of (results_dict, elapsed_time)
+        results_dict may be {k: score} or {"recall": {...}, "beir": {...}} if BEIR enabled
     """
     mode_str = "with reranker" if use_reranker else "without reranker"
     print("\n" + "=" * 60)
@@ -38,24 +39,42 @@ def evaluate_recall_with_reranker(
     print("=" * 60)
 
     eval_start = time.time()
-    scores = evaluator(
+    results = evaluator(
         collection_name=collection_name,
         nv_ranker=use_reranker,
         **evaluation_params,
     )
     eval_time = time.time() - eval_start
 
-    # Log results
+    # Handle both old format {k: score} and new format {"recall": {...}, "beir": {...}}
+    if isinstance(results, dict) and "recall" in results:
+        recall_scores = results["recall"]
+        beir_metrics = results.get("beir")
+    else:
+        recall_scores = results
+        beir_metrics = None
+
+    # Log recall results
+    reranker_suffix = "with" if use_reranker else "no"
     print(f"\nMultimodal Recall ({mode_str}):")
-    for k in sorted(scores.keys()):
-        score = scores[k]
+    for k in sorted(recall_scores.keys()):
+        score = recall_scores[k]
         print(f"  - Recall @{k}: {score:.3f}")
-        reranker_suffix = "with" if use_reranker else "no"
         kv_event_log(f"recall_multimodal_@{k}_{reranker_suffix}_reranker", score, log_path)
 
-    kv_event_log(f"recall_eval_time_s_{'with' if use_reranker else 'no'}_reranker", eval_time, log_path)
+    # Log BEIR metrics if available
+    if beir_metrics:
+        print(f"\nBEIR Metrics ({mode_str}):")
+        for metric_name, values in beir_metrics.items():
+            for k_str, score in values.items():
+                print(f"  - {k_str}: {score:.5f}")
+                # Log with format: ndcg_10_no_reranker
+                k_num = k_str.split("@")[1] if "@" in k_str else k_str
+                kv_event_log(f"{metric_name}_{k_num}_{reranker_suffix}_reranker", score, log_path)
 
-    return scores, eval_time
+    kv_event_log(f"recall_eval_time_s_{reranker_suffix}_reranker", eval_time, log_path)
+
+    return results, eval_time
 
 
 def main(config=None, log_path: str = "test_results") -> int:
@@ -141,6 +160,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "vdb_backend": vdb_backend,
             "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
             "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
+            "enable_beir": config.enable_beir,
         }
         if vdb_backend == "lancedb":
             evaluation_params["table_path"] = lancedb_path

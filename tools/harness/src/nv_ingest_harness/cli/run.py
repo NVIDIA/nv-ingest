@@ -350,6 +350,11 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     default=True,
     help="Dump service logs to artifacts directory before cleanup (managed mode only). Default: enabled",
 )
+@click.option(
+    "--list-datasets",
+    is_flag=True,
+    help="List available datasets and groups, then exit",
+)
 def main(
     case,
     managed,
@@ -362,14 +367,51 @@ def main(
     session_name,
     sku,
     dump_logs,
+    list_datasets,
 ):
+    # Handle --list-datasets
+    if list_datasets:
+        from nv_ingest_harness.config import list_datasets as get_datasets
+
+        info = get_datasets()
+
+        print("Available Datasets:")
+        print("-" * 50)
+        for name, config in sorted(info["datasets"].items()):
+            if isinstance(config, dict):
+                path = config.get("path", "N/A")
+                recall = config.get("recall_dataset")
+                recall_str = f" [recall: {recall}]" if recall else ""
+            else:
+                path = config
+                recall_str = ""
+            print(f"  {name}: {path}{recall_str}")
+
+        if info.get("groups"):
+            print("\nDataset Groups:")
+            print("-" * 50)
+            for name, members in sorted(info["groups"].items()):
+                print(f"  {name} ({len(members)} datasets):")
+                for m in members:
+                    print(f"    - {m}")
+
+        return 0
 
     if not dataset:
         print("Error: --dataset is required. Use --dataset=<name> or --dataset=<name1>,<name2>", file=sys.stderr)
+        print("       Use --list-datasets to see available datasets and groups", file=sys.stderr)
         return 1
 
-    # Parse dataset(s) - handle both single and comma-separated
-    dataset_list = [d.strip() for d in dataset.split(",") if d.strip()]
+    # Parse dataset(s) - handle single, comma-separated, and groups
+    import yaml
+
+    config_path = Path(__file__).resolve().parents[3] / "test_configs.yaml"
+    with open(config_path) as f:
+        yaml_data = yaml.safe_load(f)
+
+    from nv_ingest_harness.config import expand_dataset_names
+
+    dataset_list = expand_dataset_names(yaml_data, dataset)
     if not dataset_list:
         print("Error: No valid datasets found", file=sys.stderr)
         return 1

@@ -59,7 +59,7 @@ active:
   sparse: false  # Use sparse embeddings (Milvus only)
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
-  vdb_backend: lancedb  # milvus or lancedb
+  vdb_backend: milvus  # milvus or lancedb
   hybrid: false  # LanceDB hybrid retrieval (FTS + vector)
 
   # Extraction configuration
@@ -94,11 +94,12 @@ active:
 # docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: both  # Options: "none", "with", "both"
+  reranker_mode: none  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
   ground_truth_dir: null
+  enable_beir: false  # Enable BEIR metrics (NDCG, MAP, Precision) - requires beir package
 
 # Pre-configured datasets
 # Each dataset includes path, extraction settings, and recall evaluator
@@ -168,3 +169,129 @@ datasets:
     extract_images: false
     extract_infographics: true
     recall_dataset: bo10k
+
+  # Vidore V3 Benchmark Datasets
+  # See: https://huggingface.co/collections/vidore/vidore-benchmark-667173f98e70a1c0fa4db00d
+  vidore_v3_finance_en:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_finance_en
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_finance_en
+
+  vidore_v3_industrial:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_industrial
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_industrial
+
+  vidore_v3_computer_science:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_computer_science
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_computer_science
+
+  vidore_v3_pharmaceuticals:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_pharmaceuticals
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_pharmaceuticals
+
+  vidore_v3_hr:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_hr
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_hr
+
+  vidore_v3_energy:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_energy
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_energy
+
+  vidore_v3_physics:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_physics
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_physics
+
+  vidore_v3_finance_fr:
+    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_finance_fr
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    extract_page_as_image: true
+    extract_method: ocr
+    image_elements_modality: text_image
+    recall_dataset: vidore_v3_finance_fr
+
+# Dataset groups for running multiple datasets together
+# Use: uv run nv-ingest-harness-run --case=e2e_recall --dataset=vidore
+dataset_groups:
+  # All Vidore V3 datasets
+  vidore:
+    - vidore_v3_finance_en
+    - vidore_v3_industrial
+    - vidore_v3_computer_science
+    - vidore_v3_pharmaceuticals
+    - vidore_v3_hr
+    - vidore_v3_energy
+    - vidore_v3_physics
+    - vidore_v3_finance_fr
+
+  # Vidore English-only
+  vidore_english:
+    - vidore_v3_finance_en
+    - vidore_v3_industrial
+    - vidore_v3_computer_science
+    - vidore_v3_pharmaceuticals
+    - vidore_v3_hr
+
+  # Vidore quick test (smallest datasets)
+  vidore_quick:
+    # - vidore_v3_hr
+    # - vidore_v3_industrial
+    - vidore_v3_computer_science
