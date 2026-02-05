@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "click>=8.1.8",
     "docker>=7.1.0",
     "pyyaml>=6.0",
     "requests>=2.31.0",
@@ -20,10 +21,10 @@ ingest = [
     "pypdfium2",
 ]
 nemotron-hf = [
-    "nemotron-page-elements-v3",
-    "nemotron-graphic-elements-v1",
-    "nemotron-table-structure-v1",
-    "nemotron-ocr",
+    "nemotron-page-elements-v3>=0.dev0",
+    "nemotron-graphic-elements-v1>=0.dev0",
+    "nemotron-table-structure-v1>=0.dev0",
+    "nemotron-ocr>=0.dev0",
 ]
 
 [project.scripts]
@@ -41,3 +42,11 @@ package = true
 nv-ingest = { path = "../../src", editable = true }
 nv-ingest-api = { path = "../../api/", editable = true }
 nv-ingest-client = { path = "../../client/", editable = true }
+nemotron-page-elements-v3 = { index = "test-pypi" }
+nemotron-graphic-elements-v1 = { index = "test-pypi" }
+nemotron-table-structure-v1 = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
+
+[[tool.uv.index]]
+name = "test-pypi"
+url = "https://test.pypi.org/simple/"
