@@ -8,14 +8,6 @@ from nemotron_page_elements_v3.model import define_model as define_model_page_el
 from nemotron_page_elements_v3.model import resize_pad as resize_pad_page_elements
 from nemotron_page_elements_v3.utils import postprocess_preds_page_element as postprocess_preds_page_element
 
-from ..nim.http_utils import (
-    coerce_boxes_labels_scores,
-    default_headers,
-    extract_per_item_list,
-    normalize_endpoint,
-    post_batched_images,
-)
-
 
 class NemotronPageElementsV3(HuggingFaceModel):
     """

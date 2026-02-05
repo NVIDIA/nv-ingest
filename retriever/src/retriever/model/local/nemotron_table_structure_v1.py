@@ -6,14 +6,6 @@ from ..model import BaseModel, RunMode
 from nemotron_table_structure_v1.model import define_model as define_model_table_structure
 from nemotron_table_structure_v1.model import resize_pad as resize_pad_table_structure
 
-from ..nim.http_utils import (
-    coerce_boxes_labels_scores,
-    default_headers,
-    extract_per_item_list,
-    normalize_endpoint,
-    post_batched_images,
-)
-
 
 class NemotronTableStructureV1(BaseModel):
     """

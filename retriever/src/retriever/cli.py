@@ -66,17 +66,10 @@ def pdf_to_csv(
         raise typer.Exit(code=2)
 
     needs_yolox = (
-        extract_images
-        or extract_tables
-        or extract_charts
-        or extract_infographics
-        or method in {"pdfium_hybrid", "ocr"}
+        extract_images or extract_tables or extract_charts or extract_infographics or method in {"pdfium_hybrid", "ocr"}
     )
     if needs_yolox and not (yolox_grpc_endpoint or yolox_http_endpoint):
-        raise typer.BadParameter(
-            "YOLOX endpoint required for the requested extractions. "
-            "Set --yolox-grpc-endpoint or --yolox-http-endpoint, or disable structured/image extraction flags."
-        )
+        print(f"YOLOX NIM endpoints not set, using HuggingFace model instead.")
 
     if method == "nemotron_parse" and not (nemotron_parse_grpc_endpoint or nemotron_parse_http_endpoint):
         raise typer.BadParameter(
@@ -284,7 +277,9 @@ def pipeline_to_csv(
 
 @app.command("recall")
 def recall(
-    query_csv: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=False, help="CSV with columns: query,pdf,page (or gt_page)."),
+    query_csv: Path = typer.Argument(
+        ..., exists=True, file_okay=True, dir_okay=False, help="CSV with columns: query,pdf,page (or gt_page)."
+    ),
     lancedb_uri: str = typer.Option("./lancedb", help="LanceDB URI (folder path or remote URI)."),
     lancedb_table: str = typer.Option("embeddings", help="LanceDB table name."),
     embedding_endpoint: str = typer.Option("http://embedding:8000/v1", help="Embedding NIM endpoint."),
@@ -319,4 +314,3 @@ def main(argv: list[str] | None = None) -> int:
     # Keep a callable main() for console_scripts compatibility.
     app(prog_name="retriever", args=argv)
     return 0
-

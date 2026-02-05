@@ -9,7 +9,7 @@
 #
 
 # Directory containing PDFs (scanned recursively for *.pdf)
-input_dir: /home/jdyer/datasets/jp20/
+input_dir: /home/jdyer/datasets/jd1
 
 # PDF extraction method: pdfium | pdfium_hybrid | ocr | nemotron_parse | tika | unstructured_io | adobe | llama
 method: pdfium
@@ -19,9 +19,11 @@ auth_token: null
 
 endpoints:
   yolox:
-    # Required for method: pdfium / pdfium_hybrid / ocr
-    grpc: localhost:8001
-    http: http://localhost:8000/v1/infer
+    # If set to null then HuggingFace models will be used instead of NIMs
+    # grpc: localhost:8001
+    # http: http://localhost:8000/v1/infer
+    grpc: null
+    http: null
 
   # Only required for method: nemotron_parse
   nemotron_parse:
@@ -34,9 +36,9 @@ extract:
   # Text depth: page | document
   text_depth: document
   images: false
-  tables: false
-  charts: false
-  infographics: false
+  tables: true
+  charts: true
+  infographics: true
   page_as_image: false
 
 outputs:

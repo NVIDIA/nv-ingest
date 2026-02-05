@@ -79,8 +79,10 @@ class PDFiumConfigSchema(LowercaseProtocolMixin):
             grpc_service = _clean_service(grpc_service)
             http_service = _clean_service(http_service)
 
+            # If both are empty, use HuggingFace models instead
             if not grpc_service and not http_service:
-                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
+                grpc_service = None
+                http_service = None
 
             values[endpoint_name] = (grpc_service, http_service)
 

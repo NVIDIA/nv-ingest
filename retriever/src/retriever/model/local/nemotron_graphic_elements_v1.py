@@ -6,14 +6,6 @@ from ..model import BaseModel, RunMode
 from nemotron_graphic_elements_v1.model import define_model as define_model_graphic_elements
 from nemotron_graphic_elements_v1.model import resize_pad as resize_pad_graphic_elements
 
-from ..nim.http_utils import (
-    default_headers,
-    extract_per_item_list,
-    normalize_endpoint,
-    post_batched_images,
-    coerce_boxes_labels_scores,
-)
-
 
 class NemotronGraphicElementsV1(BaseModel):
     """

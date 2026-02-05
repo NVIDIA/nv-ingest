@@ -569,10 +569,8 @@ def render_page_elements(
     extractor_cfg: Dict[str, Any] = {}
     if method in {"pdfium", "pdfium_hybrid", "ocr"}:
         if not (yolox_grpc_endpoint or yolox_http_endpoint):
-            raise typer.BadParameter(
-                "YOLOX endpoint required for methods 'pdfium', 'pdfium_hybrid', and 'ocr'. "
-                "Set --yolox-grpc-endpoint or --yolox-http-endpoint."
-            )
+            print(f"YOLOX NIM endpoints not set, using HuggingFace model instead.")
+
         extractor_cfg["pdfium_config"] = {
             "auth_token": auth_token,
             "yolox_endpoints": [yolox_grpc_endpoint, yolox_http_endpoint],
