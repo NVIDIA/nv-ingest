@@ -47,7 +47,7 @@ If you want chunks smaller than `page`, use token-based splitting as described i
 The `split` task uses a tokenizer to count the number of tokens in the document, 
 and splits the document based on the desired maximum chunk size and chunk overlap. 
 
-We recommend the default tokenizer for token-based splitting; see [Llama tokenizer (default)](#llama-tokenizer-default).
+We recommend the default tokenizer for token-based splitting. For more information, refer to [Llama tokenizer (default)](#llama-tokenizer-default).
 You can also use any tokenizer from any HuggingFace model that includes a tokenizer file.
 
 Use the `split` method to chunk large documents as shown in the following code.
