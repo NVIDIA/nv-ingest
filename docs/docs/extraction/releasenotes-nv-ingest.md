@@ -26,7 +26,7 @@ This release contains the following key changes:
 - Added VLM caption prompt customization parameters, including reasoning control. For details, refer to [Caption Images and Control Reasoning](nv-ingest-python-api.md#caption-images-and-control-reasoning).
 - Added support for the [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse/modelcard) model which replaces the [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse/modelcard) model. For details, refer to [Advanced Visual Parsing](nemoretriever-parse.md).
 - Support is now deprecated for [paddleocr](https://build.nvidia.com/baidu/paddleocr/modelcard).
-- The `meta-llama/Llama-3.2-1B` tokenizer is now pre-downloaded so that you can run token-based splitting without making a network request. For details, refer to [Split Documents](chunking.md).
+- The default tokenizer for token-based splitting is now pre-downloaded at build time so you can run splitting without a network request. For details, refer to [Llama tokenizer (default)](chunking.md#llama-tokenizer-default).
 - For scanned PDFs, added specialized extraction strategies. For details, refer to [PDF Extraction Strategies](nv-ingest-python-api.md#pdf-extraction-strategies).
 - Added support for [LanceDB](https://lancedb.com/). For details, refer to [Upload to a Custom Data Store](data-store.md).
 - The V2 API is now available and is the default processing pipeline. The response format remains backwards-compatible. You can enable the v2 API by using `message_client_kwargs={"api_version": "v2"}`.For details, refer to [API Reference](api-docs).
