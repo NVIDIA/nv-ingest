@@ -55,6 +55,7 @@ class RedisClient(MessageBrokerClientBase):
         fetch_mode: "FetchMode" = None,  # Replace with appropriate default if FetchMode.DESTRUCTIVE is available.
         cache_config: Optional[Dict[str, Any]] = None,
         message_ttl_seconds: Optional[int] = 600,
+        pool_name: Optional[str] = None,
     ) -> None:
         """
         Initializes the Redis client with connection pooling, retry/backoff configuration,
@@ -88,6 +89,9 @@ class RedisClient(MessageBrokerClientBase):
         message_ttl_seconds : int, optional
             TTL (in seconds) for messages in NON_DESTRUCTIVE mode. If not provided,
             messages may persist indefinitely.
+        pool_name : str, optional
+            Name for the connection pool used in Prometheus metrics labels.
+            If not provided, metrics will use "default" as the pool name.
 
         Returns
         -------
@@ -111,20 +115,25 @@ class RedisClient(MessageBrokerClientBase):
                 "Messages fetched non-destructively may persist indefinitely in Redis."
             )
 
-        # Configure Connection Pool
+        from nv_ingest_api.util.service_clients.redis.redis_pool_metrics import InstrumentedBlockingConnectionPool
+
         pool_kwargs: Dict[str, Any] = {
             "host": self._host,
             "port": self._port,
             "db": self._db,
             "socket_connect_timeout": self._connection_timeout,
             "max_connections": max_pool_size,
+            "timeout": 20,  # Wait up to 20s for a connection from the pool
         }
         if self._use_ssl:
             pool_kwargs["ssl"] = True
             pool_kwargs["ssl_cert_reqs"] = None  # Or specify requirements as needed.
             logger.debug("Redis connection configured with SSL.")
 
-        self._pool: redis.ConnectionPool = redis.ConnectionPool(**pool_kwargs)
+        effective_pool_name = pool_name if pool_name else "default"
+        self._pool: redis.BlockingConnectionPool = InstrumentedBlockingConnectionPool(
+            pool_name=effective_pool_name, **pool_kwargs
+        )
 
         # Allocate initial client
         self._client: Optional[redis.Redis] = self._redis_allocator(connection_pool=self._pool)

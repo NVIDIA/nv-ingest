@@ -131,13 +131,12 @@ class RedisIngestService(IngestServiceMeta):
         self._bulk_vdb_cache_prefix: str = "vdb_bulk_upload_cache:"
         self._cache_prefix: str = "processing_cache:"
         self._state_prefix: str = "job_state:"
-        # Bound async-to-thread concurrency slightly below Redis connection pool
-        self._async_operation_semaphore: Optional[asyncio.Semaphore] = None
 
+        pool_size = int(os.getenv("REDIS_POOL_SIZE", "50"))
         self._ingest_client = RedisClient(
             host=self._redis_hostname,
             port=self._redis_port,
-            max_pool_size=self._concurrency_level,
+            max_pool_size=pool_size,
             fetch_mode=self._fetch_mode,
             cache_config=cache_config,
             message_ttl_seconds=self._result_data_ttl_seconds,
@@ -145,21 +144,16 @@ class RedisIngestService(IngestServiceMeta):
             max_retries=int(os.getenv("REDIS_MAX_RETRIES", "3")),
             max_backoff=int(os.getenv("REDIS_MAX_BACKOFF", "32")),
             connection_timeout=int(os.getenv("REDIS_CONNECTION_TIMEOUT", "300")),
+            pool_name="ingest",
         )
         logger.debug(
             f"RedisClient initialized for service. Host: {redis_hostname}:{redis_port}, "
             f"FetchMode: {fetch_mode.name}, ResultTTL: {result_data_ttl_seconds}, StateTTL: {state_ttl_seconds}"
         )
 
-    def _get_async_semaphore(self) -> asyncio.Semaphore:
-        if self._async_operation_semaphore is None:
-            semaphore_limit = max(1, self._concurrency_level - 2)
-            self._async_operation_semaphore = asyncio.Semaphore(semaphore_limit)
-        return self._async_operation_semaphore
-
     async def _run_bounded_to_thread(self, func, *args, **kwargs):
-        async with self._get_async_semaphore():
-            return await asyncio.to_thread(func, *args, **kwargs)
+        """Run blocking Redis operation in thread pool."""
+        return await asyncio.to_thread(func, *args, **kwargs)
 
     async def submit_job(self, job_spec_wrapper: "MessageWrapper", trace_id: str) -> str:
         """
