@@ -29,3 +29,12 @@ repos:
     hooks:
       - id: flake8
         args: ["--max-line-length=120", "--extend-ignore=E203,E266,F403,F405,E402"]
+
+  - repo: local
+    hooks:
+      - id: validate-deployment-configs
+        name: validate deployment configs
+        entry: python ci/scripts/validate_deployment_configs.py
+        language: system
+        files: (docker-compose\.yaml|helm/values\.yaml)
+        pass_filenames: false
