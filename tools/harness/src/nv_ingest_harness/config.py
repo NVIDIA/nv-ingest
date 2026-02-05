@@ -96,6 +96,9 @@ class TestConfig:
     ground_truth_dir: Optional[str] = None
     recall_dataset: Optional[str] = None
 
+    # Run metadata
+    note: Optional[str] = None
+
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
         errors = []
