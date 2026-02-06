@@ -6,18 +6,15 @@ from pathlib import Path
 import click
 
 from nv_ingest_harness.config import load_config
+from nv_ingest_harness.service_manager import create_service_manager
 from nv_ingest_harness.utils.cases import last_commit, now_timestr
-from nv_ingest_harness.utils.docker import (
-    stop_services,
-    start_services,
-    readiness_wait,
-)
 from nv_ingest_harness.utils.session import (
     create_session_dir,
     get_artifact_path,
     write_session_summary,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
 CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
 
 
@@ -25,38 +22,42 @@ def run_datasets(
     case,
     dataset_list,
     managed,
+    deployment_type,
     no_build,
     keep_up,
     doc_analysis,
     session_dir: str | None = None,
+    sku: str | None = None,
+    dump_logs: bool = True,
+    config_file: str | None = None,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
+    service_manager = None
     session_summary_path = None
 
     # Start services once if managed mode
     if managed:
         # Load config for first dataset to get profiles
         first_config = load_config(
+            config_file=config_file or "test_configs.yaml",
             case=case,
             dataset=dataset_list[0],
+            deployment_type=deployment_type,
         )
 
-        # Start services
-        profile_list = first_config.profiles
-        if not profile_list:
-            print("No profiles specified")
-            return 1
+        # Create appropriate service manager based on config
+        service_manager = create_service_manager(first_config, REPO_ROOT, sku=sku)
 
-        build = not no_build
-        if start_services(profiles=profile_list, build=build) != 0:
+        # Start services
+        if service_manager.start(no_build=no_build) != 0:
             print("Failed to start services")
             return 1
 
         # Wait for readiness
-        if not readiness_wait(first_config.readiness_timeout):
+        if not service_manager.check_readiness(first_config.readiness_timeout):
             print("Services failed to become ready")
-            stop_services()
+            service_manager.stop()
             return 1
 
     # Run each dataset
@@ -68,8 +69,10 @@ def run_datasets(
         # Load config for this dataset (applies dataset-specific extraction configs)
         try:
             config = load_config(
+                config_file=config_file or "test_configs.yaml",
                 case=case,
                 dataset=dataset_name,
+                deployment_type=deployment_type,
             )
         except (FileNotFoundError, ValueError) as e:
             print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
@@ -81,7 +84,12 @@ def run_datasets(
         if not artifact_name:
             artifact_name = os.path.basename(config.dataset_dir.rstrip("/"))
 
-        out_dir = get_artifact_path(session_dir, artifact_name, base_dir=config.artifacts_dir)
+        out_dir = get_artifact_path(
+            session_dir,
+            artifact_name,
+            base_dir=config.artifacts_dir,
+            deployment_type=deployment_type if managed else None,
+        )
         stdout_path = os.path.join(out_dir, "stdout.txt")
 
         print(f"Dataset: {config.dataset_dir}")
@@ -176,9 +184,43 @@ def run_datasets(
             }
         )
 
-    # Stop services if managed mode and not keeping up
-    if managed and not keep_up:
-        stop_services()
+    # Cleanup managed services
+    if managed and service_manager:
+        # Dump logs before stopping services if enabled
+        if dump_logs:
+            # Determine where to dump logs
+            if session_dir:
+                # Dump to session directory if using sessions
+                logs_dir = Path(session_dir) / "service_logs"
+            else:
+                # Dump to first result's artifact directory as fallback
+                if results and results[0].get("artifact_dir") != "N/A":
+                    logs_dir = Path(results[0]["artifact_dir"]) / "service_logs"
+                else:
+                    # Last resort: create a timestamped directory in artifacts root
+                    from nv_ingest_harness.utils.session import get_default_artifacts_root
+
+                    logs_dir = get_default_artifacts_root() / f"service_logs_{now_timestr()}"
+
+            print(f"\n{'='*60}")
+            print("Dumping service logs...")
+            print(f"{'='*60}")
+            service_manager.dump_logs(logs_dir)
+
+        # Always cleanup port forwards (prevents orphaned processes)
+        if hasattr(service_manager, "_stop_port_forwards"):
+            service_manager._stop_port_forwards()
+
+        # Only uninstall services if not keeping up
+        if not keep_up:
+            service_manager.stop()
+        else:
+            print("\n" + "=" * 60)
+            print("Services are kept running (--keep-up enabled)")
+            print("Port forwards have been cleaned up to prevent orphaned processes.")
+            if hasattr(service_manager, "print_port_forward_commands"):
+                service_manager.print_port_forward_commands()
+            print("=" * 60)
 
     # Write session summary if using a session
     if session_dir:
@@ -274,8 +316,12 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
 @click.command()
 @click.option("--case", default="e2e", help="Test case name to run")
+@click.option("--managed", is_flag=True, help="Manage services (start/stop). Default: attach to existing services")
 @click.option(
-    "--managed", is_flag=True, help="Manage Docker services (start/stop). Default: attach to existing services"
+    "--deployment-type",
+    type=click.Choice(["compose", "helm"], case_sensitive=False),
+    default="compose",
+    help="Deployment type for managed services (managed mode only)",
 )
 @click.option(
     "--dataset", help="Dataset name(s) - single name, comma-separated list, or path (e.g., bo767 or bo767,earnings)"
@@ -295,15 +341,38 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     default=None,
     help="Name for session directory (auto-created when multiple datasets or this option provided)",
 )
+@click.option(
+    "--sku",
+    type=str,
+    default=None,
+    help="GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s). Only applies to managed Compose "
+    "services.",
+)
+@click.option(
+    "--dump-logs/--no-dump-logs",
+    default=True,
+    help="Dump service logs to artifacts directory before cleanup (managed mode only). Default: enabled",
+)
+@click.option(
+    "--test-config",
+    "test_config_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to test config YAML (default: tools/harness/test_configs.yaml)",
+)
 def main(
     case,
     managed,
+    deployment_type,
     dataset,
     no_build,
     keep_up,
     doc_analysis,
     session_dir,
     session_name,
+    sku,
+    dump_logs,
+    test_config_path,
 ):
 
     if not dataset:
@@ -331,10 +400,14 @@ def main(
         case=case,
         dataset_list=dataset_list,
         managed=managed,
+        deployment_type=deployment_type,
         no_build=no_build,
         keep_up=keep_up,
         doc_analysis=doc_analysis,
         session_dir=str(session_dir) if session_dir else None,
+        sku=sku,
+        dump_logs=dump_logs,
+        config_file=test_config_path,
     )
 
 

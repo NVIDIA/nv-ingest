@@ -1,0 +1,54 @@
+name: Determine Version
+description: Determine version string from inputs or generate from date
+
+inputs:
+  version:
+    description: 'Explicit version string (leave empty for auto-generation)'
+    required: false
+    default: ''
+  date-format:
+    description: 'Date format for auto-generated version'
+    required: false
+    default: '%Y.%m.%d'
+  branch-name:
+    description: 'Branch name to extract version from (for release branches)'
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: 'Determined version string'
+    value: ${{ steps.determine.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Determine version
+      id: determine
+      shell: bash
+      run: |
+        VERSION=""
+        INPUT_VERSION="${{ inputs.version }}"
+        INPUT_BRANCH_NAME="${{ inputs.branch-name }}"
+        INPUT_DATE_FORMAT="${{ inputs.date-format }}"
+
+        # Priority 1: Explicit version input
+        if [ -n "${INPUT_VERSION}" ]; then
+          VERSION="${INPUT_VERSION}"
+          echo "Using explicit version: $VERSION"
+
+        # Priority 2: Extract from branch name (for release/* branches)
+        elif [ -n "${INPUT_BRANCH_NAME}" ]; then
+          if [[ "${INPUT_BRANCH_NAME}" == release/* ]]; then
+            VERSION="${INPUT_BRANCH_NAME#release/}"
+            echo "Extracted version from branch: $VERSION"
+          fi
+        fi
+
+        # Priority 3: Generate from date
+        if [ -z "$VERSION" ]; then
+          VERSION="$(date +"${INPUT_DATE_FORMAT}")"
+          echo "Generated version from date: $VERSION"
+        fi
+
+        echo "version=$VERSION" >> $GITHUB_OUTPUT

@@ -1,0 +1,98 @@
+name: Reusable PyPI Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: false
+        type: string
+        default: ''
+      release-type:
+        description: 'Release type (dev or release)'
+        required: false
+        type: string
+        default: 'dev'
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+      runner:
+        description: 'GitHub runner to use'
+        required: false
+        type: string
+        default: 'linux-large-disk'
+    outputs:
+      version:
+        description: 'Version that was built'
+        value: ${{ jobs.build.outputs.version }}
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Determine version
+        id: set-version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="$(date +'%Y.%m.%d')"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Validate release type
+        run: |
+          if [[ "${{ inputs.release-type }}" != "dev" && "${{ inputs.release-type }}" != "release" ]]; then
+            echo "Error: release-type must be 'dev' or 'release'"
+            exit 1
+          fi
+
+      - name: Install build dependencies
+        run: pip install build twine
+
+      - name: Build nv-ingest-api wheel
+        run: |
+          cd api
+          NV_INGEST_RELEASE_TYPE=${{ inputs.release-type }} \
+          NV_INGEST_VERSION=${{ steps.set-version.outputs.version }} \
+          python -m build
+
+      - name: Build nv-ingest-client wheel
+        run: |
+          cd client
+          NV_INGEST_RELEASE_TYPE=${{ inputs.release-type }} \
+          NV_INGEST_VERSION=${{ steps.set-version.outputs.version }} \
+          python -m build
+
+      - name: Build nv-ingest service wheel
+        run: |
+          cd src
+          NV_INGEST_RELEASE_TYPE=${{ inputs.release-type }} \
+          NV_INGEST_VERSION=${{ steps.set-version.outputs.version }} \
+          python -m build
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels
+          path: |
+            api/dist/*.whl
+            api/dist/*.tar.gz
+            client/dist/*.whl
+            client/dist/*.tar.gz
+            src/dist/*.whl
+            src/dist/*.tar.gz
+          retention-days: 7
