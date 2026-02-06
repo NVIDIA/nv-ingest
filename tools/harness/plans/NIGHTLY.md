@@ -7,6 +7,9 @@ Automated benchmarks with Slack reporting and historical tracking.
 ```bash
 cd tools/harness
 
+# Install dependencies for nightly benchmarks (E2E + Recall tests)
+uv pip install -e '.[ingest]'
+
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 uv run nv-ingest-harness-nightly
 
@@ -16,6 +19,8 @@ uv run nv-ingest-harness-nightly --skip-fresh-start  # Use running services
 uv run nv-ingest-harness-nightly --dry-run           # Show config only
 uv run nv-ingest-harness-nightly --note "Testing new embedding model"
 ```
+
+**Note**: Nightly benchmarks use E2E and recall tests which require the `[ingest]` extra (includes nv-ingest packages, pymilvus, pypdfium2).
 
 ## Configuration
 
@@ -178,6 +183,21 @@ uv run nv-ingest-harness-nightly \
 
 ## CI/CD
 
+### Installation
+
+Ensure the correct dependencies are installed based on your test needs:
+
+```bash
+# For nightly E2E + recall benchmarks
+cd tools/harness
+uv pip install -e '.[ingest]'
+
+# For standalone model benchmarks only
+uv pip install -e '.[nemotron-hf]'
+```
+
+### GitHub Actions
+
 ```yaml
 # GitHub Actions
 jobs:
@@ -187,12 +207,15 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
-      - run: cd tools/harness && uv sync && uv run nv-ingest-harness-nightly
+      - run: cd tools/harness && uv pip install -e '.[ingest]' && uv run nv-ingest-harness-nightly
 ```
+
+### Cron
 
 ```bash
 # Cron (2 AM daily)
 0 2 * * * cd /path/to/tools/harness && source ~/setup_env.sh && \
+  uv pip install -e '.[ingest]' && \
   SLACK_WEBHOOK_URL="..." uv run nv-ingest-harness-nightly >> /var/log/nightly.log 2>&1
 ```
 

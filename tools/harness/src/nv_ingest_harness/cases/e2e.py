@@ -8,7 +8,9 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
-from nv_ingest_harness.utils.interact import embed_info, kv_event_log, milvus_chunks, segment_results, pdf_page_count
+from nv_ingest_harness.utils.interact import embed_info, kv_event_log, segment_results
+from nv_ingest_harness.utils.milvus import milvus_chunks
+from nv_ingest_harness.utils.pdf import pdf_page_count
 from nv_ingest_harness.utils.vdb import get_lancedb_path
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
