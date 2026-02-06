@@ -28,16 +28,12 @@ def pdf_files_to_ledger_df(
         b64 = base64.b64encode(raw).decode("utf-8")
         rows.append(
             {
-                "source_id": f"{source_id_prefix}:{i}",
-                "source_name": path.name,
+                "source_id": str(path),
+                "source_name": str(path),
                 "content": b64,
                 "document_type": "pdf",
-                # IMPORTANT: `nv-ingest-api` treats this as *unified metadata* and validates it
-                # against `MetadataSchema` (no extra keys permitted). Put our path and any
-                # user-provided extras under `custom_content`.
                 "metadata": {"custom_content": {"path": str(path), **extra_metadata}},
             }
         )
 
     return pd.DataFrame(rows)
-

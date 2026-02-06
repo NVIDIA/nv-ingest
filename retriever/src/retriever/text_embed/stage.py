@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 console = Console()
 install(show_locals=False)
 
-app = typer.Typer(help="Text embedding stage: generate embeddings for primitives (and optional helpers for local runs).")
+app = typer.Typer(
+    help="Text embedding stage: generate embeddings for primitives (and optional helpers for local runs)."
+)
 
 
 def _validate_primitives_df(df: pd.DataFrame) -> None:
@@ -133,65 +135,6 @@ def _to_jsonable(obj: Any) -> Any:
     return str(obj)
 
 
-def _read_json_records(path: Path) -> List[Dict[str, Any]]:
-    """
-    Read a JSON file and return a DataFrame-shaped list of primitive records.
-
-    Supports wrapper payloads with keys like:
-      - extracted_df_records
-      - primitives
-    """
-    try:
-        obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except Exception as e:
-        raise typer.BadParameter(f"Failed reading JSON {path}: {e}") from e
-
-    if isinstance(obj, dict):
-        for k in ("extracted_df_records", "primitives"):
-            v = obj.get(k)
-            if isinstance(v, list):
-                return [x for x in v if isinstance(x, dict)]
-        return [obj]
-
-    if isinstance(obj, list):
-        return [x for x in obj if isinstance(x, dict)]
-
-    return []
-
-
-def _extract_metadata_texts(records: Iterable[Dict[str, Any]]) -> List[str]:
-    """
-    Extract:
-      - metadata.table_metadata.table_content
-      - metadata.content
-    """
-    pieces: List[str] = []
-    for rec in records:
-        meta = rec.get("metadata")
-        if not isinstance(meta, dict):
-            continue
-
-        table_meta = meta.get("table_metadata")
-        if isinstance(table_meta, dict):
-            tc = table_meta.get("table_content")
-            if isinstance(tc, str) and tc.strip():
-                pieces.append(tc.strip())
-
-        c = meta.get("content")
-        if isinstance(c, str) and c.strip():
-            pieces.append(c.strip())
-
-    # De-dupe consecutive repeats (common when both fields contain same content)
-    out: List[str] = []
-    prev: Optional[str] = None
-    for p in pieces:
-        if prev is not None and p == prev:
-            continue
-        out.append(p)
-        prev = p
-    return out
-
-
 def _embedding_input_path_for_input_json(input_json: Path, *, output_dir: Optional[Path]) -> Path:
     out_name = input_json.with_suffix(".embedding_input.txt").name
     return (output_dir / out_name) if output_dir is not None else input_json.with_suffix(".embedding_input.txt")
@@ -200,27 +143,6 @@ def _embedding_input_path_for_input_json(input_json: Path, *, output_dir: Option
 def _embeddings_out_path_for_input_json(input_json: Path, *, output_dir: Optional[Path]) -> Path:
     out_name = input_json.with_suffix(".text_embeddings.json").name
     return (output_dir / out_name) if output_dir is not None else input_json.with_suffix(".text_embeddings.json")
-
-
-def _make_embedding_df(
-    *,
-    combined_text: str,
-    source_id: str,
-    input_json: Path,
-    embedding_input_txt: Optional[Path],
-) -> pd.DataFrame:
-    # Minimal row satisfying nv-ingest-api's embedding transform expectations:
-    # it reads metadata.content and metadata.content_metadata.type.
-    metadata: Dict[str, Any] = {
-        "content": combined_text,
-        "content_metadata": {"type": "text"},
-        "source_metadata": {"source_id": source_id},
-        "custom_content": {
-            "input_json": str(input_json),
-            "embedding_input_txt": str(embedding_input_txt) if embedding_input_txt is not None else None,
-        },
-    }
-    return pd.DataFrame([{"document_type": "TEXT", "metadata": metadata}])
 
 
 @app.command()

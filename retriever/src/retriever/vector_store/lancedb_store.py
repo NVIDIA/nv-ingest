@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from nv_ingest_client.util.vdb.lancedb import LanceDB
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,10 @@ def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
         else:
             print(f"Page number for {path} is {page_number}")
 
+        if pdf_page != page_number:
+            breakpoint()
+            print(f"PDF page {pdf_page} does not match page number {page_number} for {path}")
+
         out.append(
             {
                 "vector": embedding,
@@ -252,25 +257,36 @@ def write_text_embeddings_dir_to_lancedb(
     skipped = 0
     failed = 0
 
-    all_rows: List[Dict[str, Any]] = []
-    for p in files:
-        try:
-            df = _read_text_embeddings_json_df(p)
-            if df.empty:
-                skipped += 1
-                continue
-            rows = _build_lancedb_rows_from_df(df)
-            if not rows:
-                skipped += 1
-                continue
-            all_rows.extend(rows)
-            processed += 1
-        except Exception:
-            failed += 1
-            logger.exception("Failed reading embeddings from %s", p)
+    lancedb = LanceDB(uri=cfg.uri, table_name=cfg.table_name, overwrite=cfg.overwrite)
 
-    # Write once so --overwrite behaves as expected.
-    _write_rows_to_lancedb(all_rows, cfg=cfg)
+    results = []
+
+    for p in files:
+        df = _read_text_embeddings_json_df(p)
+        rows = df.to_dict(orient="records")
+        results.append(rows)
+
+    lancedb.run(results)
+
+    # all_rows: List[Dict[str, Any]] = []
+    # for p in files:
+    #     try:
+    #         df = _read_text_embeddings_json_df(p)
+    #         if df.empty:
+    #             skipped += 1
+    #             continue
+    #         rows = _build_lancedb_rows_from_df(df)
+    #         if not rows:
+    #             skipped += 1
+    #             continue
+    #         all_rows.extend(rows)
+    #         processed += 1
+    #     except Exception:
+    #         failed += 1
+    #         logger.exception("Failed reading embeddings from %s", p)
+
+    # # Write once so --overwrite behaves as expected.
+    # _write_rows_to_lancedb(all_rows, cfg=cfg)
 
     return {
         "input_dir": str(input_dir),
@@ -278,6 +294,6 @@ def write_text_embeddings_dir_to_lancedb(
         "processed": processed,
         "skipped": skipped,
         "failed": failed,
-        "rows_written": len(all_rows),
+        # "rows_written": len(all_rows),
         "lancedb": {"uri": cfg.uri, "table_name": cfg.table_name, "overwrite": cfg.overwrite},
     }

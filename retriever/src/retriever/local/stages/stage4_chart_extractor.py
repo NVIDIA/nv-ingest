@@ -28,11 +28,7 @@ def _iter_stage3_table_outputs(input_dir: Path) -> list[Path]:
     # Stage3 defaults to: <input>.stem + ".table" + <input>.suffix
     # For the typical stage3 input `*.pdf_extraction.infographics.json`, this yields:
     #   `*.pdf_extraction.infographics.table.json`
-    files = [
-        p
-        for p in input_dir.iterdir()
-        if p.is_file() and p.name.endswith("pdf_extraction.infographics.table.json")
-    ]
+    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.infographic.table.json")]
     return sorted(files)
 
 
@@ -90,9 +86,7 @@ def run(
 
     files = _iter_stage3_table_outputs(input_path)
     if not files:
-        raise typer.BadParameter(
-            f"No `*pdf_extraction.infographics.table.json` files found in directory: {input_path}"
-        )
+        raise typer.BadParameter(f"No `*pdf_extraction.infographics.table.json` files found in directory: {input_path}")
 
     out_dir = output_dir or input_path
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -112,4 +106,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

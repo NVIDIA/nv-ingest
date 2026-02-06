@@ -14,6 +14,7 @@ from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.pdf.config import load_pdf_extractor_schema_from_dict
 from retriever.pdf.io import pdf_files_to_ledger_df
 from rich.console import Console
+from tqdm import tqdm
 import typer
 
 ensure_nv_ingest_api_importable()
@@ -205,6 +206,30 @@ def _to_jsonable(obj: Any) -> Any:
 def _pdf_json_out_path(pdf_path: Path) -> Path:
     # Mirror stage2 naming: append suffix to the full filename.
     return pdf_path.with_name(pdf_path.name + ".pdf_extraction.json")
+
+
+def _safe_pdf_page_count(path: str) -> int:
+    """
+    Best-effort page count for a PDF path.
+
+    Used only for progress reporting; failures should not fail extraction.
+    """
+    try:
+        import pypdfium2 as pdfium  # type: ignore
+
+        doc = pdfium.PdfDocument(path)
+        try:
+            n = int(len(doc))
+        except Exception:
+            n = int(doc.get_page_count())  # type: ignore[attr-defined]
+        try:
+            doc.close()
+        except Exception:
+            pass
+        return max(n, 0)
+    except Exception:
+        # If we can't read page count, fall back to 0 (still shows PDF progress).
+        return 0
 
 
 def _iter_ledger_pdf_paths(df_ledger: pd.DataFrame) -> Iterable[Tuple[str, str, Optional[str]]]:
@@ -611,15 +636,53 @@ def render_page_elements(
         text_depth=text_depth,
     )
 
-    df_ledger = pdf_files_to_ledger_df(pdfs)
+    # Progress reporting:
+    # - PDF progress: updates per completed PDF.
+    # - Page progress: updates by page-count *after* each PDF completes (best-effort).
+    page_counts = [_safe_pdf_page_count(p) for p in tqdm(pdfs, desc="Counting pages", unit="pdf")]
+    total_pages = sum(int(n) for n in page_counts)
 
-    extracted_df, info = extract_pdf_primitives_from_ledger_df(
-        df_ledger,
-        task_config=task_cfg,
-        extractor_config=extractor_schema,
-        write_json_outputs=bool(write_json_outputs),
-        json_output_dir=json_output_dir,
+    extracted_chunks: List[pd.DataFrame] = []
+    all_json_outputs: List[str] = []
+    info_last: Dict[str, Any] = {}
+
+    pdf_bar = tqdm(total=len(pdfs), desc="PDFs", unit="pdf")
+    page_bar = tqdm(total=total_pages, desc="Pages", unit="page")
+    try:
+        for i, (pdf_path, n_pages) in enumerate(zip(pdfs, page_counts)):
+            pdf_bar.set_postfix_str(Path(pdf_path).name)
+
+            df_ledger = pdf_files_to_ledger_df([pdf_path], start_index=i)
+            df_one, info_one = extract_pdf_primitives_from_ledger_df(
+                df_ledger,
+                task_config=task_cfg,
+                extractor_config=extractor_schema,
+                write_json_outputs=bool(write_json_outputs),
+                json_output_dir=json_output_dir,
+            )
+            info_last = dict(info_one or {})
+
+            if not df_one.empty:
+                extracted_chunks.append(df_one)
+
+            wrote = info_last.get("json_outputs")
+            if isinstance(wrote, list):
+                all_json_outputs.extend(str(x) for x in wrote)
+
+            pdf_bar.update(1)
+            page_bar.update(int(n_pages))
+    finally:
+        pdf_bar.close()
+        page_bar.close()
+
+    extracted_df = (
+        pd.concat(extracted_chunks, ignore_index=True)
+        if extracted_chunks
+        else pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
     )
+    info = dict(info_last or {})
+    if all_json_outputs:
+        info["json_outputs"] = all_json_outputs
 
     wrote = info.get("json_outputs")
     wrote_n = len(wrote) if isinstance(wrote, list) else 0

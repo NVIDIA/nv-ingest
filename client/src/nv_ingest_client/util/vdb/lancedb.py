@@ -2,6 +2,7 @@ import logging
 
 from datetime import timedelta
 from functools import partial
+import json
 from urllib.parse import urlparse
 
 import lancedb
@@ -12,6 +13,43 @@ from nv_ingest_client.util.vdb.adt_vdb import VDB
 from nv_ingest_client.util.vdb.milvus import nv_rerank
 
 logger = logging.getLogger(__name__)
+
+
+def _json_str(value) -> str:
+    """
+    Convert Python objects (dict/list/etc.) to a compact JSON string.
+
+    LanceDB table schema stores `metadata` and `source` as strings, so we must
+    serialize nested structures before ingestion.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
+    except Exception:
+        return str(value)
+
+
+def _maybe_parse_json(value):
+    """Best-effort parse for JSON-serialized string columns."""
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    if not isinstance(value, str):
+        return value
+    s = value.strip()
+    if not s:
+        return {}
+    # Avoid accidental parsing of plain strings that are not JSON objects/arrays.
+    if not (s.startswith("{") or s.startswith("[")):
+        return value
+    try:
+        return json.loads(s)
+    except Exception:
+        return value
 
 
 def _get_text_for_element(element):
@@ -85,8 +123,9 @@ def create_lancedb_results(results):
                 {
                     "vector": embedding,
                     "text": text,
-                    "metadata": str(content_meta.get("page_number", "")),
-                    "source": metadata.get("source_metadata", {}).get("source_id", ""),
+                    # Stored as strings in LanceDB; serialize nested structures.
+                    "metadata": _json_str(content_meta),
+                    "source": _json_str(metadata.get("source_metadata", {})),
                 }
             )
 
@@ -285,11 +324,24 @@ def lancedb_retrieval(
         )
         formatted = []
         for r in search_results:
+            source = _maybe_parse_json(r.get("source"))
+            content_meta = _maybe_parse_json(r.get("metadata"))
+
+            if not isinstance(source, dict):
+                source = {"source_id": "" if source is None else str(source)}
+            if not isinstance(content_meta, dict):
+                # Back-compat: previously this code used `metadata` as `page_number`.
+                try:
+                    page_number = int(content_meta)  # type: ignore[arg-type]
+                except Exception:
+                    page_number = -1
+                content_meta = {"page_number": page_number}
+
             formatted.append(
                 {
                     "entity": {
-                        "source": {"source_id": r.get("source")},
-                        "content_metadata": {"page_number": r.get("metadata")},
+                        "source": source,
+                        "content_metadata": content_meta,
                         "text": r.get("text"),
                     }
                 }

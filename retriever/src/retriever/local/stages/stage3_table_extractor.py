@@ -22,7 +22,7 @@ def _iter_pdf_extraction_infographics_json_files(input_dir: Path) -> list[Path]:
     # Match both:
     # - `pdf_extraction.infographics.json` (common when each doc has its own folder)
     # - `<doc>.pdf_extraction.infographics.json` (common when all outputs live in one folder)
-    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.infographics.json")]
+    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.infographic.json")]
     return sorted(files)
 
 
@@ -147,4 +147,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
