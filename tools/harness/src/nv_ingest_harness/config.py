@@ -195,7 +195,9 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
         FileNotFoundError: If config file doesn't exist
         ValueError: If configuration validation fails
     """
-    config_path = Path(__file__).resolve().parents[2] / config_file
+    config_path = Path(config_file)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).resolve().parents[2] / config_file
 
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}\n")
