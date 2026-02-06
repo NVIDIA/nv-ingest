@@ -9,7 +9,7 @@ from .stages import (
     stage4_chart_extractor,
     stage5_text_embeddings,
     stage6_vdb_upload,
-    stage8_recall,
+    stage7_vdb_query,
     report_stage_outputs,
     stage999_post_mortem_analysis,
 )
@@ -21,7 +21,7 @@ app.add_typer(stage3_table_extractor.app, name="stage3")
 app.add_typer(stage4_chart_extractor.app, name="stage4")
 app.add_typer(stage5_text_embeddings.app, name="stage5")
 app.add_typer(stage6_vdb_upload.app, name="stage6")
-app.add_typer(stage8_recall.app, name="stage8")
+app.add_typer(stage7_vdb_query.app, name="stage7")
 app.add_typer(report_stage_outputs.app, name="report")
 app.add_typer(stage999_post_mortem_analysis.app, name="stage999")
 

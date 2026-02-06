@@ -227,7 +227,7 @@ def _make_embedding_df(
 def run(
     input_dir: Path = typer.Option(..., "--input-dir", exists=True, file_okay=False, dir_okay=True),
     pattern: str = typer.Option(
-        "*.pdf_extraction.table.chart.json",
+        "*.pdf_extraction.infographic.table.json",
         "--pattern",
         help="Glob pattern for input JSON files (non-recursive unless --recursive is set).",
     ),
@@ -312,23 +312,7 @@ def run(
 
         t0 = time.perf_counter()
         try:
-            records = _read_json_records(in_path)
-            pieces = _extract_metadata_texts(records)
-            combined = "\n\n".join(pieces).strip()
-
-            if write_embedding_input:
-                out_txt.parent.mkdir(parents=True, exist_ok=True)
-                out_txt.write_text((combined + "\n") if combined else "", encoding="utf-8", errors="replace")
-                embedding_input_txt: Optional[Path] = out_txt
-            else:
-                embedding_input_txt = None
-
-            df_in = _make_embedding_df(
-                combined_text=combined,
-                source_id=str(in_path),
-                input_json=in_path,
-                embedding_input_txt=embedding_input_txt,
-            )
+            df_in = pd.read_json(in_path)
 
             df_out, info = embed_text_from_primitives_df(
                 df_in,
@@ -343,7 +327,6 @@ def run(
                 "pattern": str(pattern),
                 "embedding_input_txt": str(out_txt) if write_embedding_input else None,
                 "outputs": {"text_embeddings_json": str(out_json)},
-                "embedding_input_stats": {"num_pieces": int(len(pieces)), "num_chars": int(len(combined))},
                 "df_records": _to_jsonable(df_out.to_dict(orient="records")),
                 "info": _to_jsonable(info),
                 "timing": {"seconds": float(time.perf_counter() - t0)},

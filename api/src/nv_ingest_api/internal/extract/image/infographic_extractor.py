@@ -215,7 +215,7 @@ def _local_nemotron_ocr_text_predictions(
         trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
         trace_info["ocr"]["model_dir"] = model_dir
 
-    ocr = NemotronOCRV1(model_dir=model_dir, endpoint=None)
+    ocr = NemotronOCRV1(model_dir=model_dir)
 
     for idx, b64 in enumerate(valid_images):
         original_index = valid_indices[idx]

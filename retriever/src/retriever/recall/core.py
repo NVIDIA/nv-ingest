@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -27,13 +27,34 @@ class RecallConfig:
 
 
 def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize a query CSV into:
+      - query (string)
+      - golden_answer (string key that should match LanceDB `pdf_page`)
+
+    Supported inputs:
+      - query,pdf_page
+      - query,pdf,page (or query,pdf,gt_page)
+    """
     df = df.copy()
     if "gt_page" in df.columns and "page" not in df.columns:
         df = df.rename(columns={"gt_page": "page"})
-    required = {"query", "pdf", "page"}
+
+    if "query" not in df.columns:
+        raise KeyError("Query CSV must contain a 'query' column.")
+
+    if "pdf_page" in df.columns:
+        df["golden_answer"] = df["pdf_page"].astype(str)
+        return df
+
+    required = {"pdf", "page"}
     missing = required.difference(df.columns)
     if missing:
-        raise KeyError(f"Query CSV must contain columns {sorted(required)} (missing: {sorted(missing)})")
+        raise KeyError(
+            "Query CSV must contain either columns ['query','pdf_page'] or ['query','pdf','page'] "
+            f"(missing: {sorted(missing)})"
+        )
+
     df["pdf"] = df["pdf"].astype(str).str.replace(".pdf", "", regex=False)
     df["page"] = df["page"].astype(str)
     df["golden_answer"] = df.apply(lambda x: f"{x.pdf}_{x.page}", axis=1)
@@ -71,6 +92,7 @@ def _search_lancedb(
     table_name: str,
     query_vectors: List[List[float]],
     top_k: int,
+    vector_column_name: str = "vector",
 ) -> List[List[Dict[str, Any]]]:
     import lancedb  # type: ignore
 
@@ -81,7 +103,7 @@ def _search_lancedb(
     for v in query_vectors:
         q = np.asarray(v, dtype="float32")
         hits = (
-            table.search(q, vector_column_name="vector")
+            table.search(q, vector_column_name=vector_column_name)
             .select(["pdf_page", "pdf_basename", "page_number", "source_id", "path", "_distance"])
             .limit(top_k)
             .to_list()
@@ -90,37 +112,7 @@ def _search_lancedb(
     return results
 
 
-def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
-    hits = 0
-    for g, r in zip(gold, retrieved):
-        if g in (r[:k] if r else []):
-            hits += 1
-    return hits / max(1, len(gold))
-
-
-def evaluate_recall(
-    query_csv: Path,
-    *,
-    cfg: RecallConfig,
-    output_dir: Optional[Path] = None,
-) -> Dict[str, Any]:
-    df_query = _normalize_query_df(pd.read_csv(query_csv))
-    queries = df_query["query"].astype(str).tolist()
-    gold = df_query["golden_answer"].tolist()
-
-    vectors = _embed_queries_nim(
-        queries,
-        endpoint=cfg.embedding_endpoint,
-        model=cfg.embedding_model,
-        api_key=cfg.embedding_api_key,
-    )
-    raw_hits = _search_lancedb(
-        lancedb_uri=cfg.lancedb_uri,
-        table_name=cfg.lancedb_table,
-        query_vectors=vectors,
-        top_k=cfg.top_k,
-    )
-
+def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     retrieved_keys: List[List[str]] = []
     for hits in raw_hits:
         keys: List[str] = []
@@ -133,12 +125,75 @@ def evaluate_recall(
                 page = h.get("page_number")
                 keys.append(f"{pdf}_{page}" if (pdf is not None and page is not None) else "")
         retrieved_keys.append([k for k in keys if k])
+    return retrieved_keys
 
+
+def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
+    hits = 0
+    for g, r in zip(gold, retrieved):
+        if g in (r[:k] if r else []):
+            hits += 1
+    return hits / max(1, len(gold))
+
+
+def retrieve_and_score(
+    query_csv: Path,
+    *,
+    cfg: RecallConfig,
+    limit: Optional[int] = None,
+    vector_column_name: str = "vector",
+) -> Tuple[pd.DataFrame, List[str], List[List[Dict[str, Any]]], List[List[str]], Dict[str, float]]:
+    """
+    Run embeddings + LanceDB retrieval for a query CSV.
+
+    Returns:
+      - normalized query DataFrame
+      - gold keys
+      - raw LanceDB hits
+      - retrieved keys (pdf_page-like)
+      - metrics dict (recall@k)
+    """
+    df_query = _normalize_query_df(pd.read_csv(query_csv))
+    if limit is not None:
+        df_query = df_query.head(int(limit)).copy()
+
+    queries = df_query["query"].astype(str).tolist()
+    gold = df_query["golden_answer"].astype(str).tolist()
+
+    vectors = _embed_queries_nim(
+        queries,
+        endpoint=cfg.embedding_endpoint,
+        model=cfg.embedding_model,
+        api_key=cfg.embedding_api_key,
+    )
+    raw_hits = _search_lancedb(
+        lancedb_uri=cfg.lancedb_uri,
+        table_name=cfg.lancedb_table,
+        query_vectors=vectors,
+        top_k=int(cfg.top_k),
+        vector_column_name=vector_column_name,
+    )
+    retrieved_keys = _hits_to_keys(raw_hits)
     metrics = {f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k)) for k in cfg.ks}
+    return df_query, gold, raw_hits, retrieved_keys, metrics
+
+
+def evaluate_recall(
+    query_csv: Path,
+    *,
+    cfg: RecallConfig,
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    df_query, gold, raw_hits, retrieved_keys, metrics = retrieve_and_score(
+        query_csv,
+        cfg=cfg,
+        limit=None,
+        vector_column_name="vector",
+    )
 
     # Build per-query analysis DataFrame
     rows = []
-    for i, (q, g, r) in enumerate(zip(queries, gold, retrieved_keys)):
+    for i, (q, g, r) in enumerate(zip(df_query["query"].astype(str).tolist(), gold, retrieved_keys)):
         row = {"query_id": i, "query": q, "golden_answer": g, "top_retrieved": r[: cfg.top_k]}
         for k in cfg.ks:
             k = int(k)
@@ -147,7 +202,7 @@ def evaluate_recall(
         rows.append(row)
     results_df = pd.DataFrame(rows)
 
-    saved = {}
+    saved: Dict[str, str] = {}
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
         ts = time.strftime("%Y%m%d_%H%M%S")
@@ -156,8 +211,8 @@ def evaluate_recall(
         saved["results_csv"] = str(out)
 
     return {
-        "n_queries": len(df_query),
-        "top_k": cfg.top_k,
+        "n_queries": int(len(df_query)),
+        "top_k": int(cfg.top_k),
         "metrics": metrics,
         "saved": saved,
     }

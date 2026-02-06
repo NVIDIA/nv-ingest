@@ -9,7 +9,7 @@
 #
 
 # Directory containing PDFs (scanned recursively for *.pdf)
-input_dir: /home/jdyer/datasets/jd1
+input_dir: /home/jdyer/datasets/jp20
 
 # PDF extraction method: pdfium | pdfium_hybrid | ocr | nemotron_parse | tika | unstructured_io | adobe | llama
 method: pdfium
@@ -43,7 +43,7 @@ extract:
 
 outputs:
   write_json: true
-  json_output_dir: /home/jdyer/datasets/jd1-results-hf/
+  json_output_dir: /home/jdyer/datasets/jp20-results-hf/
 
 # Optionally limit number of PDFs processed
 limit: null

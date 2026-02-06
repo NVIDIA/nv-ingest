@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -14,259 +13,271 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LanceDBConfig:
-    uri: str
-    table: str = "embeddings"
-    mode: str = "append"  # append | overwrite
+    """
+    Minimal config for writing embeddings into LanceDB.
+
+    This module is intentionally lightweight: it can be used by the text-embedding
+    stage (`retriever.text_embed.stage`) and by the vector-store CLI (`retriever.vector_store.stage`).
+    """
+
+    uri: str = "lancedb"
+    table_name: str = "nv-ingest"
+    overwrite: bool = True
+
+    # Optional index creation (recommended for recall/search runs).
+    create_index: bool = True
+    index_type: str = "IVF_HNSW_SQ"
+    metric: str = "l2"
+    num_partitions: int = 16
+    num_sub_vectors: int = 256
 
 
-EXPECTED_COLUMNS: Sequence[str] = (
-    "id",
-    "vector",
-    "document_type",
-    "source_id",
-    "source_name",
-    "source_location",
-    "content_type",
-    "content_subtype",
-    "metadata_json",
-    "path",
-    "pdf_basename",
-    "page_number",
-    "pdf_page",
-)
+def _read_text_embeddings_json_df(path: Path) -> pd.DataFrame:
+    """
+    Read a `*.text_embeddings.json` file emitted by `retriever.text_embed.stage`.
 
-
-def _safe_json(obj: Any) -> str:
+    Expected wrapper shape:
+      {
+        ...,
+        "df_records": [ { "document_type": ..., "metadata": {...}, ... }, ... ],
+        ...
+      }
+    """
     try:
-        return json.dumps(obj, default=str, ensure_ascii=False)
-    except Exception:
-        return json.dumps({"_unserializable": str(type(obj))}, ensure_ascii=False)
+        obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except Exception as e:
+        raise ValueError(f"Failed reading JSON {path}: {e}") from e
 
-
-def _read_json_or_jsonl(path: Path) -> Any:
-    """
-    Read either:
-      - JSON (object or list)
-      - JSONL (one JSON object per line)
-    """
-    txt = path.read_text(encoding="utf-8", errors="replace")
-    try:
-        return json.loads(txt)
-    except Exception:
-        # Fall back to jsonl.
-        recs = []
-        for line in txt.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                recs.append(json.loads(line))
-            except Exception:
-                # Skip malformed lines rather than failing the entire ingest.
-                continue
-        return recs
-
-
-def _extract_df_records(obj: Any) -> List[Dict[str, Any]]:
-    """
-    Extract DataFrame-shaped records from wrapper payloads.
-
-    Supports common wrapper keys:
-      - df_records (text embedding stage output)
-      - extracted_df_records / primitives (pdf extraction sidecars)
-    """
     if isinstance(obj, dict):
-        for k in ("df_records", "extracted_df_records", "primitives"):
-            v = obj.get(k)
-            if isinstance(v, list):
-                return [x for x in v if isinstance(x, dict)]
-        # If it's already a "row-shaped" dict, allow it.
-        return [obj]
+        recs = obj.get("df_records")
+        if isinstance(recs, list):
+            return pd.DataFrame([r for r in recs if isinstance(r, dict)])
+        # Fall back to a single record.
+        return pd.DataFrame([obj])
 
     if isinstance(obj, list):
-        # If jsonl contains exactly one wrapper payload, unwrap it too.
-        if (
-            len(obj) == 1
-            and isinstance(obj[0], dict)
-            and not ("metadata" in obj[0] and ("document_type" in obj[0] or "uuid" in obj[0]))
-        ):
-            return _extract_df_records(obj[0])
-        return [x for x in obj if isinstance(x, dict)]
+        return pd.DataFrame([r for r in obj if isinstance(r, dict)])
 
-    return []
+    return pd.DataFrame([])
 
 
-def primitives_df_from_embeddings_json(path: Union[str, Path]) -> pd.DataFrame:
+def _iter_text_embeddings_json_files(input_dir: Path, *, recursive: bool) -> List[Path]:
     """
-    Read an embedding-stage JSON artifact (e.g. `*.text_embeddings.json`) and reconstruct
-    a primitives DataFrame with a `metadata` column containing `embedding`.
+    Return sorted list of `*.text_embeddings.json` files.
 
-    Expected wrapper shape (from `retriever.text_embed.stage` CLI):
-      { ..., "df_records": [ {"document_type": ..., "metadata": {..., "embedding": [...]}, ...}, ... ] }
+    The stage5 default naming is: `<input>.text_embeddings.json` (where `<input>` is
+    typically a stage4 output filename).
     """
-    p = Path(path)
-    obj = _read_json_or_jsonl(p)
-    records = _extract_df_records(obj)
-    df = pd.DataFrame(records)
-    return df
+    if recursive:
+        files = list(input_dir.rglob("*.text_embeddings.json"))
+    else:
+        files = list(input_dir.glob("*.text_embeddings.json"))
+    return sorted([p for p in files if p.is_file()])
 
 
-def write_embeddings_json_to_lancedb(path: Union[str, Path], *, cfg: LanceDBConfig) -> int:
+def _safe_str(x: Any) -> str:
+    return "" if x is None else str(x)
+
+
+def _extract_source_path_and_id(meta: Dict[str, Any]) -> Tuple[str, str]:
     """
-    Convenience wrapper: read `*.text_embeddings.json` (wrapper payload with `df_records`)
-    and write `metadata.embedding` vectors into LanceDB.
+    Extract a stable source path/id from metadata.
+
+    Prefers:
+      - metadata.source_metadata.source_id
+      - metadata.source_metadata.source_name
+      - metadata.custom_content.path
     """
-    df = primitives_df_from_embeddings_json(path)
-    return write_embeddings_to_lancedb(df, cfg=cfg)
+    source = meta.get("source_metadata") if isinstance(meta.get("source_metadata"), dict) else {}
+    source_id = source.get("source_id") or ""
+    source_name = source.get("source_name") or ""
+
+    custom = meta.get("custom_content") if isinstance(meta.get("custom_content"), dict) else {}
+    custom_path = custom.get("path") or custom.get("input_pdf") or custom.get("pdf_path") or ""
+
+    path = _safe_str(custom_path or source_id or source_name)
+    sid = _safe_str(source_id or path or source_name)
+    return path, sid
 
 
-def _iter_embedding_rows(df: pd.DataFrame) -> Iterable[Dict[str, Any]]:
-    """Yield LanceDB rows from an nv-ingest primitives DataFrame.
+def _extract_page_number(meta: Dict[str, Any]) -> int:
+    cm = meta.get("content_metadata") if isinstance(meta.get("content_metadata"), dict) else {}
+    page = cm.get("hierarchy", {}).get("page", -1)
+    try:
+        return int(page)
+    except Exception:
+        return -1
 
-    Assumes embedding lives in `metadata["embedding"]`.
+
+def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
-    for i, row in df.iterrows():
+    Transform an embeddings-enriched primitives DataFrame into LanceDB rows.
+
+    Rows include:
+      - vector (embedding)
+      - pdf_basename
+      - page_number
+      - pdf_page (basename_page)
+      - source_id
+      - path
+    """
+    out: List[Dict[str, Any]] = []
+
+    for _, row in df.iterrows():
         meta = row.get("metadata")
         if not isinstance(meta, dict):
             continue
-        emb = meta.get("embedding")
-        if emb is None:
+
+        embedding = meta.get("embedding")
+        if embedding is None:
             continue
 
-        custom = meta.get("custom_content") if isinstance(meta.get("custom_content"), dict) else {}
-        source = meta.get("source_metadata") if isinstance(meta.get("source_metadata"), dict) else {}
-        content_md = meta.get("content_metadata") if isinstance(meta.get("content_metadata"), dict) else {}
-        page_number = content_md.get("page_number")
-        path = custom.get("path")
-        pdf_basename = None
-        if isinstance(path, str) and path:
+        # Normalize embedding to list[float]
+        if not isinstance(embedding, list):
             try:
-                pdf_basename = Path(path).name
+                embedding = list(embedding)  # type: ignore[arg-type]
             except Exception:
-                pdf_basename = path
+                continue
 
-        yield {
-            "id": meta.get("uuid") or row.get("uuid") or f"row:{i}",
-            "vector": emb,
-            "document_type": row.get("document_type"),
-            "source_id": source.get("source_id"),
-            "source_name": source.get("source_name"),
-            "source_location": source.get("source_location"),
-            "content_type": content_md.get("type"),
-            "content_subtype": content_md.get("subtype"),
-            "metadata_json": _safe_json(meta),
-            "path": path,
-            "pdf_basename": pdf_basename,
-            "page_number": page_number,
-            "pdf_page": f"{pdf_basename}_{page_number}" if (pdf_basename is not None and page_number is not None) else None,
-        }
+        path, source_id = _extract_source_path_and_id(meta)
+        page_number = _extract_page_number(meta)
+        p = Path(path) if path else None
+        filename = p.name if p is not None else ""
+        pdf_basename = p.stem if p is not None else ""
+        pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
 
+        if page_number == -1:
+            print(f"Unable to determine page number for {path}")
+        else:
+            print(f"Page number for {path} is {page_number}")
 
-def _table_column_names(tbl: Any) -> set[str]:
-    # LanceDB returns a pyarrow.Schema for tbl.schema in most versions
-    schema = getattr(tbl, "schema", None)
-    if schema is None:
-        return set()
-    names = getattr(schema, "names", None)
-    if names is not None:
-        return set(names)
-    try:
-        return set(schema)  # type: ignore[arg-type]
-    except Exception:
-        return set()
-
-
-def _migrate_table_schema_overwrite(
-    *,
-    db: Any,
-    table_name: str,
-    expected_columns: Sequence[str],
-) -> None:
-    """Rewrite the table with missing columns added as nulls.
-
-    This is a compatibility path for older tables created before we added
-    `pdf_page` / `pdf_basename` / `page_number` etc.
-    """
-    tbl = db.open_table(table_name)
-    existing = tbl.to_pandas()
-    for col in expected_columns:
-        if col not in existing.columns:
-            existing[col] = None
-    db.create_table(table_name, data=existing.to_dict(orient="records"), mode="overwrite")
-
-
-def write_embeddings_to_lancedb(
-    df: pd.DataFrame,
-    *,
-    cfg: LanceDBConfig,
-) -> int:
-    """Write embeddings from `df` to a LanceDB table.
-
-    Returns the number of rows written.
-    """
-    import lancedb  # type: ignore
-
-    rows = list(_iter_embedding_rows(df))
-    if not rows:
-        return 0
-
-    db = lancedb.connect(cfg.uri)
-
-    if cfg.mode == "overwrite":
-        tbl = db.create_table(cfg.table, data=rows, mode="overwrite")
-        _ = tbl
-        return len(rows)
-
-    # append mode: create if missing, else add
-    if cfg.table in db.table_names():
-        tbl = db.open_table(cfg.table)
-        table_cols = _table_column_names(tbl)
-        row_cols = set(rows[0].keys())
-        missing = sorted((row_cols - table_cols))
-        if missing:
-            logger.warning(
-                "LanceDB table '%s' missing columns %s; rewriting table to add them.",
-                cfg.table,
-                missing,
-            )
-            _migrate_table_schema_overwrite(db=db, table_name=cfg.table, expected_columns=EXPECTED_COLUMNS)
-            tbl = db.open_table(cfg.table)
-        tbl.add(rows)
-    else:
-        _ = db.create_table(cfg.table, data=rows, mode="create")
-
-    return len(rows)
-
-
-def _build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description=(
-            "Ingest nv-ingest embedding JSON artifacts into LanceDB.\n\n"
-            "Reads wrapper payloads (e.g. '*.text_embeddings.json') and writes rows based on "
-            "`metadata.embedding` (stored as column 'vector')."
+        out.append(
+            {
+                "vector": embedding,
+                "pdf_page": pdf_page,
+                "filename": filename,
+                "pdf_basename": pdf_basename,
+                "page_number": int(page_number),
+                "source_id": source_id,
+                "path": path,
+            }
         )
-    )
-    p.add_argument(
-        "--input",
-        required=True,
-        help="Path to embedding JSON artifact (e.g. '*.text_embeddings.json'). Supports JSON or JSONL.",
-    )
-    p.add_argument("--uri", required=True, help="LanceDB URI (e.g. './lancedb').")
-    p.add_argument("--table", default="embeddings", help="LanceDB table name.")
-    p.add_argument("--mode", default="append", choices=["append", "overwrite"], help="Write mode.")
-    return p
+
+    return out
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = _build_arg_parser().parse_args(list(argv) if argv is not None else None)
-    n = write_embeddings_json_to_lancedb(
-        args.input,
-        cfg=LanceDBConfig(uri=str(args.uri), table=str(args.table), mode=str(args.mode)),
-    )
-    print(n)
+def _infer_vector_dim(rows: Sequence[Dict[str, Any]]) -> int:
+    for r in rows:
+        v = r.get("vector")
+        if isinstance(v, list) and v:
+            return int(len(v))
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig) -> None:
+    if not rows:
+        logger.warning("No embeddings rows provided; nothing to write to LanceDB.")
+        return
 
+    dim = _infer_vector_dim(rows)
+    if dim <= 0:
+        raise ValueError("Failed to infer embedding dimension from rows.")
+
+    try:
+        import lancedb  # type: ignore
+        import pyarrow as pa  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "LanceDB write requested but dependencies are missing. "
+            "Install `lancedb` and `pyarrow` in this environment."
+        ) from e
+
+    db = lancedb.connect(uri=cfg.uri)
+
+    schema = pa.schema(
+        [
+            pa.field("vector", pa.list_(pa.float32(), dim)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+        ]
+    )
+
+    mode = "overwrite" if cfg.overwrite else "append"
+    table = db.create_table(cfg.table_name, data=list(rows), schema=schema, mode=mode)
+
+    if cfg.create_index:
+        try:
+            table.create_index(
+                index_type=cfg.index_type,
+                metric=cfg.metric,
+                num_partitions=int(cfg.num_partitions),
+                num_sub_vectors=int(cfg.num_sub_vectors),
+                vector_column_name="vector",
+            )
+        except TypeError:
+            # Older/newer LanceDB versions may have different signatures; fall back to minimal call.
+            table.create_index(vector_column_name="vector")
+
+
+def write_embeddings_to_lancedb(df_with_embeddings: pd.DataFrame, *, cfg: LanceDBConfig) -> None:
+    """
+    Write embeddings found in `df_with_embeddings.metadata.embedding` to LanceDB.
+
+    This is used programmatically by `retriever.text_embed.stage.embed_text_from_primitives_df(...)`.
+    """
+    rows = _build_lancedb_rows_from_df(df_with_embeddings)
+    _write_rows_to_lancedb(rows, cfg=cfg)
+
+
+def write_text_embeddings_dir_to_lancedb(
+    input_dir: Path,
+    *,
+    cfg: LanceDBConfig,
+    recursive: bool = False,
+    limit: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Read `*.text_embeddings.json` files from `input_dir` and upload their embeddings to LanceDB.
+    """
+    input_dir = Path(input_dir)
+    files = _iter_text_embeddings_json_files(input_dir, recursive=bool(recursive))
+    if limit is not None:
+        files = files[: int(limit)]
+
+    processed = 0
+    skipped = 0
+    failed = 0
+
+    all_rows: List[Dict[str, Any]] = []
+    for p in files:
+        try:
+            df = _read_text_embeddings_json_df(p)
+            if df.empty:
+                skipped += 1
+                continue
+            rows = _build_lancedb_rows_from_df(df)
+            if not rows:
+                skipped += 1
+                continue
+            all_rows.extend(rows)
+            processed += 1
+        except Exception:
+            failed += 1
+            logger.exception("Failed reading embeddings from %s", p)
+
+    # Write once so --overwrite behaves as expected.
+    _write_rows_to_lancedb(all_rows, cfg=cfg)
+
+    return {
+        "input_dir": str(input_dir),
+        "n_files": len(files),
+        "processed": processed,
+        "skipped": skipped,
+        "failed": failed,
+        "rows_written": len(all_rows),
+        "lancedb": {"uri": cfg.uri, "table_name": cfg.table_name, "overwrite": cfg.overwrite},
+    }
