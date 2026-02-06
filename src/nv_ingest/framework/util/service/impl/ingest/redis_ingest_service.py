@@ -151,8 +151,7 @@ class RedisIngestService(IngestServiceMeta):
             f"FetchMode: {fetch_mode.name}, ResultTTL: {result_data_ttl_seconds}, StateTTL: {state_ttl_seconds}"
         )
 
-    async def _run_bounded_to_thread(self, func, *args, **kwargs):
-        """Run blocking Redis operation in thread pool."""
+    async def _run_in_thread(self, func, *args, **kwargs):
         return await asyncio.to_thread(func, *args, **kwargs)
 
     async def submit_job(self, job_spec_wrapper: "MessageWrapper", trace_id: str) -> str:
@@ -236,7 +235,7 @@ class RedisIngestService(IngestServiceMeta):
             logger.debug(
                 f"Submitting job {trace_id} to queue '{self._redis_task_queue}' with result TTL: {ttl_for_result}"
             )
-            await self._run_bounded_to_thread(
+            await self._run_in_thread(
                 self._ingest_client.submit_message,
                 channel_name=channel_name,
                 message=job_spec_json,
@@ -277,7 +276,7 @@ class RedisIngestService(IngestServiceMeta):
         try:
             result_channel: str = f"{job_id}"
             logger.debug(f"Attempting to fetch job result for {job_id} using mode {self._fetch_mode.name}")
-            message = await self._run_bounded_to_thread(
+            message = await self._run_in_thread(
                 self._ingest_client.fetch_message,
                 channel_name=result_channel,
                 timeout=10,
@@ -314,7 +313,7 @@ class RedisIngestService(IngestServiceMeta):
         ttl_to_set: Optional[int] = self._state_ttl_seconds
         try:
             logger.debug(f"Setting state for {job_id} to {state} with TTL {ttl_to_set}")
-            await self._run_bounded_to_thread(
+            await self._run_in_thread(
                 self._ingest_client.get_client().set,
                 state_key,
                 state,
@@ -342,7 +341,7 @@ class RedisIngestService(IngestServiceMeta):
         """
         state_key: str = f"{self._state_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+            data_bytes: Optional[bytes] = await self._run_in_thread(
                 self._ingest_client.get_client().get,
                 state_key,
             )
@@ -378,7 +377,7 @@ class RedisIngestService(IngestServiceMeta):
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
             data_to_store: str = json.dumps([job.model_dump(mode="json") for job in jobs_data])
-            await self._run_bounded_to_thread(
+            await self._run_in_thread(
                 self._ingest_client.get_client().set,
                 cache_key,
                 data_to_store,
@@ -403,7 +402,7 @@ class RedisIngestService(IngestServiceMeta):
         """
         cache_key: str = f"{self._cache_prefix}{job_id}"
         try:
-            data_bytes: Optional[bytes] = await self._run_bounded_to_thread(
+            data_bytes: Optional[bytes] = await self._run_in_thread(
                 self._ingest_client.get_client().get,
                 cache_key,
             )
@@ -453,7 +452,7 @@ class RedisIngestService(IngestServiceMeta):
         try:
             # Store subjob IDs as a set (only if there are subjobs)
             if subjob_ids:
-                await self._run_bounded_to_thread(
+                await self._run_in_thread(
                     self._ingest_client.get_client().sadd,
                     parent_key,
                     *subjob_ids,
@@ -473,7 +472,7 @@ class RedisIngestService(IngestServiceMeta):
             if subjob_descriptors:
                 metadata_to_store["subjob_descriptors"] = json.dumps(subjob_descriptors)
 
-            await self._run_bounded_to_thread(
+            await self._run_in_thread(
                 self._ingest_client.get_client().hset,
                 metadata_key,
                 mapping=metadata_to_store,
@@ -481,12 +480,12 @@ class RedisIngestService(IngestServiceMeta):
 
             # Set TTL on both keys to match state TTL
             if self._state_ttl_seconds:
-                await self._run_bounded_to_thread(
+                await self._run_in_thread(
                     self._ingest_client.get_client().expire,
                     parent_key,
                     self._state_ttl_seconds,
                 )
-                await self._run_bounded_to_thread(
+                await self._run_in_thread(
                     self._ingest_client.get_client().expire,
                     metadata_key,
                     self._state_ttl_seconds,
@@ -517,7 +516,7 @@ class RedisIngestService(IngestServiceMeta):
 
         try:
             # Check if this is a parent job (check metadata_key since non-split PDFs may not have parent_key)
-            exists = await self._run_bounded_to_thread(
+            exists = await self._run_in_thread(
                 self._ingest_client.get_client().exists,
                 metadata_key,  # Check metadata instead of parent_key for non-split PDF support
             )
@@ -526,14 +525,14 @@ class RedisIngestService(IngestServiceMeta):
                 return None
 
             # Get subjob IDs (may be empty for non-split PDFs)
-            subjob_ids_bytes = await self._run_bounded_to_thread(
+            subjob_ids_bytes = await self._run_in_thread(
                 self._ingest_client.get_client().smembers,
                 parent_key,
             )
             subjob_id_set = {id.decode("utf-8") for id in subjob_ids_bytes} if subjob_ids_bytes else set()
 
             # Get metadata
-            metadata_dict = await self._run_bounded_to_thread(
+            metadata_dict = await self._run_in_thread(
                 self._ingest_client.get_client().hgetall,
                 metadata_key,
             )
