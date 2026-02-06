@@ -94,7 +94,7 @@ active:
 # docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: both  # Options: "none", "with", "both"
+  reranker_mode: both  # Options: "none", "with", "both" - requires reranker profile enabled
 
   # Recall evaluation settings
   recall_top_k: 10
@@ -168,3 +168,29 @@ datasets:
     extract_images: false
     extract_infographics: true
     recall_dataset: bo10k
+
+  # Video dataset (96 files, ~54 GB)
+  video:
+    path: /path/to/video_retrieval_data
+    profiles: [retrieval, audio]
+    file_pattern: "*.mp4"
+    total_size_mb: 55263
+    extract_text: true
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: video
+
+  # Audio dataset (MP3 files for audio retrieval)
+  audio:
+    path: /path/to/audio_retrieval_data_mp3
+    profiles: [retrieval, audio, reranker]
+    file_pattern: "*.mp3"
+    total_size_mb: 2859
+    extract_text: false
+    extract_tables: false
+    extract_charts: false
+    extract_images: false
+    extract_infographics: false
+    recall_dataset: audio
