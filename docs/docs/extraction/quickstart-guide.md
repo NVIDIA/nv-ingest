@@ -58,18 +58,7 @@ f. Start core services. This example uses the retrieval profile.  For more infor
 
     !!! tip
 
-        The default configuration may not fit on a single GPU for some hardware targets. If you are running on any of the following GPUs, use a `docker compose` override file to reduce VRAM usage:
-        - A100-SXM4-40GB
-        - A10G
-        Override files typically lower per-service memory allocation, batch sizes, or concurrency. This trades peak throughput for making the full pipeline runnable on the available GPU. To use an override file, include it in your `docker compose up` command by using a second `-f` flag after the base `docker-compose.yaml` file. The settings in the second file override the values that are set in the first file.
-
-    The following example uses an override file that contains settings that are optimized for an NVIDIA A100 GPU with 40GB of VRAM.
-    ```shell
-    docker compose \
-      -f docker-compose.yaml \
-      -f docker-compose.a100-40gb.yaml \
-      --profile retrieval up
-    ```
+        The default configuration may not fit on a single GPU for some hardware targets. Use a [docker compose override file](#docker-compose-override-files) to reduce VRAM usage. Override files typically lower per-service memory allocation, batch sizes, or concurrency, trading peak throughput for making the full pipeline runnable on the available GPU.
 
 g. When core services have fully started, `nvidia-smi` should show processes like the following:
 
@@ -436,6 +425,46 @@ You can specify multiple `--profile` options.
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
+
+
+## Docker Compose override files
+
+The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) may exceed VRAM on a single GPU for some hardware. Override files reduce per-service memory, batch sizes, or concurrency so the full pipeline can run on the available GPU. To use an override, pass a second `-f` file after the base compose file; Docker Compose merges them and the override takes precedence.
+
+| Override file | GPU target |
+|---------------|------------|
+| `docker-compose.a10g.yaml` | NVIDIA A10G |
+| `docker-compose.a100-40gb.yaml` | NVIDIA A100-SXM4-40GB |
+| `docker-compose.l40s.yaml` | NVIDIA L40S |
+
+For **RTX Pro 6000 Server Edition** and other GPUs with limited VRAM, use the override that best matches your GPU memory (for example, `docker-compose.l40s.yaml` or `docker-compose.a10g.yaml`).
+
+**Example — A100 40GB:**
+
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  -f docker-compose.a100-40gb.yaml \
+  --profile retrieval up
+```
+
+**Example — A10G:**
+
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  -f docker-compose.a10g.yaml \
+  --profile retrieval up
+```
+
+**Example — L40S:**
+
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  -f docker-compose.l40s.yaml \
+  --profile retrieval up
+```
 
 
 ## Specify MIG slices for NIM models
