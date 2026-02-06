@@ -577,14 +577,13 @@ def pdfium_extractor(
 
             # If we want OCR extraction, rasterize the page and store it
             if extraction_needed_for_text or extraction_needed_for_structured:
-                image, padding_offsets = pdfium_pages_to_numpy(
+                image, _ = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     render_rev_byteorder=True,
                     trace_info=execution_trace_log,
                 )
-                pages_for_extractions.append((page_idx, image[0], padding_offsets[0]))
+                pages_for_extractions.append((page_idx, image[0], (0, 0)))  # No padding offset
 
                 # Whenever pages_for_extractions hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_extractions) >= YOLOX_MAX_BATCH_SIZE:
