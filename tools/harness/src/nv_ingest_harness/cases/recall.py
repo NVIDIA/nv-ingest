@@ -88,6 +88,11 @@ def main(config=None, log_path: str = "test_results") -> int:
     gpu_search = config.gpu_search
     model_name, dense_dim = embed_info()
 
+    # Deployment fingerprint - detect silent fallback to wrong model
+    if dense_dim == 1024:
+        print("WARNING: Embedding model returned dim=1024 (nv-embedqa-e5-v5 fallback)")
+        print("WARNING: Expected dim=2048 for multimodal embed. Check embedding NIM status.")
+
     # Recall-specific configuration with defaults
     reranker_mode = getattr(config, "reranker_mode", "none")
     recall_top_k = getattr(config, "recall_top_k", 10)
@@ -144,6 +149,27 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     if lancedb_path:
         print(f"Using LanceDB at: {lancedb_path}")
+
+    # Verify collection schema if using Milvus
+    if vdb_backend == "milvus":
+        try:
+            from pymilvus import MilvusClient
+
+            verify_uri = f"http://{hostname}:19530"
+            mc = MilvusClient(uri=verify_uri)
+            col_info = mc.describe_collection(collection_name)
+            for field in col_info.get("fields", []):
+                params = field.get("params", {})
+                if "dim" in params:
+                    actual_dim = int(params["dim"])
+                    if actual_dim != dense_dim:
+                        print(f"WARNING: Collection vector dim={actual_dim} != embed model dim={dense_dim}")
+                        print("WARNING: Collection may have been created with a different embedding model")
+                    else:
+                        print(f"Collection vector dim={actual_dim} matches embed model dim={dense_dim}")
+            mc.close()
+        except Exception as e:
+            print(f"Could not verify collection schema: {e}")
 
     try:
         recall_results = {}

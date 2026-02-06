@@ -83,6 +83,11 @@ def main(config=None, log_path: str = "test_results") -> int:
 
     model_name, dense_dim = embed_info()
 
+    # Deployment fingerprint - detect silent fallback to wrong model
+    if dense_dim == 1024:
+        print("WARNING: Embedding model returned dim=1024 (nv-embedqa-e5-v5 fallback)")
+        print("WARNING: Expected dim=2048 for multimodal embed. Check embedding NIM status.")
+
     # Log configuration for transparency
     print("=== Test Configuration ===")
     print(f"Dataset: {data_dir}")
@@ -256,6 +261,24 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Optional: log chunk stats and per-type breakdown
     if vdb_backend != "lancedb":
         milvus_chunks(f"http://{hostname}:19530", collection_name)
+        # Verify collection vector dimension matches expected
+        try:
+            from pymilvus import MilvusClient
+
+            mc = MilvusClient(uri=f"http://{hostname}:19530")
+            col_info = mc.describe_collection(collection_name)
+            for field in col_info.get("fields", []):
+                params = field.get("params", {})
+                if "dim" in params:
+                    actual_dim = int(params["dim"])
+                    if actual_dim != dense_dim:
+                        print(f"WARNING: Collection vector dim={actual_dim} != expected dim={dense_dim}")
+                        print("WARNING: Collection may have been created with a different embedding model")
+                    else:
+                        print(f"Collection vector dim={actual_dim} matches expected dim={dense_dim}")
+            mc.close()
+        except Exception as e:
+            print(f"Could not verify collection schema: {e}")
     text_results, table_results, chart_results = segment_results(results)
     kv_event_log("text_chunks", sum(len(x) for x in text_results), log_path)
     kv_event_log("table_chunks", sum(len(x) for x in table_results), log_path)

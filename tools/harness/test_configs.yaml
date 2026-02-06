@@ -192,6 +192,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_finance_en
+    enable_beir: true
 
   vidore_v3_industrial:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_industrial
@@ -204,6 +205,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_industrial
+    enable_beir: true
 
   vidore_v3_computer_science:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_computer_science
@@ -216,6 +218,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_computer_science
+    enable_beir: true
 
   vidore_v3_pharmaceuticals:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_pharmaceuticals
@@ -228,6 +231,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_pharmaceuticals
+    enable_beir: true
 
   vidore_v3_hr:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_hr
@@ -240,6 +244,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_hr
+    enable_beir: true
 
   vidore_v3_energy:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_energy
@@ -252,6 +257,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_energy
+    enable_beir: true
 
   vidore_v3_physics:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_physics
@@ -264,6 +270,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_physics
+    enable_beir: true
 
   vidore_v3_finance_fr:
     path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_finance_fr
@@ -276,6 +283,7 @@ datasets:
     extract_method: ocr
     image_elements_modality: text_image
     recall_dataset: vidore_v3_finance_fr
+    enable_beir: true
 
 # Dataset groups for running multiple datasets together
 # Use: uv run nv-ingest-harness-run --case=e2e_recall --dataset=vidore
