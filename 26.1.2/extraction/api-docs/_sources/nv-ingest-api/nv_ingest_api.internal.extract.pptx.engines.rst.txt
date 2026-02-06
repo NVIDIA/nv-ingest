@@ -1,0 +1,21 @@
+nv\_ingest\_api.internal.extract.pptx.engines package
+=====================================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.pptx.engines.pptx\_helper module
+-----------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pptx.engines.pptx_helper
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.pptx.engines
+   :members:
+   :show-inheritance:
+   :undoc-members:
