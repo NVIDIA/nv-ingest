@@ -1,0 +1,21 @@
+nv\_ingest\_api.util.service\_clients.rest package
+==================================================
+
+Submodules
+----------
+
+nv\_ingest\_api.util.service\_clients.rest.rest\_client module
+--------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.util.service_clients.rest.rest_client
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.util.service_clients.rest
+   :members:
+   :show-inheritance:
+   :undoc-members:

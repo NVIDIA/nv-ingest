@@ -1,0 +1,93 @@
+nv\_ingest\_api.internal.schemas.extract package
+================================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.schemas.extract.extract\_audio\_schema module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_audio_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_chart\_schema module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_chart_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_docx\_schema module
+---------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_docx_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_html\_schema module
+---------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_html_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_image\_schema module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_image_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_infographic\_schema module
+----------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_infographic_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_ocr\_schema module
+--------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_ocr_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_pdf\_schema module
+--------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_pdf_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_pptx\_schema module
+---------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_pptx_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.schemas.extract.extract\_table\_schema module
+----------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract.extract_table_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.schemas.extract
+   :members:
+   :show-inheritance:
+   :undoc-members:
