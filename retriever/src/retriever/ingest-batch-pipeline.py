@@ -353,7 +353,7 @@ def run(
     split_fn = partial(_pdf_to_pages_row, render_dpi=int(render_dpi), pages_per_batch=int(pages_per_batch))
     pages = ds.flat_map(
         split_fn,
-        ray_remote_args={"num_cpus": int(cpu_per_pdf)},
+        num_cpus=float(cpu_per_pdf),
     )
 
     logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
