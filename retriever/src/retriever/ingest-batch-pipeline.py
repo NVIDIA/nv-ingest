@@ -30,6 +30,15 @@ app = typer.Typer(
     )
 )
 
+_PAGE_SCHEMA_KEYS = (
+    "pdf_path",
+    "page_index",
+    "page_number",
+    "page_image_b64",
+    "error",
+    "error_detail",
+)
+
 
 @dataclass(frozen=True)
 class PageRecord:
@@ -44,6 +53,8 @@ class PageRecord:
             "page_index": int(self.page_index),
             "page_number": int(self.page_number),
             "page_image_b64": self.page_image_b64,
+            "error": None,
+            "error_detail": None,
         }
 
 
@@ -103,7 +114,11 @@ def _pdf_to_pages(
         return [
             {
                 "pdf_path": str(path),
+                "page_index": None,
+                "page_number": None,
+                "page_image_b64": "",
                 "error": "missing_file",
+                "error_detail": None,
             }
         ]
 
@@ -113,6 +128,9 @@ def _pdf_to_pages(
         return [
             {
                 "pdf_path": str(path),
+                "page_index": None,
+                "page_number": None,
+                "page_image_b64": "",
                 "error": "open_failed",
                 "error_detail": str(e),
             }
@@ -148,7 +166,16 @@ def _pdf_to_pages(
                         pass
             i = j
     except Exception as e:
-        out.append({"pdf_path": str(path), "error": "render_failed", "error_detail": str(e)})
+        out.append(
+            {
+                "pdf_path": str(path),
+                "page_index": None,
+                "page_number": None,
+                "page_image_b64": "",
+                "error": "render_failed",
+                "error_detail": str(e),
+            }
+        )
     finally:
         try:
             doc.close()
@@ -166,7 +193,16 @@ def _pdf_to_pages_row(
 ) -> List[Dict[str, Any]]:
     pdf_path = row.get("pdf_path")
     if not isinstance(pdf_path, str) or not pdf_path:
-        return [{"error": "missing_pdf_path"}]
+        return [
+            {
+                "pdf_path": str(pdf_path) if pdf_path is not None else "",
+                "page_index": None,
+                "page_number": None,
+                "page_image_b64": "",
+                "error": "missing_pdf_path",
+                "error_detail": None,
+            }
+        ]
     return _pdf_to_pages(
         pdf_path,
         render_dpi=int(render_dpi),
@@ -249,33 +285,64 @@ class NemotronOcrBatchFn:
 
         self._model = NemotronOCRV1(model_dir=str(resolved_dir))
 
-    def __call__(self, batch):  # Ray Data passes a pandas.DataFrame for batch_format="pandas"
-        import pandas as pd
+    def __call__(self, batch):
+        """
+        Ray Data map_batches handler.
 
-        if not isinstance(batch, pd.DataFrame):
-            batch = pd.DataFrame(batch)
+        We intentionally avoid pandas here because some environments ship a pandas build
+        that breaks Ray's internal pandas conversion utilities.
+        """
+        import pyarrow as pa  # type: ignore
+
+        if isinstance(batch, pa.Table):
+            d = batch.to_pydict()
+        elif isinstance(batch, dict):
+            d = dict(batch)
+        else:
+            # Fall back to best-effort conversion (Ray may pass other batch types).
+            try:
+                d = dict(batch)  # type: ignore[arg-type]
+            except Exception:
+                d = {"_raw": [str(batch)]}
+
+        # Ensure all expected keys exist so output schema is stable.
+        n = 0
+        for v in d.values():
+            if isinstance(v, list):
+                n = len(v)
+                break
+        for k in _PAGE_SCHEMA_KEYS:
+            if k not in d:
+                d[k] = [None] * n
+
+        images = d.get("page_image_b64", [])
+        prior_errs = d.get("error", [None] * n)
 
         texts: List[str] = []
-        errors: List[Optional[str]] = []
+        ocr_errors: List[Optional[str]] = []
 
-        for _idx, row in batch.iterrows():
-            if "page_image_b64" not in row or not isinstance(row["page_image_b64"], str):
+        for i in range(n):
+            if prior_errs[i] not in {None, ""}:
                 texts.append("")
-                errors.append("missing_page_image_b64")
+                ocr_errors.append("skipped_input_error")
+                continue
+
+            b64 = images[i]
+            if not isinstance(b64, str) or not b64:
+                texts.append("")
+                ocr_errors.append("missing_page_image_b64")
                 continue
             try:
-                # NemotronOCRV1 treats `str` input as base64 string.
-                out = self._model.invoke(row["page_image_b64"], merge_level=self._merge_level)
+                out = self._model.invoke(b64, merge_level=self._merge_level)
                 texts.append(_ocr_output_to_text(out))
-                errors.append(None)
+                ocr_errors.append(None)
             except Exception as e:
                 texts.append("")
-                errors.append(str(e))
+                ocr_errors.append(str(e))
 
-        batch = batch.copy()
-        batch["ocr_text"] = texts
-        batch["ocr_error"] = errors
-        return batch
+        d["ocr_text"] = texts
+        d["ocr_error"] = ocr_errors
+        return pa.Table.from_pydict(d)
 
 
 @app.command("run")
@@ -359,7 +426,7 @@ def run(
     logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
     ocr = pages.map_batches(
         NemotronOcrBatchFn,
-        batch_format="pandas",
+        batch_format="pyarrow",
         batch_size=int(ocr_batch_size),
         compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
         num_gpus=1,
