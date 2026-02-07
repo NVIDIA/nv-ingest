@@ -467,30 +467,30 @@ def run(
     )
 
     logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
-    ocr = pages.map_batches(
-        NemotronOcrBatchFn,
-        batch_format="pyarrow",
-        batch_size=int(ocr_batch_size),
-        compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
-        num_gpus=1,
-        fn_constructor_kwargs={
-            "model_id": str(model_id),
-            "model_dir": str(model_dir) if model_dir is not None else None,
-            "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
-            "merge_level": str(merge_level),
-        },
-    )
+    # ocr = pages.map_batches(
+    #     NemotronOcrBatchFn,
+    #     batch_format="pyarrow",
+    #     batch_size=int(ocr_batch_size),
+    #     compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
+    #     num_gpus=1,
+    #     fn_constructor_kwargs={
+    #         "model_id": str(model_id),
+    #         "model_dir": str(model_dir) if model_dir is not None else None,
+    #         "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
+    #         "merge_level": str(merge_level),
+    #     },
+    # )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    fmt = str(output_format or "parquet").strip().lower()
-    if fmt == "parquet":
-        logger.info("Writing output Parquet shards to %s", output_dir)
-        ocr.write_parquet(str(output_dir))
-    elif fmt == "jsonl":
-        logger.info("Writing output JSONL shards to %s (driver-side)", output_dir)
-        _write_jsonl_driver_side(ocr, output_dir=output_dir, rows_per_file=int(jsonl_rows_per_file))
-    else:
-        raise typer.BadParameter("Unsupported --output-format. Use 'parquet' or 'jsonl'.")
+    # fmt = str(output_format or "parquet").strip().lower()
+    # if fmt == "parquet":
+    #     logger.info("Writing output Parquet shards to %s", output_dir)
+    #     ocr.write_parquet(str(output_dir))
+    # elif fmt == "jsonl":
+    #     logger.info("Writing output JSONL shards to %s (driver-side)", output_dir)
+    #     _write_jsonl_driver_side(ocr, output_dir=output_dir, rows_per_file=int(jsonl_rows_per_file))
+    # else:
+    #     raise typer.BadParameter("Unsupported --output-format. Use 'parquet' or 'jsonl'.")
     logger.info("Done.")
 
 
