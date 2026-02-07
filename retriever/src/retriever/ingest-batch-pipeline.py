@@ -482,6 +482,7 @@ def run(
     # )
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    pages.write_json(str(output_dir))
     # fmt = str(output_format or "parquet").strip().lower()
     # if fmt == "parquet":
     #     logger.info("Writing output Parquet shards to %s", output_dir)
