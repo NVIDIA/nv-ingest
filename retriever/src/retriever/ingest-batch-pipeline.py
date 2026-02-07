@@ -424,23 +424,24 @@ def run(
     )
 
     logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
-    ocr = pages.map_batches(
-        NemotronOcrBatchFn,
-        batch_format="pyarrow",
-        batch_size=int(ocr_batch_size),
-        compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
-        num_gpus=1,
-        fn_constructor_kwargs={
-            "model_id": str(model_id),
-            "model_dir": str(model_dir) if model_dir is not None else None,
-            "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
-            "merge_level": str(merge_level),
-        },
-    )
+    # ocr = pages.map_batches(
+    #     NemotronOcrBatchFn,
+    #     batch_format="pyarrow",
+    #     batch_size=int(ocr_batch_size),
+    #     compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
+    #     num_gpus=1,
+    #     fn_constructor_kwargs={
+    #         "model_id": str(model_id),
+    #         "model_dir": str(model_dir) if model_dir is not None else None,
+    #         "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
+    #         "merge_level": str(merge_level),
+    #     },
+    # )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Writing output JSON shards to %s", output_dir)
-    ocr.write_json(str(output_dir))
+    # ocr.write_json(str(output_dir))
+    pages.write_json(str(output_dir))
     logger.info("Done.")
 
 
