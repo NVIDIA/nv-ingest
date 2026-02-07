@@ -345,6 +345,38 @@ class NemotronOcrBatchFn:
         return pa.Table.from_pydict(d)
 
 
+def _write_jsonl_driver_side(ds: Any, *, output_dir: Path, rows_per_file: int = 50_000) -> None:
+    """
+    Write JSON Lines without pandas by streaming Arrow batches on the driver.
+
+    Ray's built-in `Dataset.write_json()` currently converts blocks to pandas, which can
+    fail in environments with incompatible pandas builds. This avoids pandas entirely.
+    """
+    import json
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    file_idx = 0
+    row_idx_in_file = 0
+    f = (output_dir / f"part-{file_idx:05d}.jsonl").open("w", encoding="utf-8")
+    try:
+        for batch in ds.iter_batches(batch_format="pyarrow", batch_size=1024):
+            rows = batch.to_pylist()
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                row_idx_in_file += 1
+                if row_idx_in_file >= int(rows_per_file):
+                    f.close()
+                    file_idx += 1
+                    row_idx_in_file = 0
+                    f = (output_dir / f"part-{file_idx:05d}.jsonl").open("w", encoding="utf-8")
+    finally:
+        try:
+            f.close()
+        except Exception:
+            pass
+
+
 @app.command("run")
 def run(
     input_dir: Optional[Path] = typer.Option(
@@ -391,12 +423,23 @@ def run(
     ocr_batch_size: int = typer.Option(4, "--ocr-batch-size", min=1, help="Ray Data batch size for OCR stage."),
     ocr_actors: int = typer.Option(1, "--ocr-actors", min=1, help="Number of GPU OCR actors (1 GPU each)."),
     # Output
+    output_format: str = typer.Option(
+        "parquet",
+        "--output-format",
+        help="Output format: 'parquet' (recommended) or 'jsonl' (pandas-free fallback).",
+    ),
+    jsonl_rows_per_file: int = typer.Option(
+        50_000,
+        "--jsonl-rows-per-file",
+        min=1,
+        help="When --output-format=jsonl, max rows per output file (driver-side writer).",
+    ),
     output_dir: Path = typer.Option(
         Path("ray_ocr_outputs"),
         "--output-dir",
         file_okay=False,
         dir_okay=True,
-        help="Directory to write Ray Data JSON output shards.",
+        help="Directory to write output shards into.",
     ),
 ) -> None:
     """
@@ -424,24 +467,30 @@ def run(
     )
 
     logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
-    # ocr = pages.map_batches(
-    #     NemotronOcrBatchFn,
-    #     batch_format="pyarrow",
-    #     batch_size=int(ocr_batch_size),
-    #     compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
-    #     num_gpus=1,
-    #     fn_constructor_kwargs={
-    #         "model_id": str(model_id),
-    #         "model_dir": str(model_dir) if model_dir is not None else None,
-    #         "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
-    #         "merge_level": str(merge_level),
-    #     },
-    # )
+    ocr = pages.map_batches(
+        NemotronOcrBatchFn,
+        batch_format="pyarrow",
+        batch_size=int(ocr_batch_size),
+        compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
+        num_gpus=1,
+        fn_constructor_kwargs={
+            "model_id": str(model_id),
+            "model_dir": str(model_dir) if model_dir is not None else None,
+            "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
+            "merge_level": str(merge_level),
+        },
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Writing output JSON shards to %s", output_dir)
-    # ocr.write_json(str(output_dir))
-    pages.write_json(str(output_dir))
+    fmt = str(output_format or "parquet").strip().lower()
+    if fmt == "parquet":
+        logger.info("Writing output Parquet shards to %s", output_dir)
+        ocr.write_parquet(str(output_dir))
+    elif fmt == "jsonl":
+        logger.info("Writing output JSONL shards to %s (driver-side)", output_dir)
+        _write_jsonl_driver_side(ocr, output_dir=output_dir, rows_per_file=int(jsonl_rows_per_file))
+    else:
+        raise typer.BadParameter("Unsupported --output-format. Use 'parquet' or 'jsonl'.")
     logger.info("Done.")
 
 
