@@ -195,6 +195,29 @@ def test_transform_create_text_embeddings_internal_with_only_empty_text(mock_asy
     mock_async_runner.assert_not_called()
 
 
+@patch(f"{MODULE_UNDER_TEST}._async_runner")
+def test_transform_create_text_embeddings_internal_uses_callable_embedder_when_no_endpoint(
+    mock_async_runner, dummy_df
+):
+    def _local_embedder(texts):
+        return [[0.9, 0.8]] * len(list(texts))
+
+    task_cfg = {
+        "endpoint_url": None,  # Explicitly disable remote endpoint
+        "embedder": _local_embedder,
+        "local_batch_size": 2,
+    }
+
+    result_df, _trace = module_under_test.transform_create_text_embeddings_internal(
+        dummy_df.copy(),
+        task_cfg,
+    )
+
+    mock_async_runner.assert_not_called()
+    assert result_df.iloc[0]["metadata"]["embedding"] == [0.9, 0.8]
+    assert result_df.iloc[1]["metadata"]["embedding"] == [0.9, 0.8]
+
+
 @patch(f"{MODULE_UNDER_TEST}._async_request_handler")
 def test_async_runner_happy_path(mock_handler):
     # Arrange

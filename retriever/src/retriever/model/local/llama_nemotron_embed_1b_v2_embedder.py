@@ -24,6 +24,10 @@ class LlamaNemotronEmbed1BV2Embedder:
     device: Optional[str] = None
     hf_cache_dir: Optional[str] = None
     normalize: bool = True
+    # IMPORTANT: Some HF tokenizers set an effectively "infinite" model_max_length.
+    # If we rely on that, `truncation=True` may still allow extremely long sequences,
+    # which can explode attention-mask memory (O(seq_len^2)) and OOM the GPU.
+    max_length: int = 4096
 
     def __post_init__(self) -> None:
         self._tokenizer = None
@@ -64,7 +68,13 @@ class LlamaNemotronEmbed1BV2Embedder:
         with torch.inference_mode():
             for i in range(0, len(texts), max(1, int(batch_size))):
                 chunk = texts[i : i + max(1, int(batch_size))]
-                batch = self._tokenizer(chunk, padding=True, truncation=True, return_tensors="pt").to(dev)
+                batch = self._tokenizer(
+                    chunk,
+                    padding=True,
+                    truncation=True,
+                    max_length=max(1, int(self.max_length)),
+                    return_tensors="pt",
+                ).to(dev)
                 out = self._model(**batch)
                 # Common HF outputs: pooler_output [B,D] or last_hidden_state [B,S,D]
                 vec = getattr(out, "pooler_output", None)

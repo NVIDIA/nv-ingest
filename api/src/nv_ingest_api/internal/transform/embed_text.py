@@ -5,7 +5,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Any, Dict, Tuple, Optional, Iterable, List
+from typing import Any, Dict, Tuple, Optional, Iterable, List, Callable, Sequence
 from urllib.parse import urlparse
 
 import glom
@@ -24,6 +24,8 @@ logging.getLogger("httpcore").setLevel(logging.ERROR)
 
 
 MULTI_MODAL_MODELS = ["llama-3.2-nemoretriever-1b-vlm-embed-v1"]
+
+EmbeddingCallable = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
 
 # ------------------------------------------------------------------------------
@@ -242,6 +244,50 @@ def _async_runner(
             flat_results["info_msgs"].append(info_msg)
 
     return flat_results
+
+
+# ------------------------------------------------------------------------------
+# Local embedding hook (callable)
+# ------------------------------------------------------------------------------
+
+
+def _callable_runner(
+    prompts: List[List[str]],
+    *,
+    embedder: EmbeddingCallable,
+    batch_size: int,
+) -> dict:
+    """
+    Runs embeddings via a provided callable, returning the same shape as `_async_runner`.
+
+    Parameters
+    ----------
+    prompts:
+        A list of prompt batches (List[List[str]]).
+    embedder:
+        Callable that takes a sequence of strings and returns a sequence of embedding vectors.
+    batch_size:
+        Local batch size; used to sub-batch each provided prompt batch if needed.
+    """
+    flat_embeddings: List[Optional[Sequence[float]]] = []
+    flat_info_msgs: List[Optional[dict]] = []
+
+    for prompt_batch in prompts:
+        if not prompt_batch:
+            continue
+        for i in range(0, len(prompt_batch), max(1, int(batch_size))):
+            chunk = prompt_batch[i : i + max(1, int(batch_size))]
+            vecs = embedder(chunk)
+            vecs_list = list(vecs)
+            if len(vecs_list) != len(chunk):
+                raise ValueError(
+                    "Local embedder returned a mismatched number of embeddings "
+                    f"(got={len(vecs_list)} expected={len(chunk)})"
+                )
+            flat_embeddings.extend(vecs_list)
+            flat_info_msgs.extend([None] * len(vecs_list))
+
+    return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
 
 
 # ------------------------------------------------------------------------------
@@ -566,11 +612,21 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
-    api_key = task_config.get("api_key") or transform_config.api_key
-    endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
-    model_name = task_config.get("model_name") or transform_config.embedding_model
-    custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
-    dimensions = task_config.get("dimensions") or transform_config.dimensions
+    # Allow task_config to explicitly override values with None by checking key presence.
+    api_key = task_config["api_key"] if "api_key" in task_config else transform_config.api_key
+    endpoint_url = task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
+    model_name = task_config["model_name"] if "model_name" in task_config else transform_config.embedding_model
+    custom_content_field = (
+        task_config["custom_content_field"] if "custom_content_field" in task_config else transform_config.custom_content_field
+    )
+    dimensions = task_config["dimensions"] if "dimensions" in task_config else transform_config.dimensions
+
+    endpoint_url = endpoint_url.strip() if isinstance(endpoint_url, str) else endpoint_url
+    if isinstance(endpoint_url, str) and not endpoint_url:
+        endpoint_url = None
+
+    embedder: Optional[EmbeddingCallable] = task_config.get("embedder")
+    local_batch_size = int(task_config.get("local_batch_size") or transform_config.batch_size or 4)
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -635,18 +691,30 @@ def transform_create_text_embeddings_internal(
             else:
                 modality_batches = None
 
-            content_embeddings = _async_runner(
-                filtered_content_batches,
-                api_key,
-                endpoint_url,
-                model_name,
-                transform_config.encoding_format,
-                transform_config.input_type,
-                transform_config.truncate,
-                False,
-                modalities=modality_batches,
-                dimensions=dimensions,
-            )
+            if endpoint_url:
+                content_embeddings = _async_runner(
+                    filtered_content_batches,
+                    api_key,
+                    endpoint_url,
+                    model_name,
+                    transform_config.encoding_format,
+                    transform_config.input_type,
+                    transform_config.truncate,
+                    False,
+                    modalities=modality_batches,
+                    dimensions=dimensions,
+                )
+            elif callable(embedder):
+                content_embeddings = _callable_runner(
+                    filtered_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            else:
+                raise ValueError(
+                    "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
+                    "and no local embedder was provided in task_config['embedder']."
+                )
             # Build a simple row index -> embedding map
             embeddings_dict = dict(
                 zip(df_content.loc[valid_content_mask].index, content_embeddings.get("embeddings", []))
@@ -681,17 +749,29 @@ def transform_create_text_embeddings_internal(
             custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
             custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
 
-            custom_content_embeddings = _async_runner(
-                custom_content_batches,
-                api_key,
-                endpoint_url,
-                model_name,
-                transform_config.encoding_format,
-                transform_config.input_type,
-                transform_config.truncate,
-                False,
-                dimensions=dimensions,
-            )
+            if endpoint_url:
+                custom_content_embeddings = _async_runner(
+                    custom_content_batches,
+                    api_key,
+                    endpoint_url,
+                    model_name,
+                    transform_config.encoding_format,
+                    transform_config.input_type,
+                    transform_config.truncate,
+                    False,
+                    dimensions=dimensions,
+                )
+            elif callable(embedder):
+                custom_content_embeddings = _callable_runner(
+                    custom_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            else:
+                raise ValueError(
+                    "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
+                    "and no local embedder was provided in task_config['embedder']."
+                )
             custom_embeddings_dict = dict(
                 zip(
                     extracted_custom_content.loc[valid_custom_content_mask].index,

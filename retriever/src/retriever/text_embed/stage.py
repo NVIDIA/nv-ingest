@@ -51,6 +51,12 @@ def embed_text_from_primitives_df(
 
     if task_config is None:
         task_config = {}
+    else:
+        # Avoid mutating the caller's dict (we may inject a local embedder callable).
+        task_config = dict(task_config)
+
+    # Auto-fallback: if no embedding endpoint is configured, inject a local HF embedder callable.
+    _maybe_inject_local_hf_embedder(task_config, transform_config)
 
     execution_trace_log: Dict[str, Any] = {}
     try:
@@ -74,6 +80,49 @@ def embed_text_from_primitives_df(
     info = dict(info or {})
     info.setdefault("execution_trace_log", execution_trace_log)
     return out_df, info
+
+
+def _maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_config: TextEmbeddingSchema) -> None:
+    """
+    If no remote embedding endpoint is configured, inject a local HF embedder into task_config.
+
+    This keeps the DataFrame embedding logic centralized in `nv_ingest_api.internal.transform.embed_text`
+    while allowing retriever-local runs to operate without an embedding microservice.
+    """
+    # Respect explicit caller-provided embedder.
+    if callable(task_config.get("embedder")):
+        return
+
+    # Resolve endpoint_url with explicit None override support.
+    if "endpoint_url" in task_config:
+        endpoint_url = task_config.get("endpoint_url")
+    else:
+        endpoint_url = getattr(transform_config, "embedding_nim_endpoint", None)
+
+    endpoint_url = endpoint_url.strip() if isinstance(endpoint_url, str) else endpoint_url
+    has_endpoint = bool(endpoint_url)
+
+    use_local = bool(task_config.get("use_local_hf_if_no_endpoint", True))
+    if has_endpoint or not use_local:
+        return
+
+    # Lazy import: only load torch/HF when we truly need local embeddings.
+    from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+    local_device = task_config.get("local_hf_device")
+    local_cache_dir = task_config.get("local_hf_cache_dir")
+    local_batch_size = int(task_config.get("local_hf_batch_size") or 64)
+
+    embedder = LlamaNemotronEmbed1BV2Embedder(device=local_device, hf_cache_dir=local_cache_dir, normalize=True)
+
+    def _embed(texts):
+        vecs = embedder.embed(texts, batch_size=local_batch_size)
+        return vecs.tolist()
+
+    # Force the API transform to use the callable path by explicitly overriding endpoint_url to None.
+    task_config["endpoint_url"] = None
+    task_config["embedder"] = _embed
+    task_config["local_batch_size"] = local_batch_size
 
 
 # --------------------------------------------------------------------------------------
@@ -173,10 +222,36 @@ def run(
     endpoint_url: Optional[str] = typer.Option(
         None,
         "--endpoint-url",
-        help="Optional embedding service endpoint override (e.g. 'http://embedding:8000/v1').",
+        help=(
+            "Optional embedding service endpoint override (e.g. 'http://embedding:8000/v1'). "
+            "Use 'none' to disable remote embeddings and force local HF fallback."
+        ),
     ),
     model_name: Optional[str] = typer.Option(None, "--model-name", help="Optional embedding model name override."),
     dimensions: Optional[int] = typer.Option(None, "--dimensions", help="Optional embedding dimensions override."),
+    use_local_hf_if_no_endpoint: bool = typer.Option(
+        True,
+        "--local-hf-fallback/--no-local-hf-fallback",
+        help="If no embedding endpoint is configured, run local HuggingFace embeddings instead.",
+    ),
+    local_hf_device: Optional[str] = typer.Option(
+        None,
+        "--local-hf-device",
+        help="Device for local HF embeddings (e.g. 'cuda', 'cpu', 'cuda:0').",
+    ),
+    local_hf_cache_dir: Optional[Path] = typer.Option(
+        None,
+        "--local-hf-cache-dir",
+        file_okay=False,
+        dir_okay=True,
+        help="Optional HuggingFace cache directory for local embeddings.",
+    ),
+    local_hf_batch_size: int = typer.Option(
+        64,
+        "--local-hf-batch-size",
+        min=1,
+        help="Batch size for local HF embedding inference.",
+    ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing outputs."),
     limit: Optional[int] = typer.Option(None, "--limit", min=1, help="Optionally limit number of input files."),
     write_embedding_input: bool = typer.Option(
@@ -201,11 +276,19 @@ def run(
     if api_key is not None:
         task_cfg["api_key"] = api_key
     if endpoint_url is not None:
-        task_cfg["endpoint_url"] = endpoint_url
+        v = endpoint_url.strip()
+        task_cfg["endpoint_url"] = None if v.lower() in ("", "none", "null") else v
     if model_name is not None:
         task_cfg["model_name"] = model_name
     if dimensions is not None:
         task_cfg["dimensions"] = int(dimensions)
+    task_cfg["use_local_hf_if_no_endpoint"] = bool(use_local_hf_if_no_endpoint)
+    if local_hf_device is not None:
+        task_cfg["local_hf_device"] = str(local_hf_device)
+    if local_hf_cache_dir is not None:
+        task_cfg["local_hf_cache_dir"] = str(local_hf_cache_dir)
+    if local_hf_batch_size is not None:
+        task_cfg["local_hf_batch_size"] = int(local_hf_batch_size)
 
     inputs = sorted((input_dir.rglob(pattern) if recursive else input_dir.glob(pattern)))
     if limit is not None:

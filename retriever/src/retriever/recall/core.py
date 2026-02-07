@@ -19,11 +19,23 @@ from nv_ingest_api.util.nim import infer_microservice
 class RecallConfig:
     lancedb_uri: str
     lancedb_table: str
-    embedding_endpoint: str
     embedding_model: str
+    # Embedding endpoints (optional).
+    #
+    # If neither HTTP nor gRPC endpoint is provided (and embedding_endpoint is empty),
+    # stage7 will fall back to local HuggingFace embeddings via:
+    #   retriever.model.local.llama_nemotron_embed_1b_v2_embedder
+    embedding_http_endpoint: Optional[str] = None
+    embedding_grpc_endpoint: Optional[str] = None
+    # Back-compat single endpoint string (http URL or host:port for gRPC).
+    embedding_endpoint: Optional[str] = None
     embedding_api_key: str = ""
     top_k: int = 10
     ks: Sequence[int] = (1, 3, 5, 10)
+    # Local HF knobs (only used when endpoints are missing).
+    local_hf_device: Optional[str] = None
+    local_hf_cache_dir: Optional[str] = None
+    local_hf_batch_size: int = 64
 
 
 def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,12 +73,36 @@ def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _resolve_embedding_endpoint(cfg: RecallConfig) -> Tuple[Optional[str], Optional[bool]]:
+    """
+    Resolve which embedding endpoint to use.
+
+    Returns (endpoint, use_grpc) where:
+      - endpoint is either an http(s) URL or a host:port string for gRPC
+      - use_grpc is True for gRPC, False for HTTP, None when no endpoint is configured
+    """
+    http_ep = (cfg.embedding_http_endpoint or "").strip() if isinstance(cfg.embedding_http_endpoint, str) else None
+    grpc_ep = (cfg.embedding_grpc_endpoint or "").strip() if isinstance(cfg.embedding_grpc_endpoint, str) else None
+    single = (cfg.embedding_endpoint or "").strip() if isinstance(cfg.embedding_endpoint, str) else None
+
+    if http_ep:
+        return http_ep, False
+    if grpc_ep:
+        return grpc_ep, True
+    if single:
+        # Infer protocol: if a URL scheme is present, treat as HTTP; otherwise gRPC.
+        return single, (not single.lower().startswith("http"))
+
+    return None, None
+
+
 def _embed_queries_nim(
     queries: List[str],
     *,
     endpoint: str,
     model: str,
     api_key: str,
+    grpc: bool,
 ) -> List[List[float]]:
     # `infer_microservice` returns a list of embeddings.
     embeddings = infer_microservice(
@@ -74,7 +110,7 @@ def _embed_queries_nim(
         model_name=model,
         embedding_endpoint=endpoint,
         nvidia_api_key=(api_key or "").strip(),
-        grpc="http" not in endpoint,
+        grpc=bool(grpc),
     )
     # Some backends return numpy arrays; normalize to list-of-list floats.
     out: List[List[float]] = []
@@ -84,6 +120,22 @@ def _embed_queries_nim(
         else:
             out.append(list(e))
     return out
+
+
+def _embed_queries_local_hf(
+    queries: List[str],
+    *,
+    device: Optional[str],
+    cache_dir: Optional[str],
+    batch_size: int,
+) -> List[List[float]]:
+    # Lazy import: only load torch/HF when needed.
+    from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+    embedder = LlamaNemotronEmbed1BV2Embedder(device=device, hf_cache_dir=cache_dir, normalize=True)
+    vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
+    # Ensure list-of-list floats.
+    return vecs.detach().to("cpu").tolist()
 
 
 def _search_lancedb(
@@ -160,12 +212,22 @@ def retrieve_and_score(
     queries = df_query["query"].astype(str).tolist()
     gold = df_query["golden_answer"].astype(str).tolist()
 
-    vectors = _embed_queries_nim(
-        queries,
-        endpoint=cfg.embedding_endpoint,
-        model=cfg.embedding_model,
-        api_key=cfg.embedding_api_key,
-    )
+    endpoint, use_grpc = _resolve_embedding_endpoint(cfg)
+    if endpoint is not None and use_grpc is not None:
+        vectors = _embed_queries_nim(
+            queries,
+            endpoint=endpoint,
+            model=cfg.embedding_model,
+            api_key=cfg.embedding_api_key,
+            grpc=bool(use_grpc),
+        )
+    else:
+        vectors = _embed_queries_local_hf(
+            queries,
+            device=cfg.local_hf_device,
+            cache_dir=cfg.local_hf_cache_dir,
+            batch_size=int(cfg.local_hf_batch_size),
+        )
     raw_hits = _search_lancedb(
         lancedb_uri=cfg.lancedb_uri,
         table_name=cfg.lancedb_table,

@@ -9,8 +9,6 @@ from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
 from tqdm import tqdm
 
-from retriever.local.stages._io import iter_images, read_json
-
 console = Console()
 app = typer.Typer(help="Render/visualize various model outputs on images.")
 

@@ -8,7 +8,8 @@ This module intentionally contains no configuration logic. It re-exports the
 
   `retriever local stage5 ...`
 
-are handled by `retriever.text_embed.stage`.
+are handled by `retriever.text_embed.stage`, including local-HF fallback options
+when an embedding endpoint is not configured.
 """
 
 from retriever.text_embed.stage import app as app
