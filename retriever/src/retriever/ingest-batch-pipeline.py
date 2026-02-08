@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import logging
 import sys
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import typer
 
@@ -21,40 +21,36 @@ from retriever._local_deps import ensure_nv_ingest_api_importable
 
 ensure_nv_ingest_api_importable()
 
+from retriever.pdf.config import load_pdf_extractor_schema_from_dict
+from retriever.pdf.stage import extract_pdf_primitives_from_ledger_df, make_pdf_task_config
+
 logger = logging.getLogger(__name__)
 app = typer.Typer(
     help=(
-        "Simple Ray Data batch pipeline:\n"
-        "1) CPU: rasterize PDFs into per-page images\n"
-        "2) GPU: run Nemotron OCR (HF: nvidia/nemotron-ocr-v1) per page\n"
+        "Ray Data batch pipeline for PDF extraction (stage1).\n"
+        "\n"
+        "1) Ingest: read all PDFs into a Ray Dataset with `read_binary*`\n"
+        "2) Actor stage: run the same nv-ingest PDF extraction logic as `retriever local stage1`\n"
     )
 )
 
-_PAGE_SCHEMA_KEYS = (
-    "pdf_path",
-    "page_index",
-    "page_number",
-    "page_image_b64",
-    "error",
-    "error_detail",
-)
-
+if TYPE_CHECKING:  # pragma: no cover
+    import pandas as pd
 
 @dataclass(frozen=True)
-class PageRecord:
+class LedgerRow:
+    source_id: str
+    source_name: str
+    content_b64: str
     pdf_path: str
-    page_index: int  # 0-based
-    page_number: int  # 1-based
-    page_image_b64: str  # base64-encoded PNG (no data: prefix)
 
-    def to_row(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            "pdf_path": self.pdf_path,
-            "page_index": int(self.page_index),
-            "page_number": int(self.page_number),
-            "page_image_b64": self.page_image_b64,
-            "error": None,
-            "error_detail": None,
+            "source_id": self.source_id,
+            "source_name": self.source_name,
+            "content": self.content_b64,
+            "document_type": "pdf",
+            "metadata": {"custom_content": {"path": self.pdf_path}},
         }
 
 
@@ -92,257 +88,181 @@ def _iter_pdf_paths(
     return ordered
 
 
-def _pdf_to_pages(
-    pdf_path: str,
-    *,
-    render_dpi: int,
-    pages_per_batch: int,
-    image_format: str = "PNG",
-) -> List[Dict[str, Any]]:
+def _normalize_pdf_binary_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """
-    CPU-heavy step: rasterize a single PDF into per-page base64 images.
-
-    Uses the same PDFium stack used by `retriever/pdf/stage.py` (via `pypdfium2`).
+    Normalize Ray's binary reader output to stable keys:
+      - pdf_path: str
+      - pdf_bytes: bytes
     """
-    import pypdfium2 as pdfium  # type: ignore
+    path = row.get("path") or row.get("file_path") or row.get("uri") or row.get("filename")
+    b = row.get("bytes") or row.get("data") or row.get("content")
+    pdf_path = str(path) if path is not None else ""
 
-    from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
-    from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+    pdf_bytes: bytes
+    if isinstance(b, bytes):
+        pdf_bytes = b
+    elif isinstance(b, bytearray):
+        pdf_bytes = bytes(b)
+    elif isinstance(b, memoryview):
+        pdf_bytes = b.tobytes()
+    else:
+        # Best-effort fallback; extraction will fail gracefully downstream if this isn't valid bytes.
+        pdf_bytes = bytes(b) if b is not None else b""  # type: ignore[arg-type]
 
-    path = Path(pdf_path)
-    if not path.is_file():
-        return [
-            {
-                "pdf_path": str(path),
-                "page_index": None,
-                "page_number": None,
-                "page_image_b64": "",
-                "error": "missing_file",
-                "error_detail": None,
-            }
-        ]
+    return {"pdf_path": pdf_path, "pdf_bytes": pdf_bytes}
 
-    try:
-        doc = pdfium.PdfDocument(str(path))
-    except Exception as e:
-        return [
-            {
-                "pdf_path": str(path),
-                "page_index": None,
-                "page_number": None,
-                "page_image_b64": "",
-                "error": "open_failed",
-                "error_detail": str(e),
-            }
-        ]
 
-    out: List[Dict[str, Any]] = []
-    try:
-        n_pages = int(len(doc))
+def _binary_batch_to_ledger_df(batch: "pd.DataFrame") -> "pd.DataFrame":
+    import pandas as pd
 
-        # Process pages in small chunks to amortize render overhead.
-        i = 0
-        while i < n_pages:
-            j = min(i + int(pages_per_batch), n_pages)
-            pages = [doc.get_page(k) for k in range(i, j)]
-            try:
-                imgs, _pads = pdfium_pages_to_numpy(pages, render_dpi=int(render_dpi))
-                for k, arr in enumerate(imgs):
-                    page_index = i + k
-                    page_number = page_index + 1
-                    b64 = numpy_to_base64(arr, format=str(image_format))
-                    rec = PageRecord(
-                        pdf_path=str(path),
-                        page_index=page_index,
-                        page_number=page_number,
-                        page_image_b64=b64,
-                    )
-                    out.append(rec.to_row())
-            finally:
-                for p in pages:
-                    try:
-                        p.close()
-                    except Exception:
-                        pass
-            i = j
-    except Exception as e:
-        out.append(
-            {
-                "pdf_path": str(path),
-                "page_index": None,
-                "page_number": None,
-                "page_image_b64": "",
-                "error": "render_failed",
-                "error_detail": str(e),
-            }
+    rows: List[Dict[str, Any]] = []
+    for _, r in batch.iterrows():
+        pdf_path = str(r.get("pdf_path") or "")
+        b = r.get("pdf_bytes")
+
+        if isinstance(b, bytes):
+            raw = b
+        elif isinstance(b, bytearray):
+            raw = bytes(b)
+        elif isinstance(b, memoryview):
+            raw = b.tobytes()
+        else:
+            raw = bytes(b) if b is not None else b""  # type: ignore[arg-type]
+
+        content_b64 = base64.b64encode(raw).decode("utf-8")
+        led = LedgerRow(
+            source_id=pdf_path,
+            source_name=pdf_path,
+            content_b64=content_b64,
+            pdf_path=pdf_path,
         )
-    finally:
-        try:
-            doc.close()
-        except Exception:
-            pass
+        rows.append(led.to_dict())
 
-    return out
+    return pd.DataFrame(rows)
 
 
-def _pdf_to_pages_row(
-    row: Dict[str, Any],
+def _build_pdf_extractor_and_task_cfg(
     *,
-    render_dpi: int,
-    pages_per_batch: int,
-) -> List[Dict[str, Any]]:
-    pdf_path = row.get("pdf_path")
-    if not isinstance(pdf_path, str) or not pdf_path:
-        return [
-            {
-                "pdf_path": str(pdf_path) if pdf_path is not None else "",
-                "page_index": None,
-                "page_number": None,
-                "page_image_b64": "",
-                "error": "missing_pdf_path",
-                "error_detail": None,
-            }
-        ]
-    return _pdf_to_pages(
-        pdf_path,
-        render_dpi=int(render_dpi),
-        pages_per_batch=int(pages_per_batch),
+    method: str,
+    auth_token: Optional[str],
+    yolox_grpc_endpoint: Optional[str],
+    yolox_http_endpoint: Optional[str],
+    nemotron_parse_grpc_endpoint: Optional[str],
+    nemotron_parse_http_endpoint: Optional[str],
+    nemotron_parse_model_name: Optional[str],
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    extract_infographics: bool,
+    extract_page_as_image: bool,
+    text_depth: str,
+) -> tuple[Any, Dict[str, Any]]:
+    """
+    Mirror the config behavior from `retriever.pdf.stage` stage1 CLI.
+    """
+    method = str(method or "pdfium")
+
+    extractor_cfg: Dict[str, Any] = {}
+    if method in {"pdfium", "pdfium_hybrid", "ocr"}:
+        if not (yolox_grpc_endpoint or yolox_http_endpoint):
+            logger.info("YOLOX NIM endpoints not set; falling back to HuggingFace model.")
+        extractor_cfg["pdfium_config"] = {
+            "auth_token": auth_token,
+            "yolox_endpoints": [yolox_grpc_endpoint, yolox_http_endpoint],
+        }
+    elif method == "nemotron_parse":
+        if not (nemotron_parse_grpc_endpoint or nemotron_parse_http_endpoint):
+            raise typer.BadParameter(
+                "Nemotron Parse endpoint required for method 'nemotron_parse'. "
+                "Set --nemotron-parse-grpc-endpoint or --nemotron-parse-http-endpoint."
+            )
+        extractor_cfg["nemotron_parse_config"] = {
+            "auth_token": auth_token,
+            # Nemotron Parse may still rely on YOLOX for region proposals depending on config.
+            "yolox_endpoints": [yolox_grpc_endpoint, yolox_http_endpoint],
+            "nemotron_parse_endpoints": [nemotron_parse_grpc_endpoint, nemotron_parse_http_endpoint],
+            "nemotron_parse_model_name": nemotron_parse_model_name,
+        }
+
+    extractor_schema = load_pdf_extractor_schema_from_dict(extractor_cfg)
+    task_cfg = make_pdf_task_config(
+        method=method,
+        extract_text=bool(extract_text),
+        extract_images=bool(extract_images),
+        extract_tables=bool(extract_tables),
+        extract_charts=bool(extract_charts),
+        extract_infographics=bool(extract_infographics),
+        extract_page_as_image=bool(extract_page_as_image),
+        text_depth=str(text_depth or "page"),
     )
+    return extractor_schema, task_cfg
 
 
-def _ocr_output_to_text(obj: Any) -> str:
+class PDFExtractionActorBatchFn:
     """
-    Best-effort extraction of text from `nemotron_ocr` outputs.
-    """
-    if obj is None:
-        return ""
-    if isinstance(obj, str):
-        return obj.strip()
-    if isinstance(obj, dict):
-        for k in ("text", "output_text", "generated_text", "ocr_text"):
-            v = obj.get(k)
-            if isinstance(v, str) and v.strip():
-                return v.strip()
-        # Common structured output: {"texts": [...]}
-        texts = obj.get("texts")
-        if isinstance(texts, list):
-            parts = [t for t in texts if isinstance(t, str) and t.strip()]
-            if parts:
-                return " ".join(parts).strip()
-    if isinstance(obj, list):
-        parts = [_ocr_output_to_text(x) for x in obj]
-        parts = [p for p in parts if p]
-        return "\n".join(parts).strip()
-    return str(obj).strip()
-
-
-class NemotronOcrBatchFn:
-    """
-    Stateful Ray Data map_batches fn that runs on GPU (actor-based).
-
-    Loads the HF model repo (default: nvidia/nemotron-ocr-v1) once per actor.
+    Actor-based Ray Data stage that runs stage1 PDF extraction over binary-ingested PDFs.
     """
 
     def __init__(
         self,
         *,
-        model_id: str,
-        model_dir: Optional[str],
-        model_cache_dir: Optional[str],
-        merge_level: str,
+        method: str,
+        auth_token: Optional[str],
+        yolox_grpc_endpoint: Optional[str],
+        yolox_http_endpoint: Optional[str],
+        nemotron_parse_grpc_endpoint: Optional[str],
+        nemotron_parse_http_endpoint: Optional[str],
+        nemotron_parse_model_name: Optional[str],
+        extract_text: bool,
+        extract_images: bool,
+        extract_tables: bool,
+        extract_charts: bool,
+        extract_infographics: bool,
+        extract_page_as_image: bool,
+        text_depth: str,
+        write_json_outputs: bool,
+        json_output_dir: Optional[str],
     ) -> None:
-        self._merge_level = str(merge_level)
+        # Ensure nv-ingest-api is importable on workers too.
+        ensure_nv_ingest_api_importable()
 
-        resolved_dir: Optional[str] = str(model_dir) if model_dir else None
-        if resolved_dir is None:
-            try:
-                from huggingface_hub import snapshot_download  # type: ignore
-            except Exception as e:  # pragma: no cover
-                raise RuntimeError(
-                    "huggingface_hub is required to download the OCR model. "
-                    "Install dependencies or pass --model-dir to a local copy."
-                ) from e
+        extractor_schema, task_cfg = _build_pdf_extractor_and_task_cfg(
+            method=str(method),
+            auth_token=auth_token,
+            yolox_grpc_endpoint=yolox_grpc_endpoint,
+            yolox_http_endpoint=yolox_http_endpoint,
+            nemotron_parse_grpc_endpoint=nemotron_parse_grpc_endpoint,
+            nemotron_parse_http_endpoint=nemotron_parse_http_endpoint,
+            nemotron_parse_model_name=nemotron_parse_model_name,
+            extract_text=bool(extract_text),
+            extract_images=bool(extract_images),
+            extract_tables=bool(extract_tables),
+            extract_charts=bool(extract_charts),
+            extract_infographics=bool(extract_infographics),
+            extract_page_as_image=bool(extract_page_as_image),
+            text_depth=str(text_depth),
+        )
+        self._extractor_schema = extractor_schema
+        self._task_cfg = task_cfg
+        self._write_json_outputs = bool(write_json_outputs)
+        self._json_output_dir = str(json_output_dir) if json_output_dir else None
 
-            dl_kwargs: Dict[str, Any] = {"repo_id": str(model_id)}
-            if model_cache_dir:
-                # Force a stable per-run directory so `NemotronOCR` sees a normal filesystem path.
-                cache_dir = Path(model_cache_dir)
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                dl_kwargs["local_dir"] = str(cache_dir / model_id.replace("/", "__"))
-                dl_kwargs["local_dir_use_symlinks"] = False
+    def __call__(self, batch: "pd.DataFrame") -> "pd.DataFrame":
+        import pandas as pd
 
-            resolved_dir = snapshot_download(**dl_kwargs)
-
-        # Prefer the existing local wrapper if available; it expects a model directory.
-        try:
-            from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError(
-                "Nemotron OCR runtime is not available. This pipeline currently expects "
-                "`nemotron_ocr` via the existing `retriever.model.local.NemotronOCRV1` wrapper.\n"
-                "Either install the OCR runtime, or adjust this script to use a Transformers pipeline."
-            ) from e
-
-        self._model = NemotronOCRV1(model_dir=str(resolved_dir))
-
-    def __call__(self, batch):
-        """
-        Ray Data map_batches handler.
-
-        We intentionally avoid pandas here because some environments ship a pandas build
-        that breaks Ray's internal pandas conversion utilities.
-        """
-        import pyarrow as pa  # type: ignore
-
-        if isinstance(batch, pa.Table):
-            d = batch.to_pydict()
-        elif isinstance(batch, dict):
-            d = dict(batch)
-        else:
-            # Fall back to best-effort conversion (Ray may pass other batch types).
-            try:
-                d = dict(batch)  # type: ignore[arg-type]
-            except Exception:
-                d = {"_raw": [str(batch)]}
-
-        # Ensure all expected keys exist so output schema is stable.
-        n = 0
-        for v in d.values():
-            if isinstance(v, list):
-                n = len(v)
-                break
-        for k in _PAGE_SCHEMA_KEYS:
-            if k not in d:
-                d[k] = [None] * n
-
-        images = d.get("page_image_b64", [])
-        prior_errs = d.get("error", [None] * n)
-
-        texts: List[str] = []
-        ocr_errors: List[Optional[str]] = []
-
-        for i in range(n):
-            if prior_errs[i] not in {None, ""}:
-                texts.append("")
-                ocr_errors.append("skipped_input_error")
-                continue
-
-            b64 = images[i]
-            if not isinstance(b64, str) or not b64:
-                texts.append("")
-                ocr_errors.append("missing_page_image_b64")
-                continue
-            try:
-                out = self._model.invoke(b64, merge_level=self._merge_level)
-                texts.append(_ocr_output_to_text(out))
-                ocr_errors.append(None)
-            except Exception as e:
-                texts.append("")
-                ocr_errors.append(str(e))
-
-        d["ocr_text"] = texts
-        d["ocr_error"] = ocr_errors
-        return pa.Table.from_pydict(d)
+        df_ledger = _binary_batch_to_ledger_df(batch)
+        extracted_df, _info = extract_pdf_primitives_from_ledger_df(
+            df_ledger,
+            task_config=self._task_cfg,
+            extractor_config=self._extractor_schema,
+            write_json_outputs=bool(self._write_json_outputs),
+            json_output_dir=self._json_output_dir,
+        )
+        # Always return a DataFrame (Ray expects batch outputs to be tabular).
+        if extracted_df is None or not isinstance(extracted_df, pd.DataFrame):
+            return pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
+        return extracted_df
 
 
 def _write_jsonl_driver_side(ds: Any, *, output_dir: Path, rows_per_file: int = 50_000) -> None:
@@ -395,33 +315,71 @@ def run(
     ray_address: Optional[str] = typer.Option(
         None, "--ray-address", help="Ray cluster address (omit for local). Example: 'ray://host:10001' or 'auto'."
     ),
-    # CPU rasterization
-    render_dpi: int = typer.Option(200, "--render-dpi", min=50, max=1200, help="PDF page render DPI (CPU step)."),
-    pages_per_batch: int = typer.Option(
-        4, "--pages-per-batch", min=1, help="How many pages to render at once per PDF worker."
+    # Stage1 PDF extraction (matches `retriever pdf page-elements` defaults closely)
+    method: str = typer.Option(
+        "pdfium",
+        "--method",
+        help="PDF extraction method (e.g. 'pdfium', 'pdfium_hybrid', 'ocr', 'nemotron_parse', 'tika').",
     ),
-    cpu_per_pdf: int = typer.Option(1, "--cpu-per-pdf", min=1, help="Ray CPUs reserved per PDF render task."),
-    # GPU OCR
-    model_id: str = typer.Option(
-        "nvidia/nemotron-ocr-v1",
-        "--model-id",
-        help="HuggingFace model repo id for Nemotron OCR v1.",
-    ),
-    model_dir: Optional[Path] = typer.Option(
-        None, "--model-dir", exists=True, file_okay=False, dir_okay=True, help="Use a local model directory."
-    ),
-    model_cache_dir: Optional[Path] = typer.Option(
+    auth_token: Optional[str] = typer.Option(
         None,
-        "--model-cache-dir",
+        "--auth-token",
+        help="Auth token for NIM-backed services (e.g. YOLOX / Nemotron Parse).",
+    ),
+    yolox_grpc_endpoint: Optional[str] = typer.Option(
+        None,
+        "--yolox-grpc-endpoint",
+        help="YOLOX gRPC endpoint (e.g. 'page-elements:8001'). Used by method 'pdfium' family.",
+    ),
+    yolox_http_endpoint: Optional[str] = typer.Option(
+        None,
+        "--yolox-http-endpoint",
+        help="YOLOX HTTP endpoint (e.g. 'http://page-elements:8000/v1/infer'). Used by method 'pdfium' family.",
+    ),
+    nemotron_parse_grpc_endpoint: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-grpc-endpoint",
+        help="Nemotron Parse gRPC endpoint (required for method 'nemotron_parse').",
+    ),
+    nemotron_parse_http_endpoint: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-http-endpoint",
+        help="Nemotron Parse HTTP endpoint (required for method 'nemotron_parse').",
+    ),
+    nemotron_parse_model_name: Optional[str] = typer.Option(
+        None,
+        "--nemotron-parse-model-name",
+        help="Nemotron Parse model name (optional; defaults to schema default).",
+    ),
+    extract_text: bool = typer.Option(True, "--extract-text/--no-extract-text", help="Extract text primitives."),
+    extract_images: bool = typer.Option(False, "--extract-images/--no-extract-images", help="Extract image primitives."),
+    extract_tables: bool = typer.Option(False, "--extract-tables/--no-extract-tables", help="Extract table primitives."),
+    extract_charts: bool = typer.Option(False, "--extract-charts/--no-extract-charts", help="Extract chart primitives."),
+    extract_infographics: bool = typer.Option(
+        False, "--extract-infographics/--no-extract-infographics", help="Extract infographic primitives."
+    ),
+    extract_page_as_image: bool = typer.Option(
+        False, "--extract-page-as-image/--no-extract-page-as-image", help="Extract full page images as primitives."
+    ),
+    text_depth: str = typer.Option(
+        "page",
+        "--text-depth",
+        help="Text depth for extracted text primitives: 'page' or 'document'.",
+    ),
+    write_json_outputs: bool = typer.Option(
+        True,
+        "--write-json-outputs/--no-write-json-outputs",
+        help="Write one <pdf>.pdf_extraction.json sidecar per input PDF (best-effort).",
+    ),
+    json_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--json-output-dir",
         file_okay=False,
         dir_okay=True,
-        help="Optional directory to download/cache the HF model into.",
+        help="Optional directory to write JSON outputs into (instead of next to PDFs).",
     ),
-    merge_level: str = typer.Option(
-        "paragraph", "--merge-level", help="OCR merge level (e.g. word/sentence/paragraph)."
-    ),
-    ocr_batch_size: int = typer.Option(4, "--ocr-batch-size", min=1, help="Ray Data batch size for OCR stage."),
-    ocr_actors: int = typer.Option(1, "--ocr-actors", min=1, help="Number of GPU OCR actors (1 GPU each)."),
+    pdf_batch_size: int = typer.Option(8, "--pdf-batch-size", min=1, help="Ray Data batch size for PDF extraction."),
+    pdf_actors: int = typer.Option(1, "--pdf-actors", min=1, help="Number of PDF extraction actors."),
     # Output
     output_format: str = typer.Option(
         "parquet",
@@ -446,7 +404,7 @@ def run(
     Run the pipeline.
     """
     import ray  # type: ignore
-    import ray.data  # type: ignore
+    import ray.data as rd
 
     logging.basicConfig(level=logging.INFO)
 
@@ -456,43 +414,51 @@ def run(
 
     ray.init(address=ray_address, ignore_reinit_error=True)
 
-    logger.info("Building dataset: pdfs=%s", len(pdfs))
-    ds = ray.data.from_items([{"pdf_path": p} for p in pdfs])
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("CPU stage: rasterize PDFs into pages")
-    split_fn = partial(_pdf_to_pages_row, render_dpi=int(render_dpi), pages_per_batch=int(pages_per_batch))
-    pages = ds.flat_map(
-        split_fn,
-        num_cpus=float(cpu_per_pdf),
+    logger.info("Building binary dataset from PDFs: pdfs=%s", len(pdfs))
+    # Read all pdfs files into memory has it makes controlling parallelism easier and allows for distributed execution.
+    pdf_bin = rd.read_binary_files(pdfs, include_paths=True)
+
+    # Normalize schema so downstream stages are stable.
+    pdf_bin = pdf_bin.map(_normalize_pdf_binary_row)
+
+    logger.info("Actor stage: PDF extraction (actors=%s, batch_size=%s)", pdf_actors, pdf_batch_size)
+    extracted = pdf_bin.map_batches(
+        PDFExtractionActorBatchFn,
+        batch_format="pandas",
+        batch_size=int(pdf_batch_size),
+        compute=rd.ActorPoolStrategy(size=int(pdf_actors)),
+        fn_constructor_kwargs={
+            "method": str(method),
+            "auth_token": auth_token,
+            "yolox_grpc_endpoint": yolox_grpc_endpoint,
+            "yolox_http_endpoint": yolox_http_endpoint,
+            "nemotron_parse_grpc_endpoint": nemotron_parse_grpc_endpoint,
+            "nemotron_parse_http_endpoint": nemotron_parse_http_endpoint,
+            "nemotron_parse_model_name": nemotron_parse_model_name,
+            "extract_text": bool(extract_text),
+            "extract_images": bool(extract_images),
+            "extract_tables": bool(extract_tables),
+            "extract_charts": bool(extract_charts),
+            "extract_infographics": bool(extract_infographics),
+            "extract_page_as_image": bool(extract_page_as_image),
+            "text_depth": str(text_depth),
+            "write_json_outputs": bool(write_json_outputs),
+            "json_output_dir": str(json_output_dir) if json_output_dir is not None else None,
+        },
     )
 
-    logger.info("GPU stage: Nemotron OCR (actors=%s, batch_size=%s)", ocr_actors, ocr_batch_size)
-    # ocr = pages.map_batches(
-    #     NemotronOcrBatchFn,
-    #     batch_format="pyarrow",
-    #     batch_size=int(ocr_batch_size),
-    #     compute=ray.data.ActorPoolStrategy(size=int(ocr_actors)),
-    #     num_gpus=1,
-    #     fn_constructor_kwargs={
-    #         "model_id": str(model_id),
-    #         "model_dir": str(model_dir) if model_dir is not None else None,
-    #         "model_cache_dir": str(model_cache_dir) if model_cache_dir is not None else None,
-    #         "merge_level": str(merge_level),
-    #     },
-    # )
+    fmt = str(output_format or "parquet").strip().lower()
+    if fmt == "parquet":
+        logger.info("Writing output Parquet shards to %s", output_dir)
+        extracted.write_parquet(str(output_dir))
+    elif fmt == "jsonl":
+        logger.info("Writing output JSONL shards to %s (driver-side)", output_dir)
+        _write_jsonl_driver_side(extracted, output_dir=output_dir, rows_per_file=int(jsonl_rows_per_file))
+    else:
+        raise typer.BadParameter("Unsupported --output-format. Use 'parquet' or 'jsonl'.")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(pages.count())
-    # pages.write_json(str(output_dir))
-    # fmt = str(output_format or "parquet").strip().lower()
-    # if fmt == "parquet":
-    #     logger.info("Writing output Parquet shards to %s", output_dir)
-    #     ocr.write_parquet(str(output_dir))
-    # elif fmt == "jsonl":
-    #     logger.info("Writing output JSONL shards to %s (driver-side)", output_dir)
-    #     _write_jsonl_driver_side(ocr, output_dir=output_dir, rows_per_file=int(jsonl_rows_per_file))
-    # else:
-    #     raise typer.BadParameter("Unsupported --output-format. Use 'parquet' or 'jsonl'.")
     logger.info("Done.")
 
 
