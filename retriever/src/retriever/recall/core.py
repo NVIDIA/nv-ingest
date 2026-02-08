@@ -156,7 +156,7 @@ def _search_lancedb(
         q = np.asarray(v, dtype="float32")
         hits = (
             table.search(q, vector_column_name=vector_column_name)
-            .select(["pdf_page", "pdf_basename", "page_number", "source_id", "path", "_distance"])
+            .select(["text", "metadata", "source", "_distance"])
             .limit(top_k)
             .to_list()
         )
