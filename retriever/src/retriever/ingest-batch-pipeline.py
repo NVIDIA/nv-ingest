@@ -428,6 +428,7 @@ def run(
         PDFExtractionActorBatchFn,
         batch_format="pandas",
         batch_size=int(pdf_batch_size),
+        num_cpus=8,
         compute=rd.ActorPoolStrategy(size=int(pdf_actors)),
         fn_constructor_kwargs={
             "method": str(method),
