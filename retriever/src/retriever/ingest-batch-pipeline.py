@@ -627,7 +627,7 @@ def run(
     pdf_batch_size: int = typer.Option(8, "--pdf-batch-size", min=1, help="Ray Data batch size for PDF extraction."),
     pdf_actors: int = typer.Option(1, "--pdf-actors", min=1, help="Number of PDF extraction actors."),
     pdf_gpus_per_actor: float = typer.Option(
-        0.0, "--pdf-gpus-per-actor", min=0.0, help="GPUs reserved per PDF extraction actor."
+        1.0, "--pdf-gpus-per-actor", min=0.0, help="GPUs reserved per PDF extraction actor."
     ),
     # Stage3 (table extraction)
     run_table: bool = typer.Option(True, "--table/--no-table", help="Enable stage3 table extraction."),
@@ -637,6 +637,7 @@ def run(
     table_batch_size: int = typer.Option(64, "--table-batch-size", min=1, help="Ray Data batch size for table stage."),
     table_actors: int = typer.Option(1, "--table-actors", min=1, help="Number of table extraction actors."),
     table_cpus_per_actor: float = typer.Option(8.0, "--table-cpus-per-actor", min=0.0, help="CPUs per table actor."),
+    table_gpus_per_actor: float = typer.Option(1.0, "--table-gpus-per-actor", min=0.0, help="GPUs per table actor."),
     # Stage4 (chart extraction)
     run_chart: bool = typer.Option(True, "--chart/--no-chart", help="Enable stage4 chart extraction."),
     chart_config: Optional[Path] = typer.Option(
@@ -645,6 +646,7 @@ def run(
     chart_batch_size: int = typer.Option(64, "--chart-batch-size", min=1, help="Ray Data batch size for chart stage."),
     chart_actors: int = typer.Option(1, "--chart-actors", min=1, help="Number of chart extraction actors."),
     chart_cpus_per_actor: float = typer.Option(8.0, "--chart-cpus-per-actor", min=0.0, help="CPUs per chart actor."),
+    chart_gpus_per_actor: float = typer.Option(1.0, "--chart-gpus-per-actor", min=0.0, help="GPUs per chart actor."),
     # Stage5 (text embeddings)
     run_embed: bool = typer.Option(True, "--embed/--no-embed", help="Enable stage5 text embedding."),
     embed_config: Optional[Path] = typer.Option(
@@ -678,6 +680,7 @@ def run(
     embed_batch_size: int = typer.Option(256, "--embed-batch-size", min=1, help="Ray Data batch size for embedding stage."),
     embed_actors: int = typer.Option(1, "--embed-actors", min=1, help="Number of embedding actors."),
     embed_cpus_per_actor: float = typer.Option(4.0, "--embed-cpus-per-actor", min=0.0, help="CPUs per embedding actor."),
+    embed_gpus_per_actor: float = typer.Option(1.0, "--embed-gpus-per-actor", min=0.0, help="GPUs per embedding actor."),
     # Stage6 (vector DB upload; driver-side)
     vdb_upload: bool = typer.Option(False, "--vdb-upload/--no-vdb-upload", help="Upload embeddings to LanceDB (stage6)."),
     vdb_upload_batch_size: int = typer.Option(
@@ -781,6 +784,7 @@ def run(
             batch_format="pandas",
             batch_size=int(table_batch_size),
             num_cpus=float(table_cpus_per_actor),
+            num_gpus=float(table_gpus_per_actor),
             compute=rd.ActorPoolStrategy(size=int(table_actors)),
             fn_constructor_kwargs={"config_dict": table_cfg_dict},
         )
@@ -793,6 +797,7 @@ def run(
             batch_format="pandas",
             batch_size=int(chart_batch_size),
             num_cpus=float(chart_cpus_per_actor),
+            num_gpus=float(chart_gpus_per_actor),
             compute=rd.ActorPoolStrategy(size=int(chart_actors)),
             fn_constructor_kwargs={"config_dict": chart_cfg_dict},
         )
@@ -824,6 +829,7 @@ def run(
             batch_format="pandas",
             batch_size=int(embed_batch_size),
             num_cpus=float(embed_cpus_per_actor),
+            num_gpus=float(embed_gpus_per_actor),
             compute=rd.ActorPoolStrategy(size=int(embed_actors)),
             fn_constructor_kwargs={"config_dict": embed_cfg_dict, "task_config": embed_task_cfg},
         )
