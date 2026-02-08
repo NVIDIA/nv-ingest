@@ -734,7 +734,7 @@ def run(
     if not pdfs:
         raise typer.BadParameter("No PDFs found. Provide --input-dir and/or --pdf-list.")
 
-    ray.init(address=ray_address, ignore_reinit_error=True)
+    ray.init(address=ray_address, ignore_reinit_error=True, runtime_env={"env_vars": {"NEMOTRON_OCR_MODEL_DIR": "/home/local/jdyer/Development/nv-ingest/models/nemotron-ocr-v1/checkpoints/"}},)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
