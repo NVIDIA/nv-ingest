@@ -44,6 +44,7 @@ app = typer.Typer(
 if TYPE_CHECKING:  # pragma: no cover
     import pandas as pd
 
+
 @dataclass(frozen=True)
 class LedgerRow:
     source_id: str
@@ -348,14 +349,38 @@ class TextEmbeddingActorBatchFn:
         self._schema = load_text_embedding_schema_from_dict(config_dict or {})
         self._task_cfg = dict(task_config or {})
 
-        # Optional: pre-inject local HF embedder once per actor if no endpoint configured.
-        try:
-            from retriever.text_embed.stage import _maybe_inject_local_hf_embedder
+        # If no endpoint URL is present, force local HuggingFace embeddings and keep the
+        # embedder loaded once per actor (avoids per-batch model reload).
+        endpoint_url = self._task_cfg.get("endpoint_url")
+        if endpoint_url is None:
+            try:
+                from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
+                    LlamaNemotronEmbed1BV2Embedder,
+                )
 
-            _maybe_inject_local_hf_embedder(self._task_cfg, self._schema)
-        except Exception:
-            # Best-effort; if injection fails, the normal per-batch path will raise with context.
-            logger.exception("Failed initializing local HF embedder in embedding actor")
+                local_device = self._task_cfg.get("local_hf_device")
+                local_cache_dir = self._task_cfg.get("local_hf_cache_dir")
+                local_batch_size = int(self._task_cfg.get("local_hf_batch_size") or 64)
+
+                embedder = LlamaNemotronEmbed1BV2Embedder(
+                    device=str(local_device) if local_device is not None else None,
+                    hf_cache_dir=str(local_cache_dir) if local_cache_dir is not None else None,
+                    normalize=True,
+                )
+
+                def _embed(texts):
+                    vecs = embedder.embed(texts, batch_size=local_batch_size)
+                    return vecs.tolist()
+
+                # Force the API transform to use the callable path.
+                self._task_cfg["endpoint_url"] = None
+                self._task_cfg["embedder"] = _embed
+                self._task_cfg["local_batch_size"] = local_batch_size
+            except Exception as e:
+                raise RuntimeError(
+                    "Local HF embeddings requested (no --embed-endpoint-url), but local embedder init failed. "
+                    "Verify torch/CUDA and the `llama_nemotron_embed_1b_v2` package are installed."
+                ) from e
 
     def __call__(self, batch: "pd.DataFrame") -> "pd.DataFrame":
         import pandas as pd
@@ -598,9 +623,15 @@ def run(
         help="Nemotron Parse model name (optional; defaults to schema default).",
     ),
     extract_text: bool = typer.Option(True, "--extract-text/--no-extract-text", help="Extract text primitives."),
-    extract_images: bool = typer.Option(False, "--extract-images/--no-extract-images", help="Extract image primitives."),
-    extract_tables: bool = typer.Option(False, "--extract-tables/--no-extract-tables", help="Extract table primitives."),
-    extract_charts: bool = typer.Option(False, "--extract-charts/--no-extract-charts", help="Extract chart primitives."),
+    extract_images: bool = typer.Option(
+        False, "--extract-images/--no-extract-images", help="Extract image primitives."
+    ),
+    extract_tables: bool = typer.Option(
+        False, "--extract-tables/--no-extract-tables", help="Extract table primitives."
+    ),
+    extract_charts: bool = typer.Option(
+        False, "--extract-charts/--no-extract-charts", help="Extract chart primitives."
+    ),
     extract_infographics: bool = typer.Option(
         False, "--extract-infographics/--no-extract-infographics", help="Extract infographic primitives."
     ),
@@ -632,7 +663,12 @@ def run(
     # Stage3 (table extraction)
     run_table: bool = typer.Option(True, "--table/--no-table", help="Enable stage3 table extraction."),
     table_config: Optional[Path] = typer.Option(
-        None, "--table-config", exists=True, dir_okay=False, file_okay=True, help="Optional YAML config for table stage."
+        None,
+        "--table-config",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        help="Optional YAML config for table stage.",
     ),
     table_batch_size: int = typer.Option(64, "--table-batch-size", min=1, help="Ray Data batch size for table stage."),
     table_actors: int = typer.Option(1, "--table-actors", min=1, help="Number of table extraction actors."),
@@ -641,7 +677,12 @@ def run(
     # Stage4 (chart extraction)
     run_chart: bool = typer.Option(True, "--chart/--no-chart", help="Enable stage4 chart extraction."),
     chart_config: Optional[Path] = typer.Option(
-        None, "--chart-config", exists=True, dir_okay=False, file_okay=True, help="Optional YAML config for chart stage."
+        None,
+        "--chart-config",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        help="Optional YAML config for chart stage.",
     ),
     chart_batch_size: int = typer.Option(64, "--chart-batch-size", min=1, help="Ray Data batch size for chart stage."),
     chart_actors: int = typer.Option(1, "--chart-actors", min=1, help="Number of chart extraction actors."),
@@ -657,14 +698,20 @@ def run(
         file_okay=True,
         help="Optional YAML config for TextEmbeddingSchema.",
     ),
-    embed_api_key: Optional[str] = typer.Option(None, "--embed-api-key", help="Optional API key override for embedding."),
+    embed_api_key: Optional[str] = typer.Option(
+        None, "--embed-api-key", help="Optional API key override for embedding."
+    ),
     embed_endpoint_url: Optional[str] = typer.Option(
         None,
         "--embed-endpoint-url",
         help="Optional embedding endpoint override (use 'none' to force local HF fallback).",
     ),
-    embed_model_name: Optional[str] = typer.Option(None, "--embed-model-name", help="Optional embedding model name override."),
-    embed_dimensions: Optional[int] = typer.Option(None, "--embed-dimensions", help="Optional embedding dimensions override."),
+    embed_model_name: Optional[str] = typer.Option(
+        None, "--embed-model-name", help="Optional embedding model name override."
+    ),
+    embed_dimensions: Optional[int] = typer.Option(
+        None, "--embed-dimensions", help="Optional embedding dimensions override."
+    ),
     embed_local_hf_fallback: bool = typer.Option(
         True, "--embed-local-hf-fallback/--no-embed-local-hf-fallback", help="Enable local HF fallback if no endpoint."
     ),
@@ -677,12 +724,20 @@ def run(
     embed_local_hf_batch_size: int = typer.Option(
         64, "--embed-local-hf-batch-size", min=1, help="Batch size for local HF embedding inference."
     ),
-    embed_batch_size: int = typer.Option(256, "--embed-batch-size", min=1, help="Ray Data batch size for embedding stage."),
+    embed_batch_size: int = typer.Option(
+        256, "--embed-batch-size", min=1, help="Ray Data batch size for embedding stage."
+    ),
     embed_actors: int = typer.Option(1, "--embed-actors", min=1, help="Number of embedding actors."),
-    embed_cpus_per_actor: float = typer.Option(4.0, "--embed-cpus-per-actor", min=0.0, help="CPUs per embedding actor."),
-    embed_gpus_per_actor: float = typer.Option(1.0, "--embed-gpus-per-actor", min=0.0, help="GPUs per embedding actor."),
+    embed_cpus_per_actor: float = typer.Option(
+        4.0, "--embed-cpus-per-actor", min=0.0, help="CPUs per embedding actor."
+    ),
+    embed_gpus_per_actor: float = typer.Option(
+        1.0, "--embed-gpus-per-actor", min=0.0, help="GPUs per embedding actor."
+    ),
     # Stage6 (vector DB upload; driver-side)
-    vdb_upload: bool = typer.Option(False, "--vdb-upload/--no-vdb-upload", help="Upload embeddings to LanceDB (stage6)."),
+    vdb_upload: bool = typer.Option(
+        False, "--vdb-upload/--no-vdb-upload", help="Upload embeddings to LanceDB (stage6)."
+    ),
     vdb_upload_batch_size: int = typer.Option(
         2048, "--vdb-upload-batch-size", min=1, help="Driver-side batch size for LanceDB upload."
     ),
@@ -737,7 +792,15 @@ def run(
     if not pdfs:
         raise typer.BadParameter("No PDFs found. Provide --input-dir and/or --pdf-list.")
 
-    ray.init(address=ray_address, ignore_reinit_error=True, runtime_env={"env_vars": {"NEMOTRON_OCR_MODEL_DIR": "/home/local/jdyer/Development/nv-ingest/models/nemotron-ocr-v1/checkpoints/"}},)
+    ray.init(
+        address=ray_address,
+        ignore_reinit_error=True,
+        runtime_env={
+            "env_vars": {
+                "NEMOTRON_OCR_MODEL_DIR": "/home/local/jdyer/Development/nv-ingest/models/nemotron-ocr-v1/checkpoints/"
+            }
+        },
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -808,7 +871,13 @@ def run(
         embed_task_cfg: Dict[str, Any] = {}
         if embed_api_key is not None:
             embed_task_cfg["api_key"] = embed_api_key
-        if embed_endpoint_url is not None:
+        # IMPORTANT:
+        # - If --embed-endpoint-url is NOT provided, we intentionally force local HF embeddings by setting
+        #   endpoint_url=None (even if the schema has a default endpoint configured).
+        # - If it IS provided, use it (with 'none' meaning force-local).
+        if embed_endpoint_url is None:
+            embed_task_cfg["endpoint_url"] = None
+        else:
             v = embed_endpoint_url.strip()
             embed_task_cfg["endpoint_url"] = None if v.lower() in ("", "none", "null") else v
         if embed_model_name is not None:
@@ -890,4 +959,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
