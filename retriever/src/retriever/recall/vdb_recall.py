@@ -30,10 +30,10 @@ def _extract_hits(result: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for res in result:
         hits.append(
             {
-                "pdf_page": res.get("entity", {}).get("content_metadata", {}).get("page_number"),
-                "pdf_basename": Path(res.get("entity", {}).get("source", {}).get("source_id")).name.split(".")[0],
-                "page_number": res.get("entity", {}).get("content_metadata", {}).get("page_number"),
-                "source_id": Path(res.get("entity", {}).get("source", {}).get("source_id")).name.split(".")[0],
+                "text": res.get("text", {}),
+                "metadata": res.get("metadata", {}),
+                "source": res.get("source", {}),
+                "distance": res.get("_distance", {}),
             }
         )
     return hits
