@@ -18,7 +18,7 @@ on:
       skip_existing:
         description: "Skip already-uploaded versions"
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -70,7 +70,7 @@ jobs:
           set -euo pipefail
           # Default for scheduled runs: testpypi
           upload_to="testpypi"
-          skip_existing="true"
+          skip_existing="false"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             upload_to="${{ inputs.upload_to }}"
             skip_existing="${{ inputs.skip_existing }}"
