@@ -19,7 +19,7 @@ endpoint_config:
   # Tuple/list in the form: [grpc, http]
   # - gRPC example: "ocr:8001"
   # - HTTP example: "http://ocr:8000/v1/infer"
-  # ocr_endpoints: ["ocr:8001", "http://ocr:8000/v1/infer"]
+  #ocr_endpoints: ["localhost:8001", "http://localhost:8019/v1/infer"]
   ocr_endpoints: null
 
   # Optional; if omitted it is inferred from which endpoint is present.

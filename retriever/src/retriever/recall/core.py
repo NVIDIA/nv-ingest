@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -169,13 +170,15 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     for hits in raw_hits:
         keys: List[str] = []
         for h in hits:
+            res = json.loads(h['metadata'])
+            source = json.loads(h['source'])
             # Prefer explicit `pdf_page` column; fall back to derived form.
-            if h.get("pdf_page"):
-                keys.append(str(h["pdf_page"]))
+            if res.get("page_number") and source.get("source_id"):
+                filename = Path(source["source_id"]).stem
+                keys.append(filename + "_" + str(res["page_number"]))
             else:
-                pdf = h.get("pdf_basename") or (Path(h["path"]).name if h.get("path") else None)
-                page = h.get("page_number")
-                keys.append(f"{pdf}_{page}" if (pdf is not None and page is not None) else "")
+                breakpoint()
+                print(f"Big problem. Find me in source code and fix me! {res}")
         retrieved_keys.append([k for k in keys if k])
     return retrieved_keys
 
@@ -183,7 +186,16 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
 def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
     hits = 0
     for g, r in zip(gold, retrieved):
-        if g in (r[:k] if r else []):
+        filename = g.split("_")[0]
+        page = g.split("_")[1]
+
+        specific_page = f"{filename}_{page}"
+        entire_document = f"{filename}_-1" # This indicates that the text was retrieved from the entire document at index time and therefore the exact page is unknown but it still is a hit just with the missing metadata in the VDB
+
+        if specific_page in (r[:k] if r else []):
+            hits += 1
+        elif entire_document in (r[:k] if r else []):
+            print(f"Entire document hit! {g} {r}")
             hits += 1
     return hits / max(1, len(gold))
 
