@@ -7,10 +7,10 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 import typer
-import yaml
 from rich.console import Console
 
 from retriever._local_deps import ensure_nv_ingest_api_importable
+from retriever.ingest_config import load_ingest_config_section
 
 ensure_nv_ingest_api_importable()
 
@@ -59,18 +59,6 @@ def extract_table_data_from_primitives_df(
     info = dict(info or {})
     info.setdefault("execution_trace_log", execution_trace_log)
     return out_df, info
-
-
-def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise typer.BadParameter(f"Failed reading YAML config {path}: {e}") from e
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise typer.BadParameter(f"YAML config must be a mapping/object at top-level: {path}")
-    return data
 
 
 def _read_df(path: Path) -> pd.DataFrame:
@@ -156,14 +144,17 @@ def run(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config for TableExtractorSchema (passed to load_table_extractor_schema_from_dict).",
+        help=(
+            "Optional ingest YAML config file. If omitted, we auto-discover ./ingest-config.yaml then "
+            "$HOME/.ingest-config.yaml. Uses section: table."
+        ),
     ),
 ) -> None:
     """
     Load a primitives DataFrame, run table enrichment, and write the enriched DataFrame.
     """
     df = _read_df(input_path)
-    cfg_dict: Dict[str, Any] = _read_yaml_mapping(config) if config is not None else {}
+    cfg_dict: Dict[str, Any] = load_ingest_config_section(config, section="table")
     schema = load_table_extractor_schema_from_dict(cfg_dict)
 
     out_df, _info = extract_table_data_from_primitives_df(df, extractor_config=schema, task_config={})

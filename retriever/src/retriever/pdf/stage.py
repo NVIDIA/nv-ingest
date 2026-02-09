@@ -11,6 +11,7 @@ import pandas as pd
 import yaml
 
 from retriever._local_deps import ensure_nv_ingest_api_importable
+from retriever.ingest_config import load_ingest_config_section
 from retriever.pdf.config import load_pdf_extractor_schema_from_dict
 from retriever.pdf.io import pdf_files_to_ledger_df
 from rich.console import Console
@@ -451,7 +452,10 @@ def render_page_elements(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config file. If set, values are loaded from YAML; explicitly passed CLI flags override YAML.",
+        help=(
+            "Optional ingest YAML config file. If omitted, we auto-discover ./ingest-config.yaml then "
+            "$HOME/.ingest-config.yaml. Explicitly passed CLI flags override YAML."
+        ),
     ),
     input_dir: Optional[Path] = typer.Option(
         None,
@@ -537,9 +541,8 @@ def render_page_elements(
     This command is intentionally "directory-first" so you can point it at a folder of PDFs
     and get per-PDF outputs without having to build a ledger by hand.
     """
-    cfg_raw: Dict[str, Any] = {}
-    if config is not None:
-        cfg_raw = _normalize_page_elements_config(_read_yaml_config(config))
+    # Load consolidated ingest config (section: pdf).
+    cfg_raw = _normalize_page_elements_config(load_ingest_config_section(config, section="pdf"))
 
         # Merge: YAML provides defaults; explicit CLI flags override YAML.
         if not _argv_has_any(["--input-dir"]):

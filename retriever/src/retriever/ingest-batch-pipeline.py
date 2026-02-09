@@ -23,6 +23,7 @@ ensure_nv_ingest_api_importable()
 
 from retriever.chart.config import load_chart_extractor_schema_from_dict
 from retriever.chart.stage import extract_chart_data_from_primitives_df
+from retriever.ingest_config import load_ingest_config_file
 from retriever.pdf.config import load_pdf_extractor_schema_from_dict
 from retriever.pdf.stage import extract_pdf_primitives_from_ledger_df, make_pdf_task_config
 from retriever.table.config import load_table_extractor_schema_from_dict
@@ -96,26 +97,16 @@ def _iter_pdf_paths(
     return ordered
 
 
-def _read_yaml_mapping(path: Optional[Path]) -> Dict[str, Any]:
+def _cfg_section(cfg: Dict[str, Any], section: str) -> Dict[str, Any]:
     """
-    Read a YAML mapping from disk, returning {} when unset/empty.
-
-    We read YAML on the driver and pass dicts into Ray actors to avoid depending on
-    shared filesystem paths across nodes.
+    Return a nested mapping from cfg using dot-separated keys, else {}.
     """
-    if path is None:
-        return {}
-    try:
-        import yaml
-
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise typer.BadParameter(f"Failed reading YAML config {path}: {e}") from e
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise typer.BadParameter(f"YAML config must be a mapping/object at top-level: {path}")
-    return data
+    cur: Any = cfg
+    for part in section.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return {}
+        cur = cur.get(part)
+    return dict(cur or {}) if isinstance(cur, dict) else {}
 
 
 def _normalize_pdf_binary_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -582,6 +573,17 @@ def run(
         help="Text file with one PDF path per line (comments with # supported).",
     ),
     limit_pdfs: Optional[int] = typer.Option(None, "--limit-pdfs", help="Optionally limit number of PDFs."),
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        help=(
+            "Optional ingest YAML config file. If omitted, we auto-discover ./ingest-config.yaml then "
+            "$HOME/.ingest-config.yaml. This file contains sections used by stage3/4/5."
+        ),
+    ),
     # Ray
     ray_address: Optional[str] = typer.Option(
         None, "--ray-address", help="Ray cluster address (omit for local). Example: 'ray://host:10001' or 'auto'."
@@ -668,7 +670,7 @@ def run(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config for table stage.",
+        help="(Deprecated) Optional ingest YAML config file. Uses section: table. Prefer --config.",
     ),
     table_batch_size: int = typer.Option(64, "--table-batch-size", min=1, help="Ray Data batch size for table stage."),
     table_actors: int = typer.Option(1, "--table-actors", min=1, help="Number of table extraction actors."),
@@ -682,7 +684,7 @@ def run(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config for chart stage.",
+        help="(Deprecated) Optional ingest YAML config file. Uses section: chart. Prefer --config.",
     ),
     chart_batch_size: int = typer.Option(64, "--chart-batch-size", min=1, help="Ray Data batch size for chart stage."),
     chart_actors: int = typer.Option(1, "--chart-actors", min=1, help="Number of chart extraction actors."),
@@ -696,7 +698,7 @@ def run(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config for TextEmbeddingSchema.",
+        help="(Deprecated) Optional ingest YAML config file. Uses section: embedding. Prefer --config.",
     ),
     embed_api_key: Optional[str] = typer.Option(
         None, "--embed-api-key", help="Optional API key override for embedding."
@@ -788,6 +790,13 @@ def run(
 
     logging.basicConfig(level=logging.INFO)
 
+    ingest_cfg, _ingest_cfg_path, _ingest_cfg_source = load_ingest_config_file(config, verbose=True)
+    if config is not None and any([table_config, chart_config, embed_config]):
+        print(
+            "WARNING: --table-config/--chart-config/--embed-config are ignored because --config was provided.",
+            file=sys.stderr,
+        )
+
     pdfs = _iter_pdf_paths(input_dir=input_dir, pdf_list=pdf_list, limit_pdfs=limit_pdfs)
     if not pdfs:
         raise typer.BadParameter("No PDFs found. Provide --input-dir and/or --pdf-list.")
@@ -840,7 +849,14 @@ def run(
     )
 
     if run_table:
-        table_cfg_dict = _read_yaml_mapping(table_config)
+        table_cfg_dict: Dict[str, Any]
+        if config is not None:
+            table_cfg_dict = _cfg_section(ingest_cfg, "table")
+        elif table_config is not None:
+            table_file_cfg, _p, _s = load_ingest_config_file(table_config, verbose=True)
+            table_cfg_dict = _cfg_section(table_file_cfg, "table")
+        else:
+            table_cfg_dict = _cfg_section(ingest_cfg, "table")
         logger.info("Actor stage: table extraction (actors=%s, batch_size=%s)", table_actors, table_batch_size)
         extracted = extracted.map_batches(
             TableExtractionActorBatchFn,
@@ -853,7 +869,14 @@ def run(
         )
 
     if run_chart:
-        chart_cfg_dict = _read_yaml_mapping(chart_config)
+        chart_cfg_dict: Dict[str, Any]
+        if config is not None:
+            chart_cfg_dict = _cfg_section(ingest_cfg, "chart")
+        elif chart_config is not None:
+            chart_file_cfg, _p, _s = load_ingest_config_file(chart_config, verbose=True)
+            chart_cfg_dict = _cfg_section(chart_file_cfg, "chart")
+        else:
+            chart_cfg_dict = _cfg_section(ingest_cfg, "chart")
         logger.info("Actor stage: chart extraction (actors=%s, batch_size=%s)", chart_actors, chart_batch_size)
         extracted = extracted.map_batches(
             ChartExtractionActorBatchFn,
@@ -866,7 +889,14 @@ def run(
         )
 
     if run_embed:
-        embed_cfg_dict = _read_yaml_mapping(embed_config)
+        embed_cfg_dict: Dict[str, Any]
+        if config is not None:
+            embed_cfg_dict = _cfg_section(ingest_cfg, "embedding")
+        elif embed_config is not None:
+            embed_file_cfg, _p, _s = load_ingest_config_file(embed_config, verbose=True)
+            embed_cfg_dict = _cfg_section(embed_file_cfg, "embedding")
+        else:
+            embed_cfg_dict = _cfg_section(ingest_cfg, "embedding")
         # Task-config overrides (takes precedence over schema defaults).
         embed_task_cfg: Dict[str, Any] = {}
         if embed_api_key is not None:

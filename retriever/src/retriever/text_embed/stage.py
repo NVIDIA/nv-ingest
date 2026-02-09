@@ -8,12 +8,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 import typer
-import yaml
 from rich.console import Console
 from rich.traceback import install
 from tqdm import tqdm
 
 from retriever._local_deps import ensure_nv_ingest_api_importable
+from retriever.ingest_config import load_ingest_config_section
 
 ensure_nv_ingest_api_importable()
 
@@ -132,18 +132,6 @@ def _maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_confi
 # --------------------------------------------------------------------------------------
 
 
-def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise typer.BadParameter(f"Failed reading YAML config {path}: {e}") from e
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise typer.BadParameter(f"YAML config must be a mapping/object at top-level: {path}")
-    return data
-
-
 def _atomic_write_json(path: Path, obj: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -216,7 +204,10 @@ def run(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        help="Optional YAML config for TextEmbeddingSchema.",
+        help=(
+            "Optional ingest YAML config file. If omitted, we auto-discover ./ingest-config.yaml then "
+            "$HOME/.ingest-config.yaml. Uses section: embedding."
+        ),
     ),
     api_key: Optional[str] = typer.Option(None, "--api-key", help="Optional API key override for embedding service."),
     endpoint_url: Optional[str] = typer.Option(
@@ -268,7 +259,7 @@ def run(
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    cfg_dict: Dict[str, Any] = _read_yaml_mapping(config) if config is not None else {}
+    cfg_dict: Dict[str, Any] = load_ingest_config_section(config, section="embedding")
     schema = load_text_embedding_schema_from_dict(cfg_dict)
 
     # Task-config overrides (takes precedence over schema defaults).
