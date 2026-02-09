@@ -23,7 +23,7 @@ CASES = [
     "page_elements",
     "table_structure",
     "graphic_elements",
-    "nemotron_ocr",
+    "ocr",
 ]
 
 

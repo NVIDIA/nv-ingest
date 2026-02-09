@@ -8,7 +8,7 @@ Uses torch.utils.benchmark for accurate timing with automatic CUDA synchronizati
 and warmup handling.
 
 Usage:
-     uv run nv-ingest-harness-run --case=nemotron_ocr --dataset=/path/to/images
+     uv run nv-ingest-harness-run --case=ocr --dataset=/path/to/images
 
 Requirements:
     - nemotron_ocr package installed
@@ -184,7 +184,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "test_name": test_name,
             "dataset_dir": data_dir,
             "num_repeats": num_repeats,
-            "model": "nemotron_ocr",
+            "model": "ocr",
             "benchmark_method": "torch.utils.benchmark.Timer",
         },
         "results": {
