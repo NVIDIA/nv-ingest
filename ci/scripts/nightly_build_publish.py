@@ -259,6 +259,7 @@ def _twine_upload(dist_dir: Path, repository_url: str, token: str, *, skip_exist
         "-m",
         "twine",
         "upload",
+        "--verbose",
         "--non-interactive",
         "--repository-url",
         repository_url,
