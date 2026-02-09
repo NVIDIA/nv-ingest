@@ -9,6 +9,8 @@ from rich.console import Console
 
 from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df
 
+from nv_ingest_client.util.vdb.lancedb import LanceDB
+
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()
 
@@ -70,6 +72,70 @@ def _resolve_endpoints(
             return single, None
         return None, single
     return None, None
+
+
+@app.command("recall-with-main")
+def recall_with_main(
+    query_csv: Path = typer.Option(
+        Path("bo767_query_gt.csv"),
+        "--query-csv",
+        help="Query ground-truth CSV (expects columns: query,pdf_page OR query,pdf,page).",
+    ),
+    top_k: int = typer.Option(10, "--top-k", min=1, help="Top-k to print per query."),
+) -> None:
+
+    query_csv = _resolve_query_csv(Path(query_csv))
+    lancedb = LanceDB(lancedb_uri="lancedb")
+
+    print(f"Reading query CSV...")
+    df_query = _normalize_query_df(pd.read_csv(query_csv))
+
+    print(f"Normalizing query CSV...")
+    queries = df_query["query"].astype(str).tolist()
+    gold_concat = df_query["golden_answer"].astype(str).tolist()
+    gold_pdfs = df_query["pdf"].astype(str).tolist()
+    gold_pages = df_query["page"].astype(str).tolist()
+
+    print(f"Beginning retrieval for {len(queries)} queries...")
+    results = lancedb.retrieval(queries=queries, top_k=top_k)
+
+    print(f"Retrieval completed for {len(results)} queries.")
+
+    recall1_hits = 0
+    recall5_hits = 0
+    recall10_hits = 0
+    
+    for query, g_concat, other_pdf, other_page, topk_results in zip(queries, gold_concat, gold_pdfs, gold_pages, results):
+        print(f"\nQuery: {query}")
+        g_pdf, g_page = g_concat.split("_")
+        print(f"\tGold PDF: {g_pdf} - Gold Page: {g_page}")
+        print(f"\tOther PDF: {other_pdf} - Other Page: {other_page}")
+        print(f"\tTop-k Results:")
+        
+        for i, result in enumerate(topk_results):
+            pdf_name = Path(result['entity']['source']['source_id']).stem
+            page_number = result['entity']['content_metadata']['page_number']
+
+            print(f"\tResult {i}: {pdf_name} - {page_number}")
+
+            if page_number == -1:
+                breakpoint()
+                print(f"Seeing page numbers -1, not sure what to do with this.")
+
+            if pdf_name == g_pdf and (page_number == int(g_page) or page_number == int(other_page)):
+                print(f"\t\tHit! {i}: {pdf_name} - {page_number}")
+                if i == 0:
+                    recall1_hits += 1
+                if i < 5:
+                    recall5_hits += 1
+                if i < 10:
+                    recall10_hits += 1
+                break
+
+
+    print(f"\n\nRecall@1: {recall1_hits / len(queries)}")
+    print(f"Recall@5: {recall5_hits / len(queries)}")
+    print(f"Recall@10: {recall10_hits / len(queries)}")
 
 
 @app.command("run")
