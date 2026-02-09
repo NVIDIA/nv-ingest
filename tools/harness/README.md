@@ -164,13 +164,16 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 
 **Dataset Extraction Settings:**
 
-| Dataset | Text | Tables | Charts | Images | Infographics | Recall |
-|---------|------|--------|--------|--------|--------------|--------|
-| `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Dataset | Text | Tables | Charts | Images | Infographics | Audio | Recall |
+|---------|------|--------|--------|--------|--------------|-------|--------|
+| `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `bo10k` | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| `video` | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| `audio` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ### Configuration Precedence
 
@@ -457,7 +460,7 @@ All datasets use **multimodal-only** evaluation:
 - Default `ground_truth_dir: null` automatically uses `data/` directory
 - Custom path can be specified via `ground_truth_dir` config
 
-**Other datasets** (finance_bench, earnings, audio):
+**Other datasets** (finance_bench, earnings, audio, video, bo10k):
 - Ground truth files must be obtained separately (not in public repo)
 - Set `ground_truth_dir` to point to your ground truth directory
 - Dataset-specific evaluators are extensible (see `recall_utils.py`)
@@ -474,7 +477,7 @@ recall:
   # Recall evaluation settings
   recall_top_k: 10
   ground_truth_dir: null  # null = use repo data/ directory
-  recall_dataset: bo767  # Required: must be explicitly set (bo767, finance_bench, earnings, audio)
+  recall_dataset: bo767  # Required: must be explicitly set (bo767, finance_bench, earnings, audio, video, bo10k)
 ```
 
 ### Usage Examples

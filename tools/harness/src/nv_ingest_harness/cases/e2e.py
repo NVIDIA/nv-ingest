@@ -1,8 +1,10 @@
+import glob as glob_module
 import json
 import logging
 import os
 import shutil
 import time
+from pathlib import Path
 
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.util.document_analysis import analyze_document_chunks
@@ -89,7 +91,6 @@ def main(config=None, log_path: str = "test_results") -> int:
     if config.vdb_backend == "lancedb":
         print(f"Hybrid: {hybrid}")
 
-    # Extraction config
     extractions = []
     if extract_text:
         extractions.append("text")
@@ -101,7 +102,10 @@ def main(config=None, log_path: str = "test_results") -> int:
         extractions.append("images")
     if extract_infographics:
         extractions.append("infographics")
-    print(f"Extract: {', '.join(extractions)}")
+    needs_audio_segmentation = config.file_pattern and config.file_pattern.endswith((".mp3", ".mp4"))
+    if needs_audio_segmentation:
+        extractions.append("audio (segment_audio=True)")
+    print(f"Extract: {', '.join(extractions) if extractions else 'none'}")
 
     # Pipeline options
     pipeline_opts = []
@@ -140,30 +144,37 @@ def main(config=None, log_path: str = "test_results") -> int:
     if api_version == "v2":
         ingestor_kwargs["message_client_kwargs"] = {"api_version": "v2"}
 
-    # Convert directory to recursive glob pattern to handle nested directories
-    if os.path.isdir(data_dir):
-        # Use **/*.pdf to recursively match PDF files in subdirectories
-        file_pattern = os.path.join(data_dir, "**", "*.pdf")
+    if config.file_pattern:
+        file_pattern = os.path.join(data_dir, "**", config.file_pattern)
+        all_files = glob_module.glob(file_pattern, recursive=True)
+        if config.max_file_size_gb:
+            max_size = config.max_file_size_gb * 1e9
+            all_files = [f for f in all_files if Path(f).stat().st_size < max_size]
+        print(f"Files: {len(all_files)}")
+        ingestor = Ingestor(**ingestor_kwargs).files(all_files)
     else:
-        # Already a file or glob pattern
-        file_pattern = data_dir
-
-    ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
+        if os.path.isdir(data_dir):
+            file_pattern = os.path.join(data_dir, "**", "*.pdf")
+        else:
+            file_pattern = data_dir
+        ingestor = Ingestor(**ingestor_kwargs).files(file_pattern)
 
     # V2-only: Configure PDF splitting (server-side page splitting)
     if api_version == "v2" and pdf_split_page_count:
         ingestor = ingestor.pdf_split_config(pages_per_chunk=pdf_split_page_count)
 
-    # Extraction step
-    ingestor = ingestor.extract(
-        extract_text=extract_text,
-        extract_tables=extract_tables,
-        extract_charts=extract_charts,
-        extract_images=extract_images,
-        text_depth=text_depth,
-        table_output_format=table_output_format,
-        extract_infographics=extract_infographics,
-    )
+    extract_kwargs = {
+        "extract_text": extract_text,
+        "extract_tables": extract_tables,
+        "extract_charts": extract_charts,
+        "extract_images": extract_images,
+        "text_depth": text_depth,
+        "table_output_format": table_output_format,
+        "extract_infographics": extract_infographics,
+    }
+    if needs_audio_segmentation:
+        extract_kwargs["extract_audio_params"] = {"segment_audio": True}
+    ingestor = ingestor.extract(**extract_kwargs)
 
     # Optional pipeline steps
     if enable_caption:
@@ -236,11 +247,21 @@ def main(config=None, log_path: str = "test_results") -> int:
     kv_event_log("failure_count", len(failures), log_path)
     kv_event_log("ingestion_time_s", ingestion_time, log_path)
 
-    total_pages = pdf_page_count(data_dir)
+    total_pages = None
     pages_per_second = None
-    if total_pages > 0 and ingestion_time > 0:
-        pages_per_second = total_pages / ingestion_time
-        kv_event_log("pages_per_second", pages_per_second, log_path)
+    total_size_mb = None
+    mb_per_second = None
+
+    if config.total_size_mb:
+        total_size_mb = config.total_size_mb
+        mb_per_second = total_size_mb / ingestion_time if ingestion_time > 0 else None
+        kv_event_log("total_size_mb", total_size_mb, log_path)
+        kv_event_log("mb_per_second", mb_per_second, log_path)
+    else:
+        total_pages = pdf_page_count(data_dir)
+        if total_pages > 0 and ingestion_time > 0:
+            pages_per_second = total_pages / ingestion_time
+            kv_event_log("pages_per_second", pages_per_second, log_path)
 
     # Optional: log chunk stats and per-type breakdown
     if vdb_backend != "lancedb":
@@ -313,6 +334,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             "test_name": test_name,
             "api_version": api_version,
             "dataset_dir": data_dir,
+            "file_pattern": config.file_pattern,
+            "max_file_size_gb": config.max_file_size_gb,
             "collection_name": collection_name,
             "hostname": hostname,
             "model_name": model_name,
@@ -336,6 +359,8 @@ def main(config=None, log_path: str = "test_results") -> int:
             "ingestion_time_s": ingestion_time,
             "total_pages": total_pages,
             "pages_per_second": pages_per_second,
+            "total_size_mb": total_size_mb,
+            "mb_per_second": mb_per_second,
             "text_chunks": sum(len(x) for x in text_results),
             "table_chunks": sum(len(x) for x in table_results),
             "chart_chunks": sum(len(x) for x in chart_results),
