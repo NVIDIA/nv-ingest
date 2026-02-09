@@ -44,23 +44,6 @@ def _nightly_suffix_yyyymmdd() -> str:
     return _dt.datetime.now(_dt.UTC).strftime("%Y%m%d")
 
 
-def _git_rev(repo_path: Path, short: int = 7) -> str:
-    """Return short git commit hash for repo_path, or 'unknown' if not a git repo."""
-    try:
-        r = subprocess.run(
-            ["git", "rev-parse", f"--short={short}", "HEAD"],
-            cwd=str(repo_path),
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if r.returncode == 0 and r.stdout:
-            return r.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
-    return "unknown"
-
-
 def _venv_python(venv_dir: Path) -> Path:
     if os.name == "nt":
         return venv_dir / "Scripts" / "python.exe"
@@ -110,7 +93,7 @@ def _pep440_nightly(base_version: str, yyyymmdd: str) -> str:
     return f"{base}.dev{yyyymmdd}"
 
 
-def _patch_pyproject_version(repo_dir: Path, *, local_version_suffix: str = "") -> bool:
+def _patch_pyproject_version(repo_dir: Path) -> bool:
     pyproject = repo_dir / "pyproject.toml"
     if not pyproject.exists():
         return False
@@ -123,8 +106,6 @@ def _patch_pyproject_version(repo_dir: Path, *, local_version_suffix: str = "") 
 
     old_version = m.group(1)
     new_version = _pep440_nightly(old_version, _nightly_suffix_yyyymmdd())
-    if local_version_suffix:
-        new_version = f"{new_version}+{local_version_suffix}"
     if new_version == old_version:
         return False
 
@@ -134,7 +115,7 @@ def _patch_pyproject_version(repo_dir: Path, *, local_version_suffix: str = "") 
     return True
 
 
-def _patch_setup_cfg_version(repo_dir: Path, *, local_version_suffix: str = "") -> bool:
+def _patch_setup_cfg_version(repo_dir: Path) -> bool:
     setup_cfg = repo_dir / "setup.cfg"
     if not setup_cfg.exists():
         return False
@@ -147,8 +128,6 @@ def _patch_setup_cfg_version(repo_dir: Path, *, local_version_suffix: str = "") 
 
     old_version = m.group(1).strip().strip('"').strip("'")
     new_version = _pep440_nightly(old_version, _nightly_suffix_yyyymmdd())
-    if local_version_suffix:
-        new_version = f"{new_version}+{local_version_suffix}"
     if new_version == old_version:
         return False
 
@@ -347,12 +326,6 @@ def main() -> int:
     print(f"=== Cloning {args.repo_url} -> {repo_dir} ===")
     _clone_repo(args.repo_url, repo_dir)
 
-    # PEP 440 local version: include git hashes so changes to orchestrator or source produce distinct wheels
-    orch_hash = _git_rev(root)
-    source_hash = _git_rev(repo_dir)
-    local_version_suffix = f"orch.{orch_hash}.src.{source_hash}"
-    print(f"Version local suffix: +{local_version_suffix}")
-
     print("=== Attempting nightly version patch ===")
     if not args.project_subdir:
         detected = _auto_project_subdir(repo_dir, args.repo_id)
@@ -360,9 +333,7 @@ def main() -> int:
             args.project_subdir = detected
             print(f"Auto-detected project subdir: {args.project_subdir}")
     project_dir = repo_dir / args.project_subdir if args.project_subdir else repo_dir
-    patched = _patch_pyproject_version(
-        project_dir, local_version_suffix=local_version_suffix
-    ) or _patch_setup_cfg_version(project_dir, local_version_suffix=local_version_suffix)
+    patched = _patch_pyproject_version(project_dir) or _patch_setup_cfg_version(project_dir)
     if not patched:
         print("No static version field found to patch (continuing).")
 
