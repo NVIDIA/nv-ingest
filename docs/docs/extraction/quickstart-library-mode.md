@@ -481,4 +481,4 @@ The `run_pipeline` throws the following errors:
 - [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
 - [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
-- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
+- [Enterprise RAG Blueprint](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
