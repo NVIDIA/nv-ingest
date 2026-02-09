@@ -21,6 +21,7 @@ def _get_retrieval_func(
     vdb_backend: str,
     table_path: Optional[str] = None,
     table_name: Optional[str] = None,
+    hybrid: bool = False,
 ):
     """
     Get the retrieval function for the specified VDB backend.
@@ -39,7 +40,10 @@ def _get_retrieval_func(
     if vdb_backend == "lancedb":
         if not table_path:
             raise ValueError("table_path required for lancedb backend")
-        from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
+        if hybrid:
+            from nv_ingest_client.util.vdb.lancedb import lancedb_hybrid_retrieval as lancedb_retrieval
+        else:
+            from nv_ingest_client.util.vdb.lancedb import lancedb_retrieval
 
         kwargs = {"table_path": table_path}
         if table_name:
@@ -54,6 +58,7 @@ def get_recall_scores(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -97,7 +102,12 @@ def get_recall_scores(
 
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
-        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+        retrieval_func = _get_retrieval_func(
+            "lancedb",
+            table_path,
+            table_name=collection_name,
+            hybrid=hybrid,
+        )
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
 
@@ -155,6 +165,7 @@ def get_recall_scores_pdf_only(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -210,7 +221,12 @@ def get_recall_scores_pdf_only(
 
     # Create retrieval function once, outside the batch loop
     if vdb_backend == "lancedb":
-        retrieval_func = _get_retrieval_func("lancedb", table_path, table_name=collection_name)
+        retrieval_func = _get_retrieval_func(
+            "lancedb",
+            table_path,
+            table_name=collection_name,
+            hybrid=hybrid,
+        )
     else:
         retrieval_func = None  # Use nvingest_retrieval directly
 
@@ -269,6 +285,7 @@ def evaluate_recall_orchestrator(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -306,6 +323,7 @@ def evaluate_recall_orchestrator(
         collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         vdb_backend=vdb_backend,
         table_path=table_path,
         model_name=model_name,
@@ -353,6 +371,7 @@ def bo767_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -393,6 +412,7 @@ def bo767_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -456,6 +476,7 @@ def finance_bench_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = False,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -496,6 +517,7 @@ def finance_bench_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -557,6 +579,7 @@ def earnings_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -597,6 +620,7 @@ def earnings_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
@@ -653,6 +677,7 @@ def bo10k_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -670,6 +695,7 @@ def bo10k_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,

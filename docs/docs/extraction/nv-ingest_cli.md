@@ -117,6 +117,10 @@ nv-ingest-cli \
 - `reasoning` (boolean): Set to `true` to enable reasoning, `false` to disable it. Defaults to service default (typically disabled).
 - Ensure the VLM caption profile/service is running or pointing to the public build endpoint; otherwise the caption task will be skipped.
 
+!!! tip
+
+  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+
 Alternatively, you can use an environment variable to set the API version:
 
 ```bash
