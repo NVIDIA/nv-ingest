@@ -15,7 +15,16 @@ from nv_ingest_harness.utils.session import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
+CASES = [
+    "e2e",
+    "e2e_with_llm_summary",
+    "recall",
+    "e2e_recall",
+    "page_elements",
+    "table_structure",
+    "graphic_elements",
+    "ocr",
+]
 
 
 def run_datasets(
