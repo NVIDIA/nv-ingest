@@ -27,7 +27,8 @@ class LlamaNemotronEmbed1BV2Embedder:
     # IMPORTANT: Some HF tokenizers set an effectively "infinite" model_max_length.
     # If we rely on that, `truncation=True` may still allow extremely long sequences,
     # which can explode attention-mask memory (O(seq_len^2)) and OOM the GPU.
-    max_length: int = 4096
+    # max_length: int = 4096
+    max_length: int = 8192
 
     def __post_init__(self) -> None:
         self._tokenizer = None

@@ -27,7 +27,7 @@ from retriever.model.local import NemotronGraphicElementsV1, NemotronPageElement
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.table.table_structure import detect_table_structure_v1_from_page_elements_v3
-from retriever.text_embed import embed_text_1b_v2
+from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
     import pypdfium2 as pdfium
@@ -44,6 +44,113 @@ except Exception:  # pragma: no cover
 
 from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
+
+
+def embed_text_main_text_embed(
+    batch_df: Any,
+    *,
+    model: Any,
+    # Keep compatibility with previous `embed_text_1b_v2` signature so `.embed(...)` kwargs
+    # don't need to change for inprocess mode.
+    model_name: Optional[str] = None,
+    embedding_endpoint: Optional[str] = None,
+    text_column: str = "text",
+    inference_batch_size: int = 16,
+    output_column: str = "text_embeddings_1b_v2",
+    embedding_dim_column: str = "text_embeddings_1b_v2_dim",
+    has_embedding_column: str = "text_embeddings_1b_v2_has_embedding",
+    **_: Any,
+) -> Any:
+    """
+    Inprocess embedding task implemented via `retriever.text_embed.main_text_embed`.
+
+    This is a thin adapter that preserves the old output columns:
+    - `output_column` (payload dict with embedding)
+    - `embedding_dim_column` (int)
+    - `has_embedding_column` (bool)
+
+    It also writes `metadata.embedding` for compatibility with downstream uploaders.
+    """
+    _ = (model_name, embedding_endpoint)  # reserved for future remote execution support
+
+    if not isinstance(batch_df, pd.DataFrame):
+        raise NotImplementedError("embed_text_main_text_embed currently only supports pandas.DataFrame input.")
+    if inference_batch_size <= 0:
+        raise ValueError("inference_batch_size must be > 0")
+
+    # Build an embedder callable compatible with `create_text_embeddings_for_df`.
+    def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        vecs = model.embed(list(texts), batch_size=int(inference_batch_size))
+        tolist = getattr(vecs, "tolist", None)
+        if callable(tolist):
+            return tolist()
+        return vecs  # type: ignore[return-value]
+
+    cfg = TextEmbeddingConfig(
+        text_column=str(text_column),
+        # Generate the same payload column name as the prior implementation.
+        output_payload_column=str(output_column) if output_column else None,
+        write_embedding_to_metadata=True,
+        metadata_column="metadata",
+        # Match chunking behavior as closely as possible to previous `embed_text_1b_v2`.
+        batch_size=int(inference_batch_size),
+        encoding_format="float",
+        input_type="passage",
+        truncate="END",
+        dimensions=None,
+        embedding_nim_endpoint="http://localhost:8012/v1",
+        embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+    )
+
+
+    # # Retriever-local dataframe settings
+    # text_column: str = "text"
+    # write_embedding_to_metadata: bool = True
+    # metadata_column: str = "metadata"
+    # # Optional extra output column containing a payload dict (similar to embed_text_1b_v2)
+    # output_payload_column: Optional[str] = None
+
+    try:
+        out_df, _info = create_text_embeddings_for_df(
+            batch_df,
+            task_config={
+                "embedder": _embed,
+                # "endpoint_url": "http://localhost:8012/v1",  # inprocess uses local HF embedder
+                "endpoint_url": None,
+                "local_batch_size": int(inference_batch_size),
+            },
+            transform_config=cfg,
+        )
+    except BaseException as e:
+        # Fail-soft: preserve batch shape and set an error payload per-row.
+        err_payload = {"embedding": None, "error": {"stage": "embed", "type": e.__class__.__name__, "message": str(e)}}
+        out_df = batch_df.copy()
+        if output_column:
+            out_df[output_column] = [err_payload for _ in range(len(out_df.index))]
+        out_df[embedding_dim_column] = [0 for _ in range(len(out_df.index))]
+        out_df[has_embedding_column] = [False for _ in range(len(out_df.index))]
+        out_df["_contains_embeddings"] = [False for _ in range(len(out_df.index))]
+        return out_df
+
+    # Add backwards-compatible dim/has columns (these were produced by `embed_text_1b_v2`).
+    if embedding_dim_column:
+        def _dim(row: pd.Series) -> int:
+            md = row.get("metadata")
+            if isinstance(md, dict):
+                emb = md.get("embedding")
+                if isinstance(emb, list):
+                    return int(len(emb))
+            payload = row.get(output_column) if output_column else None
+            if isinstance(payload, dict) and isinstance(payload.get("embedding"), list):
+                return int(len(payload.get("embedding") or []))
+            return 0
+
+        out_df[embedding_dim_column] = out_df.apply(_dim, axis=1)
+    else:
+        out_df[embedding_dim_column] = [0 for _ in range(len(out_df.index))]
+
+    out_df[has_embedding_column] = [bool(int(d) > 0) for d in out_df[embedding_dim_column].tolist()]
+    return out_df
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -513,7 +620,7 @@ class InProcessIngestor(Ingestor):
             normalize=normalize,
             max_length=max_length,
         )
-        self._tasks.append((embed_text_1b_v2, embed_kwargs))
+        self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self
 
     def save_to_disk(
@@ -542,7 +649,7 @@ class InProcessIngestor(Ingestor):
         This is an in-process uploader intended to run after `.embed(...)`.
         It reads embeddings from either:
         - `metadata.embedding` (if present), or
-        - the embedding payload column produced by `embed_text_1b_v2` (default: `text_embeddings_1b_v2`)
+        - the embedding payload column produced by the embed stage (default: `text_embeddings_1b_v2`)
 
         Configuration is passed via kwargs:
         - **lancedb_uri**: str, default `"lancedb"`
