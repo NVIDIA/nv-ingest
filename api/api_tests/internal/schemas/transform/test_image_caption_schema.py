@@ -14,6 +14,8 @@ def test_image_caption_extraction_schema_defaults():
     assert schema.endpoint_url.startswith("https://")
     assert schema.prompt.startswith("Caption")
     assert schema.model_name.startswith("nvidia/")
+    assert schema.context_text_max_chars == 0
+    assert schema.temperature == 1.0
     assert schema.raise_on_failure is False
 
 
@@ -38,6 +40,26 @@ def test_image_caption_extraction_schema_accepts_truthy_values():
 
     schema = ImageCaptionExtractionSchema(raise_on_failure=0)
     assert schema.raise_on_failure is False
+
+
+def test_image_caption_extraction_schema_context_text_max_chars_custom():
+    schema = ImageCaptionExtractionSchema(context_text_max_chars=512)
+    assert schema.context_text_max_chars == 512
+
+
+def test_image_caption_extraction_schema_context_text_max_chars_none_coerced():
+    schema = ImageCaptionExtractionSchema(context_text_max_chars=None)
+    assert schema.context_text_max_chars == 0
+
+
+def test_image_caption_extraction_schema_temperature_custom():
+    schema = ImageCaptionExtractionSchema(temperature=0.5)
+    assert schema.temperature == 0.5
+
+
+def test_image_caption_extraction_schema_temperature_none_coerced():
+    schema = ImageCaptionExtractionSchema(temperature=None)
+    assert schema.temperature == 1.0
 
 
 def test_image_caption_extraction_schema_rejects_extra_fields():
