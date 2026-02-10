@@ -126,6 +126,15 @@ datasets:
     extract_infographics: false
     recall_dataset: bo767  # Evaluator for recall testing
   
+  jp20:
+    path: /path/to/jp20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: jp20  # bo10k evaluator filtered to jp20 subset
+
   bo20:
     path: /raid/jioffe/bo20
     extract_text: true
@@ -167,6 +176,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 | Dataset | Text | Tables | Charts | Images | Infographics | Recall |
 |---------|------|--------|--------|--------|--------------|--------|
 | `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `jp20` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
