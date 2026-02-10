@@ -213,6 +213,13 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 # Set entrypoint to tini with a custom entrypoint script
 ENTRYPOINT ["/opt/conda/envs/nv_ingest_runtime/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
+FROM runtime AS test
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && WHEEL="$(ls ./api/dist/*.whl)" \
+    && pip install "${WHEEL}[test]"
+
 FROM nv_ingest_install AS development
 
 RUN source activate nv_ingest_runtime && \
