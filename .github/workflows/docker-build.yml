@@ -39,7 +39,7 @@ jobs:
           if [ -s ./scripts/private_local/hf_token.txt ]; then
             SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
           fi
-          DOCKER_BUILDKIT=1 docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 --build-arg DOWNLOAD_LLAMA_TOKENIZER=True $SECRET_ARG -t nv-ingest:latest .
+          DOCKER_BUILDKIT=1 docker build --target test --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 --build-arg DOWNLOAD_LLAMA_TOKENIZER=True $SECRET_ARG -t nv-ingest:latest .
 
       - name: Cleanup HF token file
         if: always()
