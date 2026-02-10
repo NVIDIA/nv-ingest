@@ -94,7 +94,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
+    conda install -y python=3.12 mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
 COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
@@ -122,7 +122,7 @@ RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
-    && python=3.12 mamba install -y -c conda-forge tini
+    && mamba install -y -c conda-forge tini
 
 # Ensure dynamically linked libraries in the conda environment are found at runtime
 ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
