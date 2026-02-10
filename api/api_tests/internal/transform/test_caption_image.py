@@ -484,7 +484,7 @@ def test_transform_context_disabled_batch_preserved(
     """With context disabled (default), batch behavior is unchanged."""
     mock_generate.return_value = ["c1", "c2"]
 
-    result = transform_image_create_vlm_caption_internal(
+    _ = transform_image_create_vlm_caption_internal(
         dummy_df_with_images.copy(), dummy_task_config, dummy_transform_config
     )
 
