@@ -1,0 +1,4253 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/">
+      
+      
+        <link rel="prev" href="../scaling-modes/">
+      
+      
+        <link rel="next" href="../telemetry/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Benchmarking - NeMo Retriever Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/css/color-schemes.css">
+    
+      <link rel="stylesheet" href="../../assets/css/fonts.css">
+    
+      <link rel="stylesheet" href="../../assets/css/custom-material.css">
+    
+      <link rel="stylesheet" href="../../assets/css/jupyter-themes.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+ 
+    <script src="https://assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="light" data-md-color-primary="custom" data-md-color-accent="lime">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nv-ingest-integration-testing-framework" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You're not viewing the latest version.
+  <a href="../../.."> 
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../.."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NeMo Retriever Documentation" class="md-header__button md-logo" aria-label="NeMo Retriever Documentation" data-md-component="logo">
+      
+  
+  <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 164 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g>
+        <path d="M160.352,24.069L160.352,23.62L160.64,23.62C160.797,23.62 161.011,23.632 161.011,23.824C161.011,24.032 160.901,24.069 160.715,24.069L160.352,24.069M160.352,24.384L160.544,24.384L160.991,25.168L161.481,25.168L160.987,24.352C161.242,24.333 161.452,24.212 161.452,23.868C161.452,23.441 161.157,23.303 160.659,23.303L159.938,23.303L159.938,25.168L160.352,25.168L160.352,24.384M162.45,24.238C162.45,23.143 161.599,22.508 160.65,22.508C159.695,22.508 158.845,23.143 158.845,24.238C158.845,25.333 159.695,25.971 160.65,25.971C161.598,25.971 162.45,25.333 162.45,24.238M161.93,24.238C161.93,25.036 161.343,25.572 160.65,25.572L160.65,25.566C159.937,25.572 159.361,25.036 159.361,24.238C159.361,23.441 159.938,22.907 160.65,22.907C161.344,22.907 161.93,23.441 161.93,24.238"/>
+        <path d="M96.374,5.707L96.376,25.367L101.928,25.367L101.928,5.707L96.374,5.707ZM52.697,5.681L52.697,25.367L58.3,25.367L58.3,10.086L62.67,10.1C64.107,10.1 65.1,10.445 65.793,11.184C66.672,12.12 67.03,13.628 67.03,16.389L67.03,25.367L72.457,25.367L72.457,14.49C72.457,6.727 67.509,5.68 62.668,5.68L52.698,5.68L52.697,5.681ZM105.314,5.708L105.314,25.367L114.32,25.367C119.118,25.367 120.684,24.569 122.377,22.78C123.575,21.524 124.348,18.766 124.348,15.753C124.348,12.99 123.693,10.525 122.551,8.99C120.494,6.245 117.531,5.708 113.106,5.708L105.314,5.708ZM110.822,9.988L113.209,9.988C116.672,9.988 118.912,11.544 118.912,15.579C118.912,19.616 116.672,21.171 113.209,21.171L110.822,21.171L110.822,9.988ZM88.369,5.708L83.735,21.288L79.295,5.709L73.302,5.708L79.642,25.367L87.645,25.367L94.036,5.708L88.369,5.708ZM126.932,25.367L132.485,25.367L132.485,5.709L126.93,5.708L126.932,25.367ZM142.496,5.715L134.743,25.36L140.218,25.36L141.445,21.888L150.62,21.888L151.781,25.36L157.725,25.36L149.913,5.714L142.496,5.715ZM146.1,9.3L149.464,18.504L142.631,18.504L146.101,9.3L146.1,9.3Z"/>
+        <path d="M16.889,8.985L16.889,6.28C17.151,6.26 17.417,6.247 17.687,6.238C25.087,6.006 29.942,12.597 29.942,12.597C29.942,12.597 24.698,19.879 19.076,19.879C18.333,19.882 17.594,19.764 16.889,19.529L16.889,11.325C19.769,11.673 20.349,12.945 22.081,15.833L25.933,12.585C25.933,12.585 23.121,8.897 18.381,8.897C17.866,8.897 17.373,8.933 16.889,8.985ZM16.889,0.047L16.889,4.09C17.154,4.069 17.42,4.052 17.687,4.042C27.977,3.696 34.682,12.482 34.682,12.482C34.682,12.482 26.982,21.846 18.959,21.846C18.224,21.846 17.535,21.778 16.889,21.663L16.889,24.161C17.442,24.231 18.015,24.273 18.613,24.273C26.078,24.273 31.477,20.461 36.705,15.948C37.572,16.642 41.121,18.331 41.85,19.071C36.879,23.231 25.295,26.586 18.727,26.586C18.113,26.584 17.5,26.552 16.889,26.49L16.889,30L45.264,30L45.264,0.047L16.889,0.047ZM16.889,19.529L16.889,21.662C9.984,20.432 8.067,13.254 8.067,13.254C8.067,13.254 11.383,9.58 16.889,8.985L16.889,11.325L16.878,11.324C13.988,10.977 11.731,13.677 11.731,13.677C11.731,13.677 12.996,18.221 16.889,19.529ZM4.625,12.943C4.625,12.943 8.717,6.903 16.889,6.28L16.889,4.088C7.838,4.815 0,12.48 0,12.48C0,12.48 4.439,25.313 16.889,26.488L16.889,24.16C7.753,23.011 4.625,12.943 4.625,12.943Z" style="fill:rgb(118,185,0);"/>
+    </g>
+</svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NeMo Retriever Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Benchmarking
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="light" data-md-color-primary="custom" data-md-color-accent="lime"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="dark" data-md-color-primary="custom" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/NVIDIA/nv-ingest/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NVIDIA/nv-ingest
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+    
+  
+  NeMo Retriever
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NeMo Retriever Documentation" class="md-nav__button md-logo" aria-label="NeMo Retriever Documentation" data-md-component="logo">
+      
+  
+  <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 164 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g>
+        <path d="M160.352,24.069L160.352,23.62L160.64,23.62C160.797,23.62 161.011,23.632 161.011,23.824C161.011,24.032 160.901,24.069 160.715,24.069L160.352,24.069M160.352,24.384L160.544,24.384L160.991,25.168L161.481,25.168L160.987,24.352C161.242,24.333 161.452,24.212 161.452,23.868C161.452,23.441 161.157,23.303 160.659,23.303L159.938,23.303L159.938,25.168L160.352,25.168L160.352,24.384M162.45,24.238C162.45,23.143 161.599,22.508 160.65,22.508C159.695,22.508 158.845,23.143 158.845,24.238C158.845,25.333 159.695,25.971 160.65,25.971C161.598,25.971 162.45,25.333 162.45,24.238M161.93,24.238C161.93,25.036 161.343,25.572 160.65,25.572L160.65,25.566C159.937,25.572 159.361,25.036 159.361,24.238C159.361,23.441 159.938,22.907 160.65,22.907C161.344,22.907 161.93,23.441 161.93,24.238"/>
+        <path d="M96.374,5.707L96.376,25.367L101.928,25.367L101.928,5.707L96.374,5.707ZM52.697,5.681L52.697,25.367L58.3,25.367L58.3,10.086L62.67,10.1C64.107,10.1 65.1,10.445 65.793,11.184C66.672,12.12 67.03,13.628 67.03,16.389L67.03,25.367L72.457,25.367L72.457,14.49C72.457,6.727 67.509,5.68 62.668,5.68L52.698,5.68L52.697,5.681ZM105.314,5.708L105.314,25.367L114.32,25.367C119.118,25.367 120.684,24.569 122.377,22.78C123.575,21.524 124.348,18.766 124.348,15.753C124.348,12.99 123.693,10.525 122.551,8.99C120.494,6.245 117.531,5.708 113.106,5.708L105.314,5.708ZM110.822,9.988L113.209,9.988C116.672,9.988 118.912,11.544 118.912,15.579C118.912,19.616 116.672,21.171 113.209,21.171L110.822,21.171L110.822,9.988ZM88.369,5.708L83.735,21.288L79.295,5.709L73.302,5.708L79.642,25.367L87.645,25.367L94.036,5.708L88.369,5.708ZM126.932,25.367L132.485,25.367L132.485,5.709L126.93,5.708L126.932,25.367ZM142.496,5.715L134.743,25.36L140.218,25.36L141.445,21.888L150.62,21.888L151.781,25.36L157.725,25.36L149.913,5.714L142.496,5.715ZM146.1,9.3L149.464,18.504L142.631,18.504L146.101,9.3L146.1,9.3Z"/>
+        <path d="M16.889,8.985L16.889,6.28C17.151,6.26 17.417,6.247 17.687,6.238C25.087,6.006 29.942,12.597 29.942,12.597C29.942,12.597 24.698,19.879 19.076,19.879C18.333,19.882 17.594,19.764 16.889,19.529L16.889,11.325C19.769,11.673 20.349,12.945 22.081,15.833L25.933,12.585C25.933,12.585 23.121,8.897 18.381,8.897C17.866,8.897 17.373,8.933 16.889,8.985ZM16.889,0.047L16.889,4.09C17.154,4.069 17.42,4.052 17.687,4.042C27.977,3.696 34.682,12.482 34.682,12.482C34.682,12.482 26.982,21.846 18.959,21.846C18.224,21.846 17.535,21.778 16.889,21.663L16.889,24.161C17.442,24.231 18.015,24.273 18.613,24.273C26.078,24.273 31.477,20.461 36.705,15.948C37.572,16.642 41.121,18.331 41.85,19.071C36.879,23.231 25.295,26.586 18.727,26.586C18.113,26.584 17.5,26.552 16.889,26.49L16.889,30L45.264,30L45.264,0.047L16.889,0.047ZM16.889,19.529L16.889,21.662C9.984,20.432 8.067,13.254 8.067,13.254C8.067,13.254 11.383,9.58 16.889,8.985L16.889,11.325L16.878,11.324C13.988,10.977 11.731,13.677 11.731,13.677C11.731,13.677 12.996,18.221 16.889,19.529ZM4.625,12.943C4.625,12.943 8.717,6.903 16.889,6.28L16.889,4.088C7.838,4.815 0,12.48 0,12.48C0,12.48 4.439,25.313 16.889,26.488L16.889,24.16C7.753,23.011 4.625,12.943 4.625,12.943Z" style="fill:rgb(118,185,0);"/>
+    </g>
+</svg>
+
+    </a>
+    NeMo Retriever Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NVIDIA/nv-ingest/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NVIDIA/nv-ingest
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NeMo Retriever
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    NeMo Retriever
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../.." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Overview
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NeMo Retriever Extraction
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    NeMo Retriever Extraction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releasenotes-nv-ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_3" id="__nav_1_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prerequisites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Support Matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart-library-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Library Mode)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Self-Hosted)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Helm Chart)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_4" id="__nav_1_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nv-ingest_cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nv-ingest-python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v2-api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the API (V2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chunking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Split Documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filter Search Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nemoretriever-parse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Visual Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extract Speech
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vlm-embed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Multimodal Embedding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ray-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configure Ray Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_5" id="__nav_1_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customize Your Pipeline
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Customize Your Pipeline
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-defined-functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add User-defined Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-defined-stages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add User-defined Stages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nimclient/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NimClient Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Scaling Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_6" id="__nav_1_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarking
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dataset Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-download-the-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Download the Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-your-first-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Your First Test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#yaml-configuration-test_configsyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        YAML Configuration (test_configs.yaml)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="YAML Configuration (test_configs.yaml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#active-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Active Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-configured-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-Configured Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-precedence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Precedence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-options-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Options Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Options Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extraction-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extraction Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infrastructure-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infrastructure Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valid-configuration-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid Configuration Values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-sweeping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Sweeping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-synergy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Synergy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Configurations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recall-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recall Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recall Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reranker-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reranker Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collection-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collection Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-only-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multimodal-Only Evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ground-truth-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ground Truth Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sweeping-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sweeping Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sweeping Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dataset-sweeping-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Sweeping (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-sweeping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Sweeping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#attach-mode-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attach Mode (Default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managed-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managed Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts-and-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts and Logging
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Artifacts and Logging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#results-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#document-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Development Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-new-test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding New Test Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extending-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-different-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Different Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../throughput-is-dataset-dependent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Throughput Is Dataset-Dependent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_7" id="__nav_1_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ngc-api-key/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate Your NGC Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../content-metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-docs" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshoot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshoot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dataset Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-download-the-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Download the Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-your-first-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Your First Test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#yaml-configuration-test_configsyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        YAML Configuration (test_configs.yaml)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="YAML Configuration (test_configs.yaml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#active-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Active Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-configured-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-Configured Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-precedence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Precedence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-options-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Options Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Options Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extraction-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extraction Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infrastructure-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infrastructure Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valid-configuration-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid Configuration Values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-sweeping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Sweeping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-synergy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Synergy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Configurations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recall-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recall Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recall Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reranker-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reranker Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collection-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collection Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-only-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multimodal-Only Evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ground-truth-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ground Truth Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sweeping-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sweeping Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sweeping Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dataset-sweeping-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Sweeping (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-sweeping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Sweeping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#attach-mode-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attach Mode (Default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managed-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managed Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts-and-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts and Logging
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Artifacts and Logging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#results-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#document-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Development Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-new-test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding New Test Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extending-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-different-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Different Datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../.." class="md-path__link">
+          
+  <span class="md-ellipsis">
+    NeMo Retriever
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../overview/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    NeMo Retriever Extraction
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Performance
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+
+    <div style="text-align: right;">
+        <a href="https://surveys.hotjar.com/4904bf71-6484-47a7-83ff-4715cceabdb5" id="openPopupButton">Is this page helpful?</a>
+    </div>
+
+    
+                  
+
+
+  
+  
+
+
+<h1 id="nv-ingest-integration-testing-framework">nv-ingest Integration Testing Framework</h1>
+<p>A configurable, dataset-agnostic testing framework for end-to-end validation of nv-ingest pipelines. This framework uses structured YAML configuration for type safety, validation, and parameter management.</p>
+<h2 id="dataset-prerequisites">Dataset Prerequisites</h2>
+<p>Before you run any benchmarking or evaluation tests, you must first download the benchmark datasets. The three primary datasets used in nv-ingest benchmarking and evaluations are the following:</p>
+<ul>
+<li><strong>Bo20</strong> - 20 PDFs for quick testing</li>
+<li><strong>Bo767</strong> - 767 PDFs for comprehensive benchmarking</li>
+<li><strong>Bo10k</strong> - 10,000 PDFs for large-scale evaluations</li>
+</ul>
+<h3 id="how-to-download-the-datasets">How to Download the Datasets</h3>
+<p>Use the <a href="https://github.com/NVIDIA/nv-ingest/blob/main/evaluation/digital_corpora_download.ipynb">Digital Corpora Download Notebook</a> to download these datasets from the public Digital Corpora source. This notebook provides automated download functions that do the following:</p>
+<ul>
+<li>Download PDFs directly from Digital Corpora's public repository.</li>
+<li>Support all three dataset sizes (Bo20, Bo767, Bo10k).</li>
+<li>Handle the extraction and organization of files automatically.</li>
+</ul>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>These datasets are prerequisites for all benchmarking operations described in this guide. Complete the dataset download before proceeding with any test scenarios below.</p>
+</div>
+<h2 id="quick-start">Quick Start</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<p>Before you use this documentation, you need the following:</p>
+<ul>
+<li>Docker and Docker Compose are running</li>
+<li>A Python environment with nv-ingest-client installed</li>
+<li>The <a href="#dataset-prerequisites">benchmark datasets are downloaded</a></li>
+</ul>
+<h3 id="run-your-first-test">Run Your First Test</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Navigate to the nv-ingest-harness directory</span>
+<span class="nb">cd</span><span class="w"> </span>tools/harness
+
+<span class="c1"># 2. Install dependencies</span>
+uv<span class="w"> </span>sync
+
+<span class="c1"># 3. Run with a pre-configured dataset (assumes services are running)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Or use a custom path that uses the &quot;active&quot; configuration</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>/path/to/your/data
+
+<span class="c1"># With managed infrastructure (starts/stops services)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--managed
+</code></pre></div>
+<h2 id="configuration-system">Configuration System</h2>
+<h3 id="yaml-configuration-test_configsyaml">YAML Configuration (<code>test_configs.yaml</code>)</h3>
+<p>The framework uses a structured YAML file for all test configuration. Configuration is organized into logical sections:</p>
+<h4 id="active-configuration">Active Configuration</h4>
+<p>The <code>active</code> section contains your current test settings. Edit these values directly for your test runs:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Dataset</span>
+<span class="w">  </span><span class="nt">dataset_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/your/dataset</span>
+<span class="w">  </span><span class="nt">test_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># Auto-generated if null</span>
+
+<span class="w">  </span><span class="c1"># API Configuration</span>
+<span class="w">  </span><span class="nt">api_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span><span class="w">  </span><span class="c1"># v1 or v2</span>
+<span class="w">  </span><span class="nt">pdf_split_page_count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># V2 only: pages per chunk (null = default 32)</span>
+
+<span class="w">  </span><span class="c1"># Infrastructure</span>
+<span class="w">  </span><span class="nt">hostname</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span>
+<span class="w">  </span><span class="nt">readiness_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span>
+<span class="w">  </span><span class="nt">profiles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">retrieval</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="c1"># Runtime</span>
+<span class="w">  </span><span class="nt">sparse</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">gpu_search</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">embedding_model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+
+<span class="w">  </span><span class="c1"># Extraction</span>
+<span class="w">  </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">text_depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">page</span>
+<span class="w">  </span><span class="nt">table_output_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">markdown</span>
+
+<span class="w">  </span><span class="c1"># Pipeline (optional steps)</span>
+<span class="w">  </span><span class="nt">enable_caption</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">enable_split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">split_chunk_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="w">  </span><span class="nt">split_chunk_overlap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">150</span>
+
+<span class="w">  </span><span class="c1"># Storage</span>
+<span class="w">  </span><span class="nt">spill_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/spill</span>
+<span class="w">  </span><span class="nt">artifacts_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">collection_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+</code></pre></div>
+<h4 id="pre-configured-datasets">Pre-Configured Datasets</h4>
+<p>Each dataset includes its path, extraction settings, and recall evaluator in one place:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">datasets</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">bo767</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/raid/jioffe/bo767</span>
+<span class="w">    </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">recall_dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bo767</span><span class="w">  </span><span class="c1"># Evaluator for recall testing</span>
+
+<span class="w">  </span><span class="nt">bo20</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/raid/jioffe/bo20</span>
+<span class="w">    </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">recall_dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># bo20 does not have recall</span>
+
+<span class="w">  </span><span class="nt">earnings</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/raid/jioffe/earnings_conusulting</span>
+<span class="w">    </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">recall_dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">earnings</span><span class="w">  </span><span class="c1"># Evaluator for recall testing</span>
+</code></pre></div>
+<p><strong>Automatic Configuration</strong>: When you use <code>--dataset=bo767</code>, the framework automatically:
+- Sets the dataset path
+- Applies the correct extraction settings (text, tables, charts, images, infographics)
+- Configures the recall evaluator (if applicable)</p>
+<p><strong>Usage:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Single dataset - configs applied automatically</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Multiple datasets (sweeping) - each gets its own config</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings,bo20
+
+<span class="c1"># Custom path still works (uses active section config)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>/custom/path
+</code></pre></div></p>
+<p><strong>Dataset Extraction Settings:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Text</th>
+<th>Tables</th>
+<th>Charts</th>
+<th>Images</th>
+<th>Infographics</th>
+<th>Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bo767</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>earnings</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>bo20</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>financebench</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>single</code></td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<h3 id="configuration-precedence">Configuration Precedence</h3>
+<p>Settings are applied in order of priority:</p>
+<p><strong>Environment variables &gt; Dataset-specific config (path + extraction + recall_dataset) &gt; YAML active config</strong></p>
+<p><strong>Note</strong>: CLI arguments are only used for runtime decisions (which test to run, which dataset, execution mode). All configuration values come from YAML or environment variables.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code><span class="c1"># YAML active section has api_version: v1</span>
+<span class="c1"># Dataset bo767 has extract_images: false</span>
+<span class="c1"># Override via environment variable (highest priority)</span>
+<span class="nv">EXTRACT_IMAGES</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="nv">API_VERSION</span><span class="o">=</span>v2<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+<span class="c1"># Result: Uses bo767 path, but extract_images=true (env override) and api_version=v2 (env override)</span>
+</code></pre></div></p>
+<p><strong>Precedence Details:</strong>
+1. <strong>Environment variables</strong> - Highest priority, useful for CI/CD overrides
+2. <strong>Dataset-specific config</strong> - Applied automatically when using <code>--dataset=&lt;name&gt;</code>
+   - Includes: path, extraction settings, recall_dataset
+   - Only applies if dataset is defined in <code>datasets</code> section
+3. <strong>YAML active config</strong> - Base configuration, used as fallback</p>
+<h3 id="configuration-options-reference">Configuration Options Reference</h3>
+<h4 id="core-options">Core Options</h4>
+<ul>
+<li><code>dataset_dir</code> (string, required): Path to dataset directory</li>
+<li><code>test_name</code> (string): Test identifier (auto-generated if null)</li>
+<li><code>api_version</code> (string): API version - <code>v1</code> or <code>v2</code></li>
+<li><code>pdf_split_page_count</code> (integer): PDF splitting page count (V2 only, 1-128)</li>
+</ul>
+<h4 id="extraction-options">Extraction Options</h4>
+<ul>
+<li><code>extract_text</code>, <code>extract_tables</code>, <code>extract_charts</code>, <code>extract_images</code>, <code>extract_infographics</code> (boolean): Content extraction toggles</li>
+<li><code>text_depth</code> (string): Text extraction granularity - <code>page</code>, <code>document</code>, <code>block</code>, <code>line</code>, etc.</li>
+<li><code>table_output_format</code> (string): Table output format - <code>markdown</code>, <code>html</code>, <code>latex</code>, <code>pseudo_markdown</code>, <code>simple</code></li>
+</ul>
+<h4 id="pipeline-options">Pipeline Options</h4>
+<ul>
+<li><code>enable_caption</code> (boolean): Enable image captioning (requires the VLM profile to be running)</li>
+<li><code>caption_prompt</code> (string): Override the user prompt sent to the captioning VLM. Defaults to <code>"Caption the content of this image:"</code>.</li>
+<li><code>caption_reasoning</code> (boolean): Enable reasoning mode for the captioning VLM. <code>True</code> enables reasoning, <code>False</code> disables reasoning. Defaults to <code>null</code> (service default, typically disabled).</li>
+<li><code>enable_split</code> (boolean): Enable text chunking</li>
+<li><code>split_chunk_size</code> (integer): Chunk size for text splitting</li>
+<li><code>split_chunk_overlap</code> (integer): Overlap for text splitting</li>
+</ul>
+<h4 id="infrastructure-options">Infrastructure Options</h4>
+<ul>
+<li><code>hostname</code> (string): Service hostname</li>
+<li><code>readiness_timeout</code> (integer): Docker startup timeout in seconds</li>
+<li><code>profiles</code> (list): Docker compose profiles</li>
+</ul>
+<h4 id="runtime-options">Runtime Options</h4>
+<ul>
+<li><code>sparse</code> (boolean): Use sparse embeddings</li>
+<li><code>gpu_search</code> (boolean): Use GPU for search</li>
+<li><code>embedding_model</code> (string): Embedding model name (<code>auto</code> for auto-detection)</li>
+<li><code>llm_summarization_model</code> (string): LLM model for summarization (used by <code>e2e_with_llm_summary</code>)</li>
+</ul>
+<h4 id="storage-options">Storage Options</h4>
+<ul>
+<li><code>spill_dir</code> (string): Temporary processing directory</li>
+<li><code>artifacts_dir</code> (string): Test output directory (auto-generated if null)</li>
+<li><code>collection_name</code> (string): Milvus collection name (auto-generated as <code>{test_name}_multimodal</code> if null, deterministic - no timestamp)</li>
+</ul>
+<h3 id="valid-configuration-values">Valid Configuration Values</h3>
+<p><strong>text_depth</strong>: <code>block</code>, <code>body</code>, <code>document</code>, <code>header</code>, <code>line</code>, <code>nearby_block</code>, <code>other</code>, <code>page</code>, <code>span</code></p>
+<p><strong>table_output_format</strong>: <code>html</code>, <code>image</code>, <code>latex</code>, <code>markdown</code>, <code>pseudo_markdown</code>, <code>simple</code></p>
+<p><strong>api_version</strong>: <code>v1</code>, <code>v2</code></p>
+<p>Configuration is validated on load with helpful error messages.</p>
+<h2 id="running-tests">Running Tests</h2>
+<h3 id="basic-usage">Basic Usage</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run with default YAML configuration (assumes services are running)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># With document-level analysis</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--doc-analysis
+
+<span class="c1"># With managed infrastructure (starts/stops services)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--managed
+</code></pre></div>
+<h3 id="dataset-sweeping">Dataset Sweeping</h3>
+<p>Run multiple datasets in a single command - each dataset automatically gets its native extraction configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Sweep multiple datasets</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings,bo20
+
+<span class="c1"># Each dataset runs sequentially with its own:</span>
+<span class="c1"># - Extraction settings (from dataset config)</span>
+<span class="c1"># - Artifact directory (timestamped per dataset)</span>
+<span class="c1"># - Results summary at the end</span>
+
+<span class="c1"># With managed infrastructure (services start once, shared across all datasets)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings,bo20<span class="w"> </span>--managed
+
+<span class="c1"># E2E+Recall sweep (each dataset ingests then evaluates recall)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e_recall<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings
+
+<span class="c1"># Recall-only sweep (evaluates existing collections)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>recall<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings
+</code></pre></div>
+<p><strong>Sweep Behavior:</strong>
+- Services start once (if <code>--managed</code>) before the sweep
+- Each dataset gets its own artifact directory
+- Each dataset automatically applies its extraction config from <code>datasets</code> section
+- Summary printed at end showing success/failure for each dataset
+- Services stop once at end (unless <code>--keep-up</code>)</p>
+<h3 id="using-environment-variables">Using Environment Variables</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Override via environment (useful for CI/CD)</span>
+<span class="nv">API_VERSION</span><span class="o">=</span>v2<span class="w"> </span><span class="nv">EXTRACT_TABLES</span><span class="o">=</span><span class="nb">false</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e
+
+<span class="c1"># Temporary changes without editing YAML</span>
+<span class="nv">DATASET_DIR</span><span class="o">=</span>/custom/path<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e
+</code></pre></div>
+<h2 id="test-scenarios">Test Scenarios</h2>
+<h3 id="available-tests">Available Tests</h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+<th>Configuration Needed</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e2e</code></td>
+<td>Dataset-agnostic E2E ingestion</td>
+<td><code>active</code> section only</td>
+<td>✅ Primary (YAML config)</td>
+</tr>
+<tr>
+<td><code>e2e_with_llm_summary</code></td>
+<td>E2E with LLM summarization via UDF</td>
+<td><code>active</code> section only</td>
+<td>✅ Available (YAML config)</td>
+</tr>
+<tr>
+<td><code>recall</code></td>
+<td>Recall evaluation against existing collections</td>
+<td><code>active</code> + <code>recall</code> sections</td>
+<td>✅ Available (YAML config)</td>
+</tr>
+<tr>
+<td><code>e2e_recall</code></td>
+<td>Fresh ingestion + recall evaluation</td>
+<td><code>active</code> + <code>recall</code> sections</td>
+<td>✅ Available (YAML config)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note</strong>: Legacy test cases (<code>dc20_e2e</code>, <code>dc20_v2_e2e</code>) have been moved to <code>scripts/private_local</code>.</p>
+<h3 id="configuration-synergy">Configuration Synergy</h3>
+<p><strong>For E2E-only users:</strong>
+- Only configure <code>active</code> section
+- <code>collection_name</code> in active: auto-generates from <code>test_name</code> or dataset basename if <code>null</code> (deterministic, no timestamp)
+- Collection name pattern: <code>{test_name}_multimodal</code> (e.g., <code>bo767_multimodal</code>, <code>earnings_consulting_multimodal</code>)
+- <code>recall</code> section is optional (not used unless running recall tests)
+- <strong>Note</strong>: You can run <code>recall</code> later against the same collection created by <code>e2e</code></p>
+<p><strong>For Recall-only users:</strong>
+- Configure <code>active</code> section: <code>hostname</code>, <code>sparse</code>, <code>gpu_search</code>, etc. (for evaluation)
+- Configure <code>recall</code> section: <code>recall_dataset</code> (required)
+- Set <code>test_name</code> in active to match your existing collection (collection must be <code>{test_name}_multimodal</code>)
+- <code>collection_name</code> in active is ignored (recall generates <code>{test_name}_multimodal</code>)</p>
+<p><strong>For E2E+Recall users:</strong>
+- Configure <code>active</code> section: <code>dataset_dir</code>, <code>test_name</code>, extraction settings, etc.
+- Configure <code>recall</code> section: <code>recall_dataset</code> (required)
+- Collection naming: e2e_recall automatically creates <code>{test_name}_multimodal</code> collection
+- <code>collection_name</code> in active is ignored (e2e_recall forces <code>{test_name}_multimodal</code> pattern)</p>
+<h3 id="example-configurations">Example Configurations</h3>
+<p><strong>V2 API with PDF Splitting:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Edit test_configs.yaml active section:</span>
+<span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">api_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2</span>
+<span class="w">  </span><span class="nt">pdf_split_page_count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="w">  </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div></p>
+<p><strong>Text-Only Processing:</strong>
+<div class="highlight"><pre><span></span><code><span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div></p>
+<p><strong>RAG with Text Chunking:</strong>
+<div class="highlight"><pre><span></span><code><span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enable_split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">split_chunk_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="w">  </span><span class="nt">split_chunk_overlap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">150</span>
+</code></pre></div></p>
+<p><strong>Multimodal with Image Extraction:</strong>
+<div class="highlight"><pre><span></span><code><span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">enable_caption</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div></p>
+<h2 id="recall-testing">Recall Testing</h2>
+<p>Recall testing evaluates retrieval accuracy against ground truth query sets. Two test cases are available:</p>
+<h3 id="test-cases">Test Cases</h3>
+<p><strong><code>recall</code></strong> - Recall-only evaluation against existing collections:
+- Skips ingestion (assumes collections already exist)
+- Loads existing collections from Milvus
+- Evaluates recall using multimodal queries (all datasets are multimodal-only)
+- Supports reranker comparison (no reranker, with reranker, or reranker-only)</p>
+<p><strong><code>e2e_recall</code></strong> - Fresh ingestion + recall evaluation:
+- Performs full ingestion pipeline
+- Creates multimodal collection during ingestion
+- Evaluates recall immediately after ingestion
+- Combines ingestion metrics with recall metrics</p>
+<h3 id="reranker-configuration">Reranker Configuration</h3>
+<p>Three modes via <code>reranker_mode</code> setting:</p>
+<ol>
+<li><strong>No reranker</strong> (default): <code>reranker_mode: none</code></li>
+<li>
+<p>Runs evaluation without reranker only</p>
+</li>
+<li>
+<p><strong>Both modes</strong>: <code>reranker_mode: both</code></p>
+</li>
+<li>Runs evaluation twice: once without reranker, once with reranker</li>
+<li>
+<p>Useful for comparing reranker impact</p>
+</li>
+<li>
+<p><strong>Reranker only</strong>: <code>reranker_mode: with</code></p>
+</li>
+<li>Runs evaluation with reranker only</li>
+<li>Faster when you only need reranked results</li>
+</ol>
+<h3 id="collection-naming">Collection Naming</h3>
+<p><strong>Deterministic Collection Names (No Timestamps)</strong></p>
+<p>All test cases use deterministic collection names (no timestamps) to enable:
+- Reusing collections across test runs
+- Running recall evaluation after e2e ingestion
+- Consistent collection naming patterns</p>
+<p><strong>Collection Name Patterns:</strong></p>
+<p>All test cases use the same consistent pattern: <code>{test_name}_multimodal</code></p>
+<table>
+<thead>
+<tr>
+<th>Test Case</th>
+<th>Pattern</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e2e</code></td>
+<td><code>{test_name}_multimodal</code></td>
+<td><code>bo767_multimodal</code></td>
+</tr>
+<tr>
+<td><code>e2e_with_llm_summary</code></td>
+<td><code>{test_name}_multimodal</code></td>
+<td><code>bo767_multimodal</code></td>
+</tr>
+<tr>
+<td><code>e2e_recall</code></td>
+<td><code>{test_name}_multimodal</code></td>
+<td><code>bo767_multimodal</code></td>
+</tr>
+<tr>
+<td><code>recall</code></td>
+<td><code>{test_name}_multimodal</code></td>
+<td><code>bo767_multimodal</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Benefits:</strong>
+- ✅ Run <code>e2e</code> then <code>recall</code> separately - they use the same collection
+- ✅ Consistent naming across all test cases
+- ✅ Deterministic names (no timestamps) enable collection reuse</p>
+<p><strong>Recall Collections:</strong>
+- A single multimodal collection is created for recall evaluation
+- Pattern: <code>{test_name}_multimodal</code>
+- Example: <code>bo767_multimodal</code>
+- All datasets evaluate against this multimodal collection (no modality-specific collections)</p>
+<p><strong>Note</strong>: Artifact directories still use timestamps for tracking over time (e.g., <code>bo767_20251106_180859_UTC</code>), but collection names are deterministic.</p>
+<h3 id="multimodal-only-evaluation">Multimodal-Only Evaluation</h3>
+<p>All datasets use <strong>multimodal-only</strong> evaluation:
+- Ground truth queries contain all content types (text, tables, charts)
+- Single collection contains all extracted content types
+- Simplified evaluation interface (no modality filtering)</p>
+<h3 id="ground-truth-files">Ground Truth Files</h3>
+<p><strong>bo767 dataset:</strong>
+- Ground truth file: <code>bo767_query_gt.csv</code> (consolidated multimodal queries)
+- Located in repo <code>data/</code> directory
+- Default <code>ground_truth_dir: null</code> automatically uses <code>data/</code> directory
+- Custom path can be specified via <code>ground_truth_dir</code> config</p>
+<p><strong>Other datasets</strong> (finance_bench, earnings, audio):
+- Ground truth files must be obtained separately (not in public repo)
+- Set <code>ground_truth_dir</code> to point to your ground truth directory
+- Dataset-specific evaluators are extensible (see <code>recall_utils.py</code>)</p>
+<h3 id="configuration">Configuration</h3>
+<p>Edit the <code>recall</code> section in <code>test_configs.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">recall</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Reranker configuration</span>
+<span class="w">  </span><span class="nt">reranker_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span><span class="w">  </span><span class="c1"># Options: &quot;none&quot;, &quot;with&quot;, &quot;both&quot;</span>
+
+<span class="w">  </span><span class="c1"># Recall evaluation settings</span>
+<span class="w">  </span><span class="nt">recall_top_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">ground_truth_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># null = use repo data/ directory</span>
+<span class="w">  </span><span class="nt">recall_dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bo767</span><span class="w">  </span><span class="c1"># Required: must be explicitly set (bo767, finance_bench, earnings, audio)</span>
+</code></pre></div>
+<h3 id="usage-examples">Usage Examples</h3>
+<p><strong>Recall-only (existing collections):</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Evaluate existing bo767 collections (no reranker)</span>
+<span class="c1"># recall_dataset automatically set from dataset config</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>recall<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># With reranker only (set reranker_mode in YAML recall section)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>recall<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Sweep multiple datasets for recall evaluation</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>recall<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings
+</code></pre></div></p>
+<p><strong>E2E + Recall (fresh ingestion):</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Fresh ingestion with recall evaluation</span>
+<span class="c1"># recall_dataset automatically set from dataset config</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e_recall<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Sweep multiple datasets (each ingests then evaluates)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e_recall<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings
+</code></pre></div></p>
+<p><strong>Dataset configuration:</strong>
+- <strong>Dataset path</strong>: Automatically set from <code>datasets</code> section when using <code>--dataset=&lt;name&gt;</code>
+- <strong>Extraction settings</strong>: Automatically applied from <code>datasets</code> section
+- <strong>recall_dataset</strong>: Automatically set from <code>datasets</code> section (e.g., <code>bo767</code>, <code>earnings</code>, <code>finance_bench</code>)
+  - Can be overridden via environment variable: <code>RECALL_DATASET=bo767</code>
+- <strong>test_name</strong>: Auto-generated from dataset name or basename of path (can set in YAML <code>active</code> section)
+- <strong>Collection naming</strong>: <code>{test_name}_multimodal</code> (automatically generated for recall cases)
+- All datasets evaluate against the same <code>{test_name}_multimodal</code> collection (multimodal-only)</p>
+<h3 id="output">Output</h3>
+<p>Recall results are included in <code>results.json</code>:
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;recall_results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;no_reranker&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;1&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.554</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;3&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.746</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;5&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.807</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.857</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;with_reranker&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;1&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.601</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;3&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.781</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;5&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.832</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.874</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<p>Metrics are also logged via <code>kv_event_log()</code>:
+- <code>recall_multimodal_@{k}_no_reranker</code>
+- <code>recall_multimodal_@{k}_with_reranker</code>
+- <code>recall_eval_time_s_no_reranker</code>
+- <code>recall_eval_time_s_with_reranker</code></p>
+<h2 id="sweeping-parameters">Sweeping Parameters</h2>
+<h3 id="dataset-sweeping-recommended">Dataset Sweeping (Recommended)</h3>
+<p>The easiest way to test multiple datasets is using dataset sweeping:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Test multiple datasets - each gets its native config automatically</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767,earnings,bo20
+
+<span class="c1"># Each dataset runs with its pre-configured extraction settings</span>
+<span class="c1"># Results are organized in separate artifact directories</span>
+</code></pre></div>
+<h3 id="parameter-sweeping">Parameter Sweeping</h3>
+<p>To sweep through different parameter values:</p>
+<ol>
+<li><strong>Edit</strong> <code>test_configs.yaml</code> - Update values in the <code>active</code> section</li>
+<li><strong>Run</strong> the test: <code>uv run nv-ingest-harness-run --case=e2e --dataset=&lt;name&gt;</code></li>
+<li><strong>Analyze</strong> results in <code>artifacts/&lt;test_name&gt;_&lt;timestamp&gt;/</code></li>
+<li><strong>Repeat</strong> steps 1-3 for next parameter combination</li>
+</ol>
+<p>Example parameter sweep workflow:
+<div class="highlight"><pre><span></span><code><span class="c1"># Test 1: Baseline V1</span>
+vim<span class="w"> </span>test_configs.yaml<span class="w">  </span><span class="c1"># Set: api_version=v1, extract_tables=true</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Test 2: V2 with 32-page splitting</span>
+vim<span class="w"> </span>test_configs.yaml<span class="w">  </span><span class="c1"># Set: api_version=v2, pdf_split_page_count=32</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Test 3: V2 with 8-page splitting</span>
+vim<span class="w"> </span>test_configs.yaml<span class="w">  </span><span class="c1"># Set: pdf_split_page_count=8</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+
+<span class="c1"># Test 4: Tables disabled (override via env var)</span>
+<span class="nv">EXTRACT_TABLES</span><span class="o">=</span><span class="nb">false</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+</code></pre></div></p>
+<p><strong>Note</strong>: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.</p>
+<h2 id="execution-modes">Execution Modes</h2>
+<h3 id="attach-mode-default">Attach Mode (Default)</h3>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+</code></pre></div>
+<ul>
+<li><strong>Default behavior</strong>: Assumes services are already running</li>
+<li>Runs test case only (no service management)</li>
+<li>Faster for iterative testing</li>
+<li>Use when Docker services are already up</li>
+<li><code>--no-build</code> and <code>--keep-up</code> flags are ignored in attach mode</li>
+</ul>
+<h3 id="managed-mode">Managed Mode</h3>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--managed
+</code></pre></div>
+<ul>
+<li>Starts Docker services automatically</li>
+<li>Waits for service readiness (configurable timeout)</li>
+<li>Runs test case</li>
+<li>Collects artifacts</li>
+<li>Stops services after test (unless <code>--keep-up</code>)</li>
+</ul>
+<p><strong>Managed mode options:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Skip Docker image rebuild (faster startup)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--managed<span class="w"> </span>--no-build
+
+<span class="c1"># Keep services running after test (useful for multi-test scenarios)</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767<span class="w"> </span>--managed<span class="w"> </span>--keep-up
+</code></pre></div></p>
+<h2 id="artifacts-and-logging">Artifacts and Logging</h2>
+<p>All test outputs are collected in timestamped directories:</p>
+<div class="highlight"><pre><span></span><code>tools/harness/artifacts/&lt;test_name&gt;_&lt;timestamp&gt;_UTC/
+├── results.json         # Consolidated test metadata and results
+├── stdout.txt          # Complete test output
+└── e2e.json            # Structured metrics and events
+</code></pre></div>
+<p><strong>Note</strong>: Artifact directories use timestamps for tracking test runs over time, while collection names are deterministic (no timestamps) to enable collection reuse and recall evaluation.</p>
+<h3 id="results-structure">Results Structure</h3>
+<p><code>results.json</code> contains:
+- <strong>Runner metadata</strong>: case name, timestamp, git commit, infrastructure mode
+- <strong>Test configuration</strong>: API version, extraction settings, dataset info
+- <strong>Test results</strong>: chunks created, timing, performance metrics</p>
+<h3 id="document-analysis">Document Analysis</h3>
+<p>Enable per-document element breakdown:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--doc-analysis
+</code></pre></div>
+<p><strong>Sample Output:</strong>
+<div class="highlight"><pre><span></span><code>Document Analysis:
+  document1.pdf: 44 elements (text: 15, tables: 13, charts: 15, images: 0, infographics: 1)
+  document2.pdf: 14 elements (text: 9, tables: 0, charts: 4, images: 0, infographics: 1)
+</code></pre></div></p>
+<p>This provides:
+- Element counts by type for each document
+- Useful for understanding dataset characteristics
+- Helps identify processing bottlenecks
+- Validates extraction completeness</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="framework-components">Framework Components</h3>
+<p><strong>1. Configuration Layer</strong>
+- <code>test_configs.yaml</code> - Structured configuration file
+  - Active test configuration (edit directly)
+  - Dataset shortcuts for quick access
+- <code>src/nv_ingest_harness/config.py</code> - Configuration management
+  - YAML loading and parsing
+  - Type-safe config dataclass
+  - Validation logic with helpful errors
+  - Environment variable override support</p>
+<p><strong>2. Test Runner</strong>
+- <code>src/nv_ingest_harness/cli/run.py</code> - Main orchestration
+  - Configuration loading with precedence chain
+  - Docker service management (managed mode)
+  - Test case execution with config injection
+  - Artifact collection and consolidation</p>
+<p><strong>3. Test Cases</strong>
+- <code>src/nv_ingest_harness/cases/e2e.py</code> - Primary E2E test (✅ YAML-based)
+  - Accepts config object directly
+  - Type-safe parameter access
+  - Full pipeline validation (extract → embed → VDB → retrieval)
+  - Transparent configuration logging
+- <code>cases/e2e_with_llm_summary.py</code> - E2E with LLM (✅ YAML-based)
+  - Adds UDF-based LLM summarization
+  - Same config-based architecture as e2e.py
+- <code>src/nv_ingest_harness/cases/recall.py</code> - Recall evaluation (✅ YAML-based)
+  - Evaluates retrieval accuracy against existing collections
+  - Requires <code>recall_dataset</code> in config (from dataset config or env var)
+  - Supports reranker comparison modes (none, with, both)
+  - Multimodal-only evaluation against <code>{test_name}_multimodal</code> collection
+- <code>src/nv_ingest_harness/cases/e2e_recall.py</code> - E2E + Recall (✅ YAML-based)
+  - Combines ingestion (via e2e.py) with recall evaluation (via recall.py)
+  - Automatically creates collection during ingestion
+  - Requires <code>recall_dataset</code> in config (from dataset config or env var)
+  - Merges ingestion and recall metrics in results</p>
+<p><strong>4. Shared Utilities</strong>
+- <code>src/nv_ingest_harness/utils/interact.py</code> - Common testing utilities
+  - <code>embed_info()</code> - Embedding model detection
+  - <code>milvus_chunks()</code> - Vector database statistics
+  - <code>segment_results()</code> - Result categorization by type
+  - <code>kv_event_log()</code> - Structured logging
+  - <code>pdf_page_count()</code> - Dataset page counting</p>
+<h3 id="configuration-flow">Configuration Flow</h3>
+<div class="highlight"><pre><span></span><code>test_configs.yaml → load_config() → TestConfig object → test case
+    (active +        (applies          (validated,
+     datasets)        dataset config)    type-safe)
+         ↑                    ↑
+    Env overrides      Dataset configs
+    (highest)          (auto-applied)
+</code></pre></div>
+<p><strong>Configuration Loading:</strong>
+1. Start with <code>active</code> section from YAML
+2. If <code>--dataset=&lt;name&gt;</code> matches a configured dataset:
+   - Apply dataset path
+   - Apply dataset extraction settings
+   - Apply dataset <code>recall_dataset</code> (if set)
+3. Apply environment variable overrides (if any)
+4. Validate and create <code>TestConfig</code> object</p>
+<p>All test cases receive a validated <code>TestConfig</code> object with typed fields, eliminating string parsing errors.</p>
+<h2 id="development-guide">Development Guide</h2>
+<h3 id="adding-new-test-cases">Adding New Test Cases</h3>
+<ol>
+<li>
+<p><strong>Create test script</strong> in <code>cases/</code> directory</p>
+</li>
+<li>
+<p><strong>Accept config parameter</strong>:
+   <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">log_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;test_results&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Test case entry point.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: TestConfig object with all settings</span>
+<span class="sd">        log_path: Path for structured logging</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Exit code (0 = success)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Access config directly (type-safe)</span>
+    <span class="n">data_dir</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">dataset_dir</span>
+    <span class="n">api_version</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">api_version</span>
+    <span class="n">extract_text</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">extract_text</span>
+    <span class="c1"># ...</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add transparent logging</strong>:
+   <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== Test Configuration ===&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">dataset_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">api_version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extract: text=</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">extract_text</span><span class="si">}</span><span class="s2">, tables=</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">extract_tables</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Use structured logging</strong>:
+   <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">interact</span><span class="w"> </span><span class="kn">import</span> <span class="n">kv_event_log</span>
+
+<span class="n">kv_event_log</span><span class="p">(</span><span class="s2">&quot;ingestion_time_s&quot;</span><span class="p">,</span> <span class="n">elapsed_time</span><span class="p">,</span> <span class="n">log_path</span><span class="p">)</span>
+<span class="n">kv_event_log</span><span class="p">(</span><span class="s2">&quot;text_chunks&quot;</span><span class="p">,</span> <span class="n">num_text_chunks</span><span class="p">,</span> <span class="n">log_path</span><span class="p">)</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Register case</strong> in <code>run.py</code>:
+   <div class="highlight"><pre><span></span><code><span class="n">CASES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;e2e&quot;</span><span class="p">,</span> <span class="s2">&quot;e2e_with_llm_summary&quot;</span><span class="p">,</span> <span class="s2">&quot;your_new_case&quot;</span><span class="p">]</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h3 id="extending-configuration">Extending Configuration</h3>
+<p>To add new configurable parameters:</p>
+<ol>
+<li>
+<p><strong>Add to <code>TestConfig</code> dataclass</strong> in <code>config.py</code>:
+   <div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestConfig</span><span class="p">:</span>
+    <span class="c1"># ... existing fields</span>
+    <span class="n">new_param</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># Add with type and default</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add to YAML</strong> <code>active</code> section:
+   <div class="highlight"><pre><span></span><code><span class="nt">active</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># ... existing config</span>
+<span class="w">  </span><span class="nt">new_param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">  </span><span class="c1"># Match Python default</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add environment variable mapping</strong> in <code>config.py</code> (if needed):
+   <div class="highlight"><pre><span></span><code><span class="n">env_mapping</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="c1"># ... existing mappings</span>
+    <span class="s2">&quot;NEW_PARAM&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;new_param&quot;</span><span class="p">,</span> <span class="n">parse_bool</span><span class="p">),</span>
+<span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add validation</strong> (if needed) in <code>TestConfig.validate()</code>:
+   <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># ... existing validation</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_param</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">some_other_field</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;new_param requires some_other_field to be set&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">errors</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Update this README</strong> with parameter description</p>
+</li>
+</ol>
+<h3 id="testing-different-datasets">Testing Different Datasets</h3>
+<p>The framework is dataset-agnostic and supports multiple approaches:</p>
+<p><strong>Option 1: Use pre-configured dataset (Recommended)</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Dataset configs automatically applied</span>
+uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+</code></pre></div></p>
+<p><strong>Option 2: Add new dataset to YAML</strong>
+<div class="highlight"><pre><span></span><code><span class="nt">datasets</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">my_dataset</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/your/dataset</span>
+<span class="w">    </span><span class="nt">extract_text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_charts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">extract_images</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">extract_infographics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">recall_dataset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># or set to evaluator name if applicable</span>
+</code></pre></div>
+Then use: <code>uv run nv-ingest-harness-run --case=e2e --dataset=my_dataset</code></p>
+<p><strong>Option 3: Use custom path (uses active section config)</strong>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>/path/to/your/dataset
+</code></pre></div></p>
+<p><strong>Option 4: Environment variable override</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># Override specific settings via env vars</span>
+<span class="nv">EXTRACT_IMAGES</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>nv-ingest-harness-run<span class="w"> </span>--case<span class="o">=</span>e2e<span class="w"> </span>--dataset<span class="o">=</span>bo767
+</code></pre></div></p>
+<p><strong>Best Practice</strong>: For repeated testing, add your dataset to the <code>datasets</code> section with its native extraction settings. This ensures consistent configuration and enables dataset sweeping.</p>
+<h2 id="additional-resources">Additional Resources</h2>
+<ul>
+<li><strong>Configuration</strong>: See <code>config.py</code> for complete field list and validation logic</li>
+<li><strong>Test utilities</strong>: See <code>interact.py</code> for shared helper functions  </li>
+<li><strong>Docker setup</strong>: See project root README for service management commands</li>
+<li><strong>API documentation</strong>: See <code>docs/</code> for API version differences</li>
+</ul>
+<p>The framework prioritizes clarity, type safety, and validation to support reliable testing of nv-ingest pipelines.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+
+    
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../scaling-modes/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Resource Scaling Modes">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Resource Scaling Modes
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../telemetry/" class="md-footer__link md-footer__link--next" aria-label="Next: Telemetry">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Telemetry
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; Copyright 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/NVIDIA/nv-ingest/" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+
+    <script type="text/javascript">if (typeof _satellite !== "undefined") {_satellite.pageBottom();}</script>
+ 
+
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.annotate", "navigation.tabs", "navigation.indexes", "navigation.instant", "navigation.path", "navigation.instant.prefetch", "navigation.top", "navigation.footer", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

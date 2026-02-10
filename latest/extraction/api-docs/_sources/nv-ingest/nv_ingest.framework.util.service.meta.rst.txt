@@ -1,0 +1,18 @@
+nv\_ingest.framework.util.service.meta package
+==============================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest.framework.util.service.meta.ingest
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.util.service.meta
+   :members:
+   :show-inheritance:
+   :undoc-members:
