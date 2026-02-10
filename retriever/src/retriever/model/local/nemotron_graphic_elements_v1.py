@@ -32,11 +32,34 @@ class NemotronGraphicElementsV1(BaseModel):
 
     def preprocess(self, tensor: torch.Tensor) -> torch.Tensor:
         """Preprocess the input tensor."""
-        # Delegate activities to the HuggingFace model itself which implements logic for resizing and padding
-        # There is a high likelihood that further logic for performance improvements can be done
-        # here therefore that is why this shim layer is present to allow for that opportunity
-        # without modifications to the HuggingFace model itself
-        return resize_pad_graphic_elements(tensor, self.input_shape)
+        # Upstream `nemotron_graphic_elements_v1.model.resize_pad` expects CHW.
+        # Our pipeline helpers often pass BCHW (typically B=1), so normalize here.
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(f"Expected torch.Tensor, got {type(tensor)!r}")
+
+        x = tensor
+        if x.ndim == 4:
+            b = int(x.shape[0])
+            if b == 1:
+                y = resize_pad_graphic_elements(x[0], self.input_shape)
+                if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                    raise ValueError(f"resize_pad produced unexpected output: {type(y)!r}")
+                return y.unsqueeze(0)
+            outs = []
+            for i in range(b):
+                y = resize_pad_graphic_elements(x[i], self.input_shape)
+                if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                    raise ValueError(f"resize_pad produced unexpected output for batch item {i}: {type(y)!r}")
+                outs.append(y)
+            return torch.stack(outs, dim=0)
+
+        if x.ndim == 3:
+            y = resize_pad_graphic_elements(x, self.input_shape)
+            if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                raise ValueError(f"resize_pad produced unexpected output: {type(y)!r}")
+            return y.unsqueeze(0)
+
+        raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
     def invoke(
         self, input_data: torch.Tensor, orig_shape: Tuple[int, int]

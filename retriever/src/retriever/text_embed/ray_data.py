@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from .stage import embed_text_from_primitives_df
+from .text_embed import embed_text_1b_v2
 
 logger = logging.getLogger(__name__)
 
@@ -13,20 +13,25 @@ logger = logging.getLogger(__name__)
 def embed_text_ray_data(
     ds: "ray.data.Dataset",
     *,
-    transform_config: Any,
+    model: Any,
     task_config: Optional[Dict[str, Any]] = None,
     batch_size: int = 256,
 ) -> "ray.data.Dataset":
-    """Ray Data adapter for text embedding (mutates metadata in-place)."""
+    """
+    Ray Data adapter for lightweight local text embedding.
+
+    Notes:
+    - This is independent of `nv-ingest-api`.
+    - For actor-based embedding (so the embedder/model stays resident), use `TextEmbedActor`
+      from `retriever.text_embed.text_embed` with Ray's ActorPoolStrategy.
+    """
     import ray.data  # type: ignore
 
-    def _map_batch(batch: pd.DataFrame) -> pd.DataFrame:
-        out, _info = embed_text_from_primitives_df(
-            batch,
-            transform_config=transform_config,
-            task_config=task_config,
-        )
-        return out
+    task_config = dict(task_config or {})
 
-    logger.info("Running Ray Data text embedding: batch_size=%s", batch_size)
+    def _map_batch(batch: pd.DataFrame) -> pd.DataFrame:
+        return embed_text_1b_v2(batch, model=model, **task_config)
+
+    logger.info("Running Ray Data local text embedding: batch_size=%s", batch_size)
     return ds.map_batches(_map_batch, batch_format="pandas", batch_size=batch_size)
+

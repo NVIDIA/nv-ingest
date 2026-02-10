@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union, cast
 
 from torch import nn
 import torch
+import numpy as np
 from ..model import HuggingFaceModel, RunMode
 
 from nemotron_page_elements_v3.model import define_model as define_model_page_elements
@@ -27,31 +28,119 @@ class NemotronPageElementsV3(HuggingFaceModel):
         self._model = define_model_page_elements(self.model_name)
         self._page_elements_input_shape = (1024, 1024)
 
-    def preprocess(self, tensor: torch.Tensor) -> torch.Tensor:
+    def preprocess(self, tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         """Preprocess the input tensor."""
-        # Delegate activities to the HuggingFace model itself which implements logic for resizing and padding
-        # There is a high likelihood that further logic for performance improvements can be done
-        # here therefore that is why this shim layer is present to allow for that opportunity
-        # without modifications to the HuggingFace model itself
-        return resize_pad_page_elements(tensor, self.input_shape)
+        # Upstream `nemotron_page_elements_v3.model.resize_pad` expects a CHW tensor.
+        # Our pipeline helpers often pass BCHW (typically B=1), so normalize here.
+        if isinstance(tensor, torch.Tensor):
+            x = tensor
+        elif isinstance(tensor, np.ndarray):
+            arr = tensor
+            # Normalize to CHW tensor.
+            if arr.ndim == 4 and int(arr.shape[0]) == 1:
+                arr = arr[0]
+            if arr.ndim != 3:
+                raise ValueError(f"Expected 3D image array, got shape {getattr(arr, 'shape', None)}")
+            # Heuristic: HWC (RGB) -> CHW; otherwise assume CHW-like.
+            if int(arr.shape[-1]) == 3 and int(arr.shape[0]) != 3:
+                x = torch.from_numpy(np.ascontiguousarray(arr)).permute(2, 0, 1)
+            else:
+                x = torch.from_numpy(np.ascontiguousarray(arr))
+            # Normalize dtype/range.
+            if x.dtype == torch.uint8:
+                x = x.to(dtype=torch.float32) / 255.0
+            else:
+                x = x.to(dtype=torch.float32)
+        else:
+            raise TypeError(f"Expected torch.Tensor or np.ndarray, got {type(tensor)!r}")
+
+        if x.ndim == 4:
+            b = int(x.shape[0])
+            if b == 1:
+                x_chw = x[0]
+                y = resize_pad_page_elements(x_chw, self.input_shape)
+                if not isinstance(y, torch.Tensor):
+                    raise TypeError(f"resize_pad returned non-tensor: {type(y)!r}")
+                if y.ndim != 3:
+                    raise ValueError(f"Expected CHW from resize_pad, got {tuple(y.shape)}")
+                return y.unsqueeze(0)
+
+            outs: List[torch.Tensor] = []
+            for i in range(b):
+                y = resize_pad_page_elements(x[i], self.input_shape)
+                if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                    raise ValueError(f"resize_pad produced unexpected output for batch item {i}: {type(y)!r}")
+                outs.append(y)
+            return torch.stack(outs, dim=0)
+
+        if x.ndim == 3:
+            y = resize_pad_page_elements(x, self.input_shape)
+            if not isinstance(y, torch.Tensor):
+                raise TypeError(f"resize_pad returned non-tensor: {type(y)!r}")
+            if y.ndim != 3:
+                raise ValueError(f"Expected CHW from resize_pad, got {tuple(y.shape)}")
+            return y.unsqueeze(0)
+
+        raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
     def invoke(
-        self, input_data: torch.Tensor, orig_shape: Tuple[int, int]
+        self, input_data: torch.Tensor, orig_shape: Union[Tuple[int, int], Sequence[Tuple[int, int]]]
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
         if self._model is None:
             raise RuntimeError("Local page_elements_v3 model was not initialized.")
 
-        # Conditionally check and make sure the input data is on the correct device and shape
-        return self._model(input_data, orig_shape)[0]
+        # The upstream model returns a container where index [0] is the predictions.
+        with torch.inference_mode():
+            out = self._model(input_data, orig_shape)
+            return out
+        # preds0: Any
+        # if isinstance(out, (list, tuple)) and len(out) > 0:
+        #     preds0 = out[0]
+        # else:
+        #     preds0 = out
 
-    def postprocess(self, preds: List[Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # # If we got per-image preds, return them as-is so pipeline code can
+        # # avoid slow per-image fallback.
+        # if isinstance(preds0, list):
+        #     # If caller passed a batch, keep list; if single-item batch, unwrap to dict for back-compat.
+        #     if isinstance(orig_shape, (list, tuple)) and len(orig_shape) == 1:
+        #         one = preds0[0] if preds0 else {}
+        #         return cast(Dict[str, torch.Tensor], one)
+        #     return cast(List[Dict[str, torch.Tensor]], preds0)
+
+        # return cast(Dict[str, torch.Tensor], preds0)
+
+    def postprocess(
+        self, preds: Union[Dict[str, torch.Tensor], Sequence[Dict[str, torch.Tensor]]]
+    ) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], Union[torch.Tensor, List[torch.Tensor]], Union[torch.Tensor, List[torch.Tensor]]]:
         if self._model is None:
             raise RuntimeError("Local page_elements_v3 model was not initialized.")
 
-        boxes, labels, scores = postprocess_preds_page_element(
-            preds, self._model.thresholds_per_class, self._model.labels
-        )
-        return boxes, labels, scores
+        # Upstream `nemotron_page_elements_v3.utils.postprocess_preds_page_element` expects a
+        # single prediction dict (with torch tensors) and returns numpy arrays. Our pipeline
+        # may pass a *list* of per-image preds for batched inference, so handle both cases
+        # and always return torch tensors (or lists of torch tensors).
+
+        def _one(p: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            b_np, l_np, s_np = postprocess_preds_page_element(p, self._model.thresholds_per_class, self._model.labels)
+            b = torch.as_tensor(b_np, dtype=torch.float32)
+            l = torch.as_tensor(l_np, dtype=torch.int64)
+            s = torch.as_tensor(s_np, dtype=torch.float32)
+            return b, l, s
+
+        if isinstance(preds, dict):
+            return _one(preds)
+
+        boxes_list: List[torch.Tensor] = []
+        labels_list: List[torch.Tensor] = []
+        scores_list: List[torch.Tensor] = []
+        for p in preds:
+            b, l, s = _one(p)
+            boxes_list.append(b)
+            labels_list.append(l)
+            scores_list.append(s)
+
+        return boxes_list, labels_list, scores_list
 
     @property
     def model_dir(self) -> str:

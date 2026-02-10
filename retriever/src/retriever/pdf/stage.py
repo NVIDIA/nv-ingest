@@ -544,52 +544,52 @@ def render_page_elements(
     # Load consolidated ingest config (section: pdf).
     cfg_raw = _normalize_page_elements_config(load_ingest_config_section(config, section="pdf"))
 
-        # Merge: YAML provides defaults; explicit CLI flags override YAML.
-        if not _argv_has_any(["--input-dir"]):
-            if "input_dir" in cfg_raw:
-                input_dir = Path(str(cfg_raw["input_dir"]))
+    # Merge: YAML provides defaults; explicit CLI flags override YAML.
+    if not _argv_has_any(["--input-dir"]):
+        if "input_dir" in cfg_raw:
+            input_dir = Path(str(cfg_raw["input_dir"]))
 
-        if not _argv_has_any(["--method"]):
-            method = str(cfg_raw.get("method", method))
-        if not _argv_has_any(["--auth-token"]):
-            auth_token = cfg_raw.get("auth_token", auth_token)
+    if not _argv_has_any(["--method"]):
+        method = str(cfg_raw.get("method", method))
+    if not _argv_has_any(["--auth-token"]):
+        auth_token = cfg_raw.get("auth_token", auth_token)
 
-        if not _argv_has_any(["--yolox-grpc-endpoint"]):
-            yolox_grpc_endpoint = cfg_raw.get("yolox_grpc_endpoint", yolox_grpc_endpoint)
-        if not _argv_has_any(["--yolox-http-endpoint"]):
-            yolox_http_endpoint = cfg_raw.get("yolox_http_endpoint", yolox_http_endpoint)
+    if not _argv_has_any(["--yolox-grpc-endpoint"]):
+        yolox_grpc_endpoint = cfg_raw.get("yolox_grpc_endpoint", yolox_grpc_endpoint)
+    if not _argv_has_any(["--yolox-http-endpoint"]):
+        yolox_http_endpoint = cfg_raw.get("yolox_http_endpoint", yolox_http_endpoint)
 
-        if not _argv_has_any(["--nemotron-parse-grpc-endpoint"]):
-            nemotron_parse_grpc_endpoint = cfg_raw.get("nemotron_parse_grpc_endpoint", nemotron_parse_grpc_endpoint)
-        if not _argv_has_any(["--nemotron-parse-http-endpoint"]):
-            nemotron_parse_http_endpoint = cfg_raw.get("nemotron_parse_http_endpoint", nemotron_parse_http_endpoint)
-        if not _argv_has_any(["--nemotron-parse-model-name"]):
-            nemotron_parse_model_name = cfg_raw.get("nemotron_parse_model_name", nemotron_parse_model_name)
+    if not _argv_has_any(["--nemotron-parse-grpc-endpoint"]):
+        nemotron_parse_grpc_endpoint = cfg_raw.get("nemotron_parse_grpc_endpoint", nemotron_parse_grpc_endpoint)
+    if not _argv_has_any(["--nemotron-parse-http-endpoint"]):
+        nemotron_parse_http_endpoint = cfg_raw.get("nemotron_parse_http_endpoint", nemotron_parse_http_endpoint)
+    if not _argv_has_any(["--nemotron-parse-model-name"]):
+        nemotron_parse_model_name = cfg_raw.get("nemotron_parse_model_name", nemotron_parse_model_name)
 
-        if not _argv_has_any(["--extract-text", "--no-extract-text"]):
-            extract_text = bool(cfg_raw.get("extract_text", extract_text))
-        if not _argv_has_any(["--extract-images", "--no-extract-images"]):
-            extract_images = bool(cfg_raw.get("extract_images", extract_images))
-        if not _argv_has_any(["--extract-tables", "--no-extract-tables"]):
-            extract_tables = bool(cfg_raw.get("extract_tables", extract_tables))
-        if not _argv_has_any(["--extract-charts", "--no-extract-charts"]):
-            extract_charts = bool(cfg_raw.get("extract_charts", extract_charts))
-        if not _argv_has_any(["--extract-infographics", "--no-extract-infographics"]):
-            extract_infographics = bool(cfg_raw.get("extract_infographics", extract_infographics))
-        if not _argv_has_any(["--extract-page-as-image", "--no-extract-page-as-image"]):
-            extract_page_as_image = bool(cfg_raw.get("extract_page_as_image", extract_page_as_image))
+    if not _argv_has_any(["--extract-text", "--no-extract-text"]):
+        extract_text = bool(cfg_raw.get("extract_text", extract_text))
+    if not _argv_has_any(["--extract-images", "--no-extract-images"]):
+        extract_images = bool(cfg_raw.get("extract_images", extract_images))
+    if not _argv_has_any(["--extract-tables", "--no-extract-tables"]):
+        extract_tables = bool(cfg_raw.get("extract_tables", extract_tables))
+    if not _argv_has_any(["--extract-charts", "--no-extract-charts"]):
+        extract_charts = bool(cfg_raw.get("extract_charts", extract_charts))
+    if not _argv_has_any(["--extract-infographics", "--no-extract-infographics"]):
+        extract_infographics = bool(cfg_raw.get("extract_infographics", extract_infographics))
+    if not _argv_has_any(["--extract-page-as-image", "--no-extract-page-as-image"]):
+        extract_page_as_image = bool(cfg_raw.get("extract_page_as_image", extract_page_as_image))
 
-        if not _argv_has_any(["--text-depth"]):
-            text_depth = str(cfg_raw.get("text_depth", text_depth))
+    if not _argv_has_any(["--text-depth"]):
+        text_depth = str(cfg_raw.get("text_depth", text_depth))
 
-        if not _argv_has_any(["--write-json-outputs", "--no-write-json-outputs"]):
-            write_json_outputs = bool(cfg_raw.get("write_json_outputs", write_json_outputs))
-        if not _argv_has_any(["--json-output-dir"]):
-            if "json_output_dir" in cfg_raw and cfg_raw["json_output_dir"] is not None:
-                json_output_dir = Path(str(cfg_raw["json_output_dir"]))
+    if not _argv_has_any(["--write-json-outputs", "--no-write-json-outputs"]):
+        write_json_outputs = bool(cfg_raw.get("write_json_outputs", write_json_outputs))
+    if not _argv_has_any(["--json-output-dir"]):
+        if "json_output_dir" in cfg_raw and cfg_raw["json_output_dir"] is not None:
+            json_output_dir = Path(str(cfg_raw["json_output_dir"]))
 
-        if not _argv_has_any(["--limit"]):
-            limit = cfg_raw.get("limit", limit)
+    if not _argv_has_any(["--limit"]):
+        limit = cfg_raw.get("limit", limit)
 
     if input_dir is None:
         raise typer.BadParameter("Missing --input-dir (or set input_dir in --config YAML).")

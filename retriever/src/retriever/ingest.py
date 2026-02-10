@@ -137,6 +137,10 @@ class Ingestor:
         """Record a vector DB upload configuration (execution TBD)."""
         self._not_implemented("vdb_upload")
 
+    def save_intermediate_results(self, output_dir: str) -> "Ingestor":
+        """Record intermediate results persistence configuration."""
+        self._not_implemented("save_intermediate_results")
+
     def save_to_disk(
         self,
         output_directory: Optional[str] = None,

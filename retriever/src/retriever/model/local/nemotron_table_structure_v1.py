@@ -28,8 +28,37 @@ class NemotronTableStructureV1(BaseModel):
         self._table_structure_input_shape = (1024, 1024)
 
     def preprocess(self, input_tensor: torch.Tensor, orig_shape: Tuple[int, int]) -> torch.Tensor:
-        """Preprocess the input tensor."""
-        return resize_pad_table_structure(input_tensor, self.input_shape)
+        """Preprocess the input tensor.
+
+        Upstream `nemotron_table_structure_v1.model.resize_pad` expects CHW.
+        The pipeline often passes BCHW (typically B=1); normalize here.
+        """
+        if not isinstance(input_tensor, torch.Tensor):
+            raise TypeError(f"Expected torch.Tensor, got {type(input_tensor)!r}")
+
+        x = input_tensor
+        if x.ndim == 4:
+            b = int(x.shape[0])
+            if b == 1:
+                y = resize_pad_table_structure(x[0], self.input_shape)
+                if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                    raise ValueError(f"resize_pad produced unexpected output: {type(y)!r}")
+                return y.unsqueeze(0)
+            outs = []
+            for i in range(b):
+                y = resize_pad_table_structure(x[i], self.input_shape)
+                if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                    raise ValueError(f"resize_pad produced unexpected output for batch item {i}: {type(y)!r}")
+                outs.append(y)
+            return torch.stack(outs, dim=0)
+
+        if x.ndim == 3:
+            y = resize_pad_table_structure(x, self.input_shape)
+            if not isinstance(y, torch.Tensor) or y.ndim != 3:
+                raise ValueError(f"resize_pad produced unexpected output: {type(y)!r}")
+            return y.unsqueeze(0)
+
+        raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
     def invoke(
         self, input_tensor: torch.Tensor, orig_shape: Tuple[int, int]
