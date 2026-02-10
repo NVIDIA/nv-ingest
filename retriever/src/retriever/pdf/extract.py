@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import base64
 import traceback
+import pypdfium2.raw as pdfium_c
 
 import pandas as pd
 
@@ -27,18 +28,6 @@ try:
 except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
 
-
-def _page_text(page: Any) -> str:
-    # Best-effort text extraction across pypdfium2 versions.
-    try:
-        textpage = page.get_textpage()
-        if hasattr(textpage, "get_text_range"):
-            return str(textpage.get_text_range())
-        if hasattr(textpage, "get_text_bounded"):
-            return str(textpage.get_text_bounded())
-    except Exception:
-        return ""
-    return ""
 
 
 def _render_page_to_base64(page: Any, *, dpi: int = 300, image_format: str = "png") -> Dict[str, Any]:
@@ -150,6 +139,22 @@ def _error_record(
     }
 
 
+def _is_scanned_page(page) -> bool:
+    tp = page.get_textpage()
+    text = tp.get_text_bounded() or ""
+    num_chars = len(text.strip())
+    num_images = sum(1 for obj in page.get_objects() if obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE)
+
+    return num_chars == 0 and num_images > 0
+
+def _extract_page_text(page) -> str:
+    """
+    Always extract text from the given page and return it as a raw string.
+    The caller decides whether to use per-page or doc-level logic.
+    """
+    textpage = page.get_textpage()
+    return textpage.get_text_bounded()
+
 def pdf_extraction(
     pdf_binary: Any,
     extract_text: bool = False,
@@ -159,6 +164,8 @@ def pdf_extraction(
     extract_infographics: bool = False,
     dpi: int = 300,
     image_format: str = "png",
+    text_extraction_method: str = "pdfium_hybrid",
+    text_depth: str = "page",
     **kwargs: Any) -> Any:
     """
     Here are the steps for pdf extraction that should be implemented:
@@ -191,6 +198,9 @@ def pdf_extraction(
             return outputs
 
         outputs: List[Dict[str, Any]] = []
+        extracted_data = []
+        accumulated_text = []
+
         for _, row in pdf_binary.iterrows():
             pdf_bytes = row["bytes"] if "bytes" in pdf_binary.columns else None
             pdf_path = row["path"] if "path" in pdf_binary.columns else None
@@ -213,12 +223,27 @@ def pdf_extraction(
                 page = None
                 try:
                     page = doc.get_page(0)
-                    text = _page_text(page) if extract_text else ""
+                    is_scanned_page = _is_scanned_page(page)
+
+                    ocr_extraction_needed_for_text = extract_text and (
+                        (text_extraction_method == "pdfium_hybrid" and is_scanned_page) or text_extraction_method == "ocr"
+                    )
+
+                    extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
+
+                    # Text extraction
+                    if extract_text and not ocr_extraction_needed_for_text:
+                        page_text = _extract_page_text(page)
+                        # TODO: Tiddy up logic here for document depth option
+                        if text_depth == "page":
+                            text = page_text
+                        else:
+                            text = page_text
+
                     has_text = bool(text.strip()) if extract_text else False
-                    needs_ocr = bool(extract_text and not has_text)
 
                     want_any_raster = bool(
-                        extract_images or extract_tables or extract_charts or extract_infographics or needs_ocr
+                        extract_images or extract_tables or extract_charts or extract_infographics or ocr_extraction_needed_for_text
                     )
                     render_info: Optional[Dict[str, Any]] = None
                     if want_any_raster:
@@ -234,7 +259,7 @@ def pdf_extraction(
                         "infographics": [],
                         "metadata": {
                             "has_text": has_text,
-                            "needs_ocr": needs_ocr,
+                            "needs_ocr_for_text": ocr_extraction_needed_for_text,
                             "dpi": dpi,
                             "source_path": pdf_path,
                             "error": None,

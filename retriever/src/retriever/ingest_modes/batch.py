@@ -86,6 +86,10 @@ class BatchIngestor(Ingestor):
         This does not run extraction yet; it records configuration so the batch
         executor can build a concrete pipeline later.
         """
+        # Downstream batch stages assume `page_image.image_b64` exists for every page.
+        # Ensure PDF extraction emits a page image unless the caller explicitly disables it.
+        kwargs.setdefault("extract_page_as_image", True)
+
         print(f"Type kwargs: {type(kwargs)}")
         print(f"kwargs: {kwargs}")
         self._tasks.append(("extract", dict(kwargs)))

@@ -63,7 +63,7 @@ def embed_text_1b_v2(
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
     text_column: str = "text",
-    inference_batch_size: int = 64,
+    inference_batch_size: int = 32,
     output_column: str = "text_embeddings_1b_v2",
     embedding_dim_column: str = "text_embeddings_1b_v2_dim",
     has_embedding_column: str = "text_embeddings_1b_v2_has_embedding",

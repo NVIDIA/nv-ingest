@@ -21,12 +21,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.chart.chart_detection import detect_graphic_elements_v1
-from retriever.infographic.infographic_detection import detect_infographic_elements_v1
+from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
+from retriever.infographic.infographic_detection import detect_infographic_elements_v1_from_page_elements_v3
 from retriever.model.local import NemotronGraphicElementsV1, NemotronPageElementsV3, NemotronTableStructureV1
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
-from retriever.table.table_structure import detect_table_structure_v1
+from retriever.table.table_structure import detect_table_structure_v1_from_page_elements_v3
 from retriever.text_embed import embed_text_1b_v2
 
 try:
@@ -433,6 +433,12 @@ class InProcessIngestor(Ingestor):
         print(f"kwargs: {kwargs}")
 
         extract_kwargs = dict(kwargs)
+        # Downstream in-process stages (page elements / table / chart / infographic) assume
+        # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
+        # the caller explicitly disables it.
+        if "extract_page_as_image" not in extract_kwargs:
+            if any(extract_kwargs.get(k) is True for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")):
+                extract_kwargs["extract_page_as_image"] = True
         self._tasks.append((pdf_extraction, extract_kwargs))
 
         # Common, optional knobs shared by our detect_* helpers.
@@ -461,15 +467,27 @@ class InProcessIngestor(Ingestor):
 
         if kwargs.get("extract_tables") is True:
             print("Adding table structure task")
-            self._tasks.append((detect_table_structure_v1, _detect_kwargs_with_model(NemotronTableStructureV1())))
+            # Run table structure only on cropped "table" regions from page-elements.
+            self._tasks.append(
+                (detect_table_structure_v1_from_page_elements_v3, _detect_kwargs_with_model(NemotronTableStructureV1()))
+            )
 
         if kwargs.get("extract_charts") is True:
             print("Adding chart detection task")
-            self._tasks.append((detect_graphic_elements_v1, _detect_kwargs_with_model(NemotronGraphicElementsV1())))
+            # Run chart detection only on cropped "chart" regions from page-elements.
+            self._tasks.append(
+                (detect_graphic_elements_v1_from_page_elements_v3, _detect_kwargs_with_model(NemotronGraphicElementsV1()))
+            )
 
         if kwargs.get("extract_infographics") is True:
             print("Adding infographic detection task")
-            self._tasks.append((detect_infographic_elements_v1, _detect_kwargs_with_model(NemotronGraphicElementsV1())))
+            # Run infographic detection only on cropped "infographic"/"title" regions from page-elements.
+            self._tasks.append(
+                (
+                    detect_infographic_elements_v1_from_page_elements_v3,
+                    _detect_kwargs_with_model(NemotronGraphicElementsV1()),
+                )
+            )
 
         return self
 
@@ -481,8 +499,20 @@ class InProcessIngestor(Ingestor):
         This records an embedding task so call sites can chain `.embed(...)`
         after `.extract(...)`. The current implementation is a no-op placeholder.
         """
+        # NOTE: inprocess mode uses a local HF embedder (no microservice).
+        # Allow callers to control device / max_length to avoid OOMs.
         embed_kwargs = dict(kwargs)
-        embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder()
+        device = embed_kwargs.pop("device", None)
+        hf_cache_dir = embed_kwargs.pop("hf_cache_dir", None)
+        normalize = bool(embed_kwargs.pop("normalize", True))
+        max_length = int(embed_kwargs.pop("max_length", 4096))
+
+        embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
+            device=str(device) if device is not None else None,
+            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+            normalize=normalize,
+            max_length=max_length,
+        )
         self._tasks.append((embed_text_1b_v2, embed_kwargs))
         return self
 
