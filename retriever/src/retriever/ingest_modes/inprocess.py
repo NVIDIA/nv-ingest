@@ -115,8 +115,8 @@ def embed_text_main_text_embed(
             batch_df,
             task_config={
                 "embedder": _embed,
-                # "endpoint_url": "http://localhost:8012/v1",  # inprocess uses local HF embedder
-                "endpoint_url": None,
+                # "endpoint_url": "http://localhost:8012/v1",
+                "endpoint_url": None, # inprocess uses local HF embedder
                 "local_batch_size": int(inference_batch_size),
             },
             transform_config=cfg,
