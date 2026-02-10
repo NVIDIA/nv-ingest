@@ -94,7 +94,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
+    conda install -y python=3.12 mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
 COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
