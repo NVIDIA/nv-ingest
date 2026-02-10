@@ -410,9 +410,7 @@ def test_build_page_text_map():
 
 
 @patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_transform_context_enabled_per_image_calls(
-    mock_generate, dummy_transform_config
-):
+def test_transform_context_enabled_per_image_calls(mock_generate, dummy_transform_config):
     """With context enabled, each image gets its own VLM call with enriched prompt."""
     df = pd.DataFrame(
         [
@@ -443,9 +441,7 @@ def test_transform_context_enabled_per_image_calls(
         "context_text_max_chars": 500,
     }
 
-    result = transform_image_create_vlm_caption_internal(
-        df.copy(), task_config, dummy_transform_config
-    )
+    result = transform_image_create_vlm_caption_internal(df.copy(), task_config, dummy_transform_config)
 
     # Should be called once (one image)
     assert mock_generate.call_count == 1
@@ -461,9 +457,7 @@ def test_transform_context_enabled_per_image_calls(
 
 
 @patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_transform_temperature_forwarded(
-    mock_generate, dummy_df_with_images, dummy_transform_config
-):
+def test_transform_temperature_forwarded(mock_generate, dummy_df_with_images, dummy_transform_config):
     """Temperature from task_config is forwarded to _generate_captions."""
     mock_generate.return_value = ["c1", "c2"]
 
@@ -476,9 +470,7 @@ def test_transform_temperature_forwarded(
         "temperature": 0.7,
     }
 
-    transform_image_create_vlm_caption_internal(
-        dummy_df_with_images.copy(), task_config, dummy_transform_config
-    )
+    transform_image_create_vlm_caption_internal(dummy_df_with_images.copy(), task_config, dummy_transform_config)
 
     mock_generate.assert_called_once()
     _, kwargs = mock_generate.call_args
