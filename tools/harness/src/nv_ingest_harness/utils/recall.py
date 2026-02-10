@@ -678,11 +678,7 @@ def jp20_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFra
     df = bo10k_load_ground_truth(ground_truth_dir=ground_truth_dir)
 
     dataset_dir = os.environ.get("JP20_DATASET_DIR") or os.path.join(get_repo_root(), "data", "jp20")
-    jp20_pdfs = {
-        os.path.splitext(name)[0]
-        for name in os.listdir(dataset_dir)
-        if name.lower().endswith(".pdf")
-    }
+    jp20_pdfs = {os.path.splitext(name)[0] for name in os.listdir(dataset_dir) if name.lower().endswith(".pdf")}
     filtered = df[df["pdf"].isin(jp20_pdfs)].reset_index(drop=True)
 
     return filtered
@@ -727,6 +723,7 @@ def jp20_recall(
     collection_name: str,
     hostname: str = "localhost",
     sparse: bool = True,
+    hybrid: bool = False,
     model_name: str = None,
     top_k: int = 10,
     gpu_search: bool = False,
@@ -744,6 +741,7 @@ def jp20_recall(
         collection_name=collection_name,
         hostname=hostname,
         sparse=sparse,
+        hybrid=hybrid,
         model_name=model_name,
         top_k=top_k,
         gpu_search=gpu_search,
