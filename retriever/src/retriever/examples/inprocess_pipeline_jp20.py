@@ -9,7 +9,7 @@ LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
 
 ingestor = (ingestor
-    .files("/home/jdyer/datasets/jd5/*.pdf")
+    .files("/home/jdyer/datasets/jp20/*.pdf")
     .extract(
         method="pdfium",
         extract_text=True,
@@ -19,7 +19,7 @@ ingestor = (ingestor
     )
     .embed(model_name="nemo_retriever_v1")
     .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
-    .save_to_disk(output_directory="/home/jdyer/datasets/jd5_results_inprocess")
+    .save_to_disk(output_directory="/home/jdyer/datasets/jp20_results_inprocess")
 )
 
 print("Running extraction...")
@@ -32,7 +32,7 @@ table = db.open_table("nv-ingest")
 unique_basenames = table.to_pandas()["pdf_basename"].unique()
 print(f"Unique basenames: {unique_basenames}")
 
-query_csv = Path("jd5_query_gt.csv")
+query_csv = Path("jp20_query_gt.csv")
 cfg = RecallConfig(
     lancedb_uri=str(LANCEDB_URI),
     lancedb_table=str(LANCEDB_TABLE),

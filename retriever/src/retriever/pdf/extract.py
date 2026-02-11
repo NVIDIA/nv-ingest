@@ -198,8 +198,6 @@ def pdf_extraction(
             return outputs
 
         outputs: List[Dict[str, Any]] = []
-        extracted_data = []
-        accumulated_text = []
 
         for _, row in pdf_binary.iterrows():
             pdf_bytes = row["bytes"] if "bytes" in pdf_binary.columns else None
@@ -216,12 +214,14 @@ def pdf_extraction(
                 except Exception:
                     doc = pdfium.PdfDocument(BytesIO(bytes(pdf_bytes)))
 
+                # TODO: Extend to support more image formats
                 if image_format not in {"png"}:
                     raise ValueError(f"Unsupported image_format: {image_format!r}")
 
                 # Step 2: process only the first page (single-page doc).
                 page = None
                 try:
+                    # we can safely assume page[0] only because pre-splitting has already occurred.
                     page = doc.get_page(0)
                     is_scanned_page = _is_scanned_page(page)
 
