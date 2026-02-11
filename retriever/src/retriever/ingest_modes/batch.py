@@ -35,6 +35,7 @@ class BatchIngestor(Ingestor):
         logging.basicConfig(level=logging.INFO)
 
         # Initialize Ray locally for distributed execution.
+        # TODO: This should be a configuration .... 
         ray.init(address="local", ignore_reinit_error=True) 
 
         # Builder-style task configuration recorded for later execution.
@@ -77,6 +78,9 @@ class BatchIngestor(Ingestor):
 
         self._rd_dataset = rd.read_binary_files(self._input_documents, include_paths=True)
 
+        # TODO: Capture number of GPUs and calculate number of workers based on that
+        # self._rd_dataset.repartition(num_workers=100) # divide by number of workers and GPUs available
+
         return self
 
     def extract(self, **kwargs: Any) -> "BatchIngestor":
@@ -86,6 +90,8 @@ class BatchIngestor(Ingestor):
         This does not run extraction yet; it records configuration so the batch
         executor can build a concrete pipeline later.
         """
+        # TODO: Pass in kwargs in a cleaner manner. This is messy and not compliant with static typing
+
         # Downstream batch stages assume `page_image.image_b64` exists for every page.
         # Ensure PDF extraction emits a page image unless the caller explicitly disables it.
         kwargs.setdefault("extract_page_as_image", True)
@@ -107,7 +113,14 @@ class BatchIngestor(Ingestor):
 
         # Splitting pdfs is broken into a separate stage to help amoritize downstream processing if PDFs have vastly different number of pages
         pdf_split_actor = PDFSplitActor(**kwargs)
-        self._rd_dataset = self._rd_dataset.map_batches(pdf_split_actor, batch_size=1, batch_format="pandas")
+
+        # TODO: Jacob figure out how to get best batch size based on number of pages
+        # num_pages = pdfium.PdfDocument(self._rd_dataset[0]["bytes"]).page_count
+
+        self._rd_dataset = self._rd_dataset.map_batches(pdf_split_actor, batch_size=1, num_cpus=4, num_gpus=0, batch_format="pandas")
+
+
+        # TODO: I think we can split out each of these sub-tasks within the extraction stage to more discrete tasks so that Ray Data can parallelize them better
         
         # Pre-split pdfs are now ready for extraction
         extraction_actor = PDFExtractionActor(**kwargs)
