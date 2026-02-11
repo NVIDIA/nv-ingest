@@ -58,7 +58,7 @@ f. Start core services. This example uses the retrieval profile.  For more infor
 
     !!! tip
 
-        The default configuration may not fit on a single GPU for some hardware targets. Use a [docker compose override file](#docker-compose-override-files) to reduce VRAM usage. Override files typically lower per-service memory allocation, batch sizes, or concurrency, trading peak throughput for making the full pipeline runnable on the available GPU.
+        The default configuration might not fit on a single GPU for some hardware targets. Use a [docker compose override file](#docker-compose-override-files) to reduce VRAM usage. Override files typically lower per-service memory allocation, batch sizes, or concurrency, trading peak throughput for making the full pipeline runnable on the available GPU.
 
 g. When core services have fully started, `nvidia-smi` should show processes like the following:
 
