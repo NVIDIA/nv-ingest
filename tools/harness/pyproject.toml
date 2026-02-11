@@ -10,17 +10,11 @@ dependencies = [
     "pyyaml>=6.0",
     "requests>=2.31.0",
     "pynvml>=11.5.0",
-]
-
-[project.optional-dependencies]
-ingest = [
     "nv-ingest",
     "nv-ingest-api",
     "nv-ingest-client",
     "milvus-lite==2.4.12",
     "pypdfium2",
-]
-nemotron-hf = [
     "nemotron-page-elements-v3>=0.dev0",
     "nemotron-graphic-elements-v1>=0.dev0",
     "nemotron-table-structure-v1>=0.dev0",
@@ -50,3 +44,4 @@ nemotron-ocr = { index = "test-pypi" }
 [[tool.uv.index]]
 name = "test-pypi"
 url = "https://test.pypi.org/simple/"
+explicit = true
