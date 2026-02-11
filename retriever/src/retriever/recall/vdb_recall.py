@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -8,8 +9,6 @@ import pandas as pd
 from rich.console import Console
 
 from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df
-
-from nv_ingest_client.util.vdb.lancedb import LanceDB
 
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()
@@ -82,60 +81,115 @@ def recall_with_main(
         help="Query ground-truth CSV (expects columns: query,pdf_page OR query,pdf,page).",
     ),
     top_k: int = typer.Option(10, "--top-k", min=1, help="Top-k to print per query."),
+    embedding_endpoint: Optional[str] = typer.Option(
+        None,
+        "--embedding-endpoint",
+        help=(
+            "Embedding endpoint (http(s) URL or host:port for gRPC). "
+            "If omitted, you may specify --embedding-http-endpoint/--embedding-grpc-endpoint instead; "
+            "if no endpoints are provided, falls back to local HF embeddings."
+        ),
+    ),
+    embedding_http_endpoint: Optional[str] = typer.Option(
+        None,
+        "--embedding-http-endpoint",
+        help="HTTP embedding endpoint URL (e.g. 'http://localhost:8012/v1').",
+    ),
+    embedding_grpc_endpoint: Optional[str] = typer.Option(
+        None,
+        "--embedding-grpc-endpoint",
+        help="gRPC embedding endpoint (e.g. 'localhost:8013').",
+    ),
+    embedding_model: str = typer.Option(
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "--embedding-model",
+        help="Embedding model name.",
+    ),
+    embedding_api_key: Optional[str] = typer.Option(None, "--embedding-api-key", help="Embedding API key (optional)."),
+    lancedb_uri: str = typer.Option("lancedb", "--lancedb-uri", help="LanceDB database URI (directory path)."),
+    table_name: str = typer.Option("nv-ingest", "--table-name", help="LanceDB table name."),
+    vector_column_name: str = typer.Option("vector", "--vector-column", help="Vector column name in the table."),
+    local_hf_device: Optional[str] = typer.Option(
+        None,
+        "--local-hf-device",
+        help="Device for local HF embeddings when endpoints are missing (e.g. 'cuda', 'cpu', 'cuda:0').",
+    ),
+    local_hf_cache_dir: Optional[Path] = typer.Option(
+        None,
+        "--local-hf-cache-dir",
+        file_okay=False,
+        dir_okay=True,
+        help="Optional HuggingFace cache directory for local embeddings.",
+    ),
+    local_hf_batch_size: int = typer.Option(
+        64,
+        "--local-hf-batch-size",
+        min=1,
+        help="Batch size for local HF embedding inference.",
+    ),
 ) -> None:
-
     query_csv = _resolve_query_csv(Path(query_csv))
-    lancedb = LanceDB(lancedb_uri="lancedb")
 
-    print(f"Reading query CSV...")
-    df_query = _normalize_query_df(pd.read_csv(query_csv))
+    metrics_ks = (1, 5, 10)
+    search_k = max(int(top_k), max(metrics_ks))
 
-    print(f"Normalizing query CSV...")
+    http_ep, grpc_ep = _resolve_endpoints(
+        embedding_endpoint=embedding_endpoint,
+        embedding_http_endpoint=embedding_http_endpoint,
+        embedding_grpc_endpoint=embedding_grpc_endpoint,
+    )
+    cfg = RecallConfig(
+        lancedb_uri=str(lancedb_uri),
+        lancedb_table=str(table_name),
+        embedding_http_endpoint=http_ep,
+        embedding_grpc_endpoint=grpc_ep,
+        embedding_endpoint=_coerce_endpoint_str(embedding_endpoint),
+        embedding_model=str(embedding_model),
+        embedding_api_key=(embedding_api_key or ""),
+        top_k=int(search_k),
+        ks=metrics_ks,
+        local_hf_device=_coerce_endpoint_str(local_hf_device),
+        local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
+        local_hf_batch_size=int(local_hf_batch_size),
+    )
+
+    print("Reading and normalizing query CSV...")
+    df_query, gold, raw_hits, retrieved_keys, metrics = retrieve_and_score(
+        query_csv=query_csv,
+        cfg=cfg,
+        limit=None,
+        vector_column_name=str(vector_column_name),
+    )
+
     queries = df_query["query"].astype(str).tolist()
-    gold_concat = df_query["golden_answer"].astype(str).tolist()
-    gold_pdfs = df_query["pdf"].astype(str).tolist()
-    gold_pages = df_query["page"].astype(str).tolist()
+    has_separate_cols = "pdf" in df_query.columns and "page" in df_query.columns
+    if has_separate_cols:
+        gold_pdfs = df_query["pdf"].astype(str).tolist()
+        gold_pages = df_query["page"].astype(str).tolist()
 
-    print(f"Beginning retrieval for {len(queries)} queries...")
-    results = lancedb.retrieval(queries=queries, top_k=top_k)
+    print(f"Retrieval completed for {len(queries)} queries.")
 
-    print(f"Retrieval completed for {len(results)} queries.")
-
-    recall1_hits = 0
-    recall5_hits = 0
-    recall10_hits = 0
-    
-    for query, g_concat, other_pdf, other_page, topk_results in zip(queries, gold_concat, gold_pdfs, gold_pages, results):
+    for idx, (query, g_key, hits) in enumerate(zip(queries, gold, raw_hits)):
         print(f"\nQuery: {query}")
-        g_pdf, g_page = g_concat.split("_")
+        g_pdf, g_page = g_key.rsplit("_", 1)
         print(f"\tGold PDF: {g_pdf} - Gold Page: {g_page}")
-        print(f"\tOther PDF: {other_pdf} - Other Page: {other_page}")
+        if has_separate_cols:
+            print(f"\tOther PDF: {gold_pdfs[idx]} - Other Page: {gold_pages[idx]}")
         print(f"\tTop-k Results:")
-        
-        for i, result in enumerate(topk_results):
-            pdf_name = Path(result['entity']['source']['source_id']).stem
-            page_number = result['entity']['content_metadata']['page_number']
 
+        for i, h in enumerate(hits[:top_k]):
+            meta = json.loads(h["metadata"]) if isinstance(h["metadata"], str) else h["metadata"]
+            src = json.loads(h["source"]) if isinstance(h["source"], str) else h["source"]
+            pdf_name = Path(src["source_id"]).stem
+            page_number = meta.get("page_number", -1)
             print(f"\tResult {i}: {pdf_name} - {page_number}")
 
             if page_number == -1:
-                breakpoint()
-                print(f"Seeing page numbers -1, not sure what to do with this.")
+                print(f"Seeing page numbers -1 for query: {query}")
 
-            if pdf_name == g_pdf and (page_number == int(g_page) or page_number == int(other_page)):
-                print(f"\t\tHit! {i}: {pdf_name} - {page_number}")
-                if i == 0:
-                    recall1_hits += 1
-                if i < 5:
-                    recall5_hits += 1
-                if i < 10:
-                    recall10_hits += 1
-                break
-
-
-    print(f"\n\nRecall@1: {recall1_hits / len(queries)}")
-    print(f"Recall@5: {recall5_hits / len(queries)}")
-    print(f"Recall@10: {recall10_hits / len(queries)}")
+    print(f"\n\nRecall@1: {metrics['recall@1']}")
+    print(f"Recall@5: {metrics['recall@5']}")
+    print(f"Recall@10: {metrics['recall@10']}")
 
 
 @app.command("run")

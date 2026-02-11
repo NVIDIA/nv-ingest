@@ -116,7 +116,8 @@ def _maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_confi
     embedder = LlamaNemotronEmbed1BV2Embedder(device=local_device, hf_cache_dir=local_cache_dir, normalize=True)
 
     def _embed(texts):
-        vecs = embedder.embed(texts, batch_size=local_batch_size)
+        prefix = f"{transform_config.input_type}: " if getattr(transform_config, "input_type", None) else ""
+        vecs = embedder.embed([prefix + t for t in texts], batch_size=local_batch_size)
         return vecs.tolist()
 
     # Force the API transform to use the callable path by explicitly overriding endpoint_url to None.
@@ -269,6 +270,10 @@ def run(
     if endpoint_url is not None:
         v = endpoint_url.strip()
         task_cfg["endpoint_url"] = None if v.lower() in ("", "none", "null") else v
+    elif not cfg_dict.get("embedding_nim_endpoint"):
+        # No CLI endpoint and no config-file endpoint — override the schema default
+        # so _maybe_inject_local_hf_embedder() will inject the local HF fallback.
+        task_cfg["endpoint_url"] = None
     if model_name is not None:
         task_cfg["model_name"] = model_name
     if dimensions is not None:
@@ -297,6 +302,13 @@ def run(
         f"[bold cyan]Text embeddings[/bold cyan] inputs={len(inputs)} input_dir={input_dir} recursive={recursive} "
         f"output_dir={output_dir if output_dir is not None else '(alongside inputs)'}"
     )
+
+    # Pre-warm: inject the local HF embedder (if applicable) into task_cfg ONCE,
+    # so the per-file copies inside embed_text_from_primitives_df reuse it instead
+    # of re-loading the 2.5 GB model for every file.
+    console.print("[bold yellow]Loading embedding model...[/bold yellow]")
+    _maybe_inject_local_hf_embedder(task_cfg, schema)
+    console.print("[bold green]Embedding model ready.[/bold green]")
 
     for in_path in tqdm(inputs, desc="Text embeddings", unit="json"):
         out_txt = _embedding_input_path_for_input_json(in_path, output_dir=output_dir)

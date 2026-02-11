@@ -148,13 +148,7 @@ def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
         pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
 
         if page_number == -1:
-            print(f"Unable to determine page number for {path}")
-        else:
-            print(f"Page number for {path} is {page_number}")
-
-        if pdf_page != page_number:
-            breakpoint()
-            print(f"PDF page {pdf_page} does not match page number {page_number} for {path}")
+            logger.debug("Unable to determine page number for %s", path)
 
         out.append(
             {
@@ -265,6 +259,17 @@ def write_text_embeddings_dir_to_lancedb(
         df = _read_text_embeddings_json_df(p)
         rows = df.to_dict(orient="records")
         results.append(rows)
+
+    if not results:
+        logger.warning("No *.text_embeddings.json files found in %s; nothing to write.", input_dir)
+        return {
+            "input_dir": str(input_dir),
+            "n_files": 0,
+            "processed": 0,
+            "skipped": 0,
+            "failed": 0,
+            "lancedb": {"uri": cfg.uri, "table_name": cfg.table_name, "overwrite": cfg.overwrite},
+        }
 
     lancedb.run(results)
 
