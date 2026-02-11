@@ -429,7 +429,7 @@ You can specify multiple `--profile` options.
 
 ## Docker Compose override files
 
-The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) may exceed VRAM on a single GPU for some hardware. Override files reduce per-service memory, batch sizes, or concurrency so the full pipeline can run on the available GPU. To use an override, pass a second `-f` file after the base compose file; Docker Compose merges them and the override takes precedence.
+The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) might exceed VRAM on a single GPU for some hardware. Override files reduce per-service memory, batch sizes, or concurrency so the full pipeline can run on the available GPU. To use an override, pass a second `-f` file after the base compose file; Docker Compose merges them and the override takes precedence.
 
 | Override file | GPU target |
 |---------------|------------|
