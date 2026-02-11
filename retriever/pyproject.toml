@@ -30,7 +30,7 @@ dependencies = [
   "typer>=0.12.0",
   "pyyaml>=6.0",
   "lancedb",
-  #"nv-ingest-api==26.1.2",
+  "nv-ingest-api",
   "fastapi>=0.114.0",
   "uvicorn[standard]>=0.30.0",
   "httpx>=0.27.0",
@@ -65,6 +65,9 @@ dev = [
 
 [project.scripts]
 retriever = "retriever.__main__:main"
+
+[tool.uv.sources]
+nv-ingest-api = { path = "../api/", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]
