@@ -9,48 +9,20 @@ A configurable, dataset-agnostic testing framework for end-to-end validation of 
 - Python 3.12+ environment
 - Access to test datasets
 
-### Dependency Structure
-
-The harness uses optional dependency groups to avoid conflicts:
-
-| Extra | Use Case | Includes |
-|-------|----------|----------|
-| `[ingest]` | E2E ingestion benchmarking | nv-ingest packages, pymilvus, pypdfium2 |
-| `[nemotron-hf]` | Standalone model benchmarking | nemotron-* packages from HuggingFace |
-| Base (no extra) | Core utilities only | docker, pyyaml, requests, matplotlib |
-
-**Why separate?** The nv-ingest and nemotron packages have conflicting Pillow version requirements. Use the appropriate extra based on your test needs.
-
 ### Installation
-
-The harness has modular dependencies split into optional extras:
 
 ```bash
 # Navigate to the harness directory
 cd tools/harness/
 
-# Install for nv-ingest E2E benchmarking (includes pymilvus, pypdfium2)
-uv pip install -e '.[ingest]'
-
-# Install for standalone model benchmarking (nemotron-* packages)
-uv pip install -e '.[nemotron-hf]'
-
-# Install base harness only (no model dependencies)
+# Install the harness (includes nv-ingest packages, milvus-lite, pypdfium2, and nemotron-* model packages)
 uv pip install -e .
 ```
-
-**Dependency Groups:**
-- **Base**: Common utilities (docker, pyyaml, requests, matplotlib, pynvml)
-- **`[ingest]`**: nv-ingest packages + milvus-lite + pypdfium2 (for E2E tests)
-- **`[nemotron-hf]`**: Standalone Nemotron models from HuggingFace (for model benchmarks)
 
 ### Run Your First Test
 
 ```bash
-# 1. Install dependencies for E2E testing
-uv pip install -e '.[ingest]'
-
-# 2. Run with a pre-configured dataset (assumes services are running)
+# Run with a pre-configured dataset (assumes services are running)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Or use a custom path that uses the "active" configuration
@@ -126,6 +98,15 @@ datasets:
     extract_infographics: false
     recall_dataset: bo767  # Evaluator for recall testing
   
+  jp20:
+    path: /path/to/jp20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: jp20  # bo10k evaluator filtered to jp20 subset
+
   bo20:
     path: /raid/jioffe/bo20
     extract_text: true
@@ -167,6 +148,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 | Dataset | Text | Tables | Charts | Images | Infographics | Recall |
 |---------|------|--------|--------|--------|--------------|--------|
 | `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `jp20` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -541,24 +523,7 @@ Metrics are also logged via `kv_event_log()`:
 
 ## Model Testing
 
-The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure.
-
-### Installation for Model Benchmarks
-
-Model benchmarks require the standalone Nemotron packages:
-
-```bash
-cd tools/harness/
-uv pip install -e '.[nemotron-hf]'
-```
-
-This installs:
-- `nemotron-page-elements-v3`
-- `nemotron-graphic-elements-v1`
-- `nemotron-table-structure-v1`
-- `nemotron-ocr`
-
-**Note**: These packages are separate from the nv-ingest dependencies to avoid dependency conflicts (e.g., Pillow version requirements).
+The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install includes the nemotron-* packages (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`).
 
 ### Available Model Benchmarks
 
@@ -1015,11 +980,11 @@ This provides:
   - `segment_results()` - Result categorization by type
   - `kv_event_log()` - Structured logging
   - `run_cmd()` - Command execution helpers
-- `milvus.py` - Milvus/vector database utilities (requires pymilvus via `[ingest]` extra)
+- `milvus.py` - Milvus/vector database utilities
   - `milvus_chunks()` - Vector database statistics
   - `load_collection()` - Load Milvus collection
   - `unload_collection()` - Unload Milvus collection
-- `pdfium.py` - PDF utilities (requires pypdfium2 via `[ingest]` extra)
+- `pdfium.py` - PDF utilities
   - `pdf_page_count()` - Dataset page counting
   - `pdf_page_count_glob()` - Glob-based PDF page counting
 
