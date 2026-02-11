@@ -507,6 +507,7 @@ class InProcessIngestor(Ingestor):
         normalize = bool(embed_kwargs.pop("normalize", True))
         max_length = int(embed_kwargs.pop("max_length", 4096))
 
+        embed_kwargs.setdefault("input_type", "passage")
         embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
             device=str(device) if device is not None else None,
             hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,

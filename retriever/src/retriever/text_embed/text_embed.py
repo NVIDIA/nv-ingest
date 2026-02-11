@@ -62,6 +62,7 @@ def embed_text_1b_v2(
     # This lightweight implementation uses the provided local `model` regardless.
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
+    input_type: str = "passage",
     text_column: str = "text",
     inference_batch_size: int = 32,
     output_column: str = "text_embeddings_1b_v2",
@@ -99,7 +100,7 @@ def embed_text_1b_v2(
                 # Keep placeholder but mark as "no text".
                 payloads[i] = {"embedding": None, "error": None}
                 continue
-            texts.append(txt)
+            texts.append(f"{input_type}: {txt}" if input_type else txt)
             text_row_idxs.append(i)
         except BaseException as e:
             payloads[i] = _error_payload(stage="extract_text", exc=e)

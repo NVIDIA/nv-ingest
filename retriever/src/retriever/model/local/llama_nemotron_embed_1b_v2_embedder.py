@@ -34,14 +34,14 @@ class LlamaNemotronEmbed1BV2Embedder:
         self._model = None
         self._device = None
 
-        import llama_nemotron_embed_1b_v2
+        from transformers import AutoModel, AutoTokenizer
 
+        MODEL_ID = "nvidia/llama-nemotron-embed-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = self.hf_cache_dir or str(Path.home() / ".cache" / "huggingface")
-        self._tokenizer = llama_nemotron_embed_1b_v2.load_tokenizer(cache_dir=hf_cache_dir, force_download=False)
-        self._model = llama_nemotron_embed_1b_v2.load_model(
-            device=str(dev), trust_remote_code=True, cache_dir=hf_cache_dir, force_download=False
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, cache_dir=hf_cache_dir)
+        self._model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True, cache_dir=hf_cache_dir)
+        self._model = self._model.to(dev)
         self._model.eval()
         self._device = dev
 
@@ -76,13 +76,9 @@ class LlamaNemotronEmbed1BV2Embedder:
                     return_tensors="pt",
                 ).to(dev)
                 out = self._model(**batch)
-                # Common HF outputs: pooler_output [B,D] or last_hidden_state [B,S,D]
-                vec = getattr(out, "pooler_output", None)
-                if vec is None:
-                    lhs = getattr(out, "last_hidden_state", None)
-                    if lhs is None:
-                        raise ValueError("Embedding model output missing pooler_output/last_hidden_state")
-                    vec = lhs.mean(dim=1)
+                lhs = out.last_hidden_state                          # [B, S, D]
+                mask = batch["attention_mask"].unsqueeze(-1)          # [B, S, 1]
+                vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)      # [B, D]
                 vec = vec.detach().to("cpu")
                 if self.normalize:
                     vec = _l2_normalize(vec)

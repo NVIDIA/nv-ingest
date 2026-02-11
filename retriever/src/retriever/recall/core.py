@@ -107,11 +107,12 @@ def _embed_queries_nim(
 ) -> List[List[float]]:
     # `infer_microservice` returns a list of embeddings.
     embeddings = infer_microservice(
-        ["query: " + q for q in queries],
+        queries,
         model_name=model,
         embedding_endpoint=endpoint,
         nvidia_api_key=(api_key or "").strip(),
         grpc=bool(grpc),
+        input_type="query",
     )
     # Some backends return numpy arrays; normalize to list-of-list floats.
     out: List[List[float]] = []
