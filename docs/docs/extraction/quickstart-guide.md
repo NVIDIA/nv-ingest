@@ -450,7 +450,7 @@ docker compose \
   --profile retrieval up
 ```
 
-**Example — A10G:**
+### Example with A10G
 
 ```shell
 docker compose \
@@ -459,7 +459,7 @@ docker compose \
   --profile retrieval up
 ```
 
-**Example — L40S:**
+### Example with L40S
 
 ```shell
 docker compose \
@@ -499,8 +499,6 @@ This syntax and structure can be repeated for each NIM model used by CAS, ensuri
 !!! important
 
     Advanced features require additional GPU support and disk space. For more information, refer to [Support Matrix](support-matrix.md).
-
-
 
 ## Related Topics
 
