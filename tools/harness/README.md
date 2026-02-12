@@ -6,19 +6,23 @@ A configurable, dataset-agnostic testing framework for end-to-end validation of 
 
 ### Prerequisites
 - Docker and Docker Compose running
-- Python environment with nv-ingest-client
+- Python 3.12+ environment
 - Access to test datasets
+
+### Installation
+
+```bash
+# Navigate to the harness directory
+cd tools/harness/
+
+# Install the harness (includes nv-ingest packages, milvus-lite, pypdfium2, and nemotron-* model packages)
+uv pip install -e .
+```
 
 ### Run Your First Test
 
 ```bash
-# 1. Navigate to the tests directory
-cd tools/harness/
-
-# 2. Install dependencies
-uv sync
-
-# 3. Run with a pre-configured dataset (assumes services are running)
+# Run with a pre-configured dataset (assumes services are running)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Or use a custom path that uses the "active" configuration
@@ -94,6 +98,15 @@ datasets:
     extract_infographics: false
     recall_dataset: bo767  # Evaluator for recall testing
   
+  jp20:
+    path: /path/to/jp20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: jp20  # bo10k evaluator filtered to jp20 subset
+
   bo20:
     path: /raid/jioffe/bo20
     extract_text: true
@@ -135,6 +148,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 | Dataset | Text | Tables | Charts | Images | Infographics | Recall |
 |---------|------|--------|--------|--------|--------------|--------|
 | `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `jp20` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -274,6 +288,10 @@ DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 | `e2e_with_llm_summary` | E2E with LLM summarization via UDF | `active` section only | ✅ Available (YAML config) |
 | `recall` | Recall evaluation against existing collections | `active` + `recall` sections | ✅ Available (YAML config) |
 | `e2e_recall` | Fresh ingestion + recall evaluation | `active` + `recall` sections | ✅ Available (YAML config) |
+| `page_elements` | nemotron-page-elements-v3 model benchmarking (PyPi) | None | ✅ Available |
+| `graphic_elements` | nemotron-graphic-elements-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `table_structure` | nemotron-table-structure-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `ocr` | nemotron-ocr model benchmarking (PyPi) | None | ✅ Available |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
@@ -502,6 +520,115 @@ Metrics are also logged via `kv_event_log()`:
 - `recall_multimodal_@{k}_with_reranker`
 - `recall_eval_time_s_no_reranker`
 - `recall_eval_time_s_with_reranker`
+
+## Model Testing
+
+The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install includes the nemotron-* packages (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`).
+
+### Available Model Benchmarks
+
+| Case | Model | Package | Description |
+|------|-------|---------|-------------|
+| `page_elements` | [Nemotron Page Element v3](https://huggingface.co/nvidia/nemotron-page-elements-v3) | nemotron_page_elements_v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
+| `table_structure` | [Nemotron Table Structure v1](https://huggingface.co/nvidia/nemotron-table-structure-v1) | nemotron_table_structure_v1 | Table cell, row, and column detection |
+| `graphic_elements` | [Nemotron Graphic Element v1](https://huggingface.co/nvidia/nemotron-graphic-elements-v1) | nemotron_graphic_elements_v1 | Chart and graphic element detection |
+| `ocr` | [Nemotron OCR v1](https://huggingface.co/nvidia/nemotron-ocr-v1) | nemotron_ocr | Optical character recognition (text extraction with bounding boxes) |
+
+### Usage
+
+Model benchmarks don't require managed services - they run the model directly on GPU:
+
+```bash
+# Page elements benchmark
+uv run nv-ingest-harness-run --case=page_elements --dataset=/path/to/page_images
+
+# Table structure benchmark  
+uv run nv-ingest-harness-run --case=table_structure --dataset=/path/to/table_images
+
+# Graphic elements benchmark
+uv run nv-ingest-harness-run --case=graphic_elements --dataset=/path/to/chart_images
+
+# Nemotron OCR benchmark
+uv run nv-ingest-harness-run --case=ocr --dataset=/path/to/images
+```
+
+### Configuration
+
+Model benchmarks use `dataset_dir` from the config to locate images. Images are discovered recursively with extensions: `.png`, `.jpg`, `.jpeg`, `.webp`.
+
+**Optional config parameters:**
+- `num_repeats` (default: 1): Number of times to run inference per image for timing accuracy
+
+### Benchmark Method
+
+All model benchmarks use `torch.utils.benchmark.Timer` for accurate timing:
+
+- **Automatic CUDA synchronization**: Timer handles GPU sync internally
+- **Warmup**: Uses `blocked_autorange()` for stable initial timing calibration
+- **Per-image timing**: Measures preprocessing + forward pass together
+
+### Output Metrics
+
+Results are written to `results.json`:
+
+| Metric | Description |
+|--------|-------------|
+| `num_images` | Total images processed |
+| `total_detections` | Sum of all detections across images (or `total_text_regions` for OCR) |
+| `mean_inference_time_ms` | Mean inference time per image |
+| `std_inference_time_ms` | Standard deviation of inference times |
+| `min_inference_time_ms` | Fastest inference time |
+| `max_inference_time_ms` | Slowest inference time |
+| `median_inference_time_ms` | Median inference time |
+| `iqr_inference_time_ms` | Interquartile range (75th - 25th percentile) |
+| `total_inference_time_ms` | Total time for all images |
+| `throughput_images_per_sec` | Processing throughput |
+| `model_load_time_s` | Time to load the model |
+
+### Example Output
+
+```
+=== Page Elements Benchmark ===
+Dataset: /path/to/images
+Timing repeats per image: 1
+Using torch.utils.benchmark.Timer
+================================
+Found 100 image(s) to process
+Loading model...
+Model loaded in 2.34s
+Available labels: ['text', 'title', 'table', 'figure', ...]
+Running warmup with torch.utils.benchmark...
+Warmup complete. Estimated per-image time: 15.23 ms
+Processing images: 100%|████████████████| 100/100 [00:01<00:00, 65.2img/s]
+```
+
+Results in `artifacts/<dataset>_<timestamp>/results.json`:
+
+```json
+{
+  "test_config": {
+    "test_name": "page_images",
+    "dataset_dir": "/path/to/images",
+    "num_repeats": 1,
+    "model": "page_element_v3",
+    "benchmark_method": "torch.utils.benchmark.Timer"
+  },
+  "results": {
+    "num_images": 100,
+    "total_detections": 1523,
+    "mean_inference_time_ms": 15.34,
+    "std_inference_time_ms": 2.18,
+    "min_inference_time_ms": 12.45,
+    "max_inference_time_ms": 28.91,
+    "median_inference_time_ms": 14.89,
+    "iqr_inference_time_ms": 2.34,
+    "total_inference_time_ms": 1534.21,
+    "throughput_images_per_sec": 65.18,
+    "model_load_time_s": 2.34
+  },
+  "per_image_results": [...]
+}
+```
 
 ## Sweeping Parameters
 
@@ -848,12 +975,18 @@ This provides:
   - Merges ingestion and recall metrics in results
 
 **4. Shared Utilities**
-- `interact.py` - Common testing utilities
+- `interact.py` - Common testing utilities (no external model dependencies)
   - `embed_info()` - Embedding model detection
-  - `milvus_chunks()` - Vector database statistics
   - `segment_results()` - Result categorization by type
   - `kv_event_log()` - Structured logging
+  - `run_cmd()` - Command execution helpers
+- `milvus.py` - Milvus/vector database utilities
+  - `milvus_chunks()` - Vector database statistics
+  - `load_collection()` - Load Milvus collection
+  - `unload_collection()` - Unload Milvus collection
+- `pdfium.py` - PDF utilities
   - `pdf_page_count()` - Dataset page counting
+  - `pdf_page_count_glob()` - Glob-based PDF page counting
 
 ### Configuration Flow
 
