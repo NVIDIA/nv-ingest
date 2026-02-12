@@ -17,10 +17,6 @@ _RETRIEVER_SRC = _THIS_FILE.parents[1]  # .../retriever/src
 if (_RETRIEVER_SRC / "retriever").is_dir() and str(_RETRIEVER_SRC) not in sys.path:
     sys.path.insert(0, str(_RETRIEVER_SRC))
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
-
-ensure_nv_ingest_api_importable()
-
 from retriever.chart.config import load_chart_extractor_schema_from_dict
 from retriever.chart.stage import extract_chart_data_from_primitives_df
 from retriever.ingest_config import load_ingest_config_file
@@ -245,9 +241,6 @@ class PDFExtractionActorBatchFn:
         write_json_outputs: bool,
         json_output_dir: Optional[str],
     ) -> None:
-        # Ensure nv-ingest-api is importable on workers too.
-        ensure_nv_ingest_api_importable()
-
         extractor_schema, task_cfg = _build_pdf_extractor_and_task_cfg(
             method=str(method),
             auth_token=auth_token,
@@ -292,7 +285,6 @@ class TableExtractionActorBatchFn:
     """
 
     def __init__(self, *, config_dict: Dict[str, Any]) -> None:
-        ensure_nv_ingest_api_importable()
         self._schema = load_table_extractor_schema_from_dict(config_dict or {})
 
     def __call__(self, batch: "pd.DataFrame") -> "pd.DataFrame":
@@ -310,7 +302,6 @@ class ChartExtractionActorBatchFn:
     """
 
     def __init__(self, *, config_dict: Dict[str, Any]) -> None:
-        ensure_nv_ingest_api_importable()
         self._schema = load_chart_extractor_schema_from_dict(config_dict or {})
 
     def __call__(self, batch: "pd.DataFrame") -> "pd.DataFrame":
@@ -335,8 +326,6 @@ class TextEmbeddingActorBatchFn:
         config_dict: Dict[str, Any],
         task_config: Dict[str, Any],
     ) -> None:
-        ensure_nv_ingest_api_importable()
-
         self._schema = load_text_embedding_schema_from_dict(config_dict or {})
         self._task_cfg = dict(task_config or {})
 

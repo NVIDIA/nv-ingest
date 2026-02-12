@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.config_utils import endpoints_from_yaml
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 
@@ -28,4 +25,3 @@ def load_table_extractor_schema_from_dict(cfg: Dict[str, Any]) -> TableExtractor
 class TableExtractionStageConfig:
     batch_size: int = 64
     stage_name: str = "table_extraction"
-

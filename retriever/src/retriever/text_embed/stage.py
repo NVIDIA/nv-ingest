@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 import typer
@@ -12,10 +12,7 @@ from rich.console import Console
 from rich.traceback import install
 from tqdm import tqdm
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.ingest_config import load_ingest_config_section
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
