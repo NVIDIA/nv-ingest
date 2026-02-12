@@ -9,10 +9,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
-
-ensure_nv_ingest_api_importable()
-
 from nv_ingest_api.util.nim import infer_microservice
 
 
@@ -171,14 +167,13 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     for hits in raw_hits:
         keys: List[str] = []
         for h in hits:
-            res = json.loads(h['metadata'])
-            source = json.loads(h['source'])
+            res = json.loads(h["metadata"])
+            source = json.loads(h["source"])
             # Prefer explicit `pdf_page` column; fall back to derived form.
             if res.get("page_number") and source.get("source_id"):
                 filename = Path(source["source_id"]).stem
                 keys.append(filename + "_" + str(res["page_number"]))
             else:
-                breakpoint()
                 print(f"Big problem. Find me in source code and fix me! {res}")
         retrieved_keys.append([k for k in keys if k])
     return retrieved_keys
@@ -191,7 +186,9 @@ def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
         page = g.split("_")[1]
 
         specific_page = f"{filename}_{page}"
-        entire_document = f"{filename}_-1" # This indicates that the text was retrieved from the entire document at index time and therefore the exact page is unknown but it still is a hit just with the missing metadata in the VDB
+        # This indicates that the text was retrieved from the entire document at index time and therefore the exact
+        # page is unknown but it still is a hit just with the missing metadata in the VDB.
+        entire_document = f"{filename}_-1"
 
         if specific_page in (r[:k] if r else []):
             hits += 1
@@ -291,4 +288,3 @@ def evaluate_recall(
         "metrics": metrics,
         "saved": saved,
     }
-
