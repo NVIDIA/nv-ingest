@@ -1,0 +1,21 @@
+nv\_ingest\_api.internal.schemas.mutate package
+===============================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.schemas.mutate.mutate\_image\_dedup\_schema module
+---------------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.schemas.mutate
+   :members:
+   :show-inheritance:
+   :undoc-members:

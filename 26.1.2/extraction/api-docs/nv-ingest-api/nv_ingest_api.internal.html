@@ -1,0 +1,1078 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_api.internal package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-api/nv_ingest_api.internal';</script>
+
+    <link rel="icon" href="../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_api.internal.enums package" href="nv_ingest_api.internal.enums.html" />
+    <link rel="prev" title="nv_ingest_api.interface package" href="nv_ingest_api.interface.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_api</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_api.html">nv_ingest_api package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 current active has-children"><a class="current reference internal" href="#">nv_ingest_api.internal package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_api</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.html" class="nav-link">nv_ingest_api package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.internal package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-api-internal-package">
+<h1>nv_ingest_api.internal package<a class="headerlink" href="#nv-ingest-api-internal-package" title="Link to this heading">#</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.enums.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.enums.html#module-nv_ingest_api.internal.enums.common">nv_ingest_api.internal.enums.common module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum"><code class="docutils literal notranslate"><span class="pre">AccessLevelEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum.LEVEL_1"><code class="docutils literal notranslate"><span class="pre">LEVEL_1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum.LEVEL_2"><code class="docutils literal notranslate"><span class="pre">LEVEL_2</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum.LEVEL_3"><code class="docutils literal notranslate"><span class="pre">LEVEL_3</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id0"><code class="docutils literal notranslate"><span class="pre">LEVEL_1</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id1"><code class="docutils literal notranslate"><span class="pre">LEVEL_2</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id2"><code class="docutils literal notranslate"><span class="pre">LEVEL_3</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.AccessLevelEnum.UNKNOWN"><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum"><code class="docutils literal notranslate"><span class="pre">ContentDescriptionEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.DOCX_IMAGE"><code class="docutils literal notranslate"><span class="pre">DOCX_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.DOCX_TABLE"><code class="docutils literal notranslate"><span class="pre">DOCX_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.DOCX_TEXT"><code class="docutils literal notranslate"><span class="pre">DOCX_TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_CHART"><code class="docutils literal notranslate"><span class="pre">PDF_CHART</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_IMAGE"><code class="docutils literal notranslate"><span class="pre">PDF_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_INFOGRAPHIC"><code class="docutils literal notranslate"><span class="pre">PDF_INFOGRAPHIC</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_PAGE_IMAGE"><code class="docutils literal notranslate"><span class="pre">PDF_PAGE_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_TABLE"><code class="docutils literal notranslate"><span class="pre">PDF_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PDF_TEXT"><code class="docutils literal notranslate"><span class="pre">PDF_TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PPTX_IMAGE"><code class="docutils literal notranslate"><span class="pre">PPTX_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PPTX_TABLE"><code class="docutils literal notranslate"><span class="pre">PPTX_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentDescriptionEnum.PPTX_TEXT"><code class="docutils literal notranslate"><span class="pre">PPTX_TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id3"><code class="docutils literal notranslate"><span class="pre">DOCX_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id4"><code class="docutils literal notranslate"><span class="pre">DOCX_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id5"><code class="docutils literal notranslate"><span class="pre">DOCX_TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id6"><code class="docutils literal notranslate"><span class="pre">PDF_CHART</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id7"><code class="docutils literal notranslate"><span class="pre">PDF_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id8"><code class="docutils literal notranslate"><span class="pre">PDF_INFOGRAPHIC</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id9"><code class="docutils literal notranslate"><span class="pre">PDF_PAGE_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id10"><code class="docutils literal notranslate"><span class="pre">PDF_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id11"><code class="docutils literal notranslate"><span class="pre">PDF_TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id12"><code class="docutils literal notranslate"><span class="pre">PPTX_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id13"><code class="docutils literal notranslate"><span class="pre">PPTX_TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id14"><code class="docutils literal notranslate"><span class="pre">PPTX_TEXT</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum"><code class="docutils literal notranslate"><span class="pre">ContentTypeEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.AUDIO"><code class="docutils literal notranslate"><span class="pre">AUDIO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.EMBEDDING"><code class="docutils literal notranslate"><span class="pre">EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.IMAGE"><code class="docutils literal notranslate"><span class="pre">IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.INFO_MSG"><code class="docutils literal notranslate"><span class="pre">INFO_MSG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.PAGE_IMAGE"><code class="docutils literal notranslate"><span class="pre">PAGE_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.STRUCTURED"><code class="docutils literal notranslate"><span class="pre">STRUCTURED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.TEXT"><code class="docutils literal notranslate"><span class="pre">TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.UNSTRUCTURED"><code class="docutils literal notranslate"><span class="pre">UNSTRUCTURED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.VIDEO"><code class="docutils literal notranslate"><span class="pre">VIDEO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id15"><code class="docutils literal notranslate"><span class="pre">AUDIO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.CHART"><code class="docutils literal notranslate"><span class="pre">CHART</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id16"><code class="docutils literal notranslate"><span class="pre">EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id17"><code class="docutils literal notranslate"><span class="pre">IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.INFOGRAPHIC"><code class="docutils literal notranslate"><span class="pre">INFOGRAPHIC</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id18"><code class="docutils literal notranslate"><span class="pre">INFO_MSG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.NONE"><code class="docutils literal notranslate"><span class="pre">NONE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id19"><code class="docutils literal notranslate"><span class="pre">PAGE_IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id20"><code class="docutils literal notranslate"><span class="pre">STRUCTURED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.TABLE"><code class="docutils literal notranslate"><span class="pre">TABLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id21"><code class="docutils literal notranslate"><span class="pre">TEXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.ContentTypeEnum.UNKNOWN"><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id22"><code class="docutils literal notranslate"><span class="pre">VIDEO</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum"><code class="docutils literal notranslate"><span class="pre">DocumentTypeEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.BMP"><code class="docutils literal notranslate"><span class="pre">BMP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.DOCX"><code class="docutils literal notranslate"><span class="pre">DOCX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.HTML"><code class="docutils literal notranslate"><span class="pre">HTML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.JPEG"><code class="docutils literal notranslate"><span class="pre">JPEG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.PDF"><code class="docutils literal notranslate"><span class="pre">PDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.PNG"><code class="docutils literal notranslate"><span class="pre">PNG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.PPTX"><code class="docutils literal notranslate"><span class="pre">PPTX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.SVG"><code class="docutils literal notranslate"><span class="pre">SVG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.TIFF"><code class="docutils literal notranslate"><span class="pre">TIFF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.TXT"><code class="docutils literal notranslate"><span class="pre">TXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.MP3"><code class="docutils literal notranslate"><span class="pre">MP3</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.WAV"><code class="docutils literal notranslate"><span class="pre">WAV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.MP4"><code class="docutils literal notranslate"><span class="pre">MP4</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.MOV"><code class="docutils literal notranslate"><span class="pre">MOV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.AVI"><code class="docutils literal notranslate"><span class="pre">AVI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.MKV"><code class="docutils literal notranslate"><span class="pre">MKV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id23"><code class="docutils literal notranslate"><span class="pre">AVI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id24"><code class="docutils literal notranslate"><span class="pre">BMP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id25"><code class="docutils literal notranslate"><span class="pre">DOCX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id26"><code class="docutils literal notranslate"><span class="pre">HTML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id27"><code class="docutils literal notranslate"><span class="pre">JPEG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.MD"><code class="docutils literal notranslate"><span class="pre">MD</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id28"><code class="docutils literal notranslate"><span class="pre">MKV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id29"><code class="docutils literal notranslate"><span class="pre">MOV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id30"><code class="docutils literal notranslate"><span class="pre">MP3</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id31"><code class="docutils literal notranslate"><span class="pre">MP4</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id32"><code class="docutils literal notranslate"><span class="pre">PDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id33"><code class="docutils literal notranslate"><span class="pre">PNG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id34"><code class="docutils literal notranslate"><span class="pre">PPTX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id35"><code class="docutils literal notranslate"><span class="pre">SVG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id36"><code class="docutils literal notranslate"><span class="pre">TIFF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id37"><code class="docutils literal notranslate"><span class="pre">TXT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.DocumentTypeEnum.UNKNOWN"><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id38"><code class="docutils literal notranslate"><span class="pre">WAV</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum"><code class="docutils literal notranslate"><span class="pre">LanguageEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.AF"><code class="docutils literal notranslate"><span class="pre">AF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.AR"><code class="docutils literal notranslate"><span class="pre">AR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.BG"><code class="docutils literal notranslate"><span class="pre">BG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.BN"><code class="docutils literal notranslate"><span class="pre">BN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.CA"><code class="docutils literal notranslate"><span class="pre">CA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.CS"><code class="docutils literal notranslate"><span class="pre">CS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.CY"><code class="docutils literal notranslate"><span class="pre">CY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.DA"><code class="docutils literal notranslate"><span class="pre">DA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.DE"><code class="docutils literal notranslate"><span class="pre">DE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.EL"><code class="docutils literal notranslate"><span class="pre">EL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.EN"><code class="docutils literal notranslate"><span class="pre">EN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ES"><code class="docutils literal notranslate"><span class="pre">ES</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ET"><code class="docutils literal notranslate"><span class="pre">ET</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.FA"><code class="docutils literal notranslate"><span class="pre">FA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.FI"><code class="docutils literal notranslate"><span class="pre">FI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.FR"><code class="docutils literal notranslate"><span class="pre">FR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.GU"><code class="docutils literal notranslate"><span class="pre">GU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.HE"><code class="docutils literal notranslate"><span class="pre">HE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.HI"><code class="docutils literal notranslate"><span class="pre">HI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.HR"><code class="docutils literal notranslate"><span class="pre">HR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.HU"><code class="docutils literal notranslate"><span class="pre">HU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ID"><code class="docutils literal notranslate"><span class="pre">ID</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.IT"><code class="docutils literal notranslate"><span class="pre">IT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.JA"><code class="docutils literal notranslate"><span class="pre">JA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.KN"><code class="docutils literal notranslate"><span class="pre">KN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.KO"><code class="docutils literal notranslate"><span class="pre">KO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.LT"><code class="docutils literal notranslate"><span class="pre">LT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.LV"><code class="docutils literal notranslate"><span class="pre">LV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.MK"><code class="docutils literal notranslate"><span class="pre">MK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ML"><code class="docutils literal notranslate"><span class="pre">ML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.MR"><code class="docutils literal notranslate"><span class="pre">MR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.NE"><code class="docutils literal notranslate"><span class="pre">NE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.NL"><code class="docutils literal notranslate"><span class="pre">NL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.NO"><code class="docutils literal notranslate"><span class="pre">NO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.PA"><code class="docutils literal notranslate"><span class="pre">PA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.PL"><code class="docutils literal notranslate"><span class="pre">PL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.PT"><code class="docutils literal notranslate"><span class="pre">PT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.RO"><code class="docutils literal notranslate"><span class="pre">RO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.RU"><code class="docutils literal notranslate"><span class="pre">RU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SK"><code class="docutils literal notranslate"><span class="pre">SK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SL"><code class="docutils literal notranslate"><span class="pre">SL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SO"><code class="docutils literal notranslate"><span class="pre">SO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SQ"><code class="docutils literal notranslate"><span class="pre">SQ</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SV"><code class="docutils literal notranslate"><span class="pre">SV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.SW"><code class="docutils literal notranslate"><span class="pre">SW</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.TA"><code class="docutils literal notranslate"><span class="pre">TA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.TE"><code class="docutils literal notranslate"><span class="pre">TE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.TH"><code class="docutils literal notranslate"><span class="pre">TH</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.TL"><code class="docutils literal notranslate"><span class="pre">TL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.TR"><code class="docutils literal notranslate"><span class="pre">TR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.UK"><code class="docutils literal notranslate"><span class="pre">UK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.UR"><code class="docutils literal notranslate"><span class="pre">UR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.VI"><code class="docutils literal notranslate"><span class="pre">VI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ZH_CN"><code class="docutils literal notranslate"><span class="pre">ZH_CN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.ZH_TW"><code class="docutils literal notranslate"><span class="pre">ZH_TW</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.UNKNOWN"><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id39"><code class="docutils literal notranslate"><span class="pre">AF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id40"><code class="docutils literal notranslate"><span class="pre">AR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id41"><code class="docutils literal notranslate"><span class="pre">BG</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id42"><code class="docutils literal notranslate"><span class="pre">BN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id43"><code class="docutils literal notranslate"><span class="pre">CA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id44"><code class="docutils literal notranslate"><span class="pre">CS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id45"><code class="docutils literal notranslate"><span class="pre">CY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id46"><code class="docutils literal notranslate"><span class="pre">DA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id47"><code class="docutils literal notranslate"><span class="pre">DE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id48"><code class="docutils literal notranslate"><span class="pre">EL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id49"><code class="docutils literal notranslate"><span class="pre">EN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id50"><code class="docutils literal notranslate"><span class="pre">ES</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id51"><code class="docutils literal notranslate"><span class="pre">ET</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id52"><code class="docutils literal notranslate"><span class="pre">FA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id53"><code class="docutils literal notranslate"><span class="pre">FI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id54"><code class="docutils literal notranslate"><span class="pre">FR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id55"><code class="docutils literal notranslate"><span class="pre">GU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id56"><code class="docutils literal notranslate"><span class="pre">HE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id57"><code class="docutils literal notranslate"><span class="pre">HI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id58"><code class="docutils literal notranslate"><span class="pre">HR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id59"><code class="docutils literal notranslate"><span class="pre">HU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id60"><code class="docutils literal notranslate"><span class="pre">ID</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id61"><code class="docutils literal notranslate"><span class="pre">IT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id62"><code class="docutils literal notranslate"><span class="pre">JA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id63"><code class="docutils literal notranslate"><span class="pre">KN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id64"><code class="docutils literal notranslate"><span class="pre">KO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id65"><code class="docutils literal notranslate"><span class="pre">LT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id66"><code class="docutils literal notranslate"><span class="pre">LV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id67"><code class="docutils literal notranslate"><span class="pre">MK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id68"><code class="docutils literal notranslate"><span class="pre">ML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id69"><code class="docutils literal notranslate"><span class="pre">MR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id70"><code class="docutils literal notranslate"><span class="pre">NE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id71"><code class="docutils literal notranslate"><span class="pre">NL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id72"><code class="docutils literal notranslate"><span class="pre">NO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id73"><code class="docutils literal notranslate"><span class="pre">PA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id74"><code class="docutils literal notranslate"><span class="pre">PL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id75"><code class="docutils literal notranslate"><span class="pre">PT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id76"><code class="docutils literal notranslate"><span class="pre">RO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id77"><code class="docutils literal notranslate"><span class="pre">RU</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id78"><code class="docutils literal notranslate"><span class="pre">SK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id79"><code class="docutils literal notranslate"><span class="pre">SL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id80"><code class="docutils literal notranslate"><span class="pre">SO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id81"><code class="docutils literal notranslate"><span class="pre">SQ</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id82"><code class="docutils literal notranslate"><span class="pre">SV</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id83"><code class="docutils literal notranslate"><span class="pre">SW</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id84"><code class="docutils literal notranslate"><span class="pre">TA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id85"><code class="docutils literal notranslate"><span class="pre">TE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id86"><code class="docutils literal notranslate"><span class="pre">TH</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id87"><code class="docutils literal notranslate"><span class="pre">TL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id88"><code class="docutils literal notranslate"><span class="pre">TR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id89"><code class="docutils literal notranslate"><span class="pre">UK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id90"><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id91"><code class="docutils literal notranslate"><span class="pre">UR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id92"><code class="docutils literal notranslate"><span class="pre">VI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id93"><code class="docutils literal notranslate"><span class="pre">ZH_CN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id94"><code class="docutils literal notranslate"><span class="pre">ZH_TW</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.LanguageEnum.has_value"><code class="docutils literal notranslate"><span class="pre">has_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase"><code class="docutils literal notranslate"><span class="pre">PipelinePhase</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.PRE_PROCESSING"><code class="docutils literal notranslate"><span class="pre">PRE_PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.EXTRACTION"><code class="docutils literal notranslate"><span class="pre">EXTRACTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.POST_PROCESSING"><code class="docutils literal notranslate"><span class="pre">POST_PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.MUTATION"><code class="docutils literal notranslate"><span class="pre">MUTATION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.TRANSFORM"><code class="docutils literal notranslate"><span class="pre">TRANSFORM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.RESPONSE"><code class="docutils literal notranslate"><span class="pre">RESPONSE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.TELEMETRY"><code class="docutils literal notranslate"><span class="pre">TELEMETRY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.PipelinePhase.DRAIN"><code class="docutils literal notranslate"><span class="pre">DRAIN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id95"><code class="docutils literal notranslate"><span class="pre">DRAIN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id96"><code class="docutils literal notranslate"><span class="pre">EXTRACTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id97"><code class="docutils literal notranslate"><span class="pre">MUTATION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id98"><code class="docutils literal notranslate"><span class="pre">POST_PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id99"><code class="docutils literal notranslate"><span class="pre">PRE_PROCESSING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id100"><code class="docutils literal notranslate"><span class="pre">RESPONSE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id101"><code class="docutils literal notranslate"><span class="pre">TELEMETRY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id102"><code class="docutils literal notranslate"><span class="pre">TRANSFORM</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.StatusEnum"><code class="docutils literal notranslate"><span class="pre">StatusEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.StatusEnum.ERROR"><code class="docutils literal notranslate"><span class="pre">ERROR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.StatusEnum.SUCCESS"><code class="docutils literal notranslate"><span class="pre">SUCCESS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id103"><code class="docutils literal notranslate"><span class="pre">ERROR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id104"><code class="docutils literal notranslate"><span class="pre">SUCCESS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum"><code class="docutils literal notranslate"><span class="pre">TableFormatEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.HTML"><code class="docutils literal notranslate"><span class="pre">HTML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.IMAGE"><code class="docutils literal notranslate"><span class="pre">IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.LATEX"><code class="docutils literal notranslate"><span class="pre">LATEX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.MARKDOWN"><code class="docutils literal notranslate"><span class="pre">MARKDOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.PSEUDO_MARKDOWN"><code class="docutils literal notranslate"><span class="pre">PSEUDO_MARKDOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TableFormatEnum.SIMPLE"><code class="docutils literal notranslate"><span class="pre">SIMPLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id105"><code class="docutils literal notranslate"><span class="pre">HTML</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id106"><code class="docutils literal notranslate"><span class="pre">IMAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id107"><code class="docutils literal notranslate"><span class="pre">LATEX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id108"><code class="docutils literal notranslate"><span class="pre">MARKDOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id109"><code class="docutils literal notranslate"><span class="pre">PSEUDO_MARKDOWN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id110"><code class="docutils literal notranslate"><span class="pre">SIMPLE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum"><code class="docutils literal notranslate"><span class="pre">TaskTypeEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.CAPTION"><code class="docutils literal notranslate"><span class="pre">CAPTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.DEDUP"><code class="docutils literal notranslate"><span class="pre">DEDUP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.EMBED"><code class="docutils literal notranslate"><span class="pre">EMBED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.EXTRACT"><code class="docutils literal notranslate"><span class="pre">EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.FILTER"><code class="docutils literal notranslate"><span class="pre">FILTER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.SPLIT"><code class="docutils literal notranslate"><span class="pre">SPLIT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.STORE"><code class="docutils literal notranslate"><span class="pre">STORE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.STORE_EMBEDDING"><code class="docutils literal notranslate"><span class="pre">STORE_EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.VDB_UPLOAD"><code class="docutils literal notranslate"><span class="pre">VDB_UPLOAD</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.AUDIO_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">AUDIO_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.TABLE_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">TABLE_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.CHART_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">CHART_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">INFOGRAPHIC_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.UDF"><code class="docutils literal notranslate"><span class="pre">UDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id111"><code class="docutils literal notranslate"><span class="pre">AUDIO_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id112"><code class="docutils literal notranslate"><span class="pre">CAPTION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id113"><code class="docutils literal notranslate"><span class="pre">CHART_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id114"><code class="docutils literal notranslate"><span class="pre">DEDUP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id115"><code class="docutils literal notranslate"><span class="pre">EMBED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id116"><code class="docutils literal notranslate"><span class="pre">EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id117"><code class="docutils literal notranslate"><span class="pre">FILTER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id118"><code class="docutils literal notranslate"><span class="pre">INFOGRAPHIC_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TaskTypeEnum.OCR_DATA_EXTRACT"><code class="docutils literal notranslate"><span class="pre">OCR_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id119"><code class="docutils literal notranslate"><span class="pre">SPLIT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id120"><code class="docutils literal notranslate"><span class="pre">STORE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id121"><code class="docutils literal notranslate"><span class="pre">STORE_EMBEDDING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id122"><code class="docutils literal notranslate"><span class="pre">TABLE_DATA_EXTRACT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id123"><code class="docutils literal notranslate"><span class="pre">UDF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id124"><code class="docutils literal notranslate"><span class="pre">VDB_UPLOAD</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum"><code class="docutils literal notranslate"><span class="pre">TextTypeEnum</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.BLOCK"><code class="docutils literal notranslate"><span class="pre">BLOCK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.BODY"><code class="docutils literal notranslate"><span class="pre">BODY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.DOCUMENT"><code class="docutils literal notranslate"><span class="pre">DOCUMENT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.HEADER"><code class="docutils literal notranslate"><span class="pre">HEADER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.LINE"><code class="docutils literal notranslate"><span class="pre">LINE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.NEARBY_BLOCK"><code class="docutils literal notranslate"><span class="pre">NEARBY_BLOCK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.OTHER"><code class="docutils literal notranslate"><span class="pre">OTHER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.PAGE"><code class="docutils literal notranslate"><span class="pre">PAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#nv_ingest_api.internal.enums.common.TextTypeEnum.SPAN"><code class="docutils literal notranslate"><span class="pre">SPAN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id125"><code class="docutils literal notranslate"><span class="pre">BLOCK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id126"><code class="docutils literal notranslate"><span class="pre">BODY</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id127"><code class="docutils literal notranslate"><span class="pre">DOCUMENT</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id128"><code class="docutils literal notranslate"><span class="pre">HEADER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id129"><code class="docutils literal notranslate"><span class="pre">LINE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id130"><code class="docutils literal notranslate"><span class="pre">NEARBY_BLOCK</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id131"><code class="docutils literal notranslate"><span class="pre">OTHER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id132"><code class="docutils literal notranslate"><span class="pre">PAGE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html#id133"><code class="docutils literal notranslate"><span class="pre">SPAN</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.enums.html#module-nv_ingest_api.internal.enums">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.extract.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.audio.html">nv_ingest_api.internal.extract.audio package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.audio.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.audio.html#module-nv_ingest_api.internal.extract.audio.audio_extraction">nv_ingest_api.internal.extract.audio.audio_extraction module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.audio.html#module-nv_ingest_api.internal.extract.audio">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.docx.html">nv_ingest_api.internal.extract.docx package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.docx.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.docx.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.docx.html#module-nv_ingest_api.internal.extract.docx.docx_extractor">nv_ingest_api.internal.extract.docx.docx_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.docx.html#module-nv_ingest_api.internal.extract.docx">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.html.html">nv_ingest_api.internal.extract.html package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html.html#module-nv_ingest_api.internal.extract.html.html_extractor">nv_ingest_api.internal.extract.html.html_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html.html#module-nv_ingest_api.internal.extract.html">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html">nv_ingest_api.internal.extract.image package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image.chart_extractor">nv_ingest_api.internal.extract.image.chart_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image.image_extractor">nv_ingest_api.internal.extract.image.image_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image.infographic_extractor">nv_ingest_api.internal.extract.image.infographic_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image.ocr_extractor">nv_ingest_api.internal.extract.image.ocr_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image.table_extractor">nv_ingest_api.internal.extract.image.table_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.image.html#module-nv_ingest_api.internal.extract.image">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.pdf.html">nv_ingest_api.internal.extract.pdf package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pdf.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pdf.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pdf.html#module-nv_ingest_api.internal.extract.pdf.pdf_extractor">nv_ingest_api.internal.extract.pdf.pdf_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pdf.html#module-nv_ingest_api.internal.extract.pdf">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.extract.pptx.html">nv_ingest_api.internal.extract.pptx package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pptx.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pptx.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pptx.html#module-nv_ingest_api.internal.extract.pptx.pptx_extractor">nv_ingest_api.internal.extract.pptx.pptx_extractor module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.pptx.html#module-nv_ingest_api.internal.extract.pptx">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.extract.html#module-nv_ingest_api.internal.extract">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.meta.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.meta.html#module-nv_ingest_api.internal.meta.udf">nv_ingest_api.internal.meta.udf module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF"><code class="docutils literal notranslate"><span class="pre">CachedUDF</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.created_at"><code class="docutils literal notranslate"><span class="pre">created_at</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.function"><code class="docutils literal notranslate"><span class="pre">function</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.function_name"><code class="docutils literal notranslate"><span class="pre">function_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.last_used"><code class="docutils literal notranslate"><span class="pre">last_used</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.signature_validated"><code class="docutils literal notranslate"><span class="pre">signature_validated</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.CachedUDF.use_count"><code class="docutils literal notranslate"><span class="pre">use_count</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.UDFCache"><code class="docutils literal notranslate"><span class="pre">UDFCache</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.UDFCache.get"><code class="docutils literal notranslate"><span class="pre">get()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.UDFCache.get_stats"><code class="docutils literal notranslate"><span class="pre">get_stats()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.UDFCache.put"><code class="docutils literal notranslate"><span class="pre">put()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.compile_and_validate_udf"><code class="docutils literal notranslate"><span class="pre">compile_and_validate_udf()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.get_udf_cache_stats"><code class="docutils literal notranslate"><span class="pre">get_udf_cache_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.meta.html#nv_ingest_api.internal.meta.udf.udf_stage_callable_fn"><code class="docutils literal notranslate"><span class="pre">udf_stage_callable_fn()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.meta.html#module-nv_ingest_api.internal.meta">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#module-nv_ingest_api.internal.mutate.deduplicate">nv_ingest_api.internal.mutate.deduplicate module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#nv_ingest_api.internal.mutate.deduplicate.deduplicate_images_internal"><code class="docutils literal notranslate"><span class="pre">deduplicate_images_internal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#module-nv_ingest_api.internal.mutate.filter">nv_ingest_api.internal.mutate.filter module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#nv_ingest_api.internal.mutate.filter.filter_images_internal"><code class="docutils literal notranslate"><span class="pre">filter_images_internal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.mutate.html#module-nv_ingest_api.internal.mutate">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html">nv_ingest_api.internal.primitives.nim package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#module-nv_ingest_api.internal.primitives.nim.default_values">nv_ingest_api.internal.primitives.nim.default_values module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#module-nv_ingest_api.internal.primitives.nim.nim_client">nv_ingest_api.internal.primitives.nim.nim_client module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#module-nv_ingest_api.internal.primitives.nim.nim_model_interface">nv_ingest_api.internal.primitives.nim.nim_model_interface module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.nim.html#module-nv_ingest_api.internal.primitives.nim">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html">nv_ingest_api.internal.primitives.tracing package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html#module-nv_ingest_api.internal.primitives.tracing.latency">nv_ingest_api.internal.primitives.tracing.latency module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html#module-nv_ingest_api.internal.primitives.tracing.logging">nv_ingest_api.internal.primitives.tracing.logging module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html#module-nv_ingest_api.internal.primitives.tracing.tagging">nv_ingest_api.internal.primitives.tracing.tagging module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.tracing.html#module-nv_ingest_api.internal.primitives.tracing">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#module-nv_ingest_api.internal.primitives.control_message_task">nv_ingest_api.internal.primitives.control_message_task module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.control_message_task.ControlMessageTask"><code class="docutils literal notranslate"><span class="pre">ControlMessageTask</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.control_message_task.ControlMessageTask.id"><code class="docutils literal notranslate"><span class="pre">id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.control_message_task.ControlMessageTask.properties"><code class="docutils literal notranslate"><span class="pre">properties</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.control_message_task.ControlMessageTask.type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#module-nv_ingest_api.internal.primitives.ingest_control_message">nv_ingest_api.internal.primitives.ingest_control_message module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage"><code class="docutils literal notranslate"><span class="pre">IngestControlMessage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.add_task"><code class="docutils literal notranslate"><span class="pre">add_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.config"><code class="docutils literal notranslate"><span class="pre">config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.copy"><code class="docutils literal notranslate"><span class="pre">copy()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.filter_timestamp"><code class="docutils literal notranslate"><span class="pre">filter_timestamp()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.get_metadata"><code class="docutils literal notranslate"><span class="pre">get_metadata()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.get_tasks"><code class="docutils literal notranslate"><span class="pre">get_tasks()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.get_timestamp"><code class="docutils literal notranslate"><span class="pre">get_timestamp()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.get_timestamps"><code class="docutils literal notranslate"><span class="pre">get_timestamps()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.has_metadata"><code class="docutils literal notranslate"><span class="pre">has_metadata()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.has_task"><code class="docutils literal notranslate"><span class="pre">has_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.list_metadata"><code class="docutils literal notranslate"><span class="pre">list_metadata()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.payload"><code class="docutils literal notranslate"><span class="pre">payload()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.remove_task"><code class="docutils literal notranslate"><span class="pre">remove_task()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.set_metadata"><code class="docutils literal notranslate"><span class="pre">set_metadata()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.IngestControlMessage.set_timestamp"><code class="docutils literal notranslate"><span class="pre">set_timestamp()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.remove_all_tasks_by_type"><code class="docutils literal notranslate"><span class="pre">remove_all_tasks_by_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#nv_ingest_api.internal.primitives.ingest_control_message.remove_task_by_type"><code class="docutils literal notranslate"><span class="pre">remove_task_by_type()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.primitives.html#module-nv_ingest_api.internal.primitives">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html">nv_ingest_api.internal.schemas.extract package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_audio_schema">nv_ingest_api.internal.schemas.extract.extract_audio_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_chart_schema">nv_ingest_api.internal.schemas.extract.extract_chart_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_docx_schema">nv_ingest_api.internal.schemas.extract.extract_docx_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_html_schema">nv_ingest_api.internal.schemas.extract.extract_html_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_image_schema">nv_ingest_api.internal.schemas.extract.extract_image_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_infographic_schema">nv_ingest_api.internal.schemas.extract.extract_infographic_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_ocr_schema">nv_ingest_api.internal.schemas.extract.extract_ocr_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_pdf_schema">nv_ingest_api.internal.schemas.extract.extract_pdf_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_pptx_schema">nv_ingest_api.internal.schemas.extract.extract_pptx_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract.extract_table_schema">nv_ingest_api.internal.schemas.extract.extract_table_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.extract.html#module-nv_ingest_api.internal.schemas.extract">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html">nv_ingest_api.internal.schemas.message_brokers package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema">nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.request_schema">nv_ingest_api.internal.schemas.message_brokers.request_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers.response_schema">nv_ingest_api.internal.schemas.message_brokers.response_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.message_brokers.html#module-nv_ingest_api.internal.schemas.message_brokers">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html">nv_ingest_api.internal.schemas.meta package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.base_model_noext">nv_ingest_api.internal.schemas.meta.base_model_noext module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.ingest_job_schema">nv_ingest_api.internal.schemas.meta.ingest_job_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.metadata_schema">nv_ingest_api.internal.schemas.meta.metadata_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta.udf">nv_ingest_api.internal.schemas.meta.udf module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.meta.html#module-nv_ingest_api.internal.schemas.meta">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html">nv_ingest_api.internal.schemas.mutate package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#module-nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema">nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.mutate.html#module-nv_ingest_api.internal.schemas.mutate">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html">nv_ingest_api.internal.schemas.store package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store.store_embedding_schema">nv_ingest_api.internal.schemas.store.store_embedding_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store.store_image_schema">nv_ingest_api.internal.schemas.store.store_image_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.store.html#module-nv_ingest_api.internal.schemas.store">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html">nv_ingest_api.internal.schemas.transform package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_image_caption_schema">nv_ingest_api.internal.schemas.transform.transform_image_caption_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_image_filter_schema">nv_ingest_api.internal.schemas.transform.transform_image_filter_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema">nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema">nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.transform.html#module-nv_ingest_api.internal.schemas.transform">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.html#module-nv_ingest_api.internal.schemas.mixins">nv_ingest_api.internal.schemas.mixins module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.schemas.html#nv_ingest_api.internal.schemas.mixins.LowercaseProtocolMixin"><code class="docutils literal notranslate"><span class="pre">LowercaseProtocolMixin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.schemas.html#module-nv_ingest_api.internal.schemas">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.store.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.store.html#module-nv_ingest_api.internal.store.embed_text_upload">nv_ingest_api.internal.store.embed_text_upload module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.store.html#nv_ingest_api.internal.store.embed_text_upload.store_text_embeddings_internal"><code class="docutils literal notranslate"><span class="pre">store_text_embeddings_internal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.store.html#nv-ingest-api-internal-store-image-upload-module">nv_ingest_api.internal.store.image_upload module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.store.html#module-nv_ingest_api.internal.store">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.transform.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.transform.html#module-nv_ingest_api.internal.transform.caption_image">nv_ingest_api.internal.transform.caption_image module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.transform.html#nv_ingest_api.internal.transform.caption_image.transform_image_create_vlm_caption_internal"><code class="docutils literal notranslate"><span class="pre">transform_image_create_vlm_caption_internal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.transform.html#nv-ingest-api-internal-transform-embed-text-module">nv_ingest_api.internal.transform.embed_text module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.transform.html#module-nv_ingest_api.internal.transform.split_text">nv_ingest_api.internal.transform.split_text module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_api.internal.transform.html#nv_ingest_api.internal.transform.split_text.transform_text_split_and_tokenize_internal"><code class="docutils literal notranslate"><span class="pre">transform_text_split_and_tokenize_internal()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest_api.internal.transform.html#module-nv_ingest_api.internal.transform">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-nv_ingest_api.internal">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_api.internal" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_api.interface.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_api.interface package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_api.internal.enums.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_api.internal.enums package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.internal">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
