@@ -439,7 +439,9 @@ The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/
 
 For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the override that best matches your GPU memory (for example, `docker-compose.l40s.yaml` or `docker-compose.a10g.yaml`).
 
-**Example — A100 40GB:**
+### Example with A100 40GB
+
+The following example uses an override file for an A100 40GB GPU.
 
 ```shell
 docker compose \
