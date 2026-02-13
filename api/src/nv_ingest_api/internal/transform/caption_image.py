@@ -16,6 +16,75 @@ from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)
 
+_MAX_CONTEXT_TEXT_CHARS = 4096
+
+
+def _gather_context_text_for_image(
+    image_meta: Dict[str, Any],
+    page_text_map: Dict[int, List[str]],
+    max_chars: int,
+) -> str:
+    """
+    Gather surrounding OCR text for an image to provide as VLM prompt context.
+
+    Parameters
+    ----------
+    image_meta : dict
+        The full metadata dict for the image row.
+    page_text_map : dict
+        Mapping of page number -> list of text strings, precomputed from the
+        DataFrame's text rows.
+    max_chars : int
+        Maximum number of characters to return. Will be clamped to
+        ``_MAX_CONTEXT_TEXT_CHARS``.
+
+    Returns
+    -------
+    str
+        Surrounding text (possibly truncated), or empty string if none found.
+    """
+    effective_max = min(max_chars, _MAX_CONTEXT_TEXT_CHARS)
+    content_meta = image_meta.get("content_metadata", {})
+    page_num = content_meta.get("page_number", -1)
+    page_texts = page_text_map.get(page_num, [])
+    if page_texts:
+        combined = " ".join(page_texts)
+        return combined[:effective_max]
+
+    return ""
+
+
+def _build_prompt_with_context(base_prompt: str, context_text: str) -> str:
+    """
+    Prepend surrounding-text context to the base VLM prompt.
+
+    If *context_text* is empty the *base_prompt* is returned unchanged.
+    """
+    if not context_text:
+        return base_prompt
+    return f"Text near this image:\n---\n{context_text}\n---\n\n{base_prompt}"
+
+
+def _build_page_text_map(df: pd.DataFrame) -> Dict[int, List[str]]:
+    """
+    Build a mapping of page number -> list of text content strings from text
+    rows in the DataFrame.  Computed once per call to avoid O(images * rows).
+    """
+    page_text_map: Dict[int, List[str]] = {}
+    for _, row in df.iterrows():
+        meta = row.get("metadata")
+        if meta is None:
+            continue
+        cm = meta.get("content_metadata", {})
+        if cm.get("type") != "text":
+            continue
+        content = meta.get("content", "")
+        if not content:
+            continue
+        page_num = cm.get("page_number", -1)
+        page_text_map.setdefault(page_num, []).append(content)
+    return page_text_map
+
 
 def _prepare_dataframes_mod(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """
@@ -62,6 +131,7 @@ def _generate_captions(
     api_key: str,
     endpoint_url: str,
     model_name: str,
+    temperature: float = 1.0,
 ) -> List[str]:
     """
     Generates captions for a list of base64-encoded PNG images using the VLM model API.
@@ -116,7 +186,7 @@ def _generate_captions(
         )
 
         # Perform inference to generate captions.
-        captions: List[str] = nim_client.infer(data, model_name=model_name)
+        captions: List[str] = nim_client.infer(data, model_name=model_name, temperature=temperature)
         return captions
 
     except Exception as e:
@@ -182,6 +252,14 @@ def transform_image_create_vlm_caption_internal(
     endpoint_url: str = task_config.get("endpoint_url") or transform_config.endpoint_url
     model_name: str = task_config.get("model_name") or transform_config.model_name
 
+    # Context text: task config overrides pipeline default.
+    context_text_max_chars: int = task_config.get("context_text_max_chars") or getattr(
+        transform_config, "context_text_max_chars", 0
+    )
+
+    # Temperature: task config overrides pipeline default.
+    temperature: float = task_config.get("temperature") or getattr(transform_config, "temperature", 1.0)
+
     # Create a mask for rows where the content type is "image".
     df_mask: pd.Series = df_transform_ledger["metadata"].apply(
         lambda meta: meta.get("content_metadata", {}).get("type") == "image"
@@ -191,26 +269,50 @@ def transform_image_create_vlm_caption_internal(
     if not df_mask.any():
         return df_transform_ledger
 
-    # Collect base64-encoded images from the rows where the content type is "image".
-    base64_images: List[str] = df_transform_ledger.loc[df_mask, "metadata"].apply(lambda meta: meta["content"]).tolist()
+    if context_text_max_chars and context_text_max_chars > 0:
+        page_text_map = _build_page_text_map(df_transform_ledger)
 
-    # Generate captions for the collected images.
-    captions: List[str] = _generate_captions(
-        base64_images,
-        prompt,
-        system_prompt,
-        api_key,
-        endpoint_url,
-        model_name,
-    )
+        for idx in df_transform_ledger.loc[df_mask].index:
+            meta: Dict[str, Any] = df_transform_ledger.at[idx, "metadata"]
+            base64_image: str = meta["content"]
+            context_text = _gather_context_text_for_image(meta, page_text_map, context_text_max_chars)
+            enriched_prompt = _build_prompt_with_context(prompt, context_text)
 
-    # Update the DataFrame: assign each generated caption to the corresponding row.
-    for idx, caption in zip(df_transform_ledger.loc[df_mask].index, captions):
-        meta: Dict[str, Any] = df_transform_ledger.at[idx, "metadata"]
-        image_meta: Dict[str, Any] = meta.get("image_metadata", {})
-        image_meta["caption"] = caption
-        meta["image_metadata"] = image_meta
-        df_transform_ledger.at[idx, "metadata"] = meta
+            captions: List[str] = _generate_captions(
+                [base64_image],
+                enriched_prompt,
+                system_prompt,
+                api_key,
+                endpoint_url,
+                model_name,
+                temperature=temperature,
+            )
+
+            image_meta: Dict[str, Any] = meta.get("image_metadata", {})
+            image_meta["caption"] = captions[0] if captions else ""
+            meta["image_metadata"] = image_meta
+            df_transform_ledger.at[idx, "metadata"] = meta
+    else:
+        base64_images: List[str] = (
+            df_transform_ledger.loc[df_mask, "metadata"].apply(lambda meta: meta["content"]).tolist()
+        )
+
+        captions: List[str] = _generate_captions(
+            base64_images,
+            prompt,
+            system_prompt,
+            api_key,
+            endpoint_url,
+            model_name,
+            temperature=temperature,
+        )
+
+        for idx, caption in zip(df_transform_ledger.loc[df_mask].index, captions):
+            meta: Dict[str, Any] = df_transform_ledger.at[idx, "metadata"]
+            image_meta: Dict[str, Any] = meta.get("image_metadata", {})
+            image_meta["caption"] = caption
+            meta["image_metadata"] = image_meta
+            df_transform_ledger.at[idx, "metadata"] = meta
 
     logger.debug("Image content captioning complete")
     result, execution_trace_log = df_transform_ledger, {}

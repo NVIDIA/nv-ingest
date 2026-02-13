@@ -12,6 +12,8 @@ class ImageCaptionExtractionSchema(BaseModel):
     prompt: str = "Caption the content of this image:"
     system_prompt: str = "/no_think"
     model_name: str = "nvidia/nemotron-nano-12b-v2-vl"
+    context_text_max_chars: int = 0
+    temperature: float = 1.0
     raise_on_failure: bool = False
     model_config = ConfigDict(extra="forbid")
 
@@ -33,4 +35,8 @@ class ImageCaptionExtractionSchema(BaseModel):
             values["prompt"] = cls.model_fields["prompt"].default
         if values.get("system_prompt") is None:
             values["system_prompt"] = cls.model_fields["system_prompt"].default
+        if values.get("context_text_max_chars") is None:
+            values["context_text_max_chars"] = cls.model_fields["context_text_max_chars"].default
+        if values.get("temperature") is None:
+            values["temperature"] = cls.model_fields["temperature"].default
         return values

@@ -24,6 +24,8 @@ class CaptionTask(Task):
         prompt: str = None,
         system_prompt: str = None,
         model_name: str = None,
+        context_text_max_chars: int = None,
+        temperature: float = None,
     ) -> None:
         super().__init__()
 
@@ -34,6 +36,8 @@ class CaptionTask(Task):
             prompt=prompt,
             system_prompt=system_prompt,
             model_name=model_name,
+            context_text_max_chars=context_text_max_chars,
+            temperature=temperature,
         )
 
         self._api_key = validated_data.api_key
@@ -41,6 +45,8 @@ class CaptionTask(Task):
         self._prompt = validated_data.prompt
         self._system_prompt = validated_data.system_prompt
         self._model_name = validated_data.model_name
+        self._context_text_max_chars = validated_data.context_text_max_chars
+        self._temperature = validated_data.temperature
 
     def __str__(self) -> str:
         """
@@ -59,6 +65,10 @@ class CaptionTask(Task):
             info += f"  system_prompt: {self._system_prompt}\n"
         if self._model_name:
             info += f"  model_name: {self._model_name}\n"
+        if self._context_text_max_chars:
+            info += f"  context_text_max_chars: {self._context_text_max_chars}\n"
+        if self._temperature is not None:
+            info += f"  temperature: {self._temperature}\n"
 
         return info
 
@@ -82,5 +92,11 @@ class CaptionTask(Task):
 
         if self._model_name:
             task_properties["model_name"] = self._model_name
+
+        if self._context_text_max_chars:
+            task_properties["context_text_max_chars"] = self._context_text_max_chars
+
+        if self._temperature is not None:
+            task_properties["temperature"] = self._temperature
 
         return {"type": "caption", "task_properties": task_properties}
