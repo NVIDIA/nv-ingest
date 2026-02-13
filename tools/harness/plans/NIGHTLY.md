@@ -7,6 +7,9 @@ Automated benchmarks with Slack reporting and historical tracking.
 ```bash
 cd tools/harness
 
+# Install the harness
+uv pip install -e .
+
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 uv run nv-ingest-harness-nightly
 
@@ -178,6 +181,15 @@ uv run nv-ingest-harness-nightly \
 
 ## CI/CD
 
+### Installation
+
+```bash
+cd tools/harness
+uv pip install -e .
+```
+
+### GitHub Actions
+
 ```yaml
 # GitHub Actions
 jobs:
@@ -187,12 +199,15 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
-      - run: cd tools/harness && uv sync && uv run nv-ingest-harness-nightly
+      - run: cd tools/harness && uv pip install -e . && uv run nv-ingest-harness-nightly
 ```
+
+### Cron
 
 ```bash
 # Cron (2 AM daily)
 0 2 * * * cd /path/to/tools/harness && source ~/setup_env.sh && \
+  uv pip install -e . && \
   SLACK_WEBHOOK_URL="..." uv run nv-ingest-harness-nightly >> /var/log/nightly.log 2>&1
 ```
 
