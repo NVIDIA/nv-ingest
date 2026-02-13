@@ -1,0 +1,34 @@
+nv\_ingest\_api.internal.schemas package
+========================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.schemas.extract
+   nv_ingest_api.internal.schemas.message_brokers
+   nv_ingest_api.internal.schemas.meta
+   nv_ingest_api.internal.schemas.mutate
+   nv_ingest_api.internal.schemas.store
+   nv_ingest_api.internal.schemas.transform
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.schemas.mixins module
+----------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.mixins
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.schemas
+   :members:
+   :show-inheritance:
+   :undoc-members:
