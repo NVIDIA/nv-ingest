@@ -8,7 +8,7 @@ import copy
 import logging
 import threading
 import uuid
-from typing import Any, Optional, Dict, Tuple
+from typing import Any, Optional, Dict
 from typing import List
 
 import pandas as pd
