@@ -20,7 +20,7 @@ def test_transform_text_split_and_tokenize_internal_happy_path(mock_environ_get,
     # Setup a mock tokenizer
     mock_tokenizer = MagicMock()
     # Produce fake offsets
-    mock_tokenizer.encode_plus.return_value = {"offset_mapping": [(0, 4), (5, 9), (10, 19)]}
+    mock_tokenizer.return_value = {"offset_mapping": [(0, 4), (5, 9), (10, 19)]}
     mock_get_tokenizer.return_value = mock_tokenizer
 
     # Dummy dataframe
@@ -97,7 +97,7 @@ def test_transform_text_split_and_tokenize_internal_no_matching_source_type(mock
 
 def test_split_into_chunks_empty_text():
     mock_tokenizer = MagicMock()
-    mock_tokenizer.encode_plus.return_value = {"offset_mapping": []}
+    mock_tokenizer.return_value = {"offset_mapping": []}
 
     chunks = module_under_test._split_into_chunks("", mock_tokenizer)
     assert chunks == []
@@ -132,7 +132,7 @@ def test_split_into_chunks_happy_path():
 
     # Mock tokenizer behavior
     mock_tokenizer = MagicMock()
-    mock_tokenizer.encode_plus.return_value = {
+    mock_tokenizer.return_value = {
         "offset_mapping": [(0, 8), (7, 16), (17, 19), (20, 27), (28, 36), (37, 45), (46, 55)]
     }
 
