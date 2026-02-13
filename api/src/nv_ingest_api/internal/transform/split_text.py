@@ -6,8 +6,9 @@
 import os
 import copy
 import logging
+import threading
 import uuid
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Tuple
 from typing import List
 
 import pandas as pd
@@ -18,6 +19,47 @@ from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema imp
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)
+
+# Module-level tokenizer cache: persists tokenizer instances for the lifetime
+# of the process, keyed by (identifier, token) to avoid re-loading on every call.
+_tokenizer_cache: Dict[Tuple[str, Optional[str]], Any] = {}
+_tokenizer_cache_lock = threading.Lock()
+
+
+def _get_tokenizer(
+    tokenizer_identifier: str,
+    token: Optional[str] = None,
+):
+    """
+    Return a cached AutoTokenizer, creating it on first use.
+
+    Parameters
+    ----------
+    tokenizer_identifier : str
+        HuggingFace model identifier or local path.
+    token : str, optional
+        HuggingFace access token.
+
+    Returns
+    -------
+    transformers.PreTrainedTokenizer
+        The (possibly cached) tokenizer instance.
+    """
+    cache_key = (tokenizer_identifier, token)
+
+    # Fast path – no lock needed for a simple dict read (GIL-protected).
+    if cache_key in _tokenizer_cache:
+        return _tokenizer_cache[cache_key]
+
+    with _tokenizer_cache_lock:
+        # Double-check after acquiring the lock.
+        if cache_key in _tokenizer_cache:
+            return _tokenizer_cache[cache_key]
+
+        logger.info("Loading and caching tokenizer: %s", tokenizer_identifier)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_identifier, token=token)
+        _tokenizer_cache[cache_key] = tokenizer
+        return tokenizer
 
 
 def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
@@ -155,7 +197,7 @@ def transform_text_split_and_tokenize_internal(
     if tokenizer_identifier is None:
         tokenizer_identifier = "intfloat/e5-large-unsupervised"
 
-    tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
+    tokenizer_model = _get_tokenizer(tokenizer_identifier, token=hf_access_token)
 
     split_docs: List[Dict[str, Any]] = []
     for _, row in df_filtered.iterrows():
