@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Module-level tokenizer cache: persists tokenizer instances for the lifetime
 # of the process, keyed by (identifier, token) to avoid re-loading on every call.
-_tokenizer_cache: Dict[Tuple[str, Optional[str]], Any] = {}
+_tokenizer_cache: Dict[str, Any] = {}
 _tokenizer_cache_lock = threading.Lock()
 
 
@@ -45,7 +45,7 @@ def _get_tokenizer(
     transformers.PreTrainedTokenizer
         The (possibly cached) tokenizer instance.
     """
-    cache_key = (tokenizer_identifier, token)
+    cache_key = tokenizer_identifier
 
     # Fast path – no lock needed for a simple dict read (GIL-protected).
     if cache_key in _tokenizer_cache:
@@ -89,7 +89,7 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
 
 def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=20):
     # Tokenize the text into token IDs
-    encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
+    encoding = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
 
     # Get the token IDs and offsets for splitting
     offsets = encoding["offset_mapping"]
