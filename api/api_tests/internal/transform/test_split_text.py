@@ -13,15 +13,15 @@ import nv_ingest_api.internal.transform.split_text as module_under_test
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
-@patch(f"{MODULE_UNDER_TEST}.AutoTokenizer")
+@patch(f"{MODULE_UNDER_TEST}._get_tokenizer")
 @patch(f"{MODULE_UNDER_TEST}.os.path.exists", return_value=False)
 @patch(f"{MODULE_UNDER_TEST}.os.environ.get", return_value="/mock/model/path")
-def test_transform_text_split_and_tokenize_internal_happy_path(mock_environ_get, mock_exists, mock_tokenizer_class):
+def test_transform_text_split_and_tokenize_internal_happy_path(mock_environ_get, mock_exists, mock_get_tokenizer):
     # Setup a mock tokenizer
     mock_tokenizer = MagicMock()
     # Produce fake offsets
     mock_tokenizer.encode_plus.return_value = {"offset_mapping": [(0, 4), (5, 9), (10, 19)]}
-    mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+    mock_get_tokenizer.return_value = mock_tokenizer
 
     # Dummy dataframe
     df = pd.DataFrame(
@@ -57,8 +57,8 @@ def test_transform_text_split_and_tokenize_internal_happy_path(mock_environ_get,
         execution_trace_log=None,
     )
 
-    # Assert tokenizer was loaded with correct identifier
-    mock_tokenizer_class.from_pretrained.assert_called_once_with("mock_tokenizer", token=None)
+    # Assert cached tokenizer was loaded with correct identifier
+    mock_get_tokenizer.assert_called_once_with("mock_tokenizer", token=None)
 
     # Assert that splitting occurred for first row only
     assert not result.empty
@@ -67,13 +67,9 @@ def test_transform_text_split_and_tokenize_internal_happy_path(mock_environ_get,
     assert any("won't" in c for c in split_contents)
 
 
-@patch(f"{MODULE_UNDER_TEST}.AutoTokenizer")
+@patch(f"{MODULE_UNDER_TEST}._get_tokenizer")
 @patch(f"{MODULE_UNDER_TEST}.os.path.exists", return_value=False)
-def test_transform_text_split_and_tokenize_internal_no_matching_source_type(mock_exists, mock_tokenizer_class):
-    # Setup mock tokenizer
-    mock_tokenizer = MagicMock()
-    mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
-
+def test_transform_text_split_and_tokenize_internal_no_matching_source_type(mock_exists, mock_get_tokenizer):
     # Dummy dataframe with unmatched source_type
     df = pd.DataFrame(
         [
@@ -94,9 +90,9 @@ def test_transform_text_split_and_tokenize_internal_no_matching_source_type(mock
         execution_trace_log=None,
     )
 
-    # Should return the same DataFrame
+    # Should return the same DataFrame without loading a tokenizer
     assert result.equals(df)
-    mock_tokenizer_class.from_pretrained.assert_not_called()
+    mock_get_tokenizer.assert_not_called()
 
 
 def test_split_into_chunks_empty_text():
