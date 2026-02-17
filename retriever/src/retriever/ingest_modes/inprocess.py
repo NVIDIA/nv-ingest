@@ -63,6 +63,25 @@ def _combine_text_with_content(row, text_column, content_columns):
     return "\n\n".join(parts) if parts else ""
 
 
+def _deep_copy_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Shallow-copy a row dict but deep-copy any nested mutable values.
+
+    This avoids the problem where multiple exploded rows share the same
+    metadata dict reference, causing later embedding writes to overwrite
+    earlier ones.  We only deep-copy dicts and lists (the common mutable
+    types in row data); scalars and strings are immutable and safe to share.
+    """
+    import copy
+
+    out: Dict[str, Any] = {}
+    for k, v in row_dict.items():
+        if isinstance(v, (dict, list)):
+            out[k] = copy.deepcopy(v)
+        else:
+            out[k] = v
+    return out
+
+
 def explode_content_to_rows(
     batch_df: Any,
     *,
@@ -100,7 +119,7 @@ def explode_content_to_rows(
         # Row for page text.
         page_text = row_dict.get(text_column)
         if isinstance(page_text, str) and page_text.strip():
-            new_rows.append(dict(row_dict))
+            new_rows.append(_deep_copy_row(row_dict))
             exploded_any = True
 
         # One row per structured content item.
@@ -114,7 +133,7 @@ def explode_content_to_rows(
                 t = item.get("text", "")
                 if not isinstance(t, str) or not t.strip():
                     continue
-                content_row = dict(row_dict)
+                content_row = _deep_copy_row(row_dict)
                 content_row[text_column] = t.strip()
                 new_rows.append(content_row)
                 exploded_any = True
