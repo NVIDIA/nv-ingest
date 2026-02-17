@@ -148,6 +148,8 @@ envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   OMP_NUM_THREADS: 1
   RAY_num_grpc_threads: 1
+  RAY_num_server_call_thread: 1
+  RAY_worker_num_grpc_internal_threads: 1
 
   MAX_INGEST_PROCESS_WORKERS: 32
   NV_INGEST_MAX_UTIL: 32
