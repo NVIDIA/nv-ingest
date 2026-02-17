@@ -159,14 +159,28 @@ def _counter_from_page_elements_v3(value: Any) -> Counter[str]:
     return c
 
 
-def _count_table_regions(table_structure_v1: Any) -> int:
+def _count_table_regions(table_data: Any) -> int:
     """
-    Expected shape:
-      { "regions": [ {"label_name": "table", ...}, ... ] }
+    Count table regions from either the ``table`` column format (list of
+    OCR entries) or the legacy ``table_structure_v1`` format (dict with
+    ``regions``).
+
+    ``table`` format::
+
+        [ {"bbox_xyxy_norm": [...], "text": "..."}, ... ]
+
+    Legacy format (``table_structure_v1``)::
+
+        { "regions": [ {"label_name": "table", ...}, ... ] }
     """
-    if not isinstance(table_structure_v1, dict):
+    # New format: list of OCR entries — each entry is one table region.
+    if isinstance(table_data, list):
+        return len(table_data)
+
+    # Legacy format: dict with "regions" list.
+    if not isinstance(table_data, dict):
         return 0
-    regions = table_structure_v1.get("regions")
+    regions = table_data.get("regions")
     if not isinstance(regions, list):
         return 0
     n = 0
@@ -318,7 +332,7 @@ def _normalize_inprocess(*, path: Path) -> _NormalizedInprocess:
             page_element_counts_by_page[pn] = counts
 
         # Table regions (independent of "page elements" model)
-        table_region_counts_by_page[pn] = _count_table_regions(rec.get("table_structure_v1"))
+        table_region_counts_by_page[pn] = _count_table_regions(rec.get("table") or rec.get("table_structure_v1"))
 
     # Document text: join in ascending page order (keeps comparison stable).
     document_text = "\n\n".join(text_by_page[p] for p in sorted(text_by_page.keys())).strip()
@@ -580,7 +594,7 @@ def _render_pdf_summary(
             per_page.add_column("page", justify="right", no_wrap=True)
             per_page.add_column("main (tables/charts/infographics)")
             per_page.add_column("inprocess page_elements_v3 (table/chart/infographic)")
-            per_page.add_column("inprocess table_regions(table_structure_v1)")
+            per_page.add_column("inprocess table_regions(table)")
             per_page.add_column("Status", no_wrap=True)
 
             shown = 0

@@ -116,6 +116,7 @@ def _error_record(
     This is used to prevent one PDF/page failure from aborting an entire Ray job.
     """
     return {
+        "path": source_path,
         "page_number": int(page_number),
         "text": "",
         "page_image": None,
@@ -231,6 +232,9 @@ def pdf_extraction(
 
                     extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
 
+                    # Default to empty so scanned/OCR pages don't hit a NameError below.
+                    text = ""
+
                     # Text extraction
                     if extract_text and not ocr_extraction_needed_for_text:
                         page_text = _extract_page_text(page)
@@ -250,6 +254,7 @@ def pdf_extraction(
                         render_info = _render_page_to_base64(page, dpi=dpi, image_format=image_format)
 
                     page_record: Dict[str, Any] = {
+                        "path": pdf_path,
                         "page_number": page_number,
                         "text": text if extract_text else "",
                         "page_image": None,

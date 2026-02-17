@@ -29,6 +29,7 @@ class LlamaNemotronEmbed1BV2Embedder:
     # which can explode attention-mask memory (O(seq_len^2)) and OOM the GPU.
     # max_length: int = 4096
     max_length: int = 8192
+    model_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         self._tokenizer = None
@@ -37,7 +38,7 @@ class LlamaNemotronEmbed1BV2Embedder:
 
         from transformers import AutoModel, AutoTokenizer
 
-        MODEL_ID = "nvidia/llama-nemotron-embed-1b-v2"
+        MODEL_ID = self.model_id or "nvidia/llama-3.2-nv-embedqa-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = self.hf_cache_dir or str(Path.home() / ".cache" / "huggingface")
         self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, cache_dir=hf_cache_dir)
@@ -77,9 +78,9 @@ class LlamaNemotronEmbed1BV2Embedder:
                     return_tensors="pt",
                 ).to(dev)
                 out = self._model(**batch)
-                lhs = out.last_hidden_state                          # [B, S, D]
-                mask = batch["attention_mask"].unsqueeze(-1)          # [B, S, 1]
-                vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)      # [B, D]
+                lhs = out.last_hidden_state  # [B, S, D]
+                mask = batch["attention_mask"].unsqueeze(-1)  # [B, S, 1]
+                vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)  # [B, D]
                 vec = vec.detach().to("cpu")
                 if self.normalize:
                     vec = _l2_normalize(vec)

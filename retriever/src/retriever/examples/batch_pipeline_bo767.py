@@ -15,12 +15,13 @@ LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
 
 ingestor = (
-    ingestor.files("/work/data/jp20/*.pdf")
+    ingestor.files("/work/data/bo767/*.pdf")
     .extract(
         extract_text=True,
         extract_tables=True,
         extract_charts=True,
-        extract_infographics=True,
+        #extract_infographics=True,
+        extract_infographics=False,
     )
     .embed(model_name="nemo_retriever_v1")
     .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
@@ -43,7 +44,7 @@ table = db.open_table(LANCEDB_TABLE)
 unique_basenames = table.to_pandas()["pdf_basename"].unique()
 print(f"Unique basenames: {unique_basenames}")
 
-query_csv = Path("jp20_query_gt.csv")
+query_csv = Path("bo767_query_gt.csv")
 cfg = RecallConfig(
     lancedb_uri=str(LANCEDB_URI),
     lancedb_table=str(LANCEDB_TABLE),
