@@ -6,10 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.ingest_config import load_ingest_config_section
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
@@ -176,7 +173,8 @@ def render_graphic_elements(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config file. If set, values are loaded from YAML; explicitly passed CLI flags override YAML.",
+        help="Optional YAML config file. If set, values are loaded from YAML; explicitly passed CLI flags override "
+        "YAML.",
     ),
     input_dir: Optional[Path] = typer.Option(
         None,

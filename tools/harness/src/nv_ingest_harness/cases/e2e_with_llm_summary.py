@@ -12,11 +12,11 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_harness.utils.cases import get_repo_root
 from nv_ingest_harness.utils.interact import (
     embed_info,
-    milvus_chunks,
     segment_results,
     kv_event_log,
-    pdf_page_count,
 )  # noqa: E402
+from nv_ingest_harness.utils.milvus import milvus_chunks
+from nv_ingest_harness.utils.pdf import pdf_page_count
 
 # Future: Will integrate with modular nv-ingest-harness-ingest when VDB upload is separated
 
@@ -63,6 +63,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         collection_name = get_recall_collection_name(test_name)
     hostname = config.hostname
     sparse = config.sparse
+    hybrid = config.hybrid
     gpu_search = config.gpu_search
 
     # Extraction configuration
@@ -94,6 +95,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"LLM Summarize Model: {llm_model}")
     print(f"Sparse: {sparse}, GPU search: {gpu_search}")
     print(f"VDB Backend: {config.vdb_backend}")
+    if config.vdb_backend == "lancedb":
+        print(f"Hybrid: {hybrid}")
     print(f"Extract text: {extract_text}, tables: {extract_tables}, charts: {extract_charts}")
     print(f"Extract images: {extract_images}, infographics: {extract_infographics}")
     print(f"Text depth: {text_depth}, table format: {table_output_format}")

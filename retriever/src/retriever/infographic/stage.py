@@ -9,10 +9,7 @@ import pandas as pd
 import typer
 from rich.console import Console
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.ingest_config import load_ingest_config_section
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema

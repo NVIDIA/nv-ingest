@@ -52,11 +52,12 @@ class TestConfig:
     helm_port_forwards: Optional[List[dict]] = None  # List of {service, local_port, remote_port}
 
     # Runtime configuration
-    sparse: bool = True
+    sparse: bool = False
     gpu_search: bool = False
     embedding_model: str = "auto"
     llm_summarization_model: str = "nvdev/nvidia/llama-3.1-nemotron-70b-instruct"
-    vdb_backend: str = "milvus"
+    vdb_backend: str = "lancedb"
+    hybrid: bool = False
 
     # Extraction configuration
     extract_text: bool = True
@@ -194,7 +195,9 @@ def load_config(config_file: str = "test_configs.yaml", case: Optional[str] = No
         FileNotFoundError: If config file doesn't exist
         ValueError: If configuration validation fails
     """
-    config_path = Path(__file__).resolve().parents[2] / config_file
+    config_path = Path(config_file)
+    if not config_path.is_absolute():
+        config_path = Path(__file__).resolve().parents[2] / config_file
 
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}\n")
@@ -316,6 +319,7 @@ def _load_env_overrides() -> dict:
         "HELM_NAMESPACE": ("helm_namespace", str),
         "HELM_VALUES_FILE": ("helm_values_file", str),
         "SPARSE": ("sparse", parse_bool),
+        "HYBRID": ("hybrid", parse_bool),
         "GPU_SEARCH": ("gpu_search", parse_bool),
         "EMBEDDING_NIM_MODEL_NAME": ("embedding_model", str),
         "LLM_SUMMARIZATION_MODEL": ("llm_summarization_model", str),

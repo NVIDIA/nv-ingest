@@ -10,15 +10,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import pandas as pd
 import yaml
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.ingest_config import load_ingest_config_section
 from retriever.pdf.config import load_pdf_extractor_schema_from_dict
 from retriever.pdf.io import pdf_files_to_ledger_df
 from rich.console import Console
 from tqdm import tqdm
 import typer
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
@@ -607,7 +604,7 @@ def render_page_elements(
     extractor_cfg: Dict[str, Any] = {}
     if method in {"pdfium", "pdfium_hybrid", "ocr"}:
         if not (yolox_grpc_endpoint or yolox_http_endpoint):
-            print(f"YOLOX NIM endpoints not set, using HuggingFace model instead.")
+            print("YOLOX NIM endpoints not set, using HuggingFace model instead.")
 
         extractor_cfg["pdfium_config"] = {
             "auth_token": auth_token,

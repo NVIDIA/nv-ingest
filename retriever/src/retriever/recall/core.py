@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import pandas as pd
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
-
-ensure_nv_ingest_api_importable()
-
 from nv_ingest_api.util.nim import infer_microservice
 
 

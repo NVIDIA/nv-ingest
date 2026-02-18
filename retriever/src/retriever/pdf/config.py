@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict
 
-from retriever._local_deps import ensure_nv_ingest_api_importable
 from retriever.config_utils import endpoints_from_yaml
-
-ensure_nv_ingest_api_importable()
 
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 
@@ -43,4 +40,3 @@ class PDFExtractionStageConfig:
     batch_size: int = 16
     # How we label metrics/spans for this stage.
     stage_name: str = "pdf_extraction"
-
