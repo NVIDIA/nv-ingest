@@ -10,6 +10,10 @@ cd tools/harness
 # Install the harness
 uv pip install -e .
 
+# Vanilla pip: install the harness with pip, then add nightly Nemotron from Test PyPI:
+#   pip install -e .   # (after installing nv-ingest, nv-ingest-api, nv-ingest-client)
+#   pip install -r nemotron-nightly.txt --force-reinstall --no-deps
+
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 uv run nv-ingest-harness-nightly
 
