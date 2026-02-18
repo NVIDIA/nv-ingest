@@ -48,8 +48,8 @@ class PDFiumConfigSchema(LowercaseProtocolMixin):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    nim_batch_size: int = 4
-    workers_per_progress_engine: int = 5
+    nim_batch_size: int = 8
+    workers_per_progress_engine: int = 12
 
     @model_validator(mode="before")
     @classmethod
@@ -137,7 +137,7 @@ class NemotronParseConfigSchema(LowercaseProtocolMixin):
 
     timeout: float = 300.0
 
-    workers_per_progress_engine: int = 5
+    workers_per_progress_engine: int = 12
 
     @model_validator(mode="before")
     @classmethod
