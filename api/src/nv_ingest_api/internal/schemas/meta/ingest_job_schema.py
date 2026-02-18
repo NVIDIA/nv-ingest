@@ -113,6 +113,8 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     prompt: Optional[str] = None
     system_prompt: Optional[str] = None
     model_name: Optional[str] = None
+    context_text_max_chars: Optional[int] = None
+    temperature: Optional[float] = None
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
