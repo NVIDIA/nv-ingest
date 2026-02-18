@@ -102,7 +102,6 @@ def embed_text_main_text_embed(
         embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
     )
 
-
     # # Retriever-local dataframe settings
     # text_column: str = "text"
     # write_embedding_to_metadata: bool = True
@@ -116,7 +115,7 @@ def embed_text_main_text_embed(
             task_config={
                 "embedder": _embed,
                 # "endpoint_url": "http://localhost:8012/v1",
-                "endpoint_url": None, # inprocess uses local HF embedder
+                "endpoint_url": None,  # inprocess uses local HF embedder
                 "local_batch_size": int(inference_batch_size),
             },
             transform_config=cfg,
@@ -134,6 +133,7 @@ def embed_text_main_text_embed(
 
     # Add backwards-compatible dim/has columns (these were produced by `embed_text_1b_v2`).
     if embedding_dim_column:
+
         def _dim(row: pd.Series) -> int:
             md = row.get("metadata")
             if isinstance(md, dict):
@@ -544,7 +544,10 @@ class InProcessIngestor(Ingestor):
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
         # the caller explicitly disables it.
         if "extract_page_as_image" not in extract_kwargs:
-            if any(extract_kwargs.get(k) is True for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")):
+            if any(
+                extract_kwargs.get(k) is True
+                for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")
+            ):
                 extract_kwargs["extract_page_as_image"] = True
         self._tasks.append((pdf_extraction, extract_kwargs))
 
@@ -583,7 +586,10 @@ class InProcessIngestor(Ingestor):
             print("Adding chart detection task")
             # Run chart detection only on cropped "chart" regions from page-elements.
             self._tasks.append(
-                (detect_graphic_elements_v1_from_page_elements_v3, _detect_kwargs_with_model(NemotronGraphicElementsV1()))
+                (
+                    detect_graphic_elements_v1_from_page_elements_v3,
+                    _detect_kwargs_with_model(NemotronGraphicElementsV1()),
+                )
             )
 
         if kwargs.get("extract_infographics") is True:
@@ -597,7 +603,6 @@ class InProcessIngestor(Ingestor):
             )
 
         return self
-
 
     def embed(self, **kwargs: Any) -> "InProcessIngestor":
         """
@@ -673,7 +678,6 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((upload_embeddings_to_lancedb_inprocess, dict(kwargs)))
         return self
 
-
     def ingest(
         self,
         show_progress: bool = False,
@@ -732,8 +736,13 @@ class InProcessIngestor(Ingestor):
 
             return pd.DataFrame(out_rows)
 
+        # Tasks that run once on combined results (after all docs). All others run per-doc.
+        _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
+        post_tasks = [(f, k) for f, k in self._tasks if f in _post_tasks]
+
         # Iterate through all configured documents; for each file build a per-page
-        # DataFrame and run pdf_extraction on it.
+        # DataFrame and run the per-doc task chain.
         results: list[Any] = []
         docs = list(self._documents)
         doc_iter = docs
@@ -743,14 +752,19 @@ class InProcessIngestor(Ingestor):
         for doc_path in doc_iter:
             pages_df = _pdf_to_pages_df(doc_path)
 
-            # If the pipeline was configured via .extract(...), use those kwargs.
             current: Any = pages_df
-            for func, kwargs in self._tasks:
+            for func, kwargs in per_doc_tasks:
                 if func is pdf_extraction:
                     current = func(pdf_binary=current, **kwargs)
                 else:
                     current = func(current, **kwargs)
             results.append(current)
+
+        # Run upload/save once on combined results so overwrite=True keeps full corpus.
+        if post_tasks and results and all(isinstance(r, pd.DataFrame) for r in results):
+            combined = pd.concat(results, ignore_index=True)
+            for func, kwargs in post_tasks:
+                combined = func(combined, **kwargs)
 
         _ = (show_progress, return_failures, save_to_disk, return_traces)  # reserved for future use
         return results
