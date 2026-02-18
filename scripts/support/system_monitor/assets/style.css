@@ -1,0 +1,137 @@
+/* Global fonts and tokens */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0f1115;
+  --surface: #151821;
+  --surface-2: #1b2030;
+  --text: #e5e7eb;
+  --text-muted: #9aa3b2;
+  --border: #2a2f3d;
+  --accent: #4f46e5;
+  --accent-2: #06b6d4;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius: 8px;
+  --shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.18);
+  --gap-xs: 4px; --gap-sm: 8px; --gap-md: 12px; --gap-lg: 16px; --gap-xl: 24px;
+}
+
+/* Light theme support via data-theme=light on body (optional) */
+body[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f6f7fb;
+  --surface-2: #eef1f7;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Layout */
+.grid { display: grid; grid-template-columns: 320px 1fr; gap: var(--gap-lg); align-items: start; }
+.sidebar {
+  position: sticky; top: var(--gap-lg);
+  padding: var(--gap-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.section-title { font-size: 16px; font-weight: 600; margin: var(--gap-sm) 0; }
+.label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; display: block; }
+.help, .muted { color: var(--text-muted); font-size: 12px; }
+.control { margin: var(--gap-md) 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--gap-md); margin: var(--gap-sm) 0 var(--gap-lg); }
+.graph { margin-bottom: var(--gap-lg); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--gap-sm); }
+
+/* Inputs & Buttons */
+input, textarea {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+button, .button {
+  appearance: none; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+button:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+
+/* Dash core components */
+/* RadioItems */
+input[type="radio"] { accent-color: var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); }
+
+/* Dropdown (react-select) */
+.Select-control { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+.Select--single > .Select-control .Select-value, .Select-placeholder { color: var(--text); }
+.Select-menu-outer { background: var(--surface-2); border-color: var(--border); color: var(--text); z-index: 1000; }
+.Select-option { background: var(--surface-2); color: var(--text); }
+.Select-option.is-focused { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+.Select-option.is-selected { background: color-mix(in srgb, var(--accent) 28%, var(--surface-2)); }
+
+/* Slider (rc-slider) */
+.rc-slider { padding: 6px 0; }
+.rc-slider-rail { background: var(--border); }
+.rc-slider-track { background: var(--accent); }
+.rc-slider-handle { border-color: var(--accent); background: #fff; }
+
+/* Tabs */
+.tabs, .dash-tabs { background: transparent; }
+.tab { background: var(--surface); border: 1px solid var(--border) !important; color: var(--text); border-radius: 6px 6px 0 0; margin-right: 4px; padding: 8px 12px; }
+.tab--selected { border-bottom-color: transparent !important; background: var(--surface-2); }
+
+/* Upload */
+.dccUpload { border: 1px dashed var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text-muted); }
+
+/* Cytoscape container */
+#proctree-cyto-container { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+#proctree-graph { background: var(--surface); }
+
+/* Helper spacing */
+hr { border: none; border-top: 1px solid var(--border); margin: var(--gap-md) 0; opacity: 0.7; }
+
+/* Plotly figure background harmonization */
+.js-plotly-plot .plotly .bg, .js-plotly-plot .plotly .bglayer, .js-plotly-plot .plotly .plot { background: transparent !important; }
+.js-plotly-plot .plotly .infolayer { color: var(--text); }
+
+/* Sidebar spacing & control layout improvements */
+/* Add breathing room between stacked elements inside controls */
+.sidebar .control > *:not(:last-child) { margin-bottom: var(--gap-sm); }
+
+/* Space out button groups (e.g., Start/Stop/Reset/Snapshot) */
+.sidebar .control button,
+.sidebar .control .button { margin-right: var(--gap-sm); margin-bottom: var(--gap-sm); }
+
+/* Make text/number inputs full-width and comfortable in the sidebar */
+.sidebar .control input[type="text"],
+.sidebar .control input[type="number"] { width: 100%; box-sizing: border-box; }
+
+/* RadioItems and Checklist: wrap and space options nicely */
+.sidebar .control .dash-radio-items,
+.sidebar .control .dash-checklist { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.sidebar .control .dash-radio-items label,
+.sidebar .control .dash-checklist label { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Upload widget spacing */
+.sidebar .control .dccUpload { margin-top: var(--gap-sm); }
+
+/* Details sections: subtle separators and clickable summaries */
+.sidebar details { padding: 8px 0; border-top: 1px solid var(--border); }
+.sidebar details:first-of-type { border-top: none; }
+.sidebar details > summary { cursor: pointer; padding: 6px 0; }
