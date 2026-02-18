@@ -71,6 +71,8 @@ class RayStatsCollector:
 
         self._cumulative_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"processed": 0})
         self.ema_memory_per_replica: Dict[str, float] = {}  # EMA of memory per replica
+        self._consecutive_actor_timeouts: Dict[Tuple[str, str], int] = defaultdict(int)
+        self._actor_timeout_quarantine_threshold: int = 3
 
         logger.debug(
             f"RayStatsCollector initialized (Interval: {self._interval}s, "
@@ -79,6 +81,44 @@ class RayStatsCollector:
         )
 
         # --- Helper function to be run in threads ---
+
+    @staticmethod
+    def _actor_key(actor: Any) -> str:
+        """Returns a stable key for actor timeout accounting."""
+        try:
+            actor_id = getattr(actor, "_actor_id", None)
+            if actor_id is not None and hasattr(actor_id, "hex"):
+                return actor_id.hex()
+        except Exception:
+            pass
+        return repr(actor)
+
+    def _record_actor_unhealthy(self, stage_name: str, actor: Any, reason: str) -> None:
+        """
+        Records consecutive unhealthy samples and quarantines after threshold.
+        """
+        actor_key = self._actor_key(actor)
+        timeout_key = (stage_name, actor_key)
+        self._consecutive_actor_timeouts[timeout_key] += 1
+        consecutive_unhealthy = self._consecutive_actor_timeouts[timeout_key]
+        logger.warning(
+            f"[StatsCollectNow] Actor {actor} in stage '{stage_name}' unhealthy "
+            f"{consecutive_unhealthy} consecutive cycle(s): {reason}."
+        )
+
+        if consecutive_unhealthy >= self._actor_timeout_quarantine_threshold:
+            logger.error(
+                f"[StatsCollectNow] Quarantining actor {actor} in stage '{stage_name}' "
+                f"after {consecutive_unhealthy} consecutive unhealthy cycles."
+            )
+            try:
+                if hasattr(self._pipeline, "quarantine_actor"):
+                    self._pipeline.quarantine_actor(stage_name, actor, kill_actor=True)
+            except Exception as e:
+                logger.error(
+                    f"[StatsCollectNow] Failed to quarantine actor {actor} " f"in stage '{stage_name}': {e}",
+                    exc_info=True,
+                )
 
     def _get_qsize_sync(self, q_name: str, queue_actor: Any) -> Tuple[str, int]:
         """Safely calls qsize() on a queue actor and returns name + size/-1."""
@@ -260,6 +300,8 @@ class RayStatsCollector:
             logger.error(f"[StatsCollectNow] Failed to get pipeline structure: {e}", exc_info=True)
             return {}, 0, False
 
+        _source_sink_stages = {s.name for s in current_stages if s.is_source or s.is_sink}
+
         logger.debug(f"[StatsCollectNow] Starting collection for {len(current_stages)} stages.")
 
         # --- 1. Prepare Actor Stat Requests ---
@@ -283,6 +325,7 @@ class RayStatsCollector:
                     logger.error(
                         f"[StatsCollectNow] Failed to initiate get_stats for actor {actor}: {e}", exc_info=True
                     )
+                    self._record_actor_unhealthy(stage_name, actor, reason="remote_call_failed")
                     overall_success = False
 
         logger.debug(f"[StatsCollectNow] Initiated {len(actor_tasks)} actor stat requests.")
@@ -308,6 +351,15 @@ class RayStatsCollector:
                     actor, stage_name = actor_tasks[ref]
                     try:
                         stats = ray.get(ref)
+
+                        thread_alive = stats.get("processing_thread_alive", True)
+                        if not thread_alive and stage_name not in _source_sink_stages:
+                            self._record_actor_unhealthy(stage_name, actor, reason="processing_thread_dead")
+                            overall_success = False
+                            continue
+
+                        actor_key = self._actor_key(actor)
+                        self._consecutive_actor_timeouts[(stage_name, actor_key)] = 0
                         active = int(stats.get("active_processing", 0))
                         delta = int(stats.get("delta_processed", 0))
                         memory_mb = float(stats.get("memory_mb", 0.0))
@@ -325,11 +377,15 @@ class RayStatsCollector:
                         logger.warning(
                             f"[StatsCollectNow] Error getting stats for actor {actor} (Stage '{stage_name}'): {e}"
                         )
+                        self._record_actor_unhealthy(stage_name, actor, reason="get_stats_error")
                         overall_success = False
 
                 if remaining_refs:
                     logger.warning(f"[StatsCollectNow] {len(remaining_refs)} actor stats requests timed out.")
                     overall_success = False
+                    for ref in remaining_refs:
+                        actor, stage_name = actor_tasks[ref]
+                        self._record_actor_unhealthy(stage_name, actor, reason="stats_timeout")
 
             except Exception as e:
                 logger.error(f"[StatsCollectNow] Error during actor stats collection: {e}", exc_info=True)

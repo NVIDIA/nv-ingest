@@ -59,6 +59,7 @@ class PipelineTopology:
         self._scaling_state: Dict[str, str] = {}  # Map: stage_name -> "Idle" | "Scaling Up" | "Scaling Down" | "Error"
         self._stage_memory_overhead: Dict[str, float] = {}  # Populated during build/config
         self._actors_pending_removal: Set[Tuple[str, Any]] = set()
+        self._quarantined_actors: Set[Tuple[str, Any]] = set()
 
         # --- Operational State ---
         self._is_flushing: bool = False
@@ -85,6 +86,7 @@ class PipelineTopology:
             self._scaling_state.clear()
             self._stage_memory_overhead.clear()
             self._actors_pending_removal.clear()
+            self._quarantined_actors.clear()
             self._stages.clear()
             self._connections.clear()
         except Exception as e:
@@ -185,6 +187,28 @@ class PipelineTopology:
             self._actors_pending_removal.add((stage_name, actor))
             logger.debug(f"Marked actor {actor} from stage {stage_name} for removal.")
 
+    def quarantine_actor(self, stage_name: str, actor: Any) -> bool:
+        """
+        Quarantines an unhealthy actor by removing it from active stage scheduling.
+
+        Returns
+        -------
+        bool
+            True if actor was removed from the active stage list, False otherwise.
+        """
+        with self._lock:
+            stage_actors = self._stage_actors.get(stage_name, [])
+            if actor not in stage_actors:
+                logger.debug(f"Actor {actor} not present in active stage '{stage_name}' during quarantine.")
+                return False
+
+            stage_actors.remove(actor)
+            self._quarantined_actors.add((stage_name, actor))
+            logger.warning(
+                f"Quarantined actor {actor} from stage '{stage_name}'. Active count now {len(stage_actors)}."
+            )
+            return True
+
     def start_cleanup_thread(self, interval: int = 5) -> None:
         """Starts the background thread for periodic cleanup tasks."""
         if self._cleanup_thread is None or not self._cleanup_thread.is_alive():
@@ -277,6 +301,7 @@ class PipelineTopology:
             self._stage_actors.clear()
             self._edge_queues.clear()
             self._scaling_state.clear()
+            self._quarantined_actors.clear()
             self._is_flushing = False  # Reset flushing state too
 
             logger.debug("Cleared runtime state (actors, queues, scaling state, flushing flag).")
@@ -326,6 +351,14 @@ class PipelineTopology:
         """Returns a copy of the stage actors dictionary (with copies of actor lists)."""
         with self._lock:
             return {name: list(actors) for name, actors in self._stage_actors.items()}
+
+    def get_quarantined_actors(self) -> Dict[str, List[Any]]:
+        """Returns quarantined actors grouped by stage name."""
+        with self._lock:
+            grouped: Dict[str, List[Any]] = {}
+            for stage_name, actor in self._quarantined_actors:
+                grouped.setdefault(stage_name, []).append(actor)
+            return grouped
 
     def get_actor_count(self, stage_name: str) -> int:
         """Returns the number of actors for a specific stage."""
