@@ -690,6 +690,15 @@ class InProcessIngestor(Ingestor):
             ocr_flags["extract_tables"] = True
         if kwargs.get("extract_charts") is True:
             ocr_flags["extract_charts"] = True
+            print("Adding chart detection task")
+            # Run chart detection only on cropped "chart" regions from page-elements.
+            self._tasks.append(
+                (
+                    detect_graphic_elements_v1_from_page_elements_v3,
+                    _detect_kwargs_with_model(NemotronGraphicElementsV1()),
+                )
+            )
+
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
 
@@ -860,8 +869,13 @@ class InProcessIngestor(Ingestor):
 
             return pd.DataFrame(out_rows)
 
+        # Tasks that run once on combined results (after all docs). All others run per-doc.
+        _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
+        post_tasks = [(f, k) for f, k in self._tasks if f in _post_tasks]
+
         # Iterate through all configured documents; for each file build a per-page
-        # DataFrame and run pdf_extraction on it.
+        # DataFrame and run the per-doc task chain.
         results: list[Any] = []
         docs = list(self._documents)
         doc_iter = docs
@@ -871,14 +885,19 @@ class InProcessIngestor(Ingestor):
         for doc_path in doc_iter:
             pages_df = _pdf_to_pages_df(doc_path)
 
-            # If the pipeline was configured via .extract(...), use those kwargs.
             current: Any = pages_df
-            for func, kwargs in self._tasks:
+            for func, kwargs in per_doc_tasks:
                 if func is pdf_extraction:
                     current = func(pdf_binary=current, **kwargs)
                 else:
                     current = func(current, **kwargs)
             results.append(current)
+
+        # Run upload/save once on combined results so overwrite=True keeps full corpus.
+        if post_tasks and results and all(isinstance(r, pd.DataFrame) for r in results):
+            combined = pd.concat(results, ignore_index=True)
+            for func, kwargs in post_tasks:
+                combined = func(combined, **kwargs)
 
         _ = (show_progress, return_failures, save_to_disk, return_traces)  # reserved for future use
         return results
