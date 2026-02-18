@@ -21,12 +21,10 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
-from retriever.infographic.infographic_detection import detect_infographic_elements_v1_from_page_elements_v3
-from retriever.model.local import NemotronGraphicElementsV1, NemotronPageElementsV3, NemotronTableStructureV1
+from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
-from retriever.table.table_structure import detect_table_structure_v1_from_page_elements_v3
+from retriever.ocr.ocr import ocr_page_elements
 from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
@@ -45,11 +43,112 @@ except Exception:  # pragma: no cover
 from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
 
+_CONTENT_COLUMNS = ("table", "chart", "infographic")
+
+
+def _combine_text_with_content(row, text_column, content_columns):
+    """Combine page text with OCR content text for embedding."""
+    parts = []
+    base = row.get(text_column)
+    if isinstance(base, str) and base.strip():
+        parts.append(base.strip())
+    for col in content_columns:
+        content_list = row.get(col)
+        if isinstance(content_list, list):
+            for item in content_list:
+                if isinstance(item, dict):
+                    t = item.get("text", "")
+                    if isinstance(t, str) and t.strip():
+                        parts.append(t.strip())
+    return "\n\n".join(parts) if parts else ""
+
+
+def _deep_copy_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Shallow-copy a row dict but deep-copy any nested mutable values.
+
+    This avoids the problem where multiple exploded rows share the same
+    metadata dict reference, causing later embedding writes to overwrite
+    earlier ones.  We only deep-copy dicts and lists (the common mutable
+    types in row data); scalars and strings are immutable and safe to share.
+    """
+    import copy
+
+    out: Dict[str, Any] = {}
+    for k, v in row_dict.items():
+        if isinstance(v, (dict, list)):
+            out[k] = copy.deepcopy(v)
+        else:
+            out[k] = v
+    return out
+
+
+def explode_content_to_rows(
+    batch_df: Any,
+    *,
+    text_column: str = "text",
+    content_columns: Sequence[str] = _CONTENT_COLUMNS,
+) -> Any:
+    """Expand each page row into multiple rows for per-element embedding.
+
+    For each row in *batch_df*:
+    - One row with the original page text (``text_column``).
+    - One additional row per table / chart / infographic item whose
+      ``"text"`` field is non-empty.  The item text replaces
+      ``text_column`` so the downstream embedding stage embeds each
+      element independently.
+
+    This mirrors the nv-ingest pipeline where every structural element
+    gets its own embedding vector, improving recall for queries that
+    target specific tables or charts.
+
+    If a row has no page text *and* no structured content, the original
+    row is preserved as-is to maintain batch shape.
+    """
+    if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
+        return batch_df
+
+    # Fast path: if none of the content columns exist there is nothing to explode.
+    if not any(c in batch_df.columns for c in content_columns):
+        return batch_df
+
+    new_rows: List[Dict[str, Any]] = []
+    for _, row in batch_df.iterrows():
+        row_dict = row.to_dict()
+        exploded_any = False
+
+        # Row for page text.
+        page_text = row_dict.get(text_column)
+        if isinstance(page_text, str) and page_text.strip():
+            new_rows.append(_deep_copy_row(row_dict))
+            exploded_any = True
+
+        # One row per structured content item.
+        for col in content_columns:
+            content_list = row_dict.get(col)
+            if not isinstance(content_list, list):
+                continue
+            for item in content_list:
+                if not isinstance(item, dict):
+                    continue
+                t = item.get("text", "")
+                if not isinstance(t, str) or not t.strip():
+                    continue
+                content_row = _deep_copy_row(row_dict)
+                content_row[text_column] = t.strip()
+                new_rows.append(content_row)
+                exploded_any = True
+
+        # Preserve row if nothing was exploded (no text, no content).
+        if not exploded_any:
+            new_rows.append(row_dict)
+
+    return pd.DataFrame(new_rows).reset_index(drop=True)
+
 
 def embed_text_main_text_embed(
     batch_df: Any,
     *,
-    model: Any,
+    model: Any = None,
     # Keep compatibility with previous `embed_text_1b_v2` signature so `.embed(...)` kwargs
     # don't need to change for inprocess mode.
     model_name: Optional[str] = None,
@@ -70,21 +169,34 @@ def embed_text_main_text_embed(
     - `has_embedding_column` (bool)
 
     It also writes `metadata.embedding` for compatibility with downstream uploaders.
-    """
-    _ = (model_name, embedding_endpoint)  # reserved for future remote execution support
 
+    When *embedding_endpoint* is set (e.g. ``"http://embedding:8000/v1"``), a remote
+    NIM endpoint is used instead of the local HF model.  The NIM handles prefixing
+    (``input_type="passage"``) server-side.
+    """
     if not isinstance(batch_df, pd.DataFrame):
         raise NotImplementedError("embed_text_main_text_embed currently only supports pandas.DataFrame input.")
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
 
+    # Resolve endpoint: strip whitespace, treat empty string as None.
+    _endpoint = (embedding_endpoint or "").strip() or None
+
+    if _endpoint is None and model is None:
+        raise ValueError("Either a local model or an embedding_endpoint must be provided.")
+
     # Build an embedder callable compatible with `create_text_embeddings_for_df`.
-    def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
-        vecs = model.embed(list(texts), batch_size=int(inference_batch_size))
-        tolist = getattr(vecs, "tolist", None)
-        if callable(tolist):
-            return tolist()
-        return vecs  # type: ignore[return-value]
+    # Only used when running with a local model (no NIM endpoint).
+    _embed = None
+    if _endpoint is None and model is not None:
+
+        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
+            prefixed = [f"passage: {t}" for t in texts]
+            vecs = model.embed(prefixed, batch_size=int(inference_batch_size))
+            tolist = getattr(vecs, "tolist", None)
+            if callable(tolist):
+                return tolist()
+            return vecs  # type: ignore[return-value]
 
     cfg = TextEmbeddingConfig(
         text_column=str(text_column),
@@ -98,24 +210,20 @@ def embed_text_main_text_embed(
         input_type="passage",
         truncate="END",
         dimensions=None,
-        embedding_nim_endpoint="http://localhost:8012/v1",
-        embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_nim_endpoint=_endpoint or "http://localhost:8012/v1",
+        embedding_model=model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
     )
 
-    # # Retriever-local dataframe settings
-    # text_column: str = "text"
-    # write_embedding_to_metadata: bool = True
-    # metadata_column: str = "metadata"
-    # # Optional extra output column containing a payload dict (similar to embed_text_1b_v2)
-    # output_payload_column: Optional[str] = None
+    # Rows should already be exploded (one row per page text / table / chart)
+    # by ``explode_content_to_rows`` before reaching this stage.
+    embed_df = batch_df
 
     try:
         out_df, _info = create_text_embeddings_for_df(
-            batch_df,
+            embed_df,
             task_config={
                 "embedder": _embed,
-                # "endpoint_url": "http://localhost:8012/v1",
-                "endpoint_url": None,  # inprocess uses local HF embedder
+                "endpoint_url": _endpoint,
                 "local_batch_size": int(inference_batch_size),
             },
             transform_config=cfg,
@@ -150,6 +258,7 @@ def embed_text_main_text_embed(
         out_df[embedding_dim_column] = [0 for _ in range(len(out_df.index))]
 
     out_df[has_embedding_column] = [bool(int(d) > 0) for d in out_df[embedding_dim_column].tolist()]
+
     return out_df
 
 
@@ -258,25 +367,25 @@ def save_dataframe_to_disk_json(df: Any, *, output_directory: str) -> Any:
 
 
 def _extract_embedding_from_row(
-    row: pd.Series,
+    row: Any,
     *,
     embedding_column: str = "text_embeddings_1b_v2",
     embedding_key: str = "embedding",
 ) -> Optional[List[float]]:
     """
-    Extract an embedding vector from a row.
+    Extract an embedding vector from a row (namedtuple or pd.Series).
 
     Supports:
     - `metadata.embedding` (preferred if present)
     - `embedding_column` payloads like `{"embedding": [...], ...}` (from `embed_text_1b_v2`)
     """
-    meta = row.get("metadata")
+    meta = getattr(row, "metadata", None)
     if isinstance(meta, dict):
         emb = meta.get("embedding")
         if isinstance(emb, list) and emb:
             return emb  # type: ignore[return-value]
 
-    payload = row.get(embedding_column)
+    payload = getattr(row, embedding_column, None)
     if isinstance(payload, dict):
         emb = payload.get(embedding_key)
         if isinstance(emb, list) and emb:
@@ -284,25 +393,25 @@ def _extract_embedding_from_row(
     return None
 
 
-def _extract_source_path_and_page(row: pd.Series) -> Tuple[str, int]:
+def _extract_source_path_and_page(row: Any) -> Tuple[str, int]:
     """
     Best-effort extract of source path and page number for LanceDB row metadata.
     """
     path = ""
     page = -1
 
-    v = row.get("path")
+    v = getattr(row, "path", None)
     if isinstance(v, str) and v.strip():
         path = v.strip()
 
-    v = row.get("page_number")
+    v = getattr(row, "page_number", None)
     try:
         if v is not None:
             page = int(v)
     except Exception:
         pass
 
-    meta = row.get("metadata")
+    meta = getattr(row, "metadata", None)
     if isinstance(meta, dict):
         sp = meta.get("source_path")
         if isinstance(sp, str) and sp.strip():
@@ -363,7 +472,7 @@ def upload_embeddings_to_lancedb_inprocess(
         raise TypeError(f"upload_embeddings_to_lancedb_inprocess expects pandas.DataFrame, got {type(df)!r}")
 
     rows: List[Dict[str, Any]] = []
-    for _, r in df.iterrows():
+    for r in df.itertuples(index=False):
         emb = _extract_embedding_from_row(r, embedding_column=str(embedding_column), embedding_key=str(embedding_key))
         if emb is None:
             continue
@@ -395,7 +504,7 @@ def upload_embeddings_to_lancedb_inprocess(
         }
 
         if include_text:
-            t = r.get(text_column)
+            t = getattr(r, text_column, None)
             row_out["text"] = str(t) if isinstance(t, str) else ""
         else:
             # Still include the column for compatibility with the recall script's `.select(["text",...])`.
@@ -575,14 +684,12 @@ class InProcessIngestor(Ingestor):
             print("Adding page elements task")
             self._tasks.append((detect_page_elements_v3, _detect_kwargs_with_model(define_model("page_element_v3"))))
 
+        # OCR-based extraction for tables/charts/infographics.
+        ocr_flags = {}
         if kwargs.get("extract_tables") is True:
-            print("Adding table structure task")
-            # Run table structure only on cropped "table" regions from page-elements.
-            self._tasks.append(
-                (detect_table_structure_v1_from_page_elements_v3, _detect_kwargs_with_model(NemotronTableStructureV1()))
-            )
-
+            ocr_flags["extract_tables"] = True
         if kwargs.get("extract_charts") is True:
+            ocr_flags["extract_charts"] = True
             print("Adding chart detection task")
             # Run chart detection only on cropped "chart" regions from page-elements.
             self._tasks.append(
@@ -593,31 +700,56 @@ class InProcessIngestor(Ingestor):
             )
 
         if kwargs.get("extract_infographics") is True:
-            print("Adding infographic detection task")
-            # Run infographic detection only on cropped "infographic"/"title" regions from page-elements.
-            self._tasks.append(
-                (
-                    detect_infographic_elements_v1_from_page_elements_v3,
-                    _detect_kwargs_with_model(NemotronGraphicElementsV1()),
+            ocr_flags["extract_infographics"] = True
+
+        if ocr_flags:
+            print("Adding OCR extraction task")
+            ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
+            if not ocr_model_dir:
+                raise RuntimeError(
+                    "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
+                    "the path of the Nemotron OCR v1 model directory."
                 )
-            )
+            self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
 
         return self
 
     def embed(self, **kwargs: Any) -> "InProcessIngestor":
         """
-        Configure embedding for in-process execution (skeleton).
+        Configure embedding for in-process execution.
 
         This records an embedding task so call sites can chain `.embed(...)`
-        after `.extract(...)`. The current implementation is a no-op placeholder.
+        after `.extract(...)`.
+
+        When ``embedding_endpoint`` is provided (e.g.
+        ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
+        embedding instead of the local HF model.
         """
-        # NOTE: inprocess mode uses a local HF embedder (no microservice).
-        # Allow callers to control device / max_length to avoid OOMs.
+        # Explode content rows before embedding so each table/chart/infographic
+        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        self._tasks.append((explode_content_to_rows, {}))
+
         embed_kwargs = dict(kwargs)
+
+        # If a remote NIM endpoint is configured, skip local model creation.
+        endpoint = (embed_kwargs.get("embedding_endpoint") or "").strip()
+        if endpoint:
+            embed_kwargs.setdefault("input_type", "passage")
+            self._tasks.append((embed_text_main_text_embed, embed_kwargs))
+            return self
+
+        # Local HF embedder path.
+        # Allow callers to control device / max_length to avoid OOMs.
         device = embed_kwargs.pop("device", None)
         hf_cache_dir = embed_kwargs.pop("hf_cache_dir", None)
         normalize = bool(embed_kwargs.pop("normalize", True))
-        max_length = int(embed_kwargs.pop("max_length", 4096))
+        max_length = int(embed_kwargs.pop("max_length", 8192))
+
+        # model_name may be a NIM alias (e.g. "nemo_retriever_v1") or a real HF
+        # repo ID (e.g. "nvidia/llama-3.2-nv-embedqa-1b-v2"). Only forward it as
+        # model_id when it looks like an HF repo (contains "/").
+        model_name_raw = embed_kwargs.pop("model_name", None)
+        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
 
         embed_kwargs.setdefault("input_type", "passage")
         embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
@@ -625,6 +757,7 @@ class InProcessIngestor(Ingestor):
             hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
             normalize=normalize,
             max_length=max_length,
+            model_id=model_id,
         )
         self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self

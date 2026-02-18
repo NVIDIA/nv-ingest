@@ -46,11 +46,9 @@ class NemotronPageElementsV3(HuggingFaceModel):
                 x = torch.from_numpy(np.ascontiguousarray(arr)).permute(2, 0, 1)
             else:
                 x = torch.from_numpy(np.ascontiguousarray(arr))
-            # Normalize dtype/range.
-            if x.dtype == torch.uint8:
-                x = x.to(dtype=torch.float32) / 255.0
-            else:
-                x = x.to(dtype=torch.float32)
+            # Keep 0-255 range: resize_pad pads with 114.0 (designed for 0-255),
+            # and YoloXWrapper.forward() handles the 0-255 → model-input conversion.
+            x = x.to(dtype=torch.float32)
         else:
             raise TypeError(f"Expected torch.Tensor or np.ndarray, got {type(tensor)!r}")
 
@@ -83,6 +81,11 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
+    def __call__(
+        self, input_data: torch.Tensor, orig_shape: Union[Tuple[int, int], Sequence[Tuple[int, int]]]
+    ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
+        return self.invoke(input_data, orig_shape)
+
     def invoke(
         self, input_data: torch.Tensor, orig_shape: Union[Tuple[int, int], Sequence[Tuple[int, int]]]
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
@@ -110,9 +113,11 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         # return cast(Dict[str, torch.Tensor], preds0)
 
-    def postprocess(
-        self, preds: Union[Dict[str, torch.Tensor], Sequence[Dict[str, torch.Tensor]]]
-    ) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], Union[torch.Tensor, List[torch.Tensor]], Union[torch.Tensor, List[torch.Tensor]]]:
+    def postprocess(self, preds: Union[Dict[str, torch.Tensor], Sequence[Dict[str, torch.Tensor]]]) -> Tuple[
+        Union[torch.Tensor, List[torch.Tensor]],
+        Union[torch.Tensor, List[torch.Tensor]],
+        Union[torch.Tensor, List[torch.Tensor]],
+    ]:
         if self._model is None:
             raise RuntimeError("Local page_elements_v3 model was not initialized.")
 
