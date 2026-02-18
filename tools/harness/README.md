@@ -782,7 +782,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
 
 ### GPU-Specific Configuration (SKU Override)
 
-The harness supports GPU-specific configuration overrides for Docker Compose deployments via the `--sku` option:
+The harness supports GPU-specific configuration overrides via the `--sku` option for both Docker Compose and Helm deployments:
 
 ```bash
 # A10G GPU settings
@@ -796,15 +796,10 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a100-40g
 ```
 
 **How it works:**
-- Loads GPU-specific override file: `docker-compose.<sku>.yaml`
-- Merges with base `docker-compose.yaml` configuration
-- Override settings take precedence (typically batch sizes, memory limits, etc.)
-- Only applies to Docker Compose deployments (ignored for Helm)
+- **Compose:** Loads `docker-compose.<sku>.yaml` and merges with base `docker-compose.yaml` (override takes precedence).
+- **Helm:** Loads `helm/overrides/values-<sku>.yaml` via `helm upgrade -f`; merged with chart defaults (and any `helm_values_file` / `helm_values` still override).
 
-**Available SKUs:**
-- `a10g` - NVIDIA A10G GPU settings
-- `l40s` - NVIDIA L40S GPU settings
-- `a100-40gb` - NVIDIA A100 40GB GPU settings
+**Available SKUs:** `a10g` (NVIDIA A10G), `l40s` (NVIDIA L40S), `a100-40gb` (NVIDIA A100 40GB).
 
 ## Nightly Benchmarks
 
