@@ -49,14 +49,15 @@ dependencies = [
   "transformers>=4.49.0,<5.0.0",
   "tokenizers>=0.20.3,<0.22.0",
   # TensorRT support (keep Torch/TorchVision versions aligned; mismatch breaks torchvision C++ ops like nms)
-  "torch~=2.9.0",
+  "torch~=2.9.1",
   "torchvision>=0.24,<0.25",
   "einops",
   "easydict",
   "addict",
-  "nemotron-page-elements-v3==3.0.1",
-  "nemotron-graphic-elements-v1==1.0.0",
-  "nemotron-table-structure-v1==1.0.0",
+  "nemotron-page-elements-v3>=0.dev0",
+  "nemotron-graphic-elements-v1>=0.dev0",
+  "nemotron-table-structure-v1>=0.dev0",
+  "nemotron-ocr>=0.dev0",
 ]
 
 [project.optional-dependencies]
@@ -72,6 +73,22 @@ retriever = "retriever.__main__:main"
 nv-ingest = { path = "../src/", editable = true }
 nv-ingest-api = { path = "../api/", editable = true }
 nv-ingest-client = { path = "../client/", editable = true }
+nemotron-page-elements-v3 = { index = "test-pypi" }
+nemotron-graphic-elements-v1 = { index = "test-pypi" }
+nemotron-table-structure-v1 = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
+torch = { index = "torch-cuda"}
+torchvision = { index ="torch-cuda"}
+
+[[tool.uv.index]]
+name = "test-pypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-cuda"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
