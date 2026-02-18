@@ -520,7 +520,6 @@ def _convert_pdfium_page_to_numpy_for_parser(
         render_dpi=render_dpi,
         scale_tuple=scale_tuple,
         padding_tuple=padding_tuple,
-        render_rev_byteorder=True,
     )
 
     return page_images[0], padding_offsets[0]
@@ -535,7 +534,6 @@ def _convert_pdfium_page_to_numpy_for_yolox(
         [page],
         scale_tuple=scale_tuple,
         padding_tuple=padding_tuple,
-        render_rev_byteorder=True,
     )
 
     return page_images[0], padding_offsets[0]
