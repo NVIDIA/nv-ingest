@@ -31,6 +31,10 @@ DATASET_BASELINES: dict[str, dict[str, dict[str, Any]]] = {
             "min": 0.80,  # observed: 0.910
         },
     },
+    "jp20": {
+        "result_count": {"expected": 20, "required": True},
+        "failure_count": {"expected": 0, "required": True},
+    },
     "earnings": {
         "result_count": {"expected": 514, "required": True},
         "total_pages": {"expected": 12988, "required": True},

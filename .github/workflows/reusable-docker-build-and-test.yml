@@ -11,7 +11,7 @@ on:
         description: 'Dockerfile target to build'
         required: false
         type: string
-        default: 'runtime'
+        default: 'test'
       tags:
         description: 'Docker image tag(s), comma-separated (first tag is used for running tests)'
         required: true
