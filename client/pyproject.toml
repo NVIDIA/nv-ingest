@@ -14,7 +14,7 @@ authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
 ]
 license = {file = "LICENSE"}
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3.11",
     "Operating System :: OS Independent",
