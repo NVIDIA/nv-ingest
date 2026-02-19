@@ -27,30 +27,48 @@ requirements:
     - python=3.12.11
     - setuptools>=78.1.1
   run:
-    - azure-core>=1.32.0
+    - aiohttp
+    - backoff==2.2.1
+    - diskcache>=5.6.3
     - fastparquet>=2024.11.0
-    - fsspec>=2024.10.0
-    - httpx>=0.28.1
-    - isodate>=0.7.2
+    - ffmpeg-python==0.2.0
+    - fsspec>=2025.5.1
+    - glom
+    - grpcio
     - langdetect>=1.0.9
-    - protobuf=5.29.3
+    - librosa==0.10.2
+    - minio>=7.2.12
+    - numpy
+    - pandas>=2.0
+    - pillow
+    - protobuf>=5.29.3  # intentional pin
     - pydantic>=2.0.0
+    - py-opencv
     - pypdfium2>=4.30.0
-    - pytest>=8.0.2
-    - pytest-mock>=3.14.0
     - python>=3.12.11
+    - python-dateutil
     - python-docx>=1.1.2
-    - python-dotenv>=1.0.1
-    - python-magic>=0.4.27
     - python-pptx>=1.0.2
+    - redis-py>=5.2.1
     - requests>=2.28.2
-    - setuptools>=78.1.1
-    - tabulate>=0.9.0
-    - transformers>=4.57.3
-    - universal-pathlib
-    # - unstructured-client>=0.25.9
+    - scikit-learn>=1.6.0
+    - scipy>=1.15.1
+    - tqdm>=4.67.1
+    - transformers>=4.47.0
+    - universal-pathlib>=0.2.6
+  pip:
+    - nvidia-riva-client==2.20.0
+    - markitdown
+    - pymilvus>=2.5.10
+    - tritonclient
+    - unstructured-client
+  # Note: gpu extras (cudf) and llm extras (openai) are not available via conda; install via pip
 
   test:
+    requires:
+      - pytest>=8.0.2
+      - pytest-mock>=3.14.0
+      - moviepy==2.2.1
     commands:
       - pytest ./tests
 
