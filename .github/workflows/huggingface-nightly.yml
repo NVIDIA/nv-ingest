@@ -129,7 +129,7 @@ jobs:
       # IMPORTANT: CUDA toolkit must match the CUDA version PyTorch was built with
       # (the nemotron-ocr build environment currently pulls a PyTorch CUDA 12.8 build).
       # Use a PyTorch+CUDA "devel" image to avoid downloading huge torch wheels during build.
-      image: pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel
+      image: pytorch/pytorch:2.9.1-cuda13.0-cudnn9-devel
     steps:
       - name: Install system deps (git, lfs, build tools)
         shell: bash
