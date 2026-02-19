@@ -2,46 +2,11 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Unit tests for the public PDF extraction interface layer (no live services required).
-
-These tests cover the kwarg-name contract between the public API functions and the
-internal Pydantic schemas, specifically the auth_token rename that fixed the silent
-token-drop bug (see: pdf-extract-fix-token-kwarg).
-
-Root-cause recap
-----------------
-The public functions previously declared ``yolox_auth_token`` while the Pydantic
-schemas (PDFiumConfigSchema, NemotronParseConfigSchema) defined the field as
-``auth_token``.  The decorator ``extraction_interface_relay_constructor`` filters
-kwargs to only those present in the schema's model_fields, so the misnamed kwarg
-was silently dropped — the token never reached the backend.
-
-What is tested here
--------------------
-1. Schema-field sanity: both schemas expose ``auth_token``, not ``yolox_auth_token``.
-2. _build_config_from_schema correctly passes ``auth_token`` through for each schema.
-3. _build_config_from_schema silently drops the old ``yolox_auth_token`` key
-   (documents why the bug was undetectable at the Pydantic level).
-4. The public wrapper functions (pdfium, nemotron_parse) raise ``TypeError`` when
-   called with the stale ``yolox_auth_token`` kwarg — regression guard.
-5. The general ``extract_primitives_from_pdf`` raises ``TypeError`` for the same
-   stale kwarg.
-
-Import note
------------
-Groups 1-3 only require the schema package (no heavy PDF dependencies).
-Groups 4-5 import ``nv_ingest_api.interface.extract`` which pulls in ``pypdfium2``;
-``pypdfium2>=4.30.0`` is a declared core dependency in ``pyproject.toml`` so it is
-always available when the package is installed normally.
-"""
+"""Unit tests verifying expected behavior when parsing extract args into their corresponding config schemas."""
 
 import pandas as pd
 import pytest
 
-# ---------------------------------------------------------------------------
-# Always-available imports (no pypdfium2 required)
-# ---------------------------------------------------------------------------
 from nv_ingest_api.interface import _build_config_from_schema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import (
     NemotronParseConfigSchema,
