@@ -50,7 +50,7 @@ dependencies = [
     "scipy>=1.15.1",
     "tqdm>=4.67.1",
     "transformers>=4.47.0",
-    "tritonclient",
+    "tritonclient[grpc]",
     "universal_pathlib>=0.2.6",
     "unstructured-client",
 ]

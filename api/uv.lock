@@ -1634,7 +1634,7 @@ dependencies = [
     { name = "scipy" },
     { name = "tqdm" },
     { name = "transformers" },
-    { name = "tritonclient" },
+    { name = "tritonclient", extra = ["grpc"] },
     { name = "universal-pathlib" },
     { name = "unstructured-client" },
 ]
@@ -1684,7 +1684,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.15.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "transformers", specifier = ">=4.47.0" },
-    { name = "tritonclient" },
+    { name = "tritonclient", extras = ["grpc"] },
     { name = "universal-pathlib", specifier = ">=0.2.6" },
     { name = "unstructured-client" },
 ]
@@ -2910,6 +2910,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/55/cd/57180039cbd31cbcfa79bf1062c818431331ccc7d61603e0a0775e928a74/tritonclient-2.64.0-py3-none-any.whl", hash = "sha256:f31569ab491d7815f1b8c28d07f489adf817a68b98548d5d933c9845a2879e8b", size = 98299, upload-time = "2025-12-24T02:08:37.195Z" },
     { url = "https://files.pythonhosted.org/packages/47/8a/a04f810e40b874980ca8e907e18faff819777c128dda5005c407314e8e54/tritonclient-2.64.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:4d1653658ba59b380b732969e67842b2c935b147abd1e89458fd64a9335b1fc7", size = 111851, upload-time = "2025-12-24T02:08:17.006Z" },
     { url = "https://files.pythonhosted.org/packages/37/82/5cd615a687ed7c52b8a7563d8ca8a126f3077b78c3e6c5e2c3d9e6cc2542/tritonclient-2.64.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:d3a52ce099840b576aeea6c1e2e7d7a9b109f3c468e52c6212d80d5b49972688", size = 111851, upload-time = "2025-12-24T02:07:40.313Z" },
+]
+
+[package.optional-dependencies]
+grpc = [
+    { name = "grpcio" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "protobuf" },
+    { name = "python-rapidjson" },
 ]
 
 [[package]]

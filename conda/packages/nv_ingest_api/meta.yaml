@@ -60,7 +60,7 @@ requirements:
     - nvidia-riva-client==2.20.0
     - markitdown
     - pymilvus>=2.5.10
-    - tritonclient
+    - tritonclient[grpc]
     - unstructured-client
   # Note: gpu extras (cudf) and llm extras (openai) are not available via conda; install via pip
 
