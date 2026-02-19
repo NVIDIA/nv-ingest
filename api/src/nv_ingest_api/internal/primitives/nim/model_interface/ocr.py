@@ -24,6 +24,7 @@ DEFAULT_OCR_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
 NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_BLS_MODEL_NAME = "scene_text_python"
+NEMORETRIEVER_OCR_PIPELINE_MODEL_NAME = "pipeline"
 
 
 logger = logging.getLogger(__name__)
@@ -234,11 +235,26 @@ class OCRModelInterfaceBase(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if model_name in [
+        # Handle different response formats from OCR models
+        if model_name == NEMORETRIEVER_OCR_PIPELINE_MODEL_NAME:
+            # Pipeline model returns flat array (N*3,) with interleaved data:
+            # [bbox0, text0, conf0, bbox1, text1, conf1, ...]
+            # Reshape to (3, N) format
+            if response.ndim == 1:
+                if response.shape[0] % 3 != 0:
+                    raise ValueError(
+                        f"Pipeline response length {response.shape[0]} is not divisible by 3. "
+                        "Expected format: [bbox0, text0, conf0, bbox1, text1, conf1, ...]"
+                    )
+                batch_size = response.shape[0] // 3
+                # Reshape from (N*3,) to (N, 3) then transpose to (3, N)
+                response = response.reshape(batch_size, 3).transpose((1, 0))
+        elif model_name in [
             NEMORETRIEVER_OCR_MODEL_NAME,
             NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME,
             NEMORETRIEVER_OCR_BLS_MODEL_NAME,
         ]:
+            # Other NemoRetriever models return (batch_size, 3), transpose to (3, batch_size)
             response = response.transpose((1, 0))
 
         # If we have shape (3,), convert to (3, 1)
