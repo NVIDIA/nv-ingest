@@ -1,0 +1,9 @@
+# Nemotron nightly/dev packages from Test PyPI. For vanilla pip: harness env already has these
+# packages; install this file on top with --force-reinstall --no-deps to pull them from Test PyPI.
+# Usage: pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps
+--index-url https://test.pypi.org/simple/
+
+nemotron-page-elements-v3>=0.dev0
+nemotron-graphic-elements-v1>=0.dev0
+nemotron-table-structure-v1>=0.dev0
+nemotron-ocr>=0.dev0

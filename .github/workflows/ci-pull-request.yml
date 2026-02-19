@@ -36,7 +36,7 @@ jobs:
     uses: ./.github/workflows/reusable-docker-build-and-test.yml
     with:
       platform: 'linux/amd64'
-      target: 'runtime'
+      target: 'test'
       tags: 'nv-ingest:pr-${{ github.event.pull_request.number }}'
       base-image: 'ubuntu'
       base-image-tag: 'jammy-20250415.1'

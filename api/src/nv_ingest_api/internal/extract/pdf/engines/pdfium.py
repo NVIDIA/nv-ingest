@@ -558,7 +558,6 @@ def pdfium_extractor(
                 image, _ = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(16384, 16384),
-                    render_rev_byteorder=True,
                     trace_info=execution_trace_log,
                 )
                 base64_image = numpy_to_base64(image[0])
@@ -580,7 +579,6 @@ def pdfium_extractor(
                 image, _ = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    render_rev_byteorder=True,
                     trace_info=execution_trace_log,
                 )
                 pages_for_extractions.append((page_idx, image[0], (0, 0)))  # No padding offset
