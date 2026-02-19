@@ -40,7 +40,7 @@ dependencies = [
     "Pillow",
     "pydantic>2.0.0",
     "pymilvus>=2.5.10",
-    "pypdfium2>=4.30.0",
+    "pypdfium2>=4.30.0,<5",  # TODO: migrate get_pos() -> get_bounds() and audit other v5 API changes
     "python-dateutil",
     "python-docx>=1.1.2",
     "python-pptx>=1.0.2",

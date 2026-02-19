@@ -291,7 +291,7 @@ def extract_simple_images_from_pdfium_page(page, max_depth):
             # Attempt to retrieve the image bitmap
             image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
             image_base64: str = numpy_to_base64(image_numpy, format=YOLOX_PAGE_IMAGE_FORMAT)
-            image_bbox = obj.get_pos()
+            image_bbox = obj.get_pos()  # TODO: pypdfium2 v5 renames get_pos() -> get_bounds(); update when pinning is relaxed
             image_size = obj.get_size()
             if image_size[0] < 10 and image_size[1] < 10:
                 continue
@@ -336,7 +336,7 @@ def extract_merged_images_from_pdfium_page(page, merge=True, **kwargs):
         filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
         max_depth=1,
     ):
-        image_bbox = convert_pdfium_position(obj.get_pos(), page_width, page_height)
+        image_bbox = convert_pdfium_position(obj.get_pos(), page_width, page_height)  # TODO: pypdfium2 v5 renames get_pos() -> get_bounds(); update when pinning is relaxed
         image_bboxes.append(image_bbox)
 
     # If no merging is requested or no bounding boxes exist, return the list as is

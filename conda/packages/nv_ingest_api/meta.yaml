@@ -44,7 +44,7 @@ requirements:
     - protobuf>=5.29.3  # intentional pin
     - pydantic>=2.0.0
     - py-opencv
-    - pypdfium2>=4.30.0
+    - pypdfium2>=4.30.0,<5  # TODO: migrate get_pos() -> get_bounds() and audit other v5 API changes
     - python>=3.12.11
     - python-dateutil
     - python-docx>=1.1.2
