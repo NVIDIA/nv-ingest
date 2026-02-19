@@ -31,10 +31,9 @@ What is tested here
 Import note
 -----------
 Groups 1-3 only require the schema package (no heavy PDF dependencies).
-Groups 4-5 import ``nv_ingest_api.interface.extract`` which pulls in ``pypdfium2``
-and other optional dependencies; those tests are skipped automatically when the
-extras are not installed (e.g. in a minimal dev environment).  In the standard CI
-Docker image all dependencies are present and every test runs.
+Groups 4-5 import ``nv_ingest_api.interface.extract`` which pulls in ``pypdfium2``;
+``pypdfium2>=4.30.0`` is a declared core dependency in ``pyproject.toml`` so it is
+always available when the package is installed normally.
 """
 
 import pandas as pd
@@ -49,26 +48,10 @@ from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import (
     PDFiumConfigSchema,
 )
 
-# ---------------------------------------------------------------------------
-# Optional heavy imports: nv_ingest_api.interface.extract pulls in pypdfium2
-# via nv_ingest_api.internal.extract.pdf.engines.  Skip the relevant tests
-# gracefully when the dependency is absent.
-# ---------------------------------------------------------------------------
-try:
-    from nv_ingest_api.interface.extract import (
-        extract_primitives_from_pdf,
-        extract_primitives_from_pdf_nemotron_parse,
-        extract_primitives_from_pdf_pdfium,
-    )
-
-    _EXTRACT_AVAILABLE = True
-except ImportError:
-    _EXTRACT_AVAILABLE = False
-
-_requires_extract = pytest.mark.skipif(
-    not _EXTRACT_AVAILABLE,
-    reason="nv_ingest_api.interface.extract not importable (pypdfium2 or other PDF "
-    "dependencies missing); install all API extras to run these tests",
+from nv_ingest_api.interface.extract import (
+    extract_primitives_from_pdf,
+    extract_primitives_from_pdf_nemotron_parse,
+    extract_primitives_from_pdf_pdfium,
 )
 
 # ---------------------------------------------------------------------------
@@ -174,7 +157,6 @@ def test_build_config_silently_drops_yolox_auth_token_for_nemotron_parse():
 # ===========================================================================
 
 
-@_requires_extract
 def test_extract_primitives_from_pdf_pdfium_rejects_yolox_auth_token():
     """
     Regression: extract_primitives_from_pdf_pdfium no longer accepts
@@ -185,7 +167,6 @@ def test_extract_primitives_from_pdf_pdfium_rejects_yolox_auth_token():
         extract_primitives_from_pdf_pdfium(df, yolox_auth_token="stale_token")
 
 
-@_requires_extract
 def test_extract_primitives_from_pdf_nemotron_parse_rejects_yolox_auth_token():
     """
     Regression: extract_primitives_from_pdf_nemotron_parse no longer accepts
@@ -196,7 +177,6 @@ def test_extract_primitives_from_pdf_nemotron_parse_rejects_yolox_auth_token():
         extract_primitives_from_pdf_nemotron_parse(df, yolox_auth_token="stale_token")
 
 
-@_requires_extract
 def test_extract_primitives_from_pdf_rejects_yolox_auth_token():
     """
     Regression: the general extract_primitives_from_pdf no longer accepts
