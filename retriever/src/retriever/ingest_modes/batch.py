@@ -12,6 +12,7 @@ import logging
 import os
 import time
 from typing import Any, List, Optional
+from datetime import timedelta
 
 from typing import Union
 
@@ -155,7 +156,6 @@ class _LanceDBWriteActor:
 
     def __call__(self, batch_df: Any) -> Any:
         import pandas as pd
-        from datetime import timedelta
 
         rows = self._build_rows(batch_df)
         if rows:
@@ -166,15 +166,6 @@ class _LanceDBWriteActor:
 
             self._total_rows += len(rows)
 
-        self._table.create_index(
-            index_type="IVF_HNSW_SQ",
-            metric="l2",
-            num_partitions=16,
-            num_sub_vectors=256,
-            vector_column_name="vector",
-        )
-        for index_stub in self._table.list_indices():
-            self._table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
         return batch_df
 
@@ -306,7 +297,7 @@ class BatchIngestor(Ingestor):
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
-        page_elements_batch_size = kwargs.pop("page_elements_batch_size", 16)
+        page_elements_batch_size = kwargs.pop("page_elements_batch_size", 24)
         detect_batch_size = kwargs.pop("detect_batch_size", 24)
 
         # Count GPU stages that will be created (page_elements is always on).
@@ -412,7 +403,7 @@ class BatchIngestor(Ingestor):
             num_gpus=0,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=16)
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
                 # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
         # construct one instance per actor). Passing an already-constructed
@@ -437,7 +428,6 @@ class BatchIngestor(Ingestor):
             ocr_flags["extract_infographics"] = True
 
         if ocr_flags:
-            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
             self._rd_dataset = self._rd_dataset.map_batches(
                 OCRActor,
                 batch_size=detect_batch_size,
@@ -525,7 +515,6 @@ class BatchIngestor(Ingestor):
         self._vdb_upload_kwargs = dict(kwargs)
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
-        self._rd_dataset = self._rd_dataset.repartition(1)
         self._rd_dataset = self._rd_dataset.map_batches(
             _LanceDBWriteActor,
             batch_format="pandas",
@@ -643,5 +632,8 @@ class BatchIngestor(Ingestor):
             table.create_index(vector_column_name="vector")
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+
+        for index_stub in self._table.list_indices():
+            self._table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
         print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
