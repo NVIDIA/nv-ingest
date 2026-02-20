@@ -16,6 +16,7 @@ import redis
 
 
 from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase, FetchMode
+from nv_ingest_api.util.service_clients.redis.redis_pool_metrics import InstrumentedBlockingConnectionPool
 
 try:
     from diskcache import Cache
@@ -49,12 +50,13 @@ class RedisClient(MessageBrokerClientBase):
         max_retries: int = 3,
         max_backoff: int = 32,
         connection_timeout: int = 300,
-        max_pool_size: int = 128,
+        max_pool_size: int = 50,
         use_ssl: bool = False,
         redis_allocator: Callable[..., redis.Redis] = redis.Redis,
         fetch_mode: "FetchMode" = None,  # Replace with appropriate default if FetchMode.DESTRUCTIVE is available.
         cache_config: Optional[Dict[str, Any]] = None,
         message_ttl_seconds: Optional[int] = 600,
+        pool_name: Optional[str] = None,
     ) -> None:
         """
         Initializes the Redis client with connection pooling, retry/backoff configuration,
@@ -75,7 +77,7 @@ class RedisClient(MessageBrokerClientBase):
         connection_timeout : int, optional
             Timeout in seconds for establishing a Redis connection. Default is 300.
         max_pool_size : int, optional
-            Maximum size of the Redis connection pool. Default is 128.
+            Maximum size of the Redis connection pool. Default is 50.
         use_ssl : bool, optional
             Whether to use SSL for the connection. Default is False.
         redis_allocator : Callable[..., redis.Redis], optional
@@ -88,6 +90,8 @@ class RedisClient(MessageBrokerClientBase):
         message_ttl_seconds : int, optional
             TTL (in seconds) for messages in NON_DESTRUCTIVE mode. If not provided,
             messages may persist indefinitely.
+        pool_name : str, optional
+            Name for the connection pool used in Prometheus metrics labels.
 
         Returns
         -------
@@ -111,20 +115,22 @@ class RedisClient(MessageBrokerClientBase):
                 "Messages fetched non-destructively may persist indefinitely in Redis."
             )
 
-        # Configure Connection Pool
         pool_kwargs: Dict[str, Any] = {
             "host": self._host,
             "port": self._port,
             "db": self._db,
             "socket_connect_timeout": self._connection_timeout,
             "max_connections": max_pool_size,
+            "timeout": 20,  # Wait up to 20s for a connection from the pool
         }
         if self._use_ssl:
             pool_kwargs["ssl"] = True
             pool_kwargs["ssl_cert_reqs"] = None  # Or specify requirements as needed.
             logger.debug("Redis connection configured with SSL.")
 
-        self._pool: redis.ConnectionPool = redis.ConnectionPool(**pool_kwargs)
+        self._pool: redis.BlockingConnectionPool = InstrumentedBlockingConnectionPool(
+            pool_name=pool_name or "default", **pool_kwargs
+        )
 
         # Allocate initial client
         self._client: Optional[redis.Redis] = self._redis_allocator(connection_pool=self._pool)
