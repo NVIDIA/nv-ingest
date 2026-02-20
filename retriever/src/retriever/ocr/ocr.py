@@ -485,15 +485,16 @@ class OCRActor:
         extract_charts: bool = False,
         extract_infographics: bool = False,
     ) -> None:
-        model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-        if not model_dir:
-            raise RuntimeError(
-                "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-                "the path of the Nemotron OCR v1 model directory."
-            )
+        # model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
+        # if not model_dir:
+        #     raise RuntimeError(
+        #         "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
+        #         "the path of the Nemotron OCR v1 model directory."
+        #     )
         from retriever.model.local import NemotronOCRV1
 
-        self._model = NemotronOCRV1(model_dir=model_dir)
+        #self._model = NemotronOCRV1(model_dir=model_dir)
+        self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)
         self._extract_infographics = bool(extract_infographics)

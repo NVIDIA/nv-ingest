@@ -86,8 +86,6 @@ class _LanceDBWriteActor:
         Mirrors the row-building logic from
         ``upload_embeddings_to_lancedb_inprocess`` in inprocess.py.
         """
-        import pandas as pd
-
         rows: list = []
         for row in df.itertuples(index=False):
             # Extract embedding
@@ -307,6 +305,7 @@ class BatchIngestor(Ingestor):
         # -- Pop resource-tuning kwargs before forwarding to actors --
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
+        pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
         page_elements_batch_size = kwargs.pop("page_elements_batch_size", 16)
         detect_batch_size = kwargs.pop("detect_batch_size", 24)
 
@@ -330,6 +329,11 @@ class BatchIngestor(Ingestor):
             gpu_page_elements = gpu_per_stage
             gpu_ocr = gpu_per_stage
             gpu_embed = gpu_per_stage
+
+        # Allow explicit per-stage GPU overrides for controlled experiments.
+        gpu_page_elements = float(kwargs.pop("gpu_page_elements", gpu_page_elements))
+        gpu_ocr = float(kwargs.pop("gpu_ocr", gpu_ocr))
+        gpu_embed = float(kwargs.pop("gpu_embed", gpu_embed))
 
         # Each GPU stage gets 1 worker by default (each worker holds 1 model).
         page_elements_workers = kwargs.pop("page_elements_workers", 1)
@@ -404,7 +408,7 @@ class BatchIngestor(Ingestor):
             extraction_actor,
             batch_size=pdf_extract_batch_size,
             batch_format="pandas",
-            num_cpus=2,
+            num_cpus=pdf_extract_num_cpus,
             num_gpus=0,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )

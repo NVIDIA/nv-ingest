@@ -24,12 +24,15 @@ class NemotronOCRV1(BaseModel):
 
     def __init__(
         self,
-        model_dir: str,
+        model_dir: Optional[str] = None,
     ) -> None:
         super().__init__()
         from nemotron_ocr.inference.pipeline import NemotronOCR  # local-only import
 
-        self._model = NemotronOCR(model_dir=model_dir)
+        if model_dir:
+            self._model = NemotronOCR(model_dir=model_dir)
+        else:
+            self._model = NemotronOCR()
         # NemotronOCR is a high-level pipeline (not an nn.Module). We can optionally
         # TensorRT-compile individual submodules (e.g. the detector backbone) but
         # must keep post-processing (NMS, box decoding, etc.) in eager PyTorch/C++.
