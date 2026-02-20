@@ -14,25 +14,50 @@ authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
 ]
 license = {file = "LICENSE"}
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "aiohttp",
     "backoff==2.2.1",
-    "pandas>=2.0",
-    "pydantic>2.0.0",
-    "pydantic-settings>2.0.0",
-    "fsspec>=2025.5.1",
-    "universal_pathlib>=0.2.6",
+    "diskcache>=5.6.3",
+    "fastparquet>=2024.11.0",
     "ffmpeg-python==0.2.0",
-    "tritonclient",
+    "fsspec>=2025.5.1",
     "glom",
-    "pypdfium2>=4.30.0",
+    "grpcio",
+    "langdetect>=1.0.9",
+    "librosa==0.10.2",
+    "markitdown",
+    "minio>=7.2.12",
+    "numpy",
+    "nvidia-riva-client==2.20.0",
+    "opencv-python",
+    "pandas>=2.0",
+    "Pillow",
+    "pydantic>2.0.0",
+    "pymilvus>=2.5.10",
+    "pypdfium2>=4.30.0,<5",  # TODO: migrate get_pos() -> get_bounds() and audit other v5 API changes
+    "python-dateutil",
+    "python-docx>=1.1.2",
+    "python-pptx>=1.0.2",
+    "redis>=5.2.1",
+    "requests>=2.28.2",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.15.1",
+    "tqdm>=4.67.1",
+    "transformers>=4.47.0",
+    "tritonclient[grpc]",
+    "universal_pathlib>=0.2.6",
+    "unstructured-client",
 ]
 
 [project.optional-dependencies]
+gpu = ["cudf"]
+llm = ["openai"]
 test = [
     "moviepy==2.2.1",
 ]
