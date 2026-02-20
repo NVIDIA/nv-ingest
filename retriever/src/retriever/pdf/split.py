@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import traceback
@@ -76,6 +77,37 @@ def _split_pdf_to_single_page_bytes(pdf_binary: Any) -> List[bytes]:
             pass
 
     return out
+
+
+def pdf_path_to_pages_df(path: str) -> pd.DataFrame:
+    """
+    Convert a multi-page PDF at `path` into a DataFrame where each row
+    contains a single-page PDF's raw bytes.
+
+    Columns: bytes, path, page_number (1-indexed).
+    Compatible with pdf_extraction and downstream inprocess/batch stages.
+    """
+    if pdfium is None:  # pragma: no cover
+        raise ImportError("pypdfium2 is required for PDF splitting but could not be imported.") from _PDFIUM_IMPORT_ERROR
+
+    abs_path = str(Path(path).resolve())
+    out_rows: List[Dict[str, Any]] = []
+    try:
+        raw_bytes = Path(abs_path).read_bytes()
+        pages = _split_pdf_to_single_page_bytes(raw_bytes)
+        for page_idx, page_bytes in enumerate(pages):
+            out_rows.append(
+                {
+                    "bytes": page_bytes,
+                    "path": abs_path,
+                    "page_number": page_idx + 1,
+                }
+            )
+    except BaseException as e:
+        out_rows.append(
+            {"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}
+        )
+    return pd.DataFrame(out_rows)
 
 
 def split_pdf_batch(pdf_batch: Any, **kwargs: Any) -> pd.DataFrame:

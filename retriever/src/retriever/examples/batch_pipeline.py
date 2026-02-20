@@ -57,9 +57,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs to ingest.",
+        help="Directory containing PDFs or .txt files to ingest.",
         path_type=Path,
         exists=True,
+    ),
+    input_type: str = typer.Option(
+        "pdf",
+        "--input-type",
+        help="Input format: 'pdf' or 'txt'. Use 'txt' for a directory of .txt files (tokenizer-based chunking).",
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -92,20 +97,29 @@ def main(
     # else: use ray_address as-is (None → in-process, or URL to existing cluster)
 
     input_dir = Path(input_dir)
-    pdf_glob = str(input_dir / "*.pdf")
-
-    ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
-    ingestor = (
-        ingestor.files(pdf_glob)
-        .extract(
-            extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
-            extract_infographics=False,
+    if input_type == "txt":
+        glob_pattern = str(input_dir / "*.txt")
+        ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
+        ingestor = (
+            ingestor.files(glob_pattern)
+            .extract_txt(max_tokens=512, overlap_tokens=0)
+            .embed(model_name="nemo_retriever_v1")
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
-        .embed(model_name="nemo_retriever_v1")
-        .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
-    )
+    else:
+        glob_pattern = str(input_dir / "*.pdf")
+        ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
+        ingestor = (
+            ingestor.files(glob_pattern)
+            .extract(
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+            )
+            .embed(model_name="nemo_retriever_v1")
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+        )
 
     print("Running extraction...")
     ingestor.ingest()
@@ -158,8 +172,9 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
+            ext = ".txt" if input_type == "txt" else ".pdf"
             print(f"\nQuery {i}: {q}")
-            print(f"  Gold: {g}  (file: {doc}.pdf, page: {page})")
+            print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
             print("  Top hits:")
             if not scored_hits:
@@ -172,15 +187,16 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            missed_gold.append((f"{doc}.pdf", str(page)))
+            ext = ".txt" if input_type == "txt" else ".pdf"
+            missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-    print("\nMissed gold (unique pdf/page):")
+    print("\nMissed gold (unique doc/page):")
     if not missed_unique:
         print("  (none)")
     else:
-        for pdf, page in missed_unique:
-            print(f"  {pdf} page {page}")
+        for doc_page, page in missed_unique:
+            print(f"  {doc_page} page {page}")
     print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
     print("\nRecall metrics (matching retriever.recall.core):")

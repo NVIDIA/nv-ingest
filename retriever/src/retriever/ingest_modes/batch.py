@@ -250,6 +250,8 @@ class BatchIngestor(Ingestor):
         self._rd_dataset: rd.Dataset = None  # Ray Data dataset created from input documents.
         self._tasks: List[tuple[str, dict[str, Any]]] = []
         self._intermediate_output_dir: Optional[str] = None
+        self._pipeline_type: str = "pdf"  # "pdf" | "txt"
+        self._extract_txt_kwargs: Dict[str, Any] = {}
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -373,6 +375,7 @@ class BatchIngestor(Ingestor):
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
 
+        self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
 
         # Stage-specific kwargs: upstream PDF stages accept many options (dpi, extract_*),
@@ -442,6 +445,40 @@ class BatchIngestor(Ingestor):
                 fn_constructor_kwargs=ocr_flags,
             )
 
+        return self
+
+    def extract_txt(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure txt-only pipeline: read_binary_files -> TxtSplitActor (bytes -> chunk rows).
+
+        Use with .files("*.txt").extract_txt(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_txt().
+        """
+        from retriever.txt.ray_data import TxtSplitActor
+
+        self._pipeline_type = "txt"
+        self._extract_txt_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            TxtSplitActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs=dict(self._extract_txt_kwargs),
+        )
         return self
 
     def embed(self, **kwargs: Any) -> "BatchIngestor":
