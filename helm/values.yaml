@@ -69,9 +69,7 @@ replicaCount: 1
 ## @param resources.requests.memory [default: 24Gi] Specify request for memory
 ## @param resources.requests.cpu [default: "24000m"] Specify request for CPU
 resources:
-  limits:
-    memory: 200Gi
-    cpu: "48000m"
+  limits: {}
   requests:
     memory: 24Gi
     cpu: "24000m"
@@ -148,6 +146,8 @@ envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   OMP_NUM_THREADS: 1
   RAY_num_grpc_threads: 1
+  RAY_num_server_call_thread: 1
+  RAY_worker_num_grpc_internal_threads: 1
 
   MAX_INGEST_PROCESS_WORKERS: 32
   NV_INGEST_MAX_UTIL: 32
