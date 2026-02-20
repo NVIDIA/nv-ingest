@@ -354,8 +354,8 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     "--sku",
     type=str,
     default=None,
-    help="GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s). Only applies to managed Compose "
-    "services.",
+    help="GPU SKU for override file (Compose: docker-compose.<sku>.yaml; Helm: helm/overrides/values-<sku>.yaml). "
+    "Applies to managed Compose and Helm deployments (e.g., a10g, a100-40gb, l40s).",
 )
 @click.option(
     "--dump-logs/--no-dump-logs",

@@ -72,15 +72,17 @@ class HelmManager(ServiceManager):
                 cmd += ["--set", f"{key}={str_value}"]
         return cmd
 
-    def __init__(self, config, repo_root: Path):
+    def __init__(self, config, repo_root: Path, sku: str | None = None):
         """
         Initialize Helm manager.
 
         Args:
             config: Configuration object with Helm settings
             repo_root: Path to the repository root
+            sku: Optional GPU SKU for values override file (e.g., a10g, a100-40gb, l40s)
         """
         super().__init__(config, repo_root)
+        self.sku = sku
         # Helm binary command (supports "helm", "microk8s helm", "k3s helm", etc.)
         helm_bin = getattr(config, "helm_bin", "helm")
         helm_sudo = getattr(config, "helm_sudo", False)
@@ -136,6 +138,15 @@ class HelmManager(ServiceManager):
         # Add version if specified (only valid for remote charts)
         if self.chart_version:
             cmd += ["--version", self.chart_version]
+
+        # Add GPU SKU values override file if specified (helm/overrides/values-<sku>.yaml)
+        if self.sku:
+            sku_values_path = self.repo_root / "helm" / "overrides" / f"values-{self.sku}.yaml"
+            if sku_values_path.exists():
+                cmd += ["-f", str(sku_values_path)]
+                print(f"Using Helm values override: {sku_values_path}")
+            else:
+                print(f"Warning: Helm SKU override file not found: {sku_values_path}")
 
         # Parse and add values from YAML file if specified
         if self.values_file:
