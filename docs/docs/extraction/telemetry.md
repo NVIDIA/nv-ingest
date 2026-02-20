@@ -2,9 +2,7 @@
 
 You can view telemetry data for [NeMo Retriever extraction](overview.md).
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 ## OpenTelemetry

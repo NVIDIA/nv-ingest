@@ -3,9 +3,7 @@
 User-Defined Functions (UDFs) allow you to inject custom processing logic into the [NeMo Retriever extraction](overview.md) pipeline at specific stages. 
 This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 
@@ -265,7 +263,7 @@ def enhance_metadata(control_message: IngestControlMessage) -> IngestControlMess
     return control_message
 ```
 
-> **📖 For detailed metadata schema documentation, see:** [metadata_documentation.md](metadata_documentation.md)
+> **📖 For detailed metadata schema documentation, see:** [Metadata Reference](content-metadata.md).
 
 ### UDF Targeting
 

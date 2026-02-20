@@ -2,9 +2,7 @@
 
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 ## Can't process long, non-language text strings
@@ -127,9 +125,14 @@ ERROR 2025-04-24 22:49:44.434 nimutils.py:68] }
 
 
 
+## Known issues and release-specific caveats
+
+Version-specific known issues, deprecations, and NIM caveats (for example high-concurrency behavior) are documented in [Release Notes](releasenotes-nv-ingest.md). Hardware and feature constraints (e.g. GPU requirements, nemotron-parse limitations) are in [Support Matrix](support-matrix.md). When troubleshooting, check both.
+
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
+- [Release Notes](releasenotes-nv-ingest.md)
 - [Prerequisites](prerequisites.md)
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
 - [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)

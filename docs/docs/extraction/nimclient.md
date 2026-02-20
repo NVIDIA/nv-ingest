@@ -3,9 +3,7 @@
 The `NimClient` class provides a unified interface for connecting to and interacting with NVIDIA NIM Microservices. 
 This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever extraction](overview.md) pipelines and User Defined Functions (UDFs).
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 The NimClient architecture consists of two main components:
 
@@ -490,7 +488,9 @@ def batch_image_analysis_udf(control_message: IngestControlMessage) -> IngestCon
 
 ### Environment Variables
 
-Set these environment variables for your NIM endpoints:
+For extraction service environment variables (e.g. `NGC_API_KEY`, `MESSAGE_CLIENT_HOST`), see [Environment Variables for NeMo Retriever Extraction](environment-config.md).
+
+For custom NIM integrations, you can set these environment variables for your NIM endpoints:
 
 ```bash
 # NIM endpoints
