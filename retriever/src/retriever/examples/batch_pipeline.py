@@ -69,18 +69,87 @@ def main(
     start_ray: bool = typer.Option(
         False,
         "--start-ray",
-        help="Start a Ray head node (ray start --head) and connect to it. Dashboard at http://127.0.0.1:8265. Ignores --ray-address.",
+        help=(
+            "Start a Ray head node (ray start --head) and connect to it. "
+            "Dashboard at http://127.0.0.1:8265. Ignores --ray-address."
+        ),
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
         "--query-csv",
         path_type=Path,
-        help="Path to query CSV for recall evaluation. Default: bo767_query_gt.csv (current directory). Recall is skipped if the file does not exist.",
+        help=(
+            "Path to query CSV for recall evaluation. Default: bo767_query_gt.csv "
+            "(current directory). Recall is skipped if the file does not exist."
+        ),
     ),
     no_recall_details: bool = typer.Option(
         False,
         "--no-recall-details",
-        help="Do not print per-query retrieval details (query, gold, hits). Only the missed-gold summary and recall metrics are printed.",
+        help=(
+            "Do not print per-query retrieval details (query, gold, hits). "
+            "Only the missed-gold summary and recall metrics are printed."
+        ),
+    ),
+    pdf_extract_workers: int = typer.Option(
+        12,
+        "--pdf-extract-workers",
+        min=1,
+        help="Number of CPU workers for PDF extraction stage.",
+    ),
+    pdf_extract_num_cpus: float = typer.Option(
+        2.0,
+        "--pdf-extract-num-cpus",
+        min=0.1,
+        help="CPUs reserved per PDF extraction task.",
+    ),
+    pdf_extract_batch_size: int = typer.Option(
+        4,
+        "--pdf-extract-batch-size",
+        min=1,
+        help="Batch size for PDF extraction stage.",
+    ),
+    ocr_workers: int = typer.Option(
+        1,
+        "--ocr-workers",
+        min=1,
+        help="Actor count for OCR stage.",
+    ),
+    ocr_batch_size: int = typer.Option(
+        16,
+        "--ocr-batch-size",
+        min=1,
+        help="Ray Data batch size for OCR stage.",
+    ),
+    embed_workers: int = typer.Option(
+        1,
+        "--embed-workers",
+        min=1,
+        help="Actor count for embedding stage.",
+    ),
+    embed_batch_size: int = typer.Option(
+        256,
+        "--embed-batch-size",
+        min=1,
+        help="Ray Data batch size for embedding stage.",
+    ),
+    gpu_page_elements: float = typer.Option(
+        0.5,
+        "--gpu-page-elements",
+        min=0.0,
+        help="GPUs reserved per page-elements actor.",
+    ),
+    gpu_ocr: float = typer.Option(
+        1.0,
+        "--gpu-ocr",
+        min=0.0,
+        help="GPUs reserved per OCR actor.",
+    ),
+    gpu_embed: float = typer.Option(
+        0.5,
+        "--gpu-embed",
+        min=0.0,
+        help="GPUs reserved per embedding actor.",
     ),
 ) -> None:
     os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
@@ -102,8 +171,20 @@ def main(
             extract_tables=True,
             extract_charts=True,
             extract_infographics=False,
+            pdf_extract_workers=int(pdf_extract_workers),
+            pdf_extract_num_cpus=float(pdf_extract_num_cpus),
+            pdf_extract_batch_size=int(pdf_extract_batch_size),
+            detect_workers=int(ocr_workers),
+            detect_batch_size=int(ocr_batch_size),
+            gpu_page_elements=float(gpu_page_elements),
+            gpu_ocr=float(gpu_ocr),
+            gpu_embed=float(gpu_embed),
         )
-        .embed(model_name="nemo_retriever_v1")
+        .embed(
+            model_name="nemo_retriever_v1",
+            embed_workers=int(embed_workers),
+            embed_batch_size=int(embed_batch_size),
+        )
         .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
     )
 
