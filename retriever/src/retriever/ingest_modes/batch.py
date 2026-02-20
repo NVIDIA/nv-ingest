@@ -633,7 +633,7 @@ class BatchIngestor(Ingestor):
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
 
-        for index_stub in self._table.list_indices():
-            self._table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
+        for index_stub in table.list_indices():
+            table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
         print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
