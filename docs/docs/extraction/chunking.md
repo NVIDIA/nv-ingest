@@ -44,7 +44,7 @@ If you want chunks smaller than `page`, use token-based splitting as described i
 
 ## Token-Based Splitting
 
-The `split` task uses a tokenizer to count tokens and split by chunk size and overlap. For the default tokenizer, optional Llama tokenizer, and environment variables, see the canonical subsection below.
+The `split` task uses a tokenizer to count tokens and split by chunk size and overlap. For the default tokenizer, optional Llama tokenizer, and environment variables, refer to the canonical subsection below.
 
 ### Token-based splitting and tokenizers
 
