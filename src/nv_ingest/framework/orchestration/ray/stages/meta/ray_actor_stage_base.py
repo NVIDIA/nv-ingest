@@ -525,6 +525,7 @@ class RayActorStage(ABC):
         if not self._running:
             stats_copy = self.stats.copy()
             stats_copy["active_processing"] = False  # It's not active if not running
+            stats_copy["processing_thread_alive"] = False
             stats_copy["memory_mb"] = self._get_memory_usage_mb()
             return stats_copy
 
@@ -566,7 +567,31 @@ class RayActorStage(ABC):
             "queue_full": self.stats.get("queue_full", 0),
             "successful_queue_reads": self.stats.get("successful_queue_reads", 0),
             "successful_queue_writes": self.stats.get("successful_queue_writes", 0),
+            "processing_thread_alive": bool(self._processing_thread and self._processing_thread.is_alive()),
             "memory_mb": self._get_memory_usage_mb(),
+        }
+
+    @ray.method(num_returns=1)
+    def health_probe(self) -> Dict[str, Any]:
+        """
+        Returns a lightweight liveness/readiness snapshot for admission checks.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Readiness indicators used by orchestration:
+              - running: actor was started
+              - processing_thread_alive: background loop thread is alive
+              - has_input_queue: input queue was wired
+              - has_output_queue: output queue was wired
+              - processed: total processed messages
+        """
+        return {
+            "running": bool(self._running),
+            "processing_thread_alive": bool(self._processing_thread and self._processing_thread.is_alive()),
+            "has_input_queue": self._input_queue is not None,
+            "has_output_queue": self._output_queue is not None,
+            "processed": int(self.stats.get("processed", 0)),
         }
 
     @ray.method(num_returns=1)

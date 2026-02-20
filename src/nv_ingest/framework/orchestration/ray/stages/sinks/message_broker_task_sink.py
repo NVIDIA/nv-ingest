@@ -5,6 +5,7 @@
 import sys
 import json
 import logging
+import os
 from typing import Any, Dict, List, Tuple, Literal, Optional, Union
 from pydantic import BaseModel, Field
 import ray
@@ -88,6 +89,11 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         self.client = self._create_client()
         self.start_time = None
         self.message_count = 0
+        self._state_prefix = "job_state:"
+        self._state_ttl_seconds = int(os.getenv("STATE_TTL_SECONDS", "7200"))
+        self._lease_key_prefix = os.getenv("INGEST_LEASE_PREFIX", "ingest:lease")
+        self._lease_data_prefix = f"{self._lease_key_prefix}:data:"
+        self._lease_index_key = f"{self._lease_key_prefix}:index"
 
     # --- Private Helper Methods ---
     def _create_client(self):
@@ -203,8 +209,62 @@ class MessageBrokerTaskSinkStage(RayActorStage):
                 if attempt == retry_count - 1:
                     raise
 
+    def _ack_lease(self, job_id: Optional[str]) -> None:
+        if not job_id or not isinstance(self.client, RedisClient):
+            return
+
+        try:
+            client = self.client.get_client()
+            lease_data_key = f"{self._lease_data_prefix}{job_id}"
+            pipe = client.pipeline()
+            pipe.delete(lease_data_key)
+            pipe.zrem(self._lease_index_key, job_id)
+            pipe.execute()
+        except Exception as exc:
+            logger.warning("Failed to ack lease for job %s: %s", job_id, exc)
+
+    def _push_to_broker_and_ack_lease(
+        self,
+        json_payloads: List[str],
+        response_channel: str,
+        lease_job_id: Optional[str],
+        retry_count: int = 2,
+    ) -> None:
+        if not isinstance(self.client, RedisClient) or not lease_job_id:
+            self._push_to_broker(json_payloads, response_channel, retry_count=retry_count)
+            return
+
+        effective_ttl = getattr(self.client, "_message_ttl_seconds", None)
+        for attempt in range(retry_count):
+            try:
+                client = self.client.get_client()
+                lease_data_key = f"{self._lease_data_prefix}{lease_job_id}"
+                pipe = client.pipeline()
+                for payload in json_payloads:
+                    pipe.rpush(response_channel, payload)
+                if effective_ttl is not None and effective_ttl > 0:
+                    pipe.expire(response_channel, effective_ttl)
+                pipe.delete(lease_data_key)
+                pipe.zrem(self._lease_index_key, lease_job_id)
+                pipe.execute()
+                logger.debug("Sink forwarded result and acked lease for job '%s'.", lease_job_id)
+                return
+            except ValueError as e:
+                logger.warning("Attempt %d failed for lease-aware push: %s", attempt + 1, e)
+                if attempt == retry_count - 1:
+                    raise
+            except Exception as e:
+                logger.warning("Attempt %d failed for lease-aware push: %s", attempt + 1, e)
+                if attempt == retry_count - 1:
+                    raise
+
     def _handle_failure(
-        self, response_channel: str, json_result_fragments: List[Dict[str, Any]], e: Exception, mdf_size: int
+        self,
+        response_channel: str,
+        lease_job_id: Optional[str],
+        json_result_fragments: List[Dict[str, Any]],
+        e: Exception,
+        mdf_size: int,
     ) -> None:
         """
         Handles failure by logging and pushing a failure message to the broker.
@@ -223,6 +283,7 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         }
 
         self.client.submit_message(response_channel, json.dumps(fail_msg))
+        self._ack_lease(lease_job_id or response_channel)
 
     # --- Public API Methods for message broker sink ---
 
@@ -234,6 +295,7 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         mdf, df_json = None, None
         json_result_fragments = []
         response_channel = control_message.get_metadata("response_channel")
+        lease_job_id = control_message.get_metadata("lease_job_id", response_channel)
         try:
             cm_failed = control_message.get_metadata("cm_failed", False)
             if not cm_failed:
@@ -255,15 +317,15 @@ class MessageBrokerTaskSinkStage(RayActorStage):
             total_size_mb = total_payload_size / (1024 * 1024)
             logger.debug(f"Sink Total JSON payload size: {total_size_mb:.2f} MB")
             annotate_cm(control_message, message="Pushed")
-            self._push_to_broker(json_payloads, response_channel)
+            self._push_to_broker_and_ack_lease(json_payloads, response_channel, lease_job_id)
 
         except ValueError as e:
             mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
-            self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
+            self._handle_failure(response_channel, lease_job_id, json_result_fragments, e, mdf_size)
         except Exception as e:
             logger.exception(f"Critical error processing message: {e}")
             mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
-            self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
+            self._handle_failure(response_channel, lease_job_id, json_result_fragments, e, mdf_size)
 
         self.message_count += 1
         self._logger.debug(f"[Message Broker Sink] Processed message count: {self.message_count}")

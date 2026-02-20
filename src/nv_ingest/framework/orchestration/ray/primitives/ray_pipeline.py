@@ -755,6 +755,91 @@ class RayPipeline(PipelineInterface):
             # Consider raising an error to signal potential inconsistency?
             raise RuntimeError(f"Error confirming actor starts for stage '{stage_name}'") from e
 
+    def _verify_actor_readiness(
+        self, actors_to_verify: List[Any], stage_name: str, timeout_seconds: float = 10.0
+    ) -> Tuple[List[Any], List[Any]]:
+        """
+        Verifies newly started actors are responsive and ready.
+
+        Returns
+        -------
+        Tuple[List[Any], List[Any]]
+            (healthy_actors, unhealthy_actors)
+        """
+        if not actors_to_verify:
+            return [], []
+
+        healthy: List[Any] = []
+        unhealthy: List[Any] = []
+        probe_refs: Dict[ray.ObjectRef, Any] = {}
+        stage_info = self.topology.get_stage_info(stage_name)
+        is_source = bool(stage_info and stage_info.is_source)
+        is_sink = bool(stage_info and stage_info.is_sink)
+
+        for actor in actors_to_verify:
+            try:
+                probe_refs[actor.health_probe.remote()] = actor
+            except Exception:
+                try:
+                    probe_refs[actor.get_stats.remote()] = actor
+                except Exception as e:
+                    logger.warning(f"[ScaleUtil] Failed to submit readiness probe for actor {actor}: {e}")
+                    unhealthy.append(actor)
+
+        if not probe_refs:
+            return healthy, unhealthy
+
+        try:
+            ready_refs, remaining_refs = ray.wait(
+                list(probe_refs.keys()), num_returns=len(probe_refs), timeout=timeout_seconds
+            )
+        except Exception as e:
+            logger.error(f"[ScaleUtil] Readiness probe wait failed for stage '{stage_name}': {e}", exc_info=True)
+            return healthy, actors_to_verify
+
+        for ref in ready_refs:
+            actor = probe_refs[ref]
+            try:
+                probe = ray.get(ref)
+                if not isinstance(probe, dict):
+                    healthy.append(actor)
+                    continue
+
+                running = bool(probe.get("running", True))
+                thread_alive = bool(probe.get("processing_thread_alive", True))
+                has_input_queue = bool(probe.get("has_input_queue", True))
+                has_output_queue = bool(probe.get("has_output_queue", True))
+
+                if is_source:
+                    # Source actors may not run the same background processing thread/queue pattern.
+                    ready = running
+                else:
+                    wiring_ok = (is_source or has_input_queue) and (is_sink or has_output_queue)
+                    ready = running and thread_alive and wiring_ok
+
+                if ready:
+                    healthy.append(actor)
+                else:
+                    logger.warning(
+                        f"[ScaleUtil] Actor failed readiness probe for stage '{stage_name}': "
+                        f"running={running}, thread_alive={thread_alive}, "
+                        f"has_input_queue={has_input_queue}, has_output_queue={has_output_queue}"
+                    )
+                    unhealthy.append(actor)
+            except Exception as e:
+                logger.warning(f"[ScaleUtil] Error resolving readiness probe for actor {actor}: {e}")
+                unhealthy.append(actor)
+
+        for ref in remaining_refs:
+            actor = probe_refs[ref]
+            logger.warning(
+                f"[ScaleUtil] Actor readiness probe timed out for stage '{stage_name}' "
+                f"after {timeout_seconds}s: {actor}"
+            )
+            unhealthy.append(actor)
+
+        return healthy, unhealthy
+
     def _handle_scale_up(self, stage_info: StageInfo, current_count: int, target_count: int) -> None:
         """
         Handles scaling up, interacting with topology.
@@ -775,29 +860,62 @@ class RayPipeline(PipelineInterface):
         self.topology.update_scaling_state(stage_name, "Scaling Up")
 
         new_actors = []
-        all_wiring_refs = []
         successfully_added_actors = []
+        all_created_actors: List[Any] = []
+        max_retries = 3
 
         try:
-            # 1. Create actors
-            for _ in range(num_to_add):
-                new_actor = self._create_single_replica(stage_info)
-                new_actors.append(new_actor)
+            remaining_to_add = num_to_add
+            attempt = 0
 
-            # 2. Get wiring refs (uses topology internally)
-            for actor in new_actors:
-                all_wiring_refs.extend(self._get_wiring_refs_for_actor(actor, stage_name))
+            while remaining_to_add > 0 and attempt < max_retries:
+                attempt += 1
+                new_actors = []
+                all_wiring_refs = []
 
-            # 3. Wait for wiring (static helper)
-            self._wait_for_wiring(all_wiring_refs)  # Handles errors
+                logger.debug(
+                    f"[ScaleUp-{stage_name}] Attempt {attempt}/{max_retries}: creating {remaining_to_add} actor(s)."
+                )
+                for _ in range(remaining_to_add):
+                    new_actor = self._create_single_replica(stage_info)
+                    new_actors.append(new_actor)
+                    all_created_actors.append(new_actor)
 
-            # 4. Start actors (static helper)
-            self._start_actors(new_actors, stage_name)  # Handles errors
+                for actor in new_actors:
+                    all_wiring_refs.extend(self._get_wiring_refs_for_actor(actor, stage_name))
 
-            # 5. Add successfully created/wired/started actors to topology
-            for actor in new_actors:
-                self.topology.add_actor_to_stage(stage_name, actor)
-                successfully_added_actors.append(actor)  # Keep track
+                self._wait_for_wiring(all_wiring_refs)
+                self._start_actors(new_actors, stage_name)
+
+                healthy_actors, unhealthy_actors = self._verify_actor_readiness(
+                    new_actors, stage_name=stage_name, timeout_seconds=15.0
+                )
+
+                for actor in healthy_actors:
+                    self.topology.add_actor_to_stage(stage_name, actor)
+                    successfully_added_actors.append(actor)
+
+                for actor in unhealthy_actors:
+                    try:
+                        logger.warning(
+                            f"[ScaleUp-{stage_name}] Killing unhealthy actor after readiness failure: {actor}"
+                        )
+                        ray.kill(actor, no_restart=True)
+                    except Exception as kill_e:
+                        logger.warning(f"[ScaleUp-{stage_name}] Failed to kill unhealthy actor {actor}: {kill_e}")
+
+                remaining_to_add = num_to_add - len(successfully_added_actors)
+                if remaining_to_add > 0:
+                    logger.warning(
+                        f"[ScaleUp-{stage_name}] Added {len(healthy_actors)} healthy actors in attempt {attempt}. "
+                        f"{remaining_to_add} still missing."
+                    )
+
+            if remaining_to_add > 0:
+                raise RuntimeError(
+                    f"Scale up admission failed for stage '{stage_name}': "
+                    f"requested {num_to_add}, admitted {len(successfully_added_actors)}"
+                )
 
             final_count = self.topology.get_actor_count(stage_name)
             logger.debug(
@@ -811,7 +929,7 @@ class RayPipeline(PipelineInterface):
             # --- Cleanup Attempt ---
             # Actors created but potentially not wired/started/added to topology.
             # Only kill actors that were definitely *not* added to the topology.
-            actors_to_kill = [a for a in new_actors if a not in successfully_added_actors]
+            actors_to_kill = [a for a in all_created_actors if a not in successfully_added_actors]
             if actors_to_kill:
                 logger.warning(
                     f"[ScaleUp-{stage_name}] Attempting to kill {len(actors_to_kill)} partially created actors."
@@ -828,6 +946,71 @@ class RayPipeline(PipelineInterface):
             current_state = self.topology.get_scaling_state().get(stage_name)
             if current_state == "Scaling Up":
                 self.topology.update_scaling_state(stage_name, "Idle")
+
+    def quarantine_actor(self, stage_name: str, actor: Any, kill_actor: bool = True) -> bool:
+        """
+        Quarantines an actor from active scheduling and optionally kills it.
+        """
+        removed = self.topology.quarantine_actor(stage_name, actor)
+        if removed and kill_actor:
+            try:
+                ray.kill(actor, no_restart=True)
+            except Exception as e:
+                logger.warning(f"Failed to kill quarantined actor {actor} from stage '{stage_name}': {e}")
+
+        try:
+            stage_info = self.topology.get_stage_info(stage_name)
+            if stage_info is None:
+                return removed
+
+            current_count = self.topology.get_actor_count(stage_name)
+            target_count = stage_info.min_replicas
+            current_state = self.topology.get_scaling_state().get(stage_name, "Idle")
+            if current_count < target_count and current_state != "Scaling Up":
+                logger.warning(
+                    f"[Quarantine-{stage_name}] Active replicas dropped to {current_count}/{target_count}. "
+                    f"Triggering replacement scale-up."
+                )
+                self._handle_scale_up(stage_info, current_count=current_count, target_count=target_count)
+        except Exception as e:
+            logger.error(
+                f"[Quarantine-{stage_name}] Failed to replace quarantined actor for stage '{stage_name}': {e}",
+                exc_info=True,
+            )
+        return removed
+
+    def _reconcile_min_replicas(self) -> None:
+        """
+        Ensures each stage has at least its configured minimum replicas.
+        """
+        stages = self.topology.get_stages_info()
+        actor_map = self.topology.get_stage_actors()
+        scaling_state = self.topology.get_scaling_state()
+
+        for stage in stages:
+            desired = stage.min_replicas
+            if desired <= 0:
+                continue
+
+            stage_name = stage.name
+            current = len(actor_map.get(stage_name, []))
+            if current >= desired:
+                continue
+
+            if scaling_state.get(stage_name) == "Scaling Up":
+                continue
+
+            logger.warning(
+                f"[Capacity-{stage_name}] Under-provisioned: current={current}, desired={desired}. "
+                f"Starting replacement scale-up."
+            )
+            try:
+                self._handle_scale_up(stage, current_count=current, target_count=desired)
+            except Exception as e:
+                logger.error(
+                    f"[Capacity-{stage_name}] Failed enforcing min replicas ({current}->{desired}): {e}",
+                    exc_info=True,
+                )
 
     def _handle_scale_down(self, stage_name: str, current_replicas: List[Any], target_count: int) -> None:
         """
@@ -1378,10 +1561,6 @@ class RayPipeline(PipelineInterface):
             logger.debug("Pipeline is stopping. Skipping scaling cycle.")
             return
 
-        if not self.dynamic_memory_scaling:
-            logger.debug("Dynamic memory scaling disabled. Skipping cycle.")
-            return
-
         if self.topology.get_is_flushing():
             logger.debug("Skipping scaling cycle: Queue flush in progress (topology state).")
             return
@@ -1395,6 +1574,13 @@ class RayPipeline(PipelineInterface):
         try:
             if self._stopping:
                 logger.debug("Pipeline began stopping after acquiring lock. Skipping maintenance logic.")
+                return
+
+            # Always enforce minimum stage capacity, even when dynamic scaling is disabled.
+            self._reconcile_min_replicas()
+
+            if not self.dynamic_memory_scaling:
+                logger.debug("Dynamic memory scaling disabled. Capacity reconciliation only.")
                 return
 
             logger.debug("--- Performing Scaling & Maintenance Cycle ---")
@@ -1543,6 +1729,19 @@ class RayPipeline(PipelineInterface):
             try:
                 ray.get(start_futures, timeout=60.0)
                 logger.debug(f"{len(start_futures)} actors started.")
+                initial_stage_actors = self.topology.get_stage_actors()
+                unhealthy_at_start: List[Tuple[str, Any]] = []
+                for stage_name, stage_actors in initial_stage_actors.items():
+                    _, unhealthy = self._verify_actor_readiness(
+                        stage_actors, stage_name=stage_name, timeout_seconds=30.0
+                    )
+                    unhealthy_at_start.extend((stage_name, actor) for actor in unhealthy)
+
+                if unhealthy_at_start:
+                    for stage_name, actor in unhealthy_at_start:
+                        logger.error(f"Unhealthy actor detected during initial start in stage '{stage_name}': {actor}")
+                        self.quarantine_actor(stage_name, actor, kill_actor=True)
+                    raise RuntimeError(f"Pipeline start readiness check failed for {len(unhealthy_at_start)} actor(s).")
             except Exception as e:
                 logger.error(f"Error/Timeout starting actors: {e}", exc_info=True)
                 self.stop()  # Attempt cleanup
@@ -1580,14 +1779,24 @@ class RayPipeline(PipelineInterface):
         logger.debug("Stopping all actors in the topology...")
         all_actors = self.topology.get_all_actors()
         if all_actors:
-            stop_futures = [actor.stop.remote() for actor in all_actors]
+            stop_futures = []
+            for actor in all_actors:
+                try:
+                    stop_ref = actor.stop.remote()
+                    if stop_ref is not None:
+                        stop_futures.append(stop_ref)
+                except Exception as e:
+                    logger.warning(f"Failed to submit stop() for actor {actor}: {e}")
             try:
-                ready, not_ready = ray.wait(stop_futures, num_returns=len(stop_futures), timeout=60.0)
-                if not_ready:
-                    logger.warning(
-                        f"Timeout waiting for {len(not_ready)} actors to stop. " f"Proceeding with shutdown."
-                    )
-                logger.debug(f"{len(ready)} actors confirmed stop.")
+                if stop_futures:
+                    ready, not_ready = ray.wait(stop_futures, num_returns=len(stop_futures), timeout=60.0)
+                    if not_ready:
+                        logger.warning(
+                            f"Timeout waiting for {len(not_ready)} actors to stop. " f"Proceeding with shutdown."
+                        )
+                    logger.debug(f"{len(ready)} actors confirmed stop.")
+                else:
+                    logger.debug("No awaitable actor stop futures were returned.")
             except Exception as e:
                 logger.error(f"An unexpected error occurred during actor shutdown: {e}", exc_info=True)
 
