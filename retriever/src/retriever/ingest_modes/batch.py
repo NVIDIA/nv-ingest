@@ -57,6 +57,28 @@ class _LanceDBWriteActor:
         self._schema = None
         self._first_batch = True
         self._total_rows = 0
+        self._table = None
+        mode = "overwrite" if self._overwrite else "create"
+        fields = [
+                pa.field("vector", pa.list_(pa.float32(), 2048)),
+                pa.field("pdf_page", pa.string()),
+                pa.field("filename", pa.string()),
+                pa.field("pdf_basename", pa.string()),
+                pa.field("page_number", pa.int32()),
+                pa.field("source_id", pa.string()),
+                pa.field("path", pa.string()),
+                pa.field("text", pa.string()),
+                pa.field("metadata", pa.string()),
+                pa.field("source", pa.string()),
+            ]
+        self._schema = pa.schema(fields)
+        
+        self._table = self._db.create_table(
+                        self._table_name,
+                        schema=self._schema,
+                        mode=mode,
+                    )
+
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch.
@@ -135,47 +157,26 @@ class _LanceDBWriteActor:
 
     def __call__(self, batch_df: Any) -> Any:
         import pandas as pd
+        from datetime import timedelta
 
         rows = self._build_rows(batch_df)
         if rows:
             # Infer schema from first batch
-            if self._schema is None:
-                pa = self._pa
-                dim = len(rows[0]["vector"])
-                fields = [
-                    pa.field("vector", pa.list_(pa.float32(), dim)),
-                    pa.field("pdf_page", pa.string()),
-                    pa.field("filename", pa.string()),
-                    pa.field("pdf_basename", pa.string()),
-                    pa.field("page_number", pa.int32()),
-                    pa.field("source_id", pa.string()),
-                    pa.field("path", pa.string()),
-                    pa.field("text", pa.string()),
-                    pa.field("metadata", pa.string()),
-                    pa.field("source", pa.string()),
-                ]
-                self._schema = pa.schema(fields)
-
-            if self._first_batch:
-                mode = "overwrite" if self._overwrite else "create"
-                try:
-                    self._table = self._db.create_table(
-                        self._table_name,
-                        data=rows,
-                        schema=self._schema,
-                        mode=mode,
-                    )
-                except Exception:
-                    # Table might already exist in append mode
-                    self._table = self._db.open_table(self._table_name)
-                    self._table.add(rows)
-                self._first_batch = False
-            else:
-                if self._table is None:
-                    self._table = self._db.open_table(self._table_name)
-                self._table.add(rows)
+            if self._table is None:
+                self._table = self._db.open_table(self._table_name)
+            self._table.add(rows)
 
             self._total_rows += len(rows)
+
+        self._table.create_index(
+            index_type="IVF_HNSW_SQ",
+            metric="l2",
+            num_partitions=16,
+            num_sub_vectors=256,
+            vector_column_name="vector",
+        )
+        for index_stub in self._table.list_indices():
+            self._table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
         return batch_df
 
@@ -307,7 +308,7 @@ class BatchIngestor(Ingestor):
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
         page_elements_batch_size = kwargs.pop("page_elements_batch_size", 16)
-        detect_batch_size = kwargs.pop("detect_batch_size", 16)
+        detect_batch_size = kwargs.pop("detect_batch_size", 24)
 
         # Count GPU stages that will be created (page_elements is always on).
         # +1 reserves headroom for a downstream embed() stage.
@@ -407,8 +408,8 @@ class BatchIngestor(Ingestor):
             num_gpus=0,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
-
-        # Page-element detection with a GPU actor pool.
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=16)
+                # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
         # construct one instance per actor). Passing an already-constructed
         # callable object is treated as a "regular function" and will fail.
@@ -432,6 +433,7 @@ class BatchIngestor(Ingestor):
             ocr_flags["extract_infographics"] = True
 
         if ocr_flags:
+            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
             self._rd_dataset = self._rd_dataset.map_batches(
                 OCRActor,
                 batch_size=detect_batch_size,
@@ -468,6 +470,8 @@ class BatchIngestor(Ingestor):
 
         # Explode content rows before embedding so each table/chart/infographic
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
+
         from retriever.ingest_modes.inprocess import explode_content_to_rows
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -517,15 +521,16 @@ class BatchIngestor(Ingestor):
         self._vdb_upload_kwargs = dict(kwargs)
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
+        self._rd_dataset = self._rd_dataset.repartition(1)
         self._rd_dataset = self._rd_dataset.map_batches(
             _LanceDBWriteActor,
-            batch_size=256,
             batch_format="pandas",
             num_cpus=1,
             num_gpus=0,
             compute=rd.ActorPoolStrategy(size=1),
             fn_constructor_kwargs=dict(kwargs),
         )
+
 
         return self
 
