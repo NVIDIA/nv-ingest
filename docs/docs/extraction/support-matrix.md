@@ -2,10 +2,9 @@
 
 Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
 
-!!! note
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
-
+**Canonical reference:** This page is the single source of truth for pipeline NIMs and hardware support. For tokenizer and split defaults see [Token-based splitting and tokenizers](chunking.md#token-based-splitting-and-tokenizers). For environment variables see [Environment Variables](environment-config.md). For metadata schema see [Metadata Reference](content-metadata.md).
 
 ## Core and Advanced Pipeline Features
 

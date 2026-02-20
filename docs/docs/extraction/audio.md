@@ -7,9 +7,7 @@ to extract speech from audio files.
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 Currently, you can extract speech from the following file types:
 

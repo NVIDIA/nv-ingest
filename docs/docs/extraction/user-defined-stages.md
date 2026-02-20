@@ -6,9 +6,7 @@ By following these steps,
 your Lambda stages are robust, signature-validated, plug-and-play for your RayPipeline, 
 and operate on a well-defined DataFrame payload and metadata structure.
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 To add user-defined stages to your pipeline, you need the following:

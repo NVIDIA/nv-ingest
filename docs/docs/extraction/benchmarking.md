@@ -90,7 +90,7 @@ active:
   text_depth: page
   table_output_format: markdown
   
-  # Pipeline (optional steps)
+  # Pipeline (optional steps); defaults match [Split Documents](chunking.md)
   enable_caption: false
   enable_split: false
   split_chunk_size: 1024

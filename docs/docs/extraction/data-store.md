@@ -2,9 +2,7 @@
 
 Use this documentation to learn how [NeMo Retriever extraction](overview.md) handles and uploads data.
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 ## Overview
@@ -47,6 +45,8 @@ You can delete all collections by deleting that volume, and then restarting the 
 
     When you use the `vdb_upload` method, the behavior of the upload depends on the `return_failures` parameter of the `ingest` method. For details, refer to [Capture Job Failures](nv-ingest-python-api.md#capture-job-failures).
 
+**`dense_dim` must match your embedding model:** use `dense_dim=1024` for the default llama-3.2 embedder and `dense_dim=2048` for e5-v5. The default embedder is listed in [Support Matrix](support-matrix.md) and [Use the Python API](nv-ingest-python-api.md).
+
 To upload to Milvus, use code similar to the following to define your `Ingestor`.
 
 ```python
@@ -59,8 +59,7 @@ Ingestor(client=client)
         collection_name=collection_name,
         milvus_uri=milvus_uri,
         sparse=sparse,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048,
+        dense_dim=2048,  # Use 1024 for default llama-3.2 embedder; see note above
         stream=False,
         recreate=False
     )

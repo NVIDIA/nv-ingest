@@ -2,9 +2,7 @@
 
 To get started using [NeMo Retriever extraction](overview.md), you can try one of the ready-made notebooks that are available.
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 
 ## Dataset Downloads for Benchmarking

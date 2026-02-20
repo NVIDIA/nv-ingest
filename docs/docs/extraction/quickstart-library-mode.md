@@ -2,9 +2,7 @@
 
 [NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 In addition, you can use library mode, which is intended for the following cases:
 
@@ -121,8 +119,7 @@ def main():
             collection_name=collection_name,
             milvus_uri=milvus_uri,
             sparse=sparse,
-            # for llama-3.2 embedder, use 1024 for e5-v5
-            dense_dim=2048,
+            dense_dim=2048,  # Use 1024 for default llama-3.2 embedder; see [Data Store](data-store.md)
         )
     )
 
@@ -390,7 +387,7 @@ def run_ingestor():
             extract_infographics=False,
             text_depth="page",
         )
-        .split(chunk_size=1024, chunk_overlap=150)
+        .split(chunk_size=1024, chunk_overlap=150)  # Defaults: [Split Documents](chunking.md)
         .embed()
     )
 

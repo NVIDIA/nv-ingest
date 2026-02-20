@@ -2,9 +2,7 @@
 
 The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
 
-!!! note
-
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+For product naming, see [What is NeMo Retriever Extraction?](overview.md).
 
 !!! tip
 
@@ -372,7 +370,7 @@ This can be used to describe images extracted from documents.
 
 !!! note
 
-    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`.
+    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. For pipeline NIMs and VLM options, see [Support Matrix](support-matrix.md).
 
 !!! tip
 
@@ -427,7 +425,7 @@ ingestor = ingestor.embed()
 
 !!! note
 
-    By default, `embed` uses the [llama-3.2-nv-embedqa-1b-v2](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2) model.
+    By default, `embed` uses the [llama-3.2-nv-embedqa-1b-v2](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2) model. For the full list of pipeline NIMs and hardware support, see [Support Matrix](support-matrix.md).
 
 To use a different embedding model, such as [nv-embedqa-e5-v5](https://build.nvidia.com/nvidia/nv-embedqa-e5-v5), specify a different `model_name` and `endpoint_url`.
 
@@ -548,7 +546,7 @@ ingestor = ingestor.extract(
         extract_images=False,
         extract_infographics=False,
     ).split(
-        tokenizer="meta-llama/Llama-3.2-1B",
+        tokenizer="meta-llama/Llama-3.2-1B",  # For full tokenizer behavior and env vars, see [Token-based splitting and tokenizers](chunking.md#token-based-splitting-and-tokenizers)
         chunk_size=150,
         chunk_overlap=0,
         params={"split_source_types": ["mp3"], "hf_access_token": "hf_***"}
