@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import os
 import re
 import shlex
@@ -26,17 +27,46 @@ class Variant:
     # Matrix input metadata columns
     pdf_workers: int
     pdf_num_cpus: float
+    pdf_split_bs: int
     pdf_bs: int
+    page_elements_bs: int
+    page_elements_workers: int
     ocr_workers: int
     ocr_bs: int
     embed_workers: int
     embed_bs: int
+    page_elements_cpus_per_actor: float
+    ocr_cpus_per_actor: float
+    embed_cpus_per_actor: float
     gpu_page_elements: float
     gpu_ocr: float
     gpu_embed: float
     # Supported by batch_pipeline.py today
     ray_address: str | None = None
     start_ray: bool = False
+
+
+MATRIX_FIELDS = [
+    "run_id",
+    "pdf_workers",
+    "pdf_num_cpus",
+    "pdf_split_bs",
+    "pdf_bs",
+    "page_elements_bs",
+    "page_elements_workers",
+    "ocr_workers",
+    "ocr_bs",
+    "embed_workers",
+    "embed_bs",
+    "page_elements_cpus_per_actor",
+    "ocr_cpus_per_actor",
+    "embed_cpus_per_actor",
+    "gpu_page_elements",
+    "gpu_ocr",
+    "gpu_embed",
+    "ray_address",
+    "start_ray",
+]
 
 
 def parse_done_metrics(stdout: str) -> dict[str, Any]:
@@ -70,6 +100,250 @@ def parse_recall_metrics(stdout: str) -> dict[str, float]:
     return out
 
 
+def _parse_bool(raw: Any, default: bool = False) -> bool:
+    if raw is None:
+        return default
+    s = str(raw).strip().lower()
+    if s in {"1", "true", "yes", "y", "on"}:
+        return True
+    if s in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def build_default_variants() -> list[Variant]:
+    # Compact DOE-style matrix (< 1000 rows):
+    # 1) baseline
+    # 2) one-factor sweeps around baseline
+    # 3) targeted interaction grids for likely bottlenecks
+    baseline = {
+        "pdf_workers": 8,
+        "pdf_num_cpus": 2.0,
+        "pdf_split_bs": 1,
+        "pdf_bs": 16,
+        "page_elements_bs": 16,
+        "page_elements_workers": 1,
+        "ocr_workers": 2,
+        "ocr_bs": 16,
+        "embed_workers": 1,
+        "embed_bs": 256,
+        "page_elements_cpus_per_actor": 1.0,
+        "ocr_cpus_per_actor": 2.0,
+        "embed_cpus_per_actor": 1.0,
+        "gpu_page_elements": 0.5,
+        "gpu_ocr": 1.0,
+        "gpu_embed": 0.5,
+    }
+
+    variants: list[Variant] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    def _key(v: dict[str, Any]) -> tuple[Any, ...]:
+        return (
+            v["pdf_workers"],
+            v["pdf_num_cpus"],
+            v["pdf_split_bs"],
+            v["pdf_bs"],
+            v["page_elements_bs"],
+            v["page_elements_workers"],
+            v["ocr_workers"],
+            v["ocr_bs"],
+            v["embed_workers"],
+            v["embed_bs"],
+            v["page_elements_cpus_per_actor"],
+            v["ocr_cpus_per_actor"],
+            v["embed_cpus_per_actor"],
+            v["gpu_page_elements"],
+            v["gpu_ocr"],
+            v["gpu_embed"],
+        )
+
+    def add_variant(**overrides: Any) -> None:
+        cfg = dict(baseline)
+        cfg.update(overrides)
+        k = _key(cfg)
+        if k in seen:
+            return
+        seen.add(k)
+        variants.append(
+            Variant(
+                run_id=f"V{len(variants) + 1:05d}",
+                pdf_workers=int(cfg["pdf_workers"]),
+                pdf_num_cpus=float(cfg["pdf_num_cpus"]),
+                pdf_split_bs=int(cfg["pdf_split_bs"]),
+                pdf_bs=int(cfg["pdf_bs"]),
+                page_elements_bs=int(cfg["page_elements_bs"]),
+                page_elements_workers=int(cfg["page_elements_workers"]),
+                ocr_workers=int(cfg["ocr_workers"]),
+                ocr_bs=int(cfg["ocr_bs"]),
+                embed_workers=int(cfg["embed_workers"]),
+                embed_bs=int(cfg["embed_bs"]),
+                page_elements_cpus_per_actor=float(cfg["page_elements_cpus_per_actor"]),
+                ocr_cpus_per_actor=float(cfg["ocr_cpus_per_actor"]),
+                embed_cpus_per_actor=float(cfg["embed_cpus_per_actor"]),
+                gpu_page_elements=float(cfg["gpu_page_elements"]),
+                gpu_ocr=float(cfg["gpu_ocr"]),
+                gpu_embed=float(cfg["gpu_embed"]),
+            )
+        )
+
+    # 1) Baseline
+    add_variant()
+
+    # 2) One-factor sweeps
+    for x in [4, 8, 12, 16]:
+        add_variant(pdf_workers=x)
+    for x in [1.0, 2.0, 3.0, 4.0]:
+        add_variant(pdf_num_cpus=x)
+    for x in [1, 4, 8]:
+        add_variant(pdf_split_bs=x)
+    for x in [8, 16, 24, 32]:
+        add_variant(pdf_bs=x)
+    for x in [8, 16, 24, 32]:
+        add_variant(page_elements_bs=x)
+    for x in [1, 2, 3]:
+        add_variant(page_elements_workers=x)
+    for x in [1, 2, 3]:
+        add_variant(ocr_workers=x)
+    for x in [8, 16, 24, 32]:
+        add_variant(ocr_bs=x)
+    for x in [1, 2, 3]:
+        add_variant(embed_workers=x)
+    for x in [128, 256, 512, 768]:
+        add_variant(embed_bs=x)
+    for x in [1.0, 2.0, 4.0]:
+        add_variant(page_elements_cpus_per_actor=x)
+    for x in [1.0, 2.0, 4.0]:
+        add_variant(ocr_cpus_per_actor=x)
+    for x in [1.0, 2.0, 4.0]:
+        add_variant(embed_cpus_per_actor=x)
+    for x in [0.25, 0.5, 0.75]:
+        add_variant(gpu_page_elements=x)
+    for x in [0.75, 1.0, 1.25]:
+        add_variant(gpu_ocr=x)
+    for x in [0.25, 0.5, 0.75]:
+        add_variant(gpu_embed=x)
+
+    # 3) Targeted interactions
+    for ocr_bs, ocr_workers, gpu_ocr in itertools.product([8, 16, 24, 32], [1, 2, 3], [0.75, 1.0, 1.25]):
+        add_variant(ocr_bs=ocr_bs, ocr_workers=ocr_workers, gpu_ocr=gpu_ocr)
+
+    for embed_bs, embed_workers, gpu_embed in itertools.product([128, 256, 512, 768], [1, 2, 3], [0.25, 0.5, 0.75]):
+        add_variant(embed_bs=embed_bs, embed_workers=embed_workers, gpu_embed=gpu_embed)
+
+    for page_elements_bs, page_elements_workers, gpu_page_elements in itertools.product(
+        [8, 16, 24, 32], [1, 2, 3], [0.25, 0.5, 0.75]
+    ):
+        add_variant(
+            page_elements_bs=page_elements_bs,
+            page_elements_workers=page_elements_workers,
+            gpu_page_elements=gpu_page_elements,
+        )
+
+    for pdf_workers, pdf_num_cpus, pdf_bs in itertools.product([4, 8, 12, 16], [1.0, 2.0, 3.0, 4.0], [8, 16, 24, 32]):
+        add_variant(pdf_workers=pdf_workers, pdf_num_cpus=pdf_num_cpus, pdf_bs=pdf_bs)
+
+    for pe_cpu, ocr_cpu, embed_cpu in itertools.product([1.0, 2.0, 4.0], [1.0, 2.0, 4.0], [1.0, 2.0, 4.0]):
+        add_variant(
+            page_elements_cpus_per_actor=pe_cpu,
+            ocr_cpus_per_actor=ocr_cpu,
+            embed_cpus_per_actor=embed_cpu,
+        )
+
+    for pdf_bs, ocr_bs, embed_bs in itertools.product([8, 16, 24, 32], [8, 16, 24, 32], [128, 256, 512, 768]):
+        add_variant(pdf_bs=pdf_bs, ocr_bs=ocr_bs, embed_bs=embed_bs)
+
+    return variants
+
+
+def write_matrix_csv(variants: list[Variant], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=MATRIX_FIELDS)
+        writer.writeheader()
+        for v in variants:
+            writer.writerow(
+                {
+                    "run_id": v.run_id,
+                    "pdf_workers": v.pdf_workers,
+                    "pdf_num_cpus": v.pdf_num_cpus,
+                    "pdf_split_bs": v.pdf_split_bs,
+                    "pdf_bs": v.pdf_bs,
+                    "page_elements_bs": v.page_elements_bs,
+                    "page_elements_workers": v.page_elements_workers,
+                    "ocr_workers": v.ocr_workers,
+                    "ocr_bs": v.ocr_bs,
+                    "embed_workers": v.embed_workers,
+                    "embed_bs": v.embed_bs,
+                    "page_elements_cpus_per_actor": v.page_elements_cpus_per_actor,
+                    "ocr_cpus_per_actor": v.ocr_cpus_per_actor,
+                    "embed_cpus_per_actor": v.embed_cpus_per_actor,
+                    "gpu_page_elements": v.gpu_page_elements,
+                    "gpu_ocr": v.gpu_ocr,
+                    "gpu_embed": v.gpu_embed,
+                    "ray_address": v.ray_address or "",
+                    "start_ray": str(v.start_ray).lower(),
+                }
+            )
+
+
+def load_variants_from_csv(path: Path) -> list[Variant]:
+    required = {
+        "pdf_workers",
+        "pdf_num_cpus",
+        "pdf_split_bs",
+        "pdf_bs",
+        "page_elements_bs",
+        "page_elements_workers",
+        "ocr_workers",
+        "ocr_bs",
+        "embed_workers",
+        "embed_bs",
+        "page_elements_cpus_per_actor",
+        "ocr_cpus_per_actor",
+        "embed_cpus_per_actor",
+        "gpu_page_elements",
+        "gpu_ocr",
+        "gpu_embed",
+    }
+    variants: list[Variant] = []
+    with path.open("r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None:
+            raise ValueError(f"Matrix CSV has no header: {path}")
+        missing = sorted(required.difference(set(reader.fieldnames)))
+        if missing:
+            raise ValueError(f"Matrix CSV is missing required columns: {missing}")
+
+        for idx, row in enumerate(reader, start=1):
+            run_id = (row.get("run_id") or "").strip() or f"R{idx:05d}"
+            ray_address_raw = (row.get("ray_address") or "").strip()
+            variants.append(
+                Variant(
+                    run_id=run_id,
+                    pdf_workers=int(row["pdf_workers"]),
+                    pdf_num_cpus=float(row["pdf_num_cpus"]),
+                    pdf_split_bs=int(row.get("pdf_split_bs") or 1),
+                    pdf_bs=int(row["pdf_bs"]),
+                    page_elements_bs=int(row.get("page_elements_bs") or 24),
+                    page_elements_workers=int(row.get("page_elements_workers") or 1),
+                    ocr_workers=int(row["ocr_workers"]),
+                    ocr_bs=int(row["ocr_bs"]),
+                    embed_workers=int(row["embed_workers"]),
+                    embed_bs=int(row["embed_bs"]),
+                    page_elements_cpus_per_actor=float(row.get("page_elements_cpus_per_actor") or 1.0),
+                    ocr_cpus_per_actor=float(row.get("ocr_cpus_per_actor") or 1.0),
+                    embed_cpus_per_actor=float(row.get("embed_cpus_per_actor") or 1.0),
+                    gpu_page_elements=float(row["gpu_page_elements"]),
+                    gpu_ocr=float(row["gpu_ocr"]),
+                    gpu_embed=float(row["gpu_embed"]),
+                    ray_address=ray_address_raw if ray_address_raw else None,
+                    start_ray=_parse_bool(row.get("start_ray"), default=False),
+                )
+            )
+    return variants
+
+
 def format_float(value: Any, ndigits: int = 3) -> str:
     if value is None:
         return "-"
@@ -81,14 +355,21 @@ def format_float(value: Any, ndigits: int = 3) -> str:
 
 def print_matrix(rows: list[dict[str, Any]]) -> None:
     cols = [
+        "matrix_row",
         "run_id",
         "pdf_workers",
         "pdf_num_cpus",
+        "pdf_split_bs",
         "pdf_bs",
+        "page_elements_bs",
+        "page_elements_workers",
         "ocr_workers",
         "ocr_bs",
         "embed_workers",
         "embed_bs",
+        "page_elements_cpus_per_actor",
+        "ocr_cpus_per_actor",
+        "embed_cpus_per_actor",
         "gpu_page_elements",
         "gpu_ocr",
         "gpu_embed",
@@ -119,6 +400,9 @@ def print_matrix(rows: list[dict[str, Any]]) -> None:
                 "gpu_page_elements",
                 "gpu_ocr",
                 "gpu_embed",
+                "page_elements_cpus_per_actor",
+                "ocr_cpus_per_actor",
+                "embed_cpus_per_actor",
                 "wall_secs",
                 "ingest_secs",
                 "pages_per_sec_total",
@@ -154,6 +438,36 @@ def main() -> int:
         default="batch_matrix_logs",
         help="Directory for per-run stdout/stderr logs.",
     )
+    parser.add_argument(
+        "--matrix-csv",
+        default=None,
+        help=(
+            "Optional external matrix CSV path. If omitted, a default matrix is generated "
+            "using built-in cpu/gpu settings and the requested batch-size ranges."
+        ),
+    )
+    parser.add_argument(
+        "--write-default-matrix-csv",
+        default=None,
+        help="Optional path to write the generated default matrix CSV.",
+    )
+    parser.add_argument(
+        "--exit-after-writing-matrix",
+        action="store_true",
+        help="Write matrix CSV then exit without running any jobs.",
+    )
+    parser.add_argument(
+        "--row-start",
+        type=int,
+        default=1,
+        help="1-based inclusive start row from matrix to run.",
+    )
+    parser.add_argument(
+        "--row-end",
+        type=int,
+        default=None,
+        help="1-based inclusive end row from matrix to run. Defaults to final row.",
+    )
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir).resolve()
@@ -165,50 +479,52 @@ def main() -> int:
         print(f"ERROR: input directory does not exist: {input_dir}", file=sys.stderr)
         return 2
 
-    # Expanded matrix:
-    # - vary per-stage GPU fractions in 0.25 increments
-    # - vary CPU allocation and worker count for PDF extraction
-    gpu_triplets = [
-        (0.25, 0.50, 0.25),
-        (0.25, 0.75, 0.50),
-        (0.50, 0.75, 0.50),
-        (0.50, 1.00, 0.50),
-        (0.75, 1.00, 0.75),
-        (0.75, 1.25, 0.75),
-        (1.00, 1.00, 1.00),
-        (1.00, 1.25, 1.00),
-    ]
-    cpu_setups = [
-        (8, 1.0),
-        (12, 2.0),
-        (16, 3.0),
+    if args.matrix_csv:
+        matrix_path = Path(args.matrix_csv).resolve()
+        if not matrix_path.exists():
+            print(f"ERROR: matrix CSV does not exist: {matrix_path}", file=sys.stderr)
+            return 2
+        variants = load_variants_from_csv(matrix_path)
+    else:
+        variants = build_default_variants()
+
+    if args.write_default_matrix_csv:
+        write_path = Path(args.write_default_matrix_csv).resolve()
+        # Write whichever matrix is currently active so sharding is reproducible.
+        write_matrix_csv(variants, write_path)
+        print(f"Wrote matrix CSV ({len(variants)} rows): {write_path}")
+        if args.exit_after_writing_matrix:
+            return 0
+
+    total_rows = len(variants)
+    if total_rows == 0:
+        print("ERROR: matrix contains zero rows.", file=sys.stderr)
+        return 2
+
+    row_start = int(args.row_start)
+    row_end = int(args.row_end) if args.row_end is not None else total_rows
+    if row_start < 1:
+        print("--row-start must be >= 1", file=sys.stderr)
+        return 2
+    if row_end < row_start:
+        print("--row-end must be >= --row-start", file=sys.stderr)
+        return 2
+    if row_end > total_rows:
+        print(f"--row-end ({row_end}) exceeds matrix size ({total_rows})", file=sys.stderr)
+        return 2
+
+    # Preserve original matrix row numbers for distributed sharding visibility.
+    selected: list[tuple[int, Variant]] = [
+        (idx, variants[idx - 1]) for idx in range(row_start, row_end + 1)
     ]
 
-    variants: list[Variant] = []
-    idx = 0
-    for pdf_workers, pdf_num_cpus in cpu_setups:
-        for gpu_page_elements, gpu_ocr, gpu_embed in gpu_triplets:
-            idx += 1
-            variants.append(
-                Variant(
-                    run_id=f"V{idx:02d}",
-                    pdf_workers=pdf_workers,
-                    pdf_num_cpus=pdf_num_cpus,
-                    pdf_bs=4,
-                    ocr_workers=1 if gpu_ocr < 1.0 else 2,
-                    ocr_bs=16,
-                    embed_workers=1 if gpu_embed <= 0.5 else 2,
-                    embed_bs=256,
-                    gpu_page_elements=gpu_page_elements,
-                    gpu_ocr=gpu_ocr,
-                    gpu_embed=gpu_embed,
-                )
-            )
+    print(f"Loaded matrix rows: {total_rows}")
+    print(f"Running row range: [{row_start}, {row_end}] ({len(selected)} rows)")
 
     base_cmd = shlex.split(args.runner) + ["-m", args.module]
     rows: list[dict[str, Any]] = []
 
-    for variant in variants:
+    for matrix_row, variant in selected:
         cmd = base_cmd + [str(input_dir), "--query-csv", str(args.query_csv), "--no-recall-details"]
         if variant.ray_address:
             cmd += ["--ray-address", variant.ray_address]
@@ -219,8 +535,14 @@ def main() -> int:
             str(variant.pdf_workers),
             "--pdf-extract-num-cpus",
             str(variant.pdf_num_cpus),
+            "--pdf-split-batch-size",
+            str(variant.pdf_split_bs),
             "--pdf-extract-batch-size",
             str(variant.pdf_bs),
+            "--page-elements-batch-size",
+            str(variant.page_elements_bs),
+            "--page-elements-workers",
+            str(variant.page_elements_workers),
             "--ocr-workers",
             str(variant.ocr_workers),
             "--ocr-batch-size",
@@ -229,6 +551,12 @@ def main() -> int:
             str(variant.embed_workers),
             "--embed-batch-size",
             str(variant.embed_bs),
+            "--page-elements-cpus-per-actor",
+            str(variant.page_elements_cpus_per_actor),
+            "--ocr-cpus-per-actor",
+            str(variant.ocr_cpus_per_actor),
+            "--embed-cpus-per-actor",
+            str(variant.embed_cpus_per_actor),
             "--gpu-page-elements",
             str(variant.gpu_page_elements),
             "--gpu-ocr",
@@ -237,7 +565,7 @@ def main() -> int:
             str(variant.gpu_embed),
         ]
 
-        print(f"\n=== Run {variant.run_id} ===")
+        print(f"\n=== Run {variant.run_id} (row {matrix_row}) ===")
         print("CMD:", " ".join(shlex.quote(x) for x in cmd))
 
         t0 = time.perf_counter()
@@ -255,14 +583,21 @@ def main() -> int:
         recall_metrics = parse_recall_metrics(proc.stdout)
 
         row: dict[str, Any] = {
+            "matrix_row": matrix_row,
             "run_id": variant.run_id,
             "pdf_workers": variant.pdf_workers,
             "pdf_num_cpus": variant.pdf_num_cpus,
+            "pdf_split_bs": variant.pdf_split_bs,
             "pdf_bs": variant.pdf_bs,
+            "page_elements_bs": variant.page_elements_bs,
+            "page_elements_workers": variant.page_elements_workers,
             "ocr_workers": variant.ocr_workers,
             "ocr_bs": variant.ocr_bs,
             "embed_workers": variant.embed_workers,
             "embed_bs": variant.embed_bs,
+            "page_elements_cpus_per_actor": variant.page_elements_cpus_per_actor,
+            "ocr_cpus_per_actor": variant.ocr_cpus_per_actor,
+            "embed_cpus_per_actor": variant.embed_cpus_per_actor,
             "gpu_page_elements": variant.gpu_page_elements,
             "gpu_ocr": variant.gpu_ocr,
             "gpu_embed": variant.gpu_embed,
@@ -279,8 +614,8 @@ def main() -> int:
         row.update(recall_metrics)
         rows.append(row)
 
-        (logs_dir / f"{variant.run_id}.stdout.log").write_text(proc.stdout or "", encoding="utf-8")
-        (logs_dir / f"{variant.run_id}.stderr.log").write_text(proc.stderr or "", encoding="utf-8")
+        (logs_dir / f"{matrix_row:05d}_{variant.run_id}.stdout.log").write_text(proc.stdout or "", encoding="utf-8")
+        (logs_dir / f"{matrix_row:05d}_{variant.run_id}.stderr.log").write_text(proc.stderr or "", encoding="utf-8")
 
         print(
             f"Run {variant.run_id}: rc={proc.returncode}, pages={row['pages']}, "
@@ -290,14 +625,21 @@ def main() -> int:
         )
 
     base_fieldnames = [
+        "matrix_row",
         "run_id",
         "pdf_workers",
         "pdf_num_cpus",
+        "pdf_split_bs",
         "pdf_bs",
+        "page_elements_bs",
+        "page_elements_workers",
         "ocr_workers",
         "ocr_bs",
         "embed_workers",
         "embed_bs",
+        "page_elements_cpus_per_actor",
+        "ocr_cpus_per_actor",
+        "embed_cpus_per_actor",
         "gpu_page_elements",
         "gpu_ocr",
         "gpu_embed",

@@ -109,17 +109,47 @@ def main(
         min=1,
         help="Batch size for PDF extraction stage.",
     ),
+    pdf_split_batch_size: int = typer.Option(
+        1,
+        "--pdf-split-batch-size",
+        min=1,
+        help="Batch size for PDF split stage.",
+    ),
+    page_elements_batch_size: int = typer.Option(
+        24,
+        "--page-elements-batch-size",
+        min=1,
+        help="Ray Data batch size for page-elements stage.",
+    ),
     ocr_workers: int = typer.Option(
         1,
         "--ocr-workers",
         min=1,
         help="Actor count for OCR stage.",
     ),
+    page_elements_workers: int = typer.Option(
+        1,
+        "--page-elements-workers",
+        min=1,
+        help="Actor count for page-elements stage.",
+    ),
     ocr_batch_size: int = typer.Option(
         16,
         "--ocr-batch-size",
         min=1,
         help="Ray Data batch size for OCR stage.",
+    ),
+    page_elements_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--page-elements-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per page-elements actor.",
+    ),
+    ocr_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--ocr-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per OCR actor.",
     ),
     embed_workers: int = typer.Option(
         1,
@@ -132,6 +162,12 @@ def main(
         "--embed-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
+    ),
+    embed_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--embed-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per embedding actor.",
     ),
     gpu_page_elements: float = typer.Option(
         0.5,
@@ -173,9 +209,14 @@ def main(
             extract_infographics=False,
             pdf_extract_workers=int(pdf_extract_workers),
             pdf_extract_num_cpus=float(pdf_extract_num_cpus),
+            pdf_split_batch_size=int(pdf_split_batch_size),
             pdf_extract_batch_size=int(pdf_extract_batch_size),
+            page_elements_batch_size=int(page_elements_batch_size),
+            page_elements_workers=int(page_elements_workers),
             detect_workers=int(ocr_workers),
             detect_batch_size=int(ocr_batch_size),
+            page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
+            ocr_cpus_per_actor=float(ocr_cpus_per_actor),
             gpu_page_elements=float(gpu_page_elements),
             gpu_ocr=float(gpu_ocr),
             gpu_embed=float(gpu_embed),
@@ -184,6 +225,7 @@ def main(
             model_name="nemo_retriever_v1",
             embed_workers=int(embed_workers),
             embed_batch_size=int(embed_batch_size),
+            embed_cpus_per_actor=float(embed_cpus_per_actor),
         )
         .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
     )

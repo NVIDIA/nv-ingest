@@ -155,8 +155,6 @@ class _LanceDBWriteActor:
         return rows
 
     def __call__(self, batch_df: Any) -> Any:
-        import pandas as pd
-
         rows = self._build_rows(batch_df)
         if rows:
             # Infer schema from first batch
@@ -291,6 +289,8 @@ class BatchIngestor(Ingestor):
         - ``page_elements_workers``: ActorPool size for page elements (default num_gpus // 2).
         - ``detect_batch_size``: Batch size for detection stages (default 16).
         - ``detect_workers``: ActorPool size for detection stages (default num_gpus // 4).
+        - ``page_elements_cpus_per_actor``: CPUs reserved per page-elements actor (default 1).
+        - ``ocr_cpus_per_actor``: CPUs reserved per OCR actor (default 1).
         """
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
@@ -330,12 +330,14 @@ class BatchIngestor(Ingestor):
         page_elements_workers = kwargs.pop("page_elements_workers", 1)
         ocr_workers = kwargs.pop("ocr_workers", 1)
         detect_workers = kwargs.pop("detect_workers", ocr_workers)
+        page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
+        ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", 1))
 
-        # GPU actors are GPU-bound; give them minimal CPU so the extraction
-        # stage (the real CPU bottleneck) gets the lion's share.
-        gpu_cpus = 1
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
-        total_gpu_cpus = (page_elements_workers + detect_workers * detect_stage_count) * gpu_cpus
+        total_gpu_cpus = (
+            page_elements_workers * page_elements_cpus_per_actor
+            + detect_workers * detect_stage_count * ocr_cpus_per_actor
+        )
         cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
 
@@ -404,7 +406,7 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
-                # Page-element detection with a GPU actor pool.
+        # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
         # construct one instance per actor). Passing an already-constructed
         # callable object is treated as a "regular function" and will fail.
@@ -412,7 +414,7 @@ class BatchIngestor(Ingestor):
             PageElementDetectionActor,
             batch_size=page_elements_batch_size,
             batch_format="pandas",
-            num_cpus=gpu_cpus,
+            num_cpus=page_elements_cpus_per_actor,
             num_gpus=gpu_page_elements,
             compute=rd.ActorPoolStrategy(size=page_elements_workers),
             fn_constructor_kwargs=dict(detect_kwargs),
@@ -432,7 +434,7 @@ class BatchIngestor(Ingestor):
                 OCRActor,
                 batch_size=detect_batch_size,
                 batch_format="pandas",
-                num_cpus=gpu_cpus,
+                num_cpus=ocr_cpus_per_actor,
                 num_gpus=gpu_ocr,
                 compute=rd.ActorPoolStrategy(size=detect_workers),
                 fn_constructor_kwargs=ocr_flags,
@@ -449,6 +451,7 @@ class BatchIngestor(Ingestor):
 
         - ``embed_workers``: ActorPool size (default 1).
         - ``embed_batch_size``: Ray Data batch size (default 256).
+        - ``embed_cpus_per_actor``: CPUs reserved per embedding actor (default 1).
         - ``device``, ``hf_cache_dir``, ``normalize``, ``max_length``:
           forwarded to ``LlamaNemotronEmbed1BV2Embedder``.
         - ``embedding_endpoint``: optional NIM endpoint URL
@@ -458,6 +461,7 @@ class BatchIngestor(Ingestor):
         """
         embed_workers = kwargs.pop("embed_workers", 1)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
+        embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
 
         # Remaining kwargs are forwarded to the actor constructor.
         self._tasks.append(("embed", dict(kwargs)))
@@ -490,7 +494,7 @@ class BatchIngestor(Ingestor):
             _BatchEmbedActor,
             batch_size=embed_batch_size,
             batch_format="pandas",
-            num_cpus=1,
+            num_cpus=embed_cpus_per_actor,
             num_gpus=gpu_per_stage,
             compute=rd.ActorPoolStrategy(size=embed_workers),
             fn_constructor_kwargs=dict(kwargs),
