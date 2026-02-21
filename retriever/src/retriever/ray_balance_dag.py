@@ -512,8 +512,12 @@ def main() -> int:
             print(f"ERROR: matrix CSV does not exist: {matrix_path}", file=sys.stderr)
             return 2
         variants = load_variants_from_csv(matrix_path)
+        print(f"Loaded matrix CSV from: {matrix_path}")
+        print(f"Loaded matrix variant rows: {len(variants)}")
     else:
         variants = build_default_variants()
+        print("Loaded matrix source: generated default variants")
+        print(f"Loaded matrix variant rows: {len(variants)}")
 
     if args.write_default_matrix_csv:
         write_path = Path(args.write_default_matrix_csv).resolve()
