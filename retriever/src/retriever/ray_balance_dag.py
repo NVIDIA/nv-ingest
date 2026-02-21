@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import csv
 import itertools
-import math
 import os
 import re
 import shlex
@@ -113,22 +112,15 @@ def _parse_bool(raw: Any, default: bool = False) -> bool:
     return default
 
 
-def normalize_gpu_to_workers(v: Variant) -> Variant:
-    """If per-actor GPU > 1, cap at 1 and scale workers."""
-    out = Variant(**vars(v))
-
-    def _apply(gpu: float, workers: int) -> tuple[float, int]:
-        if gpu <= 1.0:
-            return gpu, workers
-        # Some clusters reject fractional GPUs above 1.0. Convert extra GPU demand
-        # into additional actors while keeping per-actor GPU at 1.
-        scale = int(math.ceil(gpu))
-        return 1.0, max(1, int(workers) * scale)
-
-    out.gpu_page_elements, out.page_elements_workers = _apply(out.gpu_page_elements, out.page_elements_workers)
-    out.gpu_ocr, out.ocr_workers = _apply(out.gpu_ocr, out.ocr_workers)
-    out.gpu_embed, out.embed_workers = _apply(out.gpu_embed, out.embed_workers)
-    return out
+def _is_valid_variant(v: Variant) -> bool:
+    # Reject invalid fractional GPU requests above 1.0 (e.g. 1.25), which many
+    # Ray clusters do not accept per actor.
+    for gpu in (v.gpu_page_elements, v.gpu_ocr, v.gpu_embed):
+        if gpu < 0:
+            return False
+        if gpu > 1.0 and abs(gpu - round(gpu)) > 1e-9:
+            return False
+    return True
 
 
 def build_default_variants() -> list[Variant]:
@@ -185,9 +177,7 @@ def build_default_variants() -> list[Variant]:
         if k in seen:
             return
         seen.add(k)
-        variants.append(
-            normalize_gpu_to_workers(
-                Variant(
+        v = Variant(
                 run_id=f"V{len(variants) + 1:05d}",
                 pdf_workers=int(cfg["pdf_workers"]),
                 pdf_num_cpus=float(cfg["pdf_num_cpus"]),
@@ -205,9 +195,9 @@ def build_default_variants() -> list[Variant]:
                 gpu_page_elements=float(cfg["gpu_page_elements"]),
                 gpu_ocr=float(cfg["gpu_ocr"]),
                 gpu_embed=float(cfg["gpu_embed"]),
-                )
-            )
         )
+        if _is_valid_variant(v):
+            variants.append(v)
 
     # 1) Baseline
     add_variant()
@@ -280,10 +270,11 @@ def build_default_variants() -> list[Variant]:
 
 def write_matrix_csv(variants: list[Variant], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    valid_variants = [v for v in variants if _is_valid_variant(v)]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=MATRIX_FIELDS)
         writer.writeheader()
-        for v in variants:
+        for v in valid_variants:
             writer.writerow(
                 {
                     "run_id": v.run_id,
@@ -329,6 +320,7 @@ def load_variants_from_csv(path: Path) -> list[Variant]:
         "gpu_embed",
     }
     variants: list[Variant] = []
+    invalid_rows = 0
     with path.open("r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
@@ -340,28 +332,33 @@ def load_variants_from_csv(path: Path) -> list[Variant]:
         for idx, row in enumerate(reader, start=1):
             run_id = (row.get("run_id") or "").strip() or f"R{idx:05d}"
             ray_address_raw = (row.get("ray_address") or "").strip()
-        raw = Variant(
-                    run_id=run_id,
-                    pdf_workers=int(row["pdf_workers"]),
-                    pdf_num_cpus=float(row["pdf_num_cpus"]),
-                    pdf_split_bs=int(row.get("pdf_split_bs") or 1),
-                    pdf_bs=int(row["pdf_bs"]),
-                    page_elements_bs=int(row.get("page_elements_bs") or 24),
-                    page_elements_workers=int(row.get("page_elements_workers") or 1),
-                    ocr_workers=int(row["ocr_workers"]),
-                    ocr_bs=int(row["ocr_bs"]),
-                    embed_workers=int(row["embed_workers"]),
-                    embed_bs=int(row["embed_bs"]),
-                    page_elements_cpus_per_actor=float(row.get("page_elements_cpus_per_actor") or 1.0),
-                    ocr_cpus_per_actor=float(row.get("ocr_cpus_per_actor") or 1.0),
-                    embed_cpus_per_actor=float(row.get("embed_cpus_per_actor") or 1.0),
-                    gpu_page_elements=float(row["gpu_page_elements"]),
-                    gpu_ocr=float(row["gpu_ocr"]),
-                    gpu_embed=float(row["gpu_embed"]),
-                    ray_address=ray_address_raw if ray_address_raw else None,
-                    start_ray=_parse_bool(row.get("start_ray"), default=False),
+            raw = Variant(
+                run_id=run_id,
+                pdf_workers=int(row["pdf_workers"]),
+                pdf_num_cpus=float(row["pdf_num_cpus"]),
+                pdf_split_bs=int(row.get("pdf_split_bs") or 1),
+                pdf_bs=int(row["pdf_bs"]),
+                page_elements_bs=int(row.get("page_elements_bs") or 24),
+                page_elements_workers=int(row.get("page_elements_workers") or 1),
+                ocr_workers=int(row["ocr_workers"]),
+                ocr_bs=int(row["ocr_bs"]),
+                embed_workers=int(row["embed_workers"]),
+                embed_bs=int(row["embed_bs"]),
+                page_elements_cpus_per_actor=float(row.get("page_elements_cpus_per_actor") or 1.0),
+                ocr_cpus_per_actor=float(row.get("ocr_cpus_per_actor") or 1.0),
+                embed_cpus_per_actor=float(row.get("embed_cpus_per_actor") or 1.0),
+                gpu_page_elements=float(row["gpu_page_elements"]),
+                gpu_ocr=float(row["gpu_ocr"]),
+                gpu_embed=float(row["gpu_embed"]),
+                ray_address=ray_address_raw if ray_address_raw else None,
+                start_ray=_parse_bool(row.get("start_ray"), default=False),
             )
-        variants.append(normalize_gpu_to_workers(raw))
+            if _is_valid_variant(raw):
+                variants.append(raw)
+            else:
+                invalid_rows += 1
+    if invalid_rows:
+        print(f"Skipped invalid variant rows from CSV: {invalid_rows}")
     return variants
 
 
