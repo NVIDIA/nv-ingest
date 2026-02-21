@@ -49,7 +49,7 @@ The script’s default matrix includes the following families.
 - `ocr_cpus_per_actor`: `[1.0, 2.0, 4.0]`
 - `embed_cpus_per_actor`: `[1.0, 2.0, 4.0]`
 - `gpu_page_elements`: `[0.25, 0.5, 0.75]`
-- `gpu_ocr`: `[0.75, 1.0, 1.25]`
+- `gpu_ocr`: `[0.75, 1.0]`
 - `gpu_embed`: `[0.25, 0.5, 0.75]`
 
 Why this matters:
@@ -85,6 +85,44 @@ Why this matters:
   combinations.
 - Row-range sharding support (`--row-start`, `--row-end`) is used for distributed
   execution across machines.
+- Runtime metrics are captured per run:
+  - Ray Data operator stats (`rd_dataset.stats()`)
+  - Ray timeline (`ray.timeline(...)`)
+
+## GPU Constraint Handling
+
+Some deployments reject fractional `num_gpus` values above `1.0` per actor.
+
+To avoid invalid scheduling requests, matrix generation/loading normalizes any
+`gpu_* > 1.0` request by:
+
+- setting per-actor GPU to `1.0`, and
+- multiplying the corresponding actor count (`*_workers`) by `ceil(gpu_*)`.
+
+This keeps total requested GPU capacity similar while using valid actor specs.
+
+## Runtime Metrics Artifacts
+
+For each run, the pipeline writes metrics files under the run logs directory
+(`runtime_metrics/` subdir) with the run prefix:
+
+- `<prefix>.rd_dataset.stats.txt` (per-operator Ray Data stats)
+- `<prefix>.ray.timeline.json` (cluster task timeline)
+- `<prefix>.runtime.summary.json` (top-level run summary)
+
+## LanceDB Isolation and Recall Guarantees
+
+To prevent cross-run contamination:
+
+- The matrix runner deletes the configured LanceDB URI path before each run.
+- Each run then recreates and writes a fresh `nv-ingest` table.
+
+To ensure recall is actually executed:
+
+- The batch pipeline now treats a missing LanceDB table as a hard failure
+  (after a short retry), instead of silently skipping recall.
+- The matrix results CSV includes a `recall_ran` flag and marks runs as failed
+  if recall metrics are absent.
 
 ## How to Generate and Run
 

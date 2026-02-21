@@ -4,9 +4,11 @@ from __future__ import annotations
 import argparse
 import csv
 import itertools
+import math
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -111,6 +113,24 @@ def _parse_bool(raw: Any, default: bool = False) -> bool:
     return default
 
 
+def normalize_gpu_to_workers(v: Variant) -> Variant:
+    """If per-actor GPU > 1, cap at 1 and scale workers."""
+    out = Variant(**vars(v))
+
+    def _apply(gpu: float, workers: int) -> tuple[float, int]:
+        if gpu <= 1.0:
+            return gpu, workers
+        # Some clusters reject fractional GPUs above 1.0. Convert extra GPU demand
+        # into additional actors while keeping per-actor GPU at 1.
+        scale = int(math.ceil(gpu))
+        return 1.0, max(1, int(workers) * scale)
+
+    out.gpu_page_elements, out.page_elements_workers = _apply(out.gpu_page_elements, out.page_elements_workers)
+    out.gpu_ocr, out.ocr_workers = _apply(out.gpu_ocr, out.ocr_workers)
+    out.gpu_embed, out.embed_workers = _apply(out.gpu_embed, out.embed_workers)
+    return out
+
+
 def build_default_variants() -> list[Variant]:
     # Compact DOE-style matrix (< 1000 rows):
     # 1) baseline
@@ -166,7 +186,8 @@ def build_default_variants() -> list[Variant]:
             return
         seen.add(k)
         variants.append(
-            Variant(
+            normalize_gpu_to_workers(
+                Variant(
                 run_id=f"V{len(variants) + 1:05d}",
                 pdf_workers=int(cfg["pdf_workers"]),
                 pdf_num_cpus=float(cfg["pdf_num_cpus"]),
@@ -184,6 +205,7 @@ def build_default_variants() -> list[Variant]:
                 gpu_page_elements=float(cfg["gpu_page_elements"]),
                 gpu_ocr=float(cfg["gpu_ocr"]),
                 gpu_embed=float(cfg["gpu_embed"]),
+                )
             )
         )
 
@@ -219,13 +241,13 @@ def build_default_variants() -> list[Variant]:
         add_variant(embed_cpus_per_actor=x)
     for x in [0.25, 0.5, 0.75]:
         add_variant(gpu_page_elements=x)
-    for x in [0.75, 1.0, 1.25]:
+    for x in [0.75, 1.0]:
         add_variant(gpu_ocr=x)
     for x in [0.25, 0.5, 0.75]:
         add_variant(gpu_embed=x)
 
     # 3) Targeted interactions
-    for ocr_bs, ocr_workers, gpu_ocr in itertools.product([8, 16, 24, 32], [1, 2, 3], [0.75, 1.0, 1.25]):
+    for ocr_bs, ocr_workers, gpu_ocr in itertools.product([8, 16, 24, 32], [1, 2, 3], [0.75, 1.0]):
         add_variant(ocr_bs=ocr_bs, ocr_workers=ocr_workers, gpu_ocr=gpu_ocr)
 
     for embed_bs, embed_workers, gpu_embed in itertools.product([128, 256, 512, 768], [1, 2, 3], [0.25, 0.5, 0.75]):
@@ -318,8 +340,7 @@ def load_variants_from_csv(path: Path) -> list[Variant]:
         for idx, row in enumerate(reader, start=1):
             run_id = (row.get("run_id") or "").strip() or f"R{idx:05d}"
             ray_address_raw = (row.get("ray_address") or "").strip()
-            variants.append(
-                Variant(
+        raw = Variant(
                     run_id=run_id,
                     pdf_workers=int(row["pdf_workers"]),
                     pdf_num_cpus=float(row["pdf_num_cpus"]),
@@ -339,8 +360,8 @@ def load_variants_from_csv(path: Path) -> list[Variant]:
                     gpu_embed=float(row["gpu_embed"]),
                     ray_address=ray_address_raw if ray_address_raw else None,
                     start_ray=_parse_bool(row.get("start_ray"), default=False),
-                )
             )
+        variants.append(normalize_gpu_to_workers(raw))
     return variants
 
 
@@ -439,6 +460,11 @@ def main() -> int:
         help="Directory for per-run stdout/stderr logs.",
     )
     parser.add_argument(
+        "--lancedb-uri",
+        default="lancedb",
+        help="LanceDB URI/path reused by each run (cleaned before each run).",
+    )
+    parser.add_argument(
         "--matrix-csv",
         default=None,
         help=(
@@ -474,6 +500,7 @@ def main() -> int:
     output_csv = Path(args.output_csv).resolve()
     logs_dir = Path(args.logs_dir).resolve()
     logs_dir.mkdir(parents=True, exist_ok=True)
+    lancedb_uri_path = Path(args.lancedb_uri).expanduser().resolve()
 
     if not input_dir.exists():
         print(f"ERROR: input directory does not exist: {input_dir}", file=sys.stderr)
@@ -525,6 +552,13 @@ def main() -> int:
     rows: list[dict[str, Any]] = []
 
     for matrix_row, variant in selected:
+        # Ensure runs are isolated: remove prior LanceDB artifacts before each run.
+        if lancedb_uri_path.exists():
+            if lancedb_uri_path.is_dir():
+                shutil.rmtree(lancedb_uri_path)
+            else:
+                lancedb_uri_path.unlink()
+
         cmd = base_cmd + [str(input_dir), "--query-csv", str(args.query_csv), "--no-recall-details"]
         if variant.ray_address:
             cmd += ["--ray-address", variant.ray_address]
@@ -563,6 +597,12 @@ def main() -> int:
             str(variant.gpu_ocr),
             "--gpu-embed",
             str(variant.gpu_embed),
+            "--lancedb-uri",
+            str(lancedb_uri_path),
+            "--runtime-metrics-dir",
+            str(logs_dir / "runtime_metrics"),
+            "--runtime-metrics-prefix",
+            f"{matrix_row:05d}_{variant.run_id}",
         ]
 
         print(f"\n=== Run {variant.run_id} (row {matrix_row}) ===")
@@ -581,6 +621,13 @@ def main() -> int:
         pages = metrics["pages"]
         ingest_secs = metrics["ingest_secs"]
         recall_metrics = parse_recall_metrics(proc.stdout)
+        recall_ran = bool(recall_metrics)
+        effective_return_code = proc.returncode if (proc.returncode != 0 or recall_ran) else 98
+        failure_reason = ""
+        if proc.returncode != 0:
+            failure_reason = f"subprocess_exit_{proc.returncode}"
+        elif not recall_ran:
+            failure_reason = "missing_recall_metrics"
 
         row: dict[str, Any] = {
             "matrix_row": matrix_row,
@@ -603,7 +650,9 @@ def main() -> int:
             "gpu_embed": variant.gpu_embed,
             "ray_address": variant.ray_address,
             "start_ray": variant.start_ray,
-            "return_code": proc.returncode,
+            "return_code": effective_return_code,
+            "recall_ran": recall_ran,
+            "failure_reason": failure_reason,
             "files": metrics["files"],
             "pages": pages,
             "wall_secs": wall_secs,
@@ -618,7 +667,7 @@ def main() -> int:
         (logs_dir / f"{matrix_row:05d}_{variant.run_id}.stderr.log").write_text(proc.stderr or "", encoding="utf-8")
 
         print(
-            f"Run {variant.run_id}: rc={proc.returncode}, pages={row['pages']}, "
+            f"Run {variant.run_id}: rc={effective_return_code}, pages={row['pages']}, "
             f"wall={format_float(row['wall_secs'])}s, "
             f"pps_total={format_float(row['pages_per_sec_total'])}, "
             f"recall@10={format_float(row.get('recall_recall_10'))}"
@@ -646,6 +695,8 @@ def main() -> int:
         "ray_address",
         "start_ray",
         "return_code",
+        "recall_ran",
+        "failure_reason",
         "files",
         "pages",
         "wall_secs",

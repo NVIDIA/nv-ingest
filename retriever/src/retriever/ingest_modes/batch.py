@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import datetime as _dt
 import glob
+import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any, List, Optional
 from datetime import timedelta
 
@@ -568,7 +570,17 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
-    def ingest(self) -> int:
+    def ingest(
+        self,
+        show_progress: bool = False,
+        return_failures: bool = False,
+        save_to_disk: bool = False,
+        return_traces: bool = False,
+        *,
+        runtime_metrics_dir: Optional[str] = None,
+        runtime_metrics_prefix: Optional[str] = None,
+        **_: Any,
+    ) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
 
@@ -577,11 +589,46 @@ class BatchIngestor(Ingestor):
         pipeline finishes, we create the LanceDB vector index (which must happen
         after all writes are complete).
         """
+        _ = (show_progress, return_failures, save_to_disk, return_traces)
         t0 = time.monotonic()
         num_pages = self._rd_dataset.count()
         elapsed = time.monotonic() - t0
 
         print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
+
+        # Best-effort runtime metrics capture for per-run stage-level debugging.
+        if runtime_metrics_dir:
+            metrics_dir = Path(runtime_metrics_dir)
+            metrics_dir.mkdir(parents=True, exist_ok=True)
+            prefix = (runtime_metrics_prefix or "run").strip() or "run"
+
+            stats_path = metrics_dir / f"{prefix}.rd_dataset.stats.txt"
+            timeline_path = metrics_dir / f"{prefix}.ray.timeline.json"
+            summary_path = metrics_dir / f"{prefix}.runtime.summary.json"
+
+            stats_text = ""
+            try:
+                stats_text = str(self._rd_dataset.stats())
+                stats_path.write_text(stats_text, encoding="utf-8")
+            except Exception as e:
+                print(f"Warning: failed writing dataset stats: {e}")
+
+            try:
+                ray.timeline(filename=str(timeline_path))
+            except Exception as e:
+                print(f"Warning: failed writing ray timeline: {e}")
+
+            try:
+                summary = {
+                    "input_files": int(len(self._input_documents)),
+                    "num_pages": int(num_pages),
+                    "elapsed_seconds": float(elapsed),
+                    "stats_path": str(stats_path),
+                    "timeline_path": str(timeline_path),
+                }
+                summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+            except Exception as e:
+                print(f"Warning: failed writing runtime summary: {e}")
 
         # Create LanceDB vector index after all streaming writes are complete.
         if hasattr(self, "_vdb_upload_kwargs") and self._vdb_upload_kwargs:

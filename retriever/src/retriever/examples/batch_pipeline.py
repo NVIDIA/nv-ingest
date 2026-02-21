@@ -5,6 +5,7 @@ Run with: uv run python -m retriever.examples.batch_pipeline <input-dir>
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,56 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _ensure_lancedb_table(uri: str, table_name: str) -> None:
+    """
+    Ensure the local LanceDB URI exists and table can be opened.
+
+    Creates an empty table with the expected schema if it does not exist yet.
+    """
+    # Local path URI in this pipeline.
+    Path(uri).mkdir(parents=True, exist_ok=True)
+
+    db = lancedb.connect(uri)
+    try:
+        db.open_table(table_name)
+        return
+    except Exception:
+        pass
+
+    import pyarrow as pa  # type: ignore
+
+    schema = pa.schema(
+        [
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+            pa.field("source", pa.string()),
+        ]
+    )
+    empty = pa.table(
+        {
+            "vector": [],
+            "pdf_page": [],
+            "filename": [],
+            "pdf_basename": [],
+            "page_number": [],
+            "source_id": [],
+            "path": [],
+            "text": [],
+            "metadata": [],
+            "source": [],
+        },
+        schema=schema,
+    )
+    db.create_table(table_name, data=empty, schema=schema, mode="create")
 
 
 def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
@@ -187,8 +238,29 @@ def main(
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
+    runtime_metrics_dir: Optional[Path] = typer.Option(
+        None,
+        "--runtime-metrics-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where Ray runtime metrics are written per run.",
+    ),
+    runtime_metrics_prefix: Optional[str] = typer.Option(
+        None,
+        "--runtime-metrics-prefix",
+        help="Optional filename prefix for per-run metrics artifacts.",
+    ),
+    lancedb_uri: str = typer.Option(
+        LANCEDB_URI,
+        "--lancedb-uri",
+        help="LanceDB URI/path for this run.",
+    ),
 ) -> None:
     os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
+    # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
+    lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
+    _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
 
     # Resolve Ray: start a head node, connect to given address, or run in-process
     if start_ray:
@@ -227,11 +299,14 @@ def main(
             embed_batch_size=int(embed_batch_size),
             embed_cpus_per_actor=float(embed_cpus_per_actor),
         )
-        .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+        .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
     )
 
     print("Running extraction...")
-    ingestor.ingest()
+    ingestor.ingest(
+        runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
+        runtime_metrics_prefix=runtime_metrics_prefix,
+    )
     print("Extraction complete.")
 
     ray.shutdown()
@@ -244,13 +319,35 @@ def main(
         print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
         return
 
-    db = lancedb.connect(f"./{LANCEDB_URI}")
-    table = db.open_table(LANCEDB_TABLE)
+    db = lancedb.connect(lancedb_uri)
+    table = None
+    open_err: Optional[Exception] = None
+    for _ in range(3):
+        try:
+            table = db.open_table(LANCEDB_TABLE)
+            open_err = None
+            break
+        except Exception as e:
+            open_err = e
+            # Create table if missing, then retry open.
+            _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+            time.sleep(2)
+    if table is None:
+        raise RuntimeError(
+            f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
+            f"but it was not found."
+        ) from open_err
+    try:
+        if int(table.count_rows()) == 0:
+            print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+            return
+    except Exception:
+        pass
     unique_basenames = table.to_pandas()["pdf_basename"].unique()
     print(f"Unique basenames: {unique_basenames}")
 
     cfg = RecallConfig(
-        lancedb_uri=str(LANCEDB_URI),
+        lancedb_uri=str(lancedb_uri),
         lancedb_table=str(LANCEDB_TABLE),
         embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
         top_k=10,
