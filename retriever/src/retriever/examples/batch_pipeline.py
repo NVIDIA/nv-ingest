@@ -279,6 +279,7 @@ def main(
             extract_tables=True,
             extract_charts=True,
             extract_infographics=False,
+            debug_run_id=str(runtime_metrics_prefix or "unknown"),
             pdf_extract_workers=int(pdf_extract_workers),
             pdf_extract_num_cpus=float(pdf_extract_num_cpus),
             pdf_split_batch_size=int(pdf_split_batch_size),

@@ -27,6 +27,29 @@ from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
 
+DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
+
+
+# region agent log
+def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
+    payload = {
+        "sessionId": "250ae2",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# endregion
+
 
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
@@ -75,7 +98,7 @@ class _LanceDBWriteActor:
                 pa.field("source", pa.string()),
             ]
         self._schema = pa.schema(fields)
-        
+
         self._table = self._db.create_table(
                         self._table_name,
                         schema=self._schema,
@@ -165,7 +188,6 @@ class _LanceDBWriteActor:
             self._table.add(rows)
 
             self._total_rows += len(rows)
-
 
         return batch_df
 
@@ -296,6 +318,7 @@ class BatchIngestor(Ingestor):
         """
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
+        debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
@@ -342,6 +365,46 @@ class BatchIngestor(Ingestor):
         )
         cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
+
+        # region agent log
+        total_gpu_requested = (
+            float(gpu_page_elements) * float(page_elements_workers)
+            + float(gpu_ocr) * float(detect_workers * detect_stage_count)
+            + float(gpu_embed) * 1.0
+        )
+        _debug_log(
+            run_id=debug_run_id,
+            hypothesis_id="H1",
+            location="ingest_modes/batch.py:extract",
+            message="Resource envelope computed for Ray stages",
+            data={
+                "num_gpus_available": self._num_gpus,
+                "num_cpus_available": self._num_cpus,
+                "gpu_page_elements": gpu_page_elements,
+                "gpu_ocr": gpu_ocr,
+                "gpu_embed": gpu_embed,
+                "page_elements_workers": page_elements_workers,
+                "detect_workers": detect_workers,
+                "detect_stage_count": detect_stage_count,
+                "pdf_extract_workers": pdf_extract_workers,
+                "pdf_extract_num_cpus": pdf_extract_num_cpus,
+                "total_gpu_requested_across_stages": total_gpu_requested,
+                "can_fully_overlap_gpu_stages": bool(total_gpu_requested <= float(self._num_gpus)),
+            },
+        )
+        _debug_log(
+            run_id=debug_run_id,
+            hypothesis_id="H2",
+            location="ingest_modes/batch.py:extract",
+            message="CPU reservation breakdown for actors and extraction pool",
+            data={
+                "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                "total_gpu_actor_cpus_reserved": total_gpu_cpus,
+                "cpus_for_extract": cpus_for_extract,
+            },
+        )
+        # endregion
 
         # Store per-stage GPU allocations for downstream stages (e.g. embed).
         self._gpu_page_elements = gpu_page_elements
@@ -530,7 +593,6 @@ class BatchIngestor(Ingestor):
             fn_constructor_kwargs=dict(kwargs),
         )
 
-
         return self
 
     def save_intermediate_results(self, output_dir: str) -> "BatchIngestor":
@@ -595,6 +657,21 @@ class BatchIngestor(Ingestor):
         elapsed = time.monotonic() - t0
 
         print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
+        # region agent log
+        _debug_log(
+            run_id=str(runtime_metrics_prefix or "unknown"),
+            hypothesis_id="H3",
+            location="ingest_modes/batch.py:ingest",
+            message="Pipeline completed with aggregate throughput",
+            data={
+                "input_files": len(self._input_documents),
+                "num_pages": int(num_pages),
+                "elapsed_seconds": float(elapsed),
+                "pages_per_second_total": float(num_pages / elapsed) if elapsed > 0 else None,
+                "runtime_metrics_dir": runtime_metrics_dir,
+            },
+        )
+        # endregion
 
         # Best-effort runtime metrics capture for per-run stage-level debugging.
         if runtime_metrics_dir:

@@ -71,6 +71,9 @@ def make_seed_page_elements_row(pdf_path: Path, *, dpi: int) -> Dict[str, Any]:
     extract_row = make_seed_extraction_row(pdf_path)
     extraction_actor = PDFExtractionActor(
         extract_text=True,
+        # Force raster generation for seed rows. The extractor currently renders
+        # images when one of these feature flags is enabled.
+        extract_images=True,
         extract_tables=False,
         extract_charts=False,
         extract_infographics=False,
@@ -82,7 +85,11 @@ def make_seed_page_elements_row(pdf_path: Path, *, dpi: int) -> Dict[str, Any]:
         raise RuntimeError("PDF extraction seed generation returned no rows.")
     out = extracted_df.iloc[0].to_dict()
     page_image = out.get("page_image") if isinstance(out, dict) else None
-    if not (isinstance(page_image, dict) and isinstance(page_image.get("image_b64"), str) and page_image.get("image_b64")):
+    if not (
+        isinstance(page_image, dict)
+        and isinstance(page_image.get("image_b64"), str)
+        and page_image.get("image_b64")
+    ):
         raise RuntimeError("Seed extraction row does not contain page_image.image_b64.")
     return out
 
@@ -167,7 +174,9 @@ def benchmark_sweep(
     return best, all_results
 
 
-def maybe_write_results_json(path: Optional[Path], *, best: ThroughputResult, results: Sequence[ThroughputResult]) -> None:
+def maybe_write_results_json(
+    path: Optional[Path], *, best: ThroughputResult, results: Sequence[ThroughputResult]
+) -> None:
     if path is None:
         return
     payload = {
