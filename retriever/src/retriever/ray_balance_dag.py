@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import itertools
+import json
 import os
 import re
 import shlex
@@ -68,6 +69,44 @@ MATRIX_FIELDS = [
     "ray_address",
     "start_ray",
 ]
+
+TUNABLE_KNOBS = [
+    "pdf_workers",
+    "pdf_num_cpus",
+    "pdf_split_bs",
+    "pdf_bs",
+    "page_elements_bs",
+    "page_elements_workers",
+    "ocr_workers",
+    "ocr_bs",
+    "embed_workers",
+    "embed_bs",
+    "page_elements_cpus_per_actor",
+    "ocr_cpus_per_actor",
+    "embed_cpus_per_actor",
+    "gpu_page_elements",
+    "gpu_ocr",
+    "gpu_embed",
+]
+
+KNOB_TO_ACTOR = {
+    "pdf_workers": "pdf_extraction_taskpool",
+    "pdf_num_cpus": "pdf_extraction_taskpool",
+    "pdf_split_bs": "pdf_split_taskpool",
+    "pdf_bs": "pdf_extraction_taskpool",
+    "page_elements_bs": "page_elements_actor",
+    "page_elements_workers": "page_elements_actor",
+    "ocr_workers": "ocr_actor",
+    "ocr_bs": "ocr_actor",
+    "embed_workers": "embed_actor",
+    "embed_bs": "embed_actor",
+    "page_elements_cpus_per_actor": "page_elements_actor",
+    "ocr_cpus_per_actor": "ocr_actor",
+    "embed_cpus_per_actor": "embed_actor",
+    "gpu_page_elements": "page_elements_actor",
+    "gpu_ocr": "ocr_actor",
+    "gpu_embed": "embed_actor",
+}
 
 
 def parse_done_metrics(stdout: str) -> dict[str, Any]:
@@ -371,6 +410,18 @@ def format_float(value: Any, ndigits: int = 3) -> str:
         return str(value)
 
 
+def _variant_to_dict(v: Variant) -> dict[str, Any]:
+    return {k: getattr(v, k) for k in TUNABLE_KNOBS}
+
+
+def _changed_knobs(baseline: Variant, candidate: Variant) -> list[str]:
+    out: list[str] = []
+    for k in TUNABLE_KNOBS:
+        if getattr(baseline, k) != getattr(candidate, k):
+            out.append(k)
+    return out
+
+
 def print_matrix(rows: list[dict[str, Any]]) -> None:
     cols = [
         "matrix_row",
@@ -392,6 +443,8 @@ def print_matrix(rows: list[dict[str, Any]]) -> None:
         "gpu_ocr",
         "gpu_embed",
         "return_code",
+        "skipped",
+        "prune_reason",
         "pages",
         "wall_secs",
         "ingest_secs",
@@ -491,6 +544,25 @@ def main() -> int:
         default=None,
         help="1-based inclusive end row from matrix to run. Defaults to final row.",
     )
+    parser.add_argument(
+        "--adaptive-prune",
+        action="store_true",
+        help=(
+            "Enable conservative pruning: if a single-knob variant is slower than baseline, "
+            "skip later variants that move that same knob farther in that direction."
+        ),
+    )
+    parser.add_argument(
+        "--slowdown-threshold-pct",
+        type=float,
+        default=0.0,
+        help="Minimum slowdown percentage vs baseline required before pruning logic triggers.",
+    )
+    parser.add_argument(
+        "--prune-log",
+        default=None,
+        help="Optional JSONL log path for adaptive pruning decisions (default: <logs-dir>/adaptive_prune.jsonl).",
+    )
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir).resolve()
@@ -498,6 +570,7 @@ def main() -> int:
     logs_dir = Path(args.logs_dir).resolve()
     logs_dir.mkdir(parents=True, exist_ok=True)
     lancedb_uri_path = Path(args.lancedb_uri).expanduser().resolve()
+    prune_log_path = Path(args.prune_log).resolve() if args.prune_log else (logs_dir / "adaptive_prune.jsonl")
 
     if not input_dir.exists():
         print(f"ERROR: input directory does not exist: {input_dir}", file=sys.stderr)
@@ -551,8 +624,85 @@ def main() -> int:
 
     base_cmd = shlex.split(args.runner) + ["-m", args.module]
     rows: list[dict[str, Any]] = []
+    prune_rules: dict[str, dict[str, Any]] = {}
+    baseline_variant: Variant | None = None
+    for _, v in selected:
+        if v.run_id == "V00001":
+            baseline_variant = v
+            break
+    if baseline_variant is None and selected:
+        baseline_variant = selected[0][1]
+
+    baseline_pps: float | None = None
+    threshold = max(0.0, float(args.slowdown_threshold_pct)) / 100.0
+
+    def _log_prune_event(event: dict[str, Any]) -> None:
+        try:
+            prune_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with prune_log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     for matrix_row, variant in selected:
+        if args.adaptive_prune and baseline_variant is not None and baseline_pps is not None and prune_rules:
+            matched: list[str] = []
+            for knob, rule in prune_rules.items():
+                base_val = float(getattr(baseline_variant, knob))
+                cur_val = float(getattr(variant, knob))
+                delta = cur_val - base_val
+                direction = int(rule["direction"])
+                min_abs_delta = float(rule["min_abs_delta"])
+                if direction * delta > 0 and abs(delta) >= min_abs_delta:
+                    matched.append(knob)
+            if matched:
+                reason = "pruned_by_knob:" + ",".join(sorted(matched))
+                row = {
+                    "matrix_row": matrix_row,
+                    "run_id": variant.run_id,
+                    "pdf_workers": variant.pdf_workers,
+                    "pdf_num_cpus": variant.pdf_num_cpus,
+                    "pdf_split_bs": variant.pdf_split_bs,
+                    "pdf_bs": variant.pdf_bs,
+                    "page_elements_bs": variant.page_elements_bs,
+                    "page_elements_workers": variant.page_elements_workers,
+                    "ocr_workers": variant.ocr_workers,
+                    "ocr_bs": variant.ocr_bs,
+                    "embed_workers": variant.embed_workers,
+                    "embed_bs": variant.embed_bs,
+                    "page_elements_cpus_per_actor": variant.page_elements_cpus_per_actor,
+                    "ocr_cpus_per_actor": variant.ocr_cpus_per_actor,
+                    "embed_cpus_per_actor": variant.embed_cpus_per_actor,
+                    "gpu_page_elements": variant.gpu_page_elements,
+                    "gpu_ocr": variant.gpu_ocr,
+                    "gpu_embed": variant.gpu_embed,
+                    "ray_address": variant.ray_address,
+                    "start_ray": variant.start_ray,
+                    "return_code": 99,
+                    "recall_ran": False,
+                    "failure_reason": reason,
+                    "skipped": True,
+                    "prune_reason": reason,
+                    "files": None,
+                    "pages": None,
+                    "wall_secs": None,
+                    "ingest_secs": None,
+                    "pages_per_sec_total": None,
+                    "pages_per_sec_ingest": None,
+                }
+                rows.append(row)
+                _log_prune_event(
+                    {
+                        "event": "variant_pruned",
+                        "matrix_row": matrix_row,
+                        "run_id": variant.run_id,
+                        "reason": reason,
+                    }
+                )
+                print(f"\n=== Run {variant.run_id} (row {matrix_row}) ===")
+                print(f"SKIPPED: {reason}")
+                continue
+
         # Ensure runs are isolated: remove prior LanceDB artifacts before each run.
         if lancedb_uri_path.exists():
             if lancedb_uri_path.is_dir():
@@ -654,6 +804,8 @@ def main() -> int:
             "return_code": effective_return_code,
             "recall_ran": recall_ran,
             "failure_reason": failure_reason,
+            "skipped": False,
+            "prune_reason": "",
             "files": metrics["files"],
             "pages": pages,
             "wall_secs": wall_secs,
@@ -663,6 +815,64 @@ def main() -> int:
         }
         row.update(recall_metrics)
         rows.append(row)
+
+        # Baseline = V00001 when present in selection, else first selected variant.
+        if baseline_variant is not None and baseline_pps is None and variant.run_id == baseline_variant.run_id:
+            baseline_pps = row.get("pages_per_sec_total")
+            _log_prune_event(
+                {
+                    "event": "baseline_set",
+                    "matrix_row": matrix_row,
+                    "run_id": variant.run_id,
+                    "baseline_pages_per_sec_total": baseline_pps,
+                    "baseline_knobs": _variant_to_dict(variant),
+                }
+            )
+
+        if (
+            args.adaptive_prune
+            and baseline_variant is not None
+            and baseline_pps is not None
+            and not row.get("skipped")
+            and isinstance(row.get("pages_per_sec_total"), (int, float))
+        ):
+            pps = float(row["pages_per_sec_total"])
+            if pps < float(baseline_pps) * (1.0 - threshold):
+                changed = _changed_knobs(baseline_variant, variant)
+                event = {
+                    "event": "slower_than_baseline",
+                    "matrix_row": matrix_row,
+                    "run_id": variant.run_id,
+                    "baseline_pages_per_sec_total": baseline_pps,
+                    "current_pages_per_sec_total": pps,
+                    "threshold_pct": float(args.slowdown_threshold_pct),
+                    "changed_knobs": changed,
+                    "changed_actors": sorted({KNOB_TO_ACTOR.get(k, "unknown") for k in changed}),
+                }
+                if len(changed) == 1:
+                    knob = changed[0]
+                    base_val = float(getattr(baseline_variant, knob))
+                    cur_val = float(getattr(variant, knob))
+                    delta = cur_val - base_val
+                    if delta != 0:
+                        rule = prune_rules.get(knob)
+                        abs_delta = abs(delta)
+                        direction = 1 if delta > 0 else -1
+                        if rule is None:
+                            prune_rules[knob] = {
+                                "direction": direction,
+                                "min_abs_delta": abs_delta,
+                                "actor": KNOB_TO_ACTOR.get(knob, "unknown"),
+                                "source_run_id": variant.run_id,
+                            }
+                        else:
+                            # Tighten prune threshold if this is closer to baseline.
+                            if direction == int(rule["direction"]):
+                                rule["min_abs_delta"] = min(float(rule["min_abs_delta"]), abs_delta)
+                        event["prune_rule_added"] = {knob: prune_rules.get(knob)}
+                else:
+                    event["prune_rule_added"] = None
+                _log_prune_event(event)
 
         (logs_dir / f"{matrix_row:05d}_{variant.run_id}.stdout.log").write_text(proc.stdout or "", encoding="utf-8")
         (logs_dir / f"{matrix_row:05d}_{variant.run_id}.stderr.log").write_text(proc.stderr or "", encoding="utf-8")
@@ -698,6 +908,8 @@ def main() -> int:
         "return_code",
         "recall_ran",
         "failure_reason",
+        "skipped",
+        "prune_reason",
         "files",
         "pages",
         "wall_secs",
