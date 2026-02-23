@@ -238,6 +238,16 @@ def main(
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
+    page_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--page-elements-invoke-url",
+        help="Optional remote endpoint URL for page-elements model inference.",
+    ),
+    ocr_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--ocr-invoke-url",
+        help="Optional remote endpoint URL for OCR model inference.",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -261,6 +271,21 @@ def main(
     # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
     lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
     _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+
+    # Remote endpoints don't need local model GPUs for their stage.
+    if page_elements_invoke_url and float(gpu_page_elements) != 0.0:
+        print(
+            "[WARN] --page-elements-invoke-url is set; forcing --gpu-page-elements from "
+            f"{float(gpu_page_elements):.3f} to 0.0"
+        )
+        gpu_page_elements = 0.0
+
+    if ocr_invoke_url and float(gpu_ocr) != 0.0:
+        print(
+            "[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from "
+            f"{float(gpu_ocr):.3f} to 0.0"
+        )
+        gpu_ocr = 0.0
 
     # Resolve Ray: start a head node, connect to given address, or run in-process
     if start_ray:
@@ -293,6 +318,8 @@ def main(
             gpu_page_elements=float(gpu_page_elements),
             gpu_ocr=float(gpu_ocr),
             gpu_embed=float(gpu_embed),
+            page_elements_invoke_url=page_elements_invoke_url,
+            ocr_invoke_url=ocr_invoke_url,
         )
         .embed(
             model_name="nemo_retriever_v1",

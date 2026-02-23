@@ -446,8 +446,20 @@ class BatchIngestor(Ingestor):
             "output_column",
             "num_detections_column",
             "counts_by_label_column",
+            "api_key",
+            "request_timeout_s",
+            "remote_max_pool_workers",
+            "remote_max_retries",
+            "remote_max_429_retries",
         }
         detect_kwargs = {k: kwargs[k] for k in detect_passthrough_keys if k in kwargs}
+        page_elements_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url"))
+        if page_elements_invoke_url:
+            detect_kwargs["invoke_url"] = page_elements_invoke_url
+        if "page_elements_request_timeout_s" in kwargs:
+            detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
+        if "page_elements_api_key" in kwargs:
+            detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
 
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
@@ -493,6 +505,22 @@ class BatchIngestor(Ingestor):
             ocr_flags["extract_charts"] = True
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
+        for k in (
+            "api_key",
+            "request_timeout_s",
+            "remote_max_pool_workers",
+            "remote_max_retries",
+            "remote_max_429_retries",
+        ):
+            if k in kwargs:
+                ocr_flags[k] = kwargs[k]
+        ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+        if ocr_invoke_url:
+            ocr_flags["invoke_url"] = ocr_invoke_url
+        if "ocr_request_timeout_s" in kwargs:
+            ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+        if "ocr_api_key" in kwargs:
+            ocr_flags["api_key"] = kwargs["ocr_api_key"]
 
         if ocr_flags:
             self._rd_dataset = self._rd_dataset.map_batches(

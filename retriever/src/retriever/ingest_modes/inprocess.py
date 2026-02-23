@@ -668,11 +668,33 @@ class InProcessIngestor(Ingestor):
             "counts_by_label_column",
         }
 
-        def _detect_kwargs_with_model(model_obj: Any) -> dict[str, Any]:
+        def _stage_remote_kwargs(stage_name: str) -> dict[str, Any]:
+            stage_prefix = f"{stage_name}_"
+            out: dict[str, Any] = {}
+            invoke_url = kwargs.get(f"{stage_prefix}invoke_url", kwargs.get("invoke_url"))
+            if invoke_url:
+                out["invoke_url"] = invoke_url
+            api_key = kwargs.get(f"{stage_prefix}api_key", kwargs.get("api_key"))
+            if api_key:
+                out["api_key"] = api_key
+            timeout = kwargs.get(f"{stage_prefix}request_timeout_s", kwargs.get("request_timeout_s"))
+            if timeout is not None:
+                out["request_timeout_s"] = timeout
+            for k in ("remote_max_pool_workers", "remote_max_retries", "remote_max_429_retries"):
+                stage_key = f"{stage_prefix}{k}"
+                if stage_key in kwargs:
+                    out[k] = kwargs[stage_key]
+                elif k in kwargs:
+                    out[k] = kwargs[k]
+            return out
+
+        def _detect_kwargs_with_model(model_obj: Any, *, stage_name: str, allow_remote: bool) -> dict[str, Any]:
             d: dict[str, Any] = {"model": model_obj}
             for k in detect_passthrough_keys:
                 if k in kwargs:
                     d[k] = kwargs[k]
+            if allow_remote:
+                d.update(_stage_remote_kwargs(stage_name))
             return d
 
         # NOTE: Page element detection is a common prerequisite for downstream
@@ -682,7 +704,16 @@ class InProcessIngestor(Ingestor):
             kwargs.get(k) is True for k in ("extract_text", "extract_tables", "extract_charts", "extract_infographics")
         ):
             print("Adding page elements task")
-            self._tasks.append((detect_page_elements_v3, _detect_kwargs_with_model(define_model("page_element_v3"))))
+            self._tasks.append(
+                (
+                    detect_page_elements_v3,
+                    _detect_kwargs_with_model(
+                        define_model("page_element_v3"),
+                        stage_name="page_elements",
+                        allow_remote=True,
+                    ),
+                )
+            )
 
         # OCR-based extraction for tables/charts/infographics.
         ocr_flags = {}
@@ -695,12 +726,13 @@ class InProcessIngestor(Ingestor):
             self._tasks.append(
                 (
                     detect_graphic_elements_v1_from_page_elements_v3,
-                    _detect_kwargs_with_model(NemotronGraphicElementsV1()),
+                    _detect_kwargs_with_model(NemotronGraphicElementsV1(), stage_name="chart", allow_remote=False),
                 )
             )
 
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
+        ocr_flags.update(_stage_remote_kwargs("ocr"))
 
         if ocr_flags:
             print("Adding OCR extraction task")

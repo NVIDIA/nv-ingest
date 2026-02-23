@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import base64
 import io
-import os
 import time
 import traceback
 
 import numpy as np
 import pandas as pd
+from retriever.nim.nim import invoke_image_inference_batches
 
 try:
     from PIL import Image
@@ -182,6 +182,26 @@ def _crop_all_from_page(
     return results
 
 
+def _np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
+    if Image is None:  # pragma: no cover
+        raise ImportError("Pillow is required for image encoding.")
+    img = Image.fromarray(crop_array.astype(np.uint8), mode="RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _extract_remote_ocr_item(response_item: Any) -> Any:
+    if isinstance(response_item, dict):
+        for k in ("prediction", "predictions", "output", "outputs", "data"):
+            v = response_item.get(k)
+            if isinstance(v, list) and v:
+                return v[0]
+            if v is not None:
+                return v
+    return response_item
+
+
 def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
     """
     Parse the output of ``NemotronOCRV1.invoke()`` into a flat list of
@@ -320,10 +340,14 @@ def _blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
 def ocr_page_elements(
     batch_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron OCR v1 on cropped regions detected by PageElements v3.
@@ -351,6 +375,10 @@ def ocr_page_elements(
     """
     if not isinstance(batch_df, pd.DataFrame):
         raise NotImplementedError("ocr_page_elements currently only supports pandas.DataFrame input.")
+    invoke_url = (invoke_url or kwargs.get("ocr_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
 
     # Determine which labels we need to process.
     wanted_labels: set[str] = set()
@@ -399,32 +427,70 @@ def ocr_page_elements(
             # --- decode page image once, crop all matching detections ---
             crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
 
-            for label_name, bbox, crop_array in crops:
-                # Use word-level merging for tables to preserve cell boundaries;
-                # paragraph-level for charts/infographics where structure matters less.
-                ml = "word" if label_name == "table" else "paragraph"
-                preds = model.invoke(crop_array, merge_level=ml)
+            if use_remote:
+                crop_b64s: List[str] = []
+                crop_meta: List[Tuple[str, List[float]]] = []
+                for label_name, bbox, crop_array in crops:
+                    crop_b64s.append(_np_rgb_to_b64_png(crop_array))
+                    crop_meta.append((label_name, bbox))
 
-                # Parse and assemble text.
-                blocks = _parse_ocr_result(preds)
-                if label_name == "table":
-                    text = _blocks_to_pseudo_markdown(blocks)
-                    if not text:
-                        text = _blocks_to_text(blocks)  # fallback
-                else:
-                    text = _blocks_to_text(blocks)
+                if crop_b64s:
+                    response_items = invoke_image_inference_batches(
+                        invoke_url=invoke_url,
+                        image_b64_list=crop_b64s,
+                        api_key=api_key,
+                        timeout_s=float(request_timeout_s),
+                        max_batch_size=int(kwargs.get("inference_batch_size", 8)),
+                        max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+                        max_retries=int(kwargs.get("remote_max_retries", 10)),
+                        max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                    )
+                    if len(response_items) != len(crop_meta):
+                        raise RuntimeError(
+                            f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}"
+                        )
 
-                entry = {
-                    "bbox_xyxy_norm": bbox,
-                    "text": text,
-                }
+                    for i, (label_name, bbox) in enumerate(crop_meta):
+                        preds = _extract_remote_ocr_item(response_items[i])
+                        blocks = _parse_ocr_result(preds)
+                        if label_name == "table":
+                            text = _blocks_to_pseudo_markdown(blocks) or _blocks_to_text(blocks)
+                        else:
+                            text = _blocks_to_text(blocks)
+                        entry = {"bbox_xyxy_norm": bbox, "text": text}
+                        if label_name == "table":
+                            table_items.append(entry)
+                        elif label_name == "chart":
+                            chart_items.append(entry)
+                        elif label_name == "infographic":
+                            infographic_items.append(entry)
+            else:
+                for label_name, bbox, crop_array in crops:
+                    # Use word-level merging for tables to preserve cell boundaries;
+                    # paragraph-level for charts/infographics where structure matters less.
+                    ml = "word" if label_name == "table" else "paragraph"
+                    preds = model.invoke(crop_array, merge_level=ml)
 
-                if label_name == "table":
-                    table_items.append(entry)
-                elif label_name == "chart":
-                    chart_items.append(entry)
-                elif label_name == "infographic":
-                    infographic_items.append(entry)
+                    # Parse and assemble text.
+                    blocks = _parse_ocr_result(preds)
+                    if label_name == "table":
+                        text = _blocks_to_pseudo_markdown(blocks)
+                        if not text:
+                            text = _blocks_to_text(blocks)  # fallback
+                    else:
+                        text = _blocks_to_text(blocks)
+
+                    entry = {
+                        "bbox_xyxy_norm": bbox,
+                        "text": text,
+                    }
+
+                    if label_name == "table":
+                        table_items.append(entry)
+                    elif label_name == "chart":
+                        chart_items.append(entry)
+                    elif label_name == "infographic":
+                        infographic_items.append(entry)
 
         except BaseException as e:
             row_error = {
@@ -476,7 +542,15 @@ class OCRActor:
         )
     """
 
-    __slots__ = ("_model", "_extract_tables", "_extract_charts", "_extract_infographics")
+    __slots__ = (
+        "_model",
+        "_extract_tables",
+        "_extract_charts",
+        "_extract_infographics",
+        "_invoke_url",
+        "_api_key",
+        "_request_timeout_s",
+    )
 
     def __init__(
         self,
@@ -484,6 +558,10 @@ class OCRActor:
         extract_tables: bool = False,
         extract_charts: bool = False,
         extract_infographics: bool = False,
+        ocr_invoke_url: Optional[str] = None,
+        invoke_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        request_timeout_s: float = 120.0,
     ) -> None:
         # model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
         # if not model_dir:
@@ -491,10 +569,16 @@ class OCRActor:
         #         "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
         #         "the path of the Nemotron OCR v1 model directory."
         #     )
-        from retriever.model.local import NemotronOCRV1
+        self._invoke_url = (ocr_invoke_url or invoke_url or "").strip()
+        self._api_key = api_key
+        self._request_timeout_s = float(request_timeout_s)
+        if self._invoke_url:
+            self._model = None
+        else:
+            from retriever.model.local import NemotronOCRV1
 
-        #self._model = NemotronOCRV1(model_dir=model_dir)
-        self._model = NemotronOCRV1()
+            #self._model = NemotronOCRV1(model_dir=model_dir)
+            self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)
         self._extract_infographics = bool(extract_infographics)
@@ -504,9 +588,13 @@ class OCRActor:
             return ocr_page_elements(
                 batch_df,
                 model=self._model,
+                invoke_url=self._invoke_url,
+                api_key=self._api_key,
+                request_timeout_s=self._request_timeout_s,
                 extract_tables=self._extract_tables,
                 extract_charts=self._extract_charts,
                 extract_infographics=self._extract_infographics,
+                **override_kwargs,
             )
         except BaseException as e:
             # Never let the Ray UDF raise — return a DataFrame with error metadata.
