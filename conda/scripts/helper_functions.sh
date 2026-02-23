@@ -30,6 +30,17 @@ validate_conda_build_environment() {
     fi
 }
 
+get_package_version() {
+    local version_script=$1
+    python3 -c "
+import importlib.util
+spec = importlib.util.spec_from_file_location('version', '$version_script')
+version = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(version)
+print(version.get_version())
+"
+}
+
 determine_git_root() {
     ##############################
     # Determine Git Root
