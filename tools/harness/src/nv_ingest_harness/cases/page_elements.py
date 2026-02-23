@@ -141,6 +141,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     results = []
     inference_times = []
     total_detections = 0
+    
+    start_time = time.perf_counter()
 
     for img_path in tqdm(image_paths, desc="Processing images", unit="page"):
         # Load image
@@ -165,6 +167,9 @@ def main(config=None, log_path: str = "test_results") -> int:
             "num_detections": num_detections,
         }
         results.append(result)
+        
+    end_time = time.perf_counter()
+    total_time = end_time - start_time
 
     # Calculate statistics
     times = np.array(inference_times)
@@ -173,7 +178,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     min_time = np.min(times)
     max_time = np.max(times)
     median_time = np.median(times)
-    total_time = np.sum(times)
+    # total_time = np.sum(times)
     throughput = num_images / (total_time / 1000) if total_time > 0 else 0
 
     # Calculate IQR (interquartile range) - useful stat from torch.utils.benchmark
