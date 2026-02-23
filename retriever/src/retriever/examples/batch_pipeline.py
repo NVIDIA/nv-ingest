@@ -21,6 +21,44 @@ LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
 
 
+def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
+    """
+    Estimate pages processed by counting unique (source_id, page_number) pairs.
+
+    Falls back to table row count if page-level fields are unavailable.
+    """
+    try:
+        db = lancedb.connect(uri)
+        table = db.open_table(table_name)
+    except Exception:
+        return None
+
+    try:
+        df = table.to_pandas()[["source_id", "page_number"]]
+        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
+    except Exception:
+        try:
+            return int(table.count_rows())
+        except Exception:
+            return None
+
+
+def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
+    if ingest_elapsed_s <= 0:
+        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
+        return
+    if processed_pages is None:
+        print(
+            "Pages/sec: unavailable (could not estimate processed pages). "
+            f"Ingest time: {ingest_elapsed_s:.2f}s"
+        )
+        return
+
+    pps = processed_pages / ingest_elapsed_s
+    print(f"Pages processed: {processed_pages}")
+    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
+
+
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """
     Ensure the local LanceDB URI exists and table can be opened.
@@ -331,10 +369,13 @@ def main(
     )
 
     print("Running extraction...")
+    ingest_start = time.perf_counter()
     ingestor.ingest(
         runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
         runtime_metrics_prefix=runtime_metrics_prefix,
     )
+    ingest_elapsed_s = time.perf_counter() - ingest_start
+    processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
     print("Extraction complete.")
 
     ray.shutdown()
@@ -345,6 +386,7 @@ def main(
     query_csv = Path(query_csv)
     if not query_csv.exists():
         print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+        _print_pages_per_second(processed_pages, ingest_elapsed_s)
         return
 
     db = lancedb.connect(lancedb_uri)
@@ -368,6 +410,7 @@ def main(
     try:
         if int(table.count_rows()) == 0:
             print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+            _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
     except Exception:
         pass
@@ -434,6 +477,7 @@ def main(
     print("\nRecall metrics (matching retriever.recall.core):")
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
+    _print_pages_per_second(processed_pages, ingest_elapsed_s)
 
 
 if __name__ == "__main__":
