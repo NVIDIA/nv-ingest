@@ -13,6 +13,14 @@ def _chunk_ranges(total: int, chunk_size: int) -> List[Tuple[int, int]]:
     return [(i, min(i + chunk_size, total)) for i in range(0, total, chunk_size)]
 
 
+def _parse_invoke_urls(invoke_url: str) -> List[str]:
+    parts = [p.strip() for p in str(invoke_url or "").split(",")]
+    urls = [p for p in parts if p]
+    if not urls:
+        raise ValueError("invoke_url is required")
+    return urls
+
+
 def _normalize_batch_response(response_json: Any, expected_count: int) -> List[Any]:
     """
     Normalize common NIM HTTP response shapes to one item per input image.
@@ -110,12 +118,14 @@ def invoke_image_inference_batches(
     max_429_retries: int = 5,
 ) -> List[Any]:
     """
-    Invoke an image NIM HTTP endpoint with batched concurrent requests.
+    Invoke one or more image NIM HTTP endpoints with batched concurrent requests.
+
+    `invoke_url` may be a single URL or a comma-separated URL list.
+    When multiple URLs are provided, batches are distributed round-robin.
 
     Returns one response item per input image, in the same order.
     """
-    if not invoke_url or not str(invoke_url).strip():
-        raise ValueError("invoke_url is required")
+    invoke_urls = _parse_invoke_urls(invoke_url)
 
     token = (api_key or "").strip()
     headers: Dict[str, str] = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -129,7 +139,7 @@ def invoke_image_inference_batches(
     ranges = _chunk_ranges(n, int(max_batch_size))
     flattened: List[Optional[Any]] = [None] * n
 
-    def _invoke_one_batch(start: int, end: int) -> Tuple[int, int, List[Any]]:
+    def _invoke_one_batch(start: int, end: int, endpoint_url: str) -> Tuple[int, int, List[Any]]:
         inputs = [
             {
                 "type": "image_url",
@@ -139,7 +149,7 @@ def invoke_image_inference_batches(
         ]
         payload = {"input": inputs}
         response_json = _post_with_retries(
-            invoke_url=invoke_url,
+            invoke_url=endpoint_url,
             payload=payload,
             headers=headers,
             timeout_s=float(timeout_s),
@@ -151,7 +161,13 @@ def invoke_image_inference_batches(
 
     with ThreadPoolExecutor(max_workers=max(1, int(max_pool_workers))) as executor:
         futures = {
-            executor.submit(_invoke_one_batch, start, end): (start, end) for start, end in ranges
+            executor.submit(
+                _invoke_one_batch,
+                start,
+                end,
+                invoke_urls[idx % len(invoke_urls)],
+            ): (start, end)
+            for idx, (start, end) in enumerate(ranges)
         }
         for future in as_completed(futures):
             start, end = futures[future]
