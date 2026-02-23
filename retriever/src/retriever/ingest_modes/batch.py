@@ -318,6 +318,12 @@ class BatchIngestor(Ingestor):
         """
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
+        def _endpoint_count(raw: Any) -> int:
+            s = str(raw or "").strip()
+            if not s:
+                return 0
+            return len([p for p in s.split(",") if p.strip()])
+
         debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
@@ -357,6 +363,28 @@ class BatchIngestor(Ingestor):
         detect_workers = kwargs.pop("detect_workers", ocr_workers)
         page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
         ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", 1))
+
+        # When remote endpoints are provided as a comma-separated list, scale
+        # actor count to match endpoint count so load can be distributed.
+        pe_endpoints = _endpoint_count(kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url")))
+        if pe_endpoints > 0 and int(page_elements_workers) != int(pe_endpoints):
+            logging.warning(
+                "page_elements invoke URL list has %d endpoint(s); overriding page_elements_workers from %d to %d",
+                pe_endpoints,
+                int(page_elements_workers),
+                int(pe_endpoints),
+            )
+            page_elements_workers = int(pe_endpoints)
+
+        ocr_endpoints = _endpoint_count(kwargs.get("ocr_invoke_url", kwargs.get("invoke_url")))
+        if ocr_endpoints > 0 and int(detect_workers) != int(ocr_endpoints):
+            logging.warning(
+                "ocr invoke URL list has %d endpoint(s); overriding detect_workers from %d to %d",
+                ocr_endpoints,
+                int(detect_workers),
+                int(ocr_endpoints),
+            )
+            detect_workers = int(ocr_endpoints)
 
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
         total_gpu_cpus = (
