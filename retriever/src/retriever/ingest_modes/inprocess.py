@@ -36,6 +36,7 @@ from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
 from ..pdf.split import pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
+from ..html import html_file_to_chunks_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
@@ -596,9 +597,10 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract) or "txt" (extract_txt). Loader dispatch in ingest().
-        self._pipeline_type: Literal["pdf", "txt"] = "pdf"
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), or "html" (extract_html). Loader dispatch in ingest().
+        self._pipeline_type: Literal["pdf", "txt", "html"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
+        self._extract_html_kwargs: Dict[str, Any] = {}
 
     def files(self, documents: Union[str, List[str]]) -> "InProcessIngestor":
         """
@@ -767,12 +769,34 @@ class InProcessIngestor(Ingestor):
         }
         return self
 
+    def extract_html(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """
+        Configure HTML ingestion: markitdown -> markdown -> tokenizer chunking (no PDF extraction).
+
+        Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_html().
+        """
+        self._pipeline_type = "html"
+        self._extract_html_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        return self
+
     def embed(self, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure embedding for in-process execution.
 
         This records an embedding task so call sites can chain `.embed(...)`
-        after `.extract(...)` or `.extract_txt()`.
+        after `.extract(...)`, `.extract_txt()`, or `.extract_html()`.
 
         When ``embedding_endpoint`` is provided (e.g.
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
@@ -889,6 +913,9 @@ class InProcessIngestor(Ingestor):
         if self._pipeline_type == "pdf":
             def _loader(p: str) -> pd.DataFrame:
                 return pdf_path_to_pages_df(p)
+        elif self._pipeline_type == "html":
+            def _loader(p: str) -> pd.DataFrame:
+                return html_file_to_chunks_df(p, **self._extract_html_kwargs)
         else:
             def _loader(p: str) -> pd.DataFrame:
                 return txt_file_to_chunks_df(p, **self._extract_txt_kwargs)

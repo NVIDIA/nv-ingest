@@ -58,6 +58,7 @@ dependencies = [
   "nemotron-graphic-elements-v1>=0.dev0",
   "nemotron-table-structure-v1>=0.dev0",
   "nemotron-ocr>=0.dev0",
+  "markitdown",
 ]
 
 [project.optional-dependencies]

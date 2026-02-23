@@ -12,6 +12,7 @@ from .benchmark import app as benchmark_app
 from .vector_store import app as vector_store_app
 from .recall import app as recall_app
 from .txt import __main__ as txt_main
+from .html import __main__ as html_main
 
 app = typer.Typer(help="Retriever")
 app.add_typer(image_app, name="image")
@@ -23,6 +24,7 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(vector_store_app, name="vector-store")
 app.add_typer(recall_app, name="recall")
 app.add_typer(txt_main.app, name="txt")
+app.add_typer(html_main.app, name="html")
 
 
 def main():

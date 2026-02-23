@@ -54,14 +54,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="Directory containing PDFs, .txt, or .html files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf' or 'txt'. Use 'txt' for a directory of .txt files (tokenizer-based chunking).",
+        help="Input format: 'pdf', 'txt', or 'html'. Use 'txt' for .txt files (tokenizer chunking), 'html' for .html (markitdown -> markdown -> chunks).",
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -75,8 +75,8 @@ def main(
         help="Do not print per-query retrieval details (query, gold, hits). Only the missed-gold summary and recall metrics are printed.",
     ),
 ) -> None:
-    if input_type == "txt":
-        pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt
+    if input_type in ("txt", "html"):
+        pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt or .html
     else:
         os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
 
@@ -87,6 +87,15 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
+            .embed(model_name="nemo_retriever_v1")
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+        )
+    elif input_type == "html":
+        glob_pattern = str(input_dir / "*.html")
+        ingestor = create_ingestor(run_mode="inprocess")
+        ingestor = (
+            ingestor.files(glob_pattern)
+            .extract_html(max_tokens=512, overlap_tokens=0)
             .embed(model_name="nemo_retriever_v1")
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
         )

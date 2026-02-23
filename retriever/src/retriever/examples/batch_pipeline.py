@@ -146,14 +146,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="Directory containing PDFs, .txt, or .html files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf' or 'txt'. Use 'txt' for a directory of .txt files (tokenizer-based chunking).",
+        help="Input format: 'pdf', 'txt', or 'html'. Use 'txt' for .txt files, 'html' for .html (markitdown -> chunks).",
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -346,6 +346,15 @@ def main(
             .embed(model_name="nemo_retriever_v1")
             .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
+    elif input_type == "html":
+        glob_pattern = str(input_dir / "*.html")
+        ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
+        ingestor = (
+            ingestor.files(glob_pattern)
+            .extract_html(max_tokens=512, overlap_tokens=0)
+            .embed(model_name="nemo_retriever_v1")
+            .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+        )
     else:
         pdf_glob = str(input_dir / "*.pdf")
         ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
@@ -463,7 +472,7 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
-            ext = ".txt" if input_type == "txt" else ".pdf"
+            ext = ".html" if input_type == "html" else (".txt" if input_type == "txt" else ".pdf")
             print(f"\nQuery {i}: {q}")
             print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
@@ -478,7 +487,7 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            ext = ".txt" if input_type == "txt" else ".pdf"
+            ext = ".html" if input_type == "html" else (".txt" if input_type == "txt" else ".pdf")
             missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))

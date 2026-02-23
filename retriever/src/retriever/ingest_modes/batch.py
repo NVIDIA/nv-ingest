@@ -262,8 +262,9 @@ class BatchIngestor(Ingestor):
         self._rd_dataset: rd.Dataset = None  # Ray Data dataset created from input documents.
         self._tasks: List[tuple[str, dict[str, Any]]] = []
         self._intermediate_output_dir: Optional[str] = None
-        self._pipeline_type: str = "pdf"  # "pdf" | "txt"
+        self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
         self._extract_txt_kwargs: Dict[str, Any] = {}
+        self._extract_html_kwargs: Dict[str, Any] = {}
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -597,6 +598,40 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
             num_gpus=0,
             fn_constructor_kwargs=dict(self._extract_txt_kwargs),
+        )
+        return self
+
+    def extract_html(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure HTML-only pipeline: read_binary_files -> HtmlSplitActor (bytes -> chunk rows).
+
+        Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_html().
+        """
+        from retriever.html.ray_data import HtmlSplitActor
+
+        self._pipeline_type = "html"
+        self._extract_html_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            HtmlSplitActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs=dict(self._extract_html_kwargs),
         )
         return self
 
