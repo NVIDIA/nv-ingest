@@ -17,6 +17,7 @@ import time
 import traceback
 
 import pandas as pd
+from retriever.nim.nim import invoke_image_inference_batches
 
 try:
     import numpy as np
@@ -226,6 +227,17 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
     return dets
 
 
+def _extract_remote_pred_item(response_item: Any) -> Any:
+    if isinstance(response_item, dict):
+        for k in ("prediction", "predictions", "output", "outputs", "data"):
+            v = response_item.get(k)
+            if isinstance(v, list) and v:
+                return v[0]
+            if v is not None:
+                return v
+    return response_item
+
+
 def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     out: Dict[str, int] = {}
     for d in detections:
@@ -242,11 +254,15 @@ def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
 def detect_infographic_elements_v1(
     batch_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
     inference_batch_size: int = 8,
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron Graphic Elements v1 on an infographic image source.
@@ -263,28 +279,73 @@ def detect_infographic_elements_v1(
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
 
-    label_names = _labels_from_model(model)
+    invoke_url = (invoke_url or kwargs.get("infographic_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
+
+    label_names = _labels_from_model(model) if model is not None else []
 
     tensors: List[Optional["torch.Tensor"]] = []
     shapes: List[Optional[Tuple[int, int]]] = []
+    image_b64_list: List[Optional[str]] = []
     payloads: List[Dict[str, Any]] = []
     for _, row in batch_df.iterrows():
         try:
             b64 = row.get("page_image", {}).get("image_b64", None)
             if not b64:
                 raise ValueError("No usable image_b64 found in row.")
-            t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-            tensors.append(t)
-            shapes.append(orig_shape)
+            image_b64_list.append(b64)
+            if use_remote:
+                tensors.append(None)
+                shapes.append(None)
+            else:
+                t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
+                tensors.append(t)
+                shapes.append(orig_shape)
             payloads.append({"detections": []})
         except BaseException as e:
             tensors.append(None)
             shapes.append(None)
+            image_b64_list.append(None)
             payloads.append(_error_payload(stage="decode_image", exc=e))
 
-    valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
+    if use_remote:
+        valid = [i for i, b64 in enumerate(image_b64_list) if isinstance(b64, str) and bool(b64)]
+    else:
+        valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
+
+    if use_remote and valid:
+        valid_b64 = [image_b64_list[i] for i in valid if image_b64_list[i]]
+        t0 = time.perf_counter()
+        try:
+            response_items = invoke_image_inference_batches(
+                invoke_url=invoke_url,
+                image_b64_list=cast(List[str], valid_b64),
+                api_key=api_key,
+                timeout_s=float(request_timeout_s),
+                max_batch_size=int(inference_batch_size),
+                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+                max_retries=int(kwargs.get("remote_max_retries", 10)),
+                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+            )
+            elapsed = time.perf_counter() - t0
+            if len(response_items) != len(valid):
+                raise RuntimeError(f"Expected {len(valid)} remote predictions, got {len(response_items)}")
+            for local_j, row_i in enumerate(valid):
+                pred_item = _extract_remote_pred_item(response_items[local_j])
+                dets = _prediction_to_detections(pred_item, label_names=label_names)
+                payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
+        except BaseException as e:
+            elapsed = time.perf_counter() - t0
+            for row_i in valid:
+                payloads[row_i] = _error_payload(stage="remote_invoke", exc=e) | {
+                    "timing": {"seconds": float(elapsed)}
+                }
 
     for chunk_start in range(0, len(valid), int(inference_batch_size)):
+        if use_remote:
+            break
         idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
         if not idxs:
             continue
@@ -365,7 +426,10 @@ def detect_infographic_elements_v1(
 def detect_infographic_elements_v1_from_page_elements_v3(
     pages_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
     inference_batch_size: int = 8,
     page_elements_column: str = "page_elements_v3",
     page_elements_counts_by_label_column: str = "page_elements_v3_counts_by_label",
@@ -374,6 +438,7 @@ def detect_infographic_elements_v1_from_page_elements_v3(
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron Graphic Elements v1 only on cropped infographic/title regions.
@@ -391,6 +456,10 @@ def detect_infographic_elements_v1_from_page_elements_v3(
         )
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
+    invoke_url = (invoke_url or kwargs.get("infographic_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
 
     allowed = {str(x).strip() for x in (allowed_page_element_labels or []) if str(x).strip()}
     if not allowed:
@@ -483,89 +552,120 @@ def detect_infographic_elements_v1_from_page_elements_v3(
         out_counts.append({})
 
     if crop_b64s:
-        label_names = _labels_from_model(model)
+        label_names = _labels_from_model(model) if model is not None else []
 
-        tensors: List[Optional["torch.Tensor"]] = []
-        shapes: List[Optional[Tuple[int, int]]] = []
         crop_payloads: List[Dict[str, Any]] = []
-        for b64 in crop_b64s:
-            try:
-                t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-                tensors.append(t)
-                shapes.append(orig_shape)
-                crop_payloads.append({"detections": []})
-            except BaseException as e:
-                tensors.append(None)
-                shapes.append(None)
-                crop_payloads.append(_error_payload(stage="decode_image", exc=e))
-
-        valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
-
-        for chunk_start in range(0, len(valid), int(inference_batch_size)):
-            idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
-            if not idxs:
-                continue
-
-            pre_list: List["torch.Tensor"] = []
-            orig_shapes: List[Tuple[int, int]] = []
-            for i in idxs:
-                t = tensors[i]
-                sh = shapes[i]
-                if t is None or sh is None:
-                    continue
-                orig_shapes.append(sh)
-                x = t.unsqueeze(0)
-                try:
-                    pre = model.preprocess(x)
-                except Exception:
-                    pre = x
-                if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
-                    pre_list.append(pre[0])
-                elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                    pre_list.append(pre)
-                else:
-                    pre_list.append(t)
-
-            if not pre_list:
-                continue
-
-            batch = torch.stack(pre_list, dim=0)
+        if use_remote:
             t0 = time.perf_counter()
             try:
-                preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
+                response_items = invoke_image_inference_batches(
+                    invoke_url=invoke_url,
+                    image_b64_list=crop_b64s,
+                    api_key=api_key,
+                    timeout_s=float(request_timeout_s),
+                    max_batch_size=int(inference_batch_size),
+                    max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+                    max_retries=int(kwargs.get("remote_max_retries", 10)),
+                    max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                )
                 elapsed = time.perf_counter() - t0
-                preds_list = preds if isinstance(preds, list) else [preds]
-                if len(preds_list) != len(idxs):
-                    raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
-                for local_j, crop_i in enumerate(idxs):
-                    dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
-                    crop_payloads[crop_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
-            except BaseException:
-                for crop_i in idxs:
-                    t = tensors[crop_i]
-                    sh = shapes[crop_i]
+                if len(response_items) != len(crop_b64s):
+                    raise RuntimeError(f"Expected {len(crop_b64s)} remote predictions, got {len(response_items)}")
+                for resp in response_items:
+                    pred_item = _extract_remote_pred_item(resp)
+                    dets = _prediction_to_detections(pred_item, label_names=label_names)
+                    crop_payloads.append({"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None})
+            except BaseException as e:
+                elapsed = time.perf_counter() - t0
+                for _ in crop_b64s:
+                    crop_payloads.append(
+                        _error_payload(stage="remote_invoke", exc=e) | {"timing": {"seconds": float(elapsed)}}
+                    )
+        else:
+            tensors: List[Optional["torch.Tensor"]] = []
+            shapes: List[Optional[Tuple[int, int]]] = []
+            for b64 in crop_b64s:
+                try:
+                    t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
+                    tensors.append(t)
+                    shapes.append(orig_shape)
+                    crop_payloads.append({"detections": []})
+                except BaseException as e:
+                    tensors.append(None)
+                    shapes.append(None)
+                    crop_payloads.append(_error_payload(stage="decode_image", exc=e))
+
+            valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
+
+            for chunk_start in range(0, len(valid), int(inference_batch_size)):
+                idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
+                if not idxs:
+                    continue
+
+                pre_list: List["torch.Tensor"] = []
+                orig_shapes: List[Tuple[int, int]] = []
+                for i in idxs:
+                    t = tensors[i]
+                    sh = shapes[i]
                     if t is None or sh is None:
                         continue
+                    orig_shapes.append(sh)
                     x = t.unsqueeze(0)
-                    t1 = time.perf_counter()
                     try:
-                        try:
-                            pre = model.preprocess(x)
-                        except Exception:
-                            pre = x
-                        if isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                            pre = pre.unsqueeze(0)
-                        pred = model.invoke(pre, sh)
-                        dets = _prediction_to_detections(pred, label_names=label_names)
+                        pre = model.preprocess(x)
+                    except Exception:
+                        pre = x
+                    if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
+                        pre_list.append(pre[0])
+                    elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                        pre_list.append(pre)
+                    else:
+                        pre_list.append(t)
+
+                if not pre_list:
+                    continue
+
+                batch = torch.stack(pre_list, dim=0)
+                t0 = time.perf_counter()
+                try:
+                    preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
+                    elapsed = time.perf_counter() - t0
+                    preds_list = preds if isinstance(preds, list) else [preds]
+                    if len(preds_list) != len(idxs):
+                        raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
+                    for local_j, crop_i in enumerate(idxs):
+                        dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
                         crop_payloads[crop_i] = {
                             "detections": dets,
-                            "timing": {"seconds": float(time.perf_counter() - t1)},
+                            "timing": {"seconds": float(elapsed)},
                             "error": None,
                         }
-                    except BaseException as e:
-                        crop_payloads[crop_i] = _error_payload(stage="invoke", exc=e) | {
-                            "timing": {"seconds": float(time.perf_counter() - t1)}
-                        }
+                except BaseException:
+                    for crop_i in idxs:
+                        t = tensors[crop_i]
+                        sh = shapes[crop_i]
+                        if t is None or sh is None:
+                            continue
+                        x = t.unsqueeze(0)
+                        t1 = time.perf_counter()
+                        try:
+                            try:
+                                pre = model.preprocess(x)
+                            except Exception:
+                                pre = x
+                            if isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                                pre = pre.unsqueeze(0)
+                            pred = model.invoke(pre, sh)
+                            dets = _prediction_to_detections(pred, label_names=label_names)
+                            crop_payloads[crop_i] = {
+                                "detections": dets,
+                                "timing": {"seconds": float(time.perf_counter() - t1)},
+                                "error": None,
+                            }
+                        except BaseException as e:
+                            crop_payloads[crop_i] = _error_payload(stage="invoke", exc=e) | {
+                                "timing": {"seconds": float(time.perf_counter() - t1)}
+                            }
 
         for crop_i, region_ref in enumerate(crop_region_refs):
             payload = crop_payloads[crop_i] if crop_i < len(crop_payloads) else {"detections": []}
@@ -623,9 +723,17 @@ class InfographicDetectionActor:
 
     def __init__(self, **detect_kwargs: Any) -> None:
         self.detect_kwargs = dict(detect_kwargs)
-        from retriever.model.local import NemotronGraphicElementsV1
+        invoke_url = str(
+            self.detect_kwargs.get("infographic_invoke_url") or self.detect_kwargs.get("invoke_url") or ""
+        ).strip()
+        if invoke_url and "invoke_url" not in self.detect_kwargs:
+            self.detect_kwargs["invoke_url"] = invoke_url
+        if invoke_url:
+            self._model = None
+        else:
+            from retriever.model.local import NemotronGraphicElementsV1
 
-        self._model = NemotronGraphicElementsV1()
+            self._model = NemotronGraphicElementsV1()
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:

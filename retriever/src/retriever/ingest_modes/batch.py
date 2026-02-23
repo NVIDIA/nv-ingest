@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import datetime as _dt
 import glob
+import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any, List, Optional
+from datetime import timedelta
 
 from typing import Union
 
@@ -23,6 +26,29 @@ from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
+
+DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
+
+
+# region agent log
+def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
+    payload = {
+        "sessionId": "250ae2",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# endregion
 
 
 class _LanceDBWriteActor:
@@ -57,6 +83,28 @@ class _LanceDBWriteActor:
         self._schema = None
         self._first_batch = True
         self._total_rows = 0
+        self._table = None
+        mode = "overwrite" if self._overwrite else "create"
+        fields = [
+                pa.field("vector", pa.list_(pa.float32(), 2048)),
+                pa.field("pdf_page", pa.string()),
+                pa.field("filename", pa.string()),
+                pa.field("pdf_basename", pa.string()),
+                pa.field("page_number", pa.int32()),
+                pa.field("source_id", pa.string()),
+                pa.field("path", pa.string()),
+                pa.field("text", pa.string()),
+                pa.field("metadata", pa.string()),
+                pa.field("source", pa.string()),
+            ]
+        self._schema = pa.schema(fields)
+
+        self._table = self._db.create_table(
+                        self._table_name,
+                        schema=self._schema,
+                        mode=mode,
+                    )
+
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch.
@@ -135,41 +183,9 @@ class _LanceDBWriteActor:
         rows = self._build_rows(batch_df)
         if rows:
             # Infer schema from first batch
-            if self._schema is None:
-                pa = self._pa
-                dim = len(rows[0]["vector"])
-                fields = [
-                    pa.field("vector", pa.list_(pa.float32(), dim)),
-                    pa.field("pdf_page", pa.string()),
-                    pa.field("filename", pa.string()),
-                    pa.field("pdf_basename", pa.string()),
-                    pa.field("page_number", pa.int32()),
-                    pa.field("source_id", pa.string()),
-                    pa.field("path", pa.string()),
-                    pa.field("text", pa.string()),
-                    pa.field("metadata", pa.string()),
-                    pa.field("source", pa.string()),
-                ]
-                self._schema = pa.schema(fields)
-
-            if self._first_batch:
-                mode = "overwrite" if self._overwrite else "create"
-                try:
-                    self._table = self._db.create_table(
-                        self._table_name,
-                        data=rows,
-                        schema=self._schema,
-                        mode=mode,
-                    )
-                except Exception:
-                    # Table might already exist in append mode
-                    self._table = self._db.open_table(self._table_name)
-                    self._table.add(rows)
-                self._first_batch = False
-            else:
-                if self._table is None:
-                    self._table = self._db.open_table(self._table_name)
-                self._table.add(rows)
+            if self._table is None:
+                self._table = self._db.open_table(self._table_name)
+            self._table.add(rows)
 
             self._total_rows += len(rows)
 
@@ -299,14 +315,17 @@ class BatchIngestor(Ingestor):
         - ``page_elements_workers``: ActorPool size for page elements (default num_gpus // 2).
         - ``detect_batch_size``: Batch size for detection stages (default 16).
         - ``detect_workers``: ActorPool size for detection stages (default num_gpus // 4).
+        - ``page_elements_cpus_per_actor``: CPUs reserved per page-elements actor (default 1).
+        - ``ocr_cpus_per_actor``: CPUs reserved per OCR actor (default 1).
         """
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
+        debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
-        page_elements_batch_size = kwargs.pop("page_elements_batch_size", 16)
-        detect_batch_size = kwargs.pop("detect_batch_size", 16)
+        page_elements_batch_size = kwargs.pop("page_elements_batch_size", 24)
+        detect_batch_size = kwargs.pop("detect_batch_size", 24)
 
         # Count GPU stages that will be created (page_elements is always on).
         # +1 reserves headroom for a downstream embed() stage.
@@ -338,14 +357,56 @@ class BatchIngestor(Ingestor):
         page_elements_workers = kwargs.pop("page_elements_workers", 1)
         ocr_workers = kwargs.pop("ocr_workers", 1)
         detect_workers = kwargs.pop("detect_workers", ocr_workers)
+        page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
+        ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", 1))
 
-        # GPU actors are GPU-bound; give them minimal CPU so the extraction
-        # stage (the real CPU bottleneck) gets the lion's share.
-        gpu_cpus = 1
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
-        total_gpu_cpus = (page_elements_workers + detect_workers * detect_stage_count) * gpu_cpus
+        total_gpu_cpus = (
+            page_elements_workers * page_elements_cpus_per_actor
+            + detect_workers * detect_stage_count * ocr_cpus_per_actor
+        )
         cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
+
+        # region agent log
+        total_gpu_requested = (
+            float(gpu_page_elements) * float(page_elements_workers)
+            + float(gpu_ocr) * float(detect_workers * detect_stage_count)
+            + float(gpu_embed) * 1.0
+        )
+        _debug_log(
+            run_id=debug_run_id,
+            hypothesis_id="H1",
+            location="ingest_modes/batch.py:extract",
+            message="Resource envelope computed for Ray stages",
+            data={
+                "num_gpus_available": self._num_gpus,
+                "num_cpus_available": self._num_cpus,
+                "gpu_page_elements": gpu_page_elements,
+                "gpu_ocr": gpu_ocr,
+                "gpu_embed": gpu_embed,
+                "page_elements_workers": page_elements_workers,
+                "detect_workers": detect_workers,
+                "detect_stage_count": detect_stage_count,
+                "pdf_extract_workers": pdf_extract_workers,
+                "pdf_extract_num_cpus": pdf_extract_num_cpus,
+                "total_gpu_requested_across_stages": total_gpu_requested,
+                "can_fully_overlap_gpu_stages": bool(total_gpu_requested <= float(self._num_gpus)),
+            },
+        )
+        _debug_log(
+            run_id=debug_run_id,
+            hypothesis_id="H2",
+            location="ingest_modes/batch.py:extract",
+            message="CPU reservation breakdown for actors and extraction pool",
+            data={
+                "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                "total_gpu_actor_cpus_reserved": total_gpu_cpus,
+                "cpus_for_extract": cpus_for_extract,
+            },
+        )
+        # endregion
 
         # Store per-stage GPU allocations for downstream stages (e.g. embed).
         self._gpu_page_elements = gpu_page_elements
@@ -388,8 +449,20 @@ class BatchIngestor(Ingestor):
             "output_column",
             "num_detections_column",
             "counts_by_label_column",
+            "api_key",
+            "request_timeout_s",
+            "remote_max_pool_workers",
+            "remote_max_retries",
+            "remote_max_429_retries",
         }
         detect_kwargs = {k: kwargs[k] for k in detect_passthrough_keys if k in kwargs}
+        page_elements_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url"))
+        if page_elements_invoke_url:
+            detect_kwargs["invoke_url"] = page_elements_invoke_url
+        if "page_elements_request_timeout_s" in kwargs:
+            detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
+        if "page_elements_api_key" in kwargs:
+            detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
 
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
@@ -412,7 +485,7 @@ class BatchIngestor(Ingestor):
             num_gpus=0,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
-
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
         # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
         # construct one instance per actor). Passing an already-constructed
@@ -421,7 +494,7 @@ class BatchIngestor(Ingestor):
             PageElementDetectionActor,
             batch_size=page_elements_batch_size,
             batch_format="pandas",
-            num_cpus=gpu_cpus,
+            num_cpus=page_elements_cpus_per_actor,
             num_gpus=gpu_page_elements,
             compute=rd.ActorPoolStrategy(size=page_elements_workers),
             fn_constructor_kwargs=dict(detect_kwargs),
@@ -435,13 +508,29 @@ class BatchIngestor(Ingestor):
             ocr_flags["extract_charts"] = True
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
+        for k in (
+            "api_key",
+            "request_timeout_s",
+            "remote_max_pool_workers",
+            "remote_max_retries",
+            "remote_max_429_retries",
+        ):
+            if k in kwargs:
+                ocr_flags[k] = kwargs[k]
+        ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+        if ocr_invoke_url:
+            ocr_flags["invoke_url"] = ocr_invoke_url
+        if "ocr_request_timeout_s" in kwargs:
+            ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+        if "ocr_api_key" in kwargs:
+            ocr_flags["api_key"] = kwargs["ocr_api_key"]
 
         if ocr_flags:
             self._rd_dataset = self._rd_dataset.map_batches(
                 OCRActor,
                 batch_size=detect_batch_size,
                 batch_format="pandas",
-                num_cpus=gpu_cpus,
+                num_cpus=ocr_cpus_per_actor,
                 num_gpus=gpu_ocr,
                 compute=rd.ActorPoolStrategy(size=detect_workers),
                 fn_constructor_kwargs=ocr_flags,
@@ -492,6 +581,7 @@ class BatchIngestor(Ingestor):
 
         - ``embed_workers``: ActorPool size (default 1).
         - ``embed_batch_size``: Ray Data batch size (default 256).
+        - ``embed_cpus_per_actor``: CPUs reserved per embedding actor (default 1).
         - ``device``, ``hf_cache_dir``, ``normalize``, ``max_length``:
           forwarded to ``LlamaNemotronEmbed1BV2Embedder``.
         - ``embedding_endpoint``: optional NIM endpoint URL
@@ -501,12 +591,15 @@ class BatchIngestor(Ingestor):
         """
         embed_workers = kwargs.pop("embed_workers", 1)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
+        embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
 
         # Remaining kwargs are forwarded to the actor constructor.
         self._tasks.append(("embed", dict(kwargs)))
 
         # Explode content rows before embedding so each table/chart/infographic
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
+
         from retriever.ingest_modes.inprocess import explode_content_to_rows
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -531,7 +624,7 @@ class BatchIngestor(Ingestor):
             _BatchEmbedActor,
             batch_size=embed_batch_size,
             batch_format="pandas",
-            num_cpus=1,
+            num_cpus=embed_cpus_per_actor,
             num_gpus=gpu_per_stage,
             compute=rd.ActorPoolStrategy(size=embed_workers),
             fn_constructor_kwargs=dict(kwargs),
@@ -558,7 +651,6 @@ class BatchIngestor(Ingestor):
         # Streaming write stage — single actor, CPU-only, no GPU needed.
         self._rd_dataset = self._rd_dataset.map_batches(
             _LanceDBWriteActor,
-            batch_size=256,
             batch_format="pandas",
             num_cpus=1,
             num_gpus=0,
@@ -605,7 +697,17 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
-    def ingest(self) -> int:
+    def ingest(
+        self,
+        show_progress: bool = False,
+        return_failures: bool = False,
+        save_to_disk: bool = False,
+        return_traces: bool = False,
+        *,
+        runtime_metrics_dir: Optional[str] = None,
+        runtime_metrics_prefix: Optional[str] = None,
+        **_: Any,
+    ) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
 
@@ -614,11 +716,61 @@ class BatchIngestor(Ingestor):
         pipeline finishes, we create the LanceDB vector index (which must happen
         after all writes are complete).
         """
+        _ = (show_progress, return_failures, save_to_disk, return_traces)
         t0 = time.monotonic()
         num_pages = self._rd_dataset.count()
         elapsed = time.monotonic() - t0
 
         print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
+        # region agent log
+        _debug_log(
+            run_id=str(runtime_metrics_prefix or "unknown"),
+            hypothesis_id="H3",
+            location="ingest_modes/batch.py:ingest",
+            message="Pipeline completed with aggregate throughput",
+            data={
+                "input_files": len(self._input_documents),
+                "num_pages": int(num_pages),
+                "elapsed_seconds": float(elapsed),
+                "pages_per_second_total": float(num_pages / elapsed) if elapsed > 0 else None,
+                "runtime_metrics_dir": runtime_metrics_dir,
+            },
+        )
+        # endregion
+
+        # Best-effort runtime metrics capture for per-run stage-level debugging.
+        if runtime_metrics_dir:
+            metrics_dir = Path(runtime_metrics_dir)
+            metrics_dir.mkdir(parents=True, exist_ok=True)
+            prefix = (runtime_metrics_prefix or "run").strip() or "run"
+
+            stats_path = metrics_dir / f"{prefix}.rd_dataset.stats.txt"
+            timeline_path = metrics_dir / f"{prefix}.ray.timeline.json"
+            summary_path = metrics_dir / f"{prefix}.runtime.summary.json"
+
+            stats_text = ""
+            try:
+                stats_text = str(self._rd_dataset.stats())
+                stats_path.write_text(stats_text, encoding="utf-8")
+            except Exception as e:
+                print(f"Warning: failed writing dataset stats: {e}")
+
+            try:
+                ray.timeline(filename=str(timeline_path))
+            except Exception as e:
+                print(f"Warning: failed writing ray timeline: {e}")
+
+            try:
+                summary = {
+                    "input_files": int(len(self._input_documents)),
+                    "num_pages": int(num_pages),
+                    "elapsed_seconds": float(elapsed),
+                    "stats_path": str(stats_path),
+                    "timeline_path": str(timeline_path),
+                }
+                summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+            except Exception as e:
+                print(f"Warning: failed writing runtime summary: {e}")
 
         # Create LanceDB vector index after all streaming writes are complete.
         if hasattr(self, "_vdb_upload_kwargs") and self._vdb_upload_kwargs:
@@ -673,5 +825,8 @@ class BatchIngestor(Ingestor):
             table.create_index(vector_column_name="vector")
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+
+        for index_stub in table.list_indices():
+            table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
         print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")

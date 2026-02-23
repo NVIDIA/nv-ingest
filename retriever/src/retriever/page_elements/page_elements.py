@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import base64
@@ -34,6 +33,8 @@ try:
 except ImportError:
     postprocess_page_elements_v3 = None  # type: ignore[assignment,misc]
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
+
+from retriever.nim.nim import invoke_page_elements_batches
 
 
 TensorOrArray = Union["torch.Tensor", "np.ndarray"]
@@ -121,7 +122,7 @@ def _decode_b64_image_to_np_array(image_b64: str) -> Tuple["np.array", Tuple[int
     return arr, (int(h), int(w))
 
 
-def _labels_from_model(model: Any) -> List[str]:
+def _labels_from_model(_model: Any) -> List[str]:
     return [
             "table",
             "chart",
@@ -321,10 +322,62 @@ def _apply_page_elements_v3_postprocess(
         return dets
 
 
+def _remote_response_to_detections(
+    *,
+    response_json: Dict[str, Any],
+    label_names: List[str],
+    thresholds_per_class: Sequence[float],
+) -> List[Dict[str, Any]]:
+    # Try direct model-pred style payload first (or common wrappers around it).
+    candidates: List[Any] = [response_json]
+    data_list = response_json.get("data")
+    if isinstance(data_list, list) and data_list:
+        candidates.append(data_list[0])
+    output_list = response_json.get("output")
+    if isinstance(output_list, list) and output_list:
+        candidates.append(output_list[0])
+    pred_list = response_json.get("predictions")
+    if isinstance(pred_list, list) and pred_list:
+        candidates.append(pred_list[0])
+
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+        try:
+            boxes, labels, scores = postprocess_preds_page_element(cand, list(thresholds_per_class), label_names)
+            dets = _postprocess_to_per_image_detections(
+                boxes=[boxes],
+                labels=[labels],
+                scores=[scores],
+                batch_size=1,
+                label_names=label_names,
+            )[0]
+            return _apply_page_elements_v3_postprocess(dets)
+        except Exception:
+            pass
+
+    # Fall back to API-style annotation dict:
+    # {"table": [[x0,y0,x1,y1,conf], ...], "paragraph": [...]}
+    for cand in candidates:
+        if not isinstance(cand, dict) or not cand:
+            continue
+        if all(isinstance(v, list) for v in cand.values()):
+            try:
+                dets = _annotation_dict_to_detections(cand)  # type: ignore[arg-type]
+                return _apply_page_elements_v3_postprocess(dets)
+            except Exception:
+                pass
+
+    raise RuntimeError(f"Unsupported remote response format (keys={list(response_json.keys())!r})")
+
+
 def detect_page_elements_v3(
     pages_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
     inference_batch_size: int = 8,
     output_column: str = "page_elements_v3",
     num_detections_column: str = "page_elements_v3_num_detections",
@@ -355,7 +408,6 @@ def detect_page_elements_v3(
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
 
-
     # Working snippet for single image inference and debugging
     # breakpoint()
     # first_page = pages_df.iloc[0]
@@ -371,36 +423,105 @@ def detect_page_elements_v3(
     # print(preds)
     # breakpoint()
 
-    # Prepare per-row image tensors (and placeholders for missing/errored rows).
+    invoke_url = (invoke_url or kwargs.get("page_elements_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
+
+    # Prepare per-row decode artifacts (local mode), raw base64 (remote mode),
+    # and placeholders for missing/errored rows.
     row_tensors: List[Optional[TensorOrArray]] = []
     row_shapes: List[Optional[Tuple[int, int]]] = []
+    row_b64: List[Optional[str]] = []
     row_payloads: List[Dict[str, Any]] = []
 
-    label_names = _labels_from_model(model)
+    label_names = _labels_from_model(model) if model is not None else list(_RETRIEVER_LABEL_NAMES)
+    if model is not None and hasattr(model, "thresholds_per_class"):
+        thresholds_per_class = list(getattr(model, "thresholds_per_class"))
+    else:
+        thresholds_per_class = [0.0 for _ in label_names]
 
     for _, row in pages_df.iterrows():
         try:
             b64 = row.get("page_image")["image_b64"]
             if not b64:
                 raise ValueError("No usable image_b64 found in row.")
-            t, orig_shape = _decode_b64_image_to_np_array(b64)
-            row_tensors.append(t)
-            row_shapes.append(orig_shape)
+            row_b64.append(b64)
+            if use_remote:
+                row_tensors.append(None)
+                row_shapes.append(None)
+            else:
+                t, orig_shape = _decode_b64_image_to_np_array(b64)
+                row_tensors.append(t)
+                row_shapes.append(orig_shape)
             row_payloads.append({"detections": []})
         except BaseException as e:
             row_tensors.append(None)
             row_shapes.append(None)
+            row_b64.append(None)
             row_payloads.append(_error_payload(stage="decode_image", exc=e))
 
     # Run inference over only valid rows, but write results back in original order.
-    valid_indices = [i for i, t in enumerate(row_tensors) if t is not None and row_shapes[i] is not None]
+    if use_remote:
+        valid_indices = [i for i, b64 in enumerate(row_b64) if b64]
+    else:
+        valid_indices = [i for i, t in enumerate(row_tensors) if t is not None and row_shapes[i] is not None]
 
-    if valid_indices and torch is None:  # pragma: no cover
+    if (not use_remote) and valid_indices and torch is None:  # pragma: no cover
         raise ImportError("torch is required for page element detection.")
 
+    if use_remote and valid_indices:
+        valid_b64: List[str] = []
+        for row_i in valid_indices:
+            b64 = row_b64[row_i]
+            if b64:
+                valid_b64.append(b64)
+
+        t0 = time.perf_counter()
+        try:
+            response_items = invoke_page_elements_batches(
+                invoke_url=invoke_url,
+                image_b64_list=valid_b64,
+                api_key=api_key,
+                timeout_s=float(request_timeout_s),
+                max_batch_size=int(inference_batch_size),
+                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+                max_retries=int(kwargs.get("remote_max_retries", 10)),
+                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+            )
+            elapsed = time.perf_counter() - t0
+
+            if len(response_items) != len(valid_indices):
+                raise RuntimeError(
+                    "Remote response count mismatch: "
+                    f"expected {len(valid_indices)}, got {len(response_items)}"
+                )
+
+            for local_i, row_i in enumerate(valid_indices):
+                dets = _remote_response_to_detections(
+                    response_json=response_items[local_i],
+                    label_names=label_names,
+                    thresholds_per_class=thresholds_per_class,
+                )
+                row_payloads[row_i] = {
+                    "detections": dets,
+                    "timing": {"seconds": float(elapsed)},
+                    "error": None,
+                }
+        except BaseException as e:
+            elapsed = time.perf_counter() - t0
+            for row_i in valid_indices:
+                row_payloads[row_i] = _error_payload(stage="remote_inference", exc=e) | {
+                    "timing": {"seconds": float(elapsed)}
+                }
+
     for chunk_start in range(0, len(valid_indices), int(inference_batch_size)):
-        chunk_idx = valid_indices[chunk_start : chunk_start + int(inference_batch_size)]
+        chunk_idx = valid_indices[chunk_start:chunk_start + int(inference_batch_size)]
         if not chunk_idx:
+            continue
+
+        if use_remote:
             continue
 
         # Preprocess each image to a fixed shape so we can stack.
@@ -457,7 +578,7 @@ def detect_page_elements_v3(
             print(f"Error invoking model: {ex}")
             preds_list: List[Any] = []
             for j in range(int(batch.shape[0])):
-                preds_list.append(model(batch[j : j + 1], orig_shapes[j]))
+                preds_list.append(model(batch[j:j + 1], orig_shapes[j]))
             preds = preds_list
         elapsed = time.perf_counter() - t0
 
@@ -485,7 +606,11 @@ def detect_page_elements_v3(
                         labels_list.append(torch.empty((0,), dtype=torch.int64))
                         scores_list.append(torch.empty((0,), dtype=torch.float32))
                         continue
-                    b_np, l_np, s_np = postprocess_preds_page_element(p, model.thresholds_per_class, model.labels)
+                    b_np, l_np, s_np = postprocess_preds_page_element(
+                        p,
+                        list(thresholds_per_class),
+                        label_names,
+                    )
                     boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))
                     labels_list.append(torch.as_tensor(l_np, dtype=torch.int64))
                     scores_list.append(torch.as_tensor(s_np, dtype=torch.float32))
@@ -509,11 +634,15 @@ def detect_page_elements_v3(
         except BaseException as e:
             # If postprocess fails, attach an error but keep job alive.
             for row_i in chunk_idx:
-                row_payloads[row_i] = _error_payload(stage="postprocess", exc=e) | {"timing": {"seconds": float(elapsed)}}
+                row_payloads[row_i] = _error_payload(stage="postprocess", exc=e) | {
+                    "timing": {"seconds": float(elapsed)}
+                }
 
     out = pages_df.copy()
     out[output_column] = row_payloads
-    out[num_detections_column] = [int(len(p.get("detections") or [])) if isinstance(p, dict) else 0 for p in row_payloads]
+    out[num_detections_column] = [
+        int(len(p.get("detections") or [])) if isinstance(p, dict) else 0 for p in row_payloads
+    ]
     out[counts_by_label_column] = [
         _counts_by_label(p.get("detections") or []) if isinstance(p, dict) else {} for p in row_payloads
     ]
@@ -532,9 +661,17 @@ class PageElementDetectionActor:
 
     def __init__(self, **detect_kwargs: Any) -> None:
         self.detect_kwargs = dict(detect_kwargs)
-        from retriever.model.local import NemotronPageElementsV3
+        invoke_url = str(
+            self.detect_kwargs.get("page_elements_invoke_url") or self.detect_kwargs.get("invoke_url") or ""
+        ).strip()
+        if invoke_url and "invoke_url" not in self.detect_kwargs:
+            self.detect_kwargs["invoke_url"] = invoke_url
+        if invoke_url:
+            self._model = None
+        else:
+            from retriever.model.local import NemotronPageElementsV3
 
-        self._model = NemotronPageElementsV3()
+            self._model = NemotronPageElementsV3()
 
     def __call__(self, pages_df: Any, **override_kwargs: Any) -> Any:
         try:

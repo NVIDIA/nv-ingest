@@ -5,6 +5,7 @@ Run with: uv run python -m retriever.examples.batch_pipeline <input-dir>
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,94 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
+    """
+    Estimate pages processed by counting unique (source_id, page_number) pairs.
+
+    Falls back to table row count if page-level fields are unavailable.
+    """
+    try:
+        db = lancedb.connect(uri)
+        table = db.open_table(table_name)
+    except Exception:
+        return None
+
+    try:
+        df = table.to_pandas()[["source_id", "page_number"]]
+        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
+    except Exception:
+        try:
+            return int(table.count_rows())
+        except Exception:
+            return None
+
+
+def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
+    if ingest_elapsed_s <= 0:
+        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
+        return
+    if processed_pages is None:
+        print(
+            "Pages/sec: unavailable (could not estimate processed pages). "
+            f"Ingest time: {ingest_elapsed_s:.2f}s"
+        )
+        return
+
+    pps = processed_pages / ingest_elapsed_s
+    print(f"Pages processed: {processed_pages}")
+    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
+
+
+def _ensure_lancedb_table(uri: str, table_name: str) -> None:
+    """
+    Ensure the local LanceDB URI exists and table can be opened.
+
+    Creates an empty table with the expected schema if it does not exist yet.
+    """
+    # Local path URI in this pipeline.
+    Path(uri).mkdir(parents=True, exist_ok=True)
+
+    db = lancedb.connect(uri)
+    try:
+        db.open_table(table_name)
+        return
+    except Exception:
+        pass
+
+    import pyarrow as pa  # type: ignore
+
+    schema = pa.schema(
+        [
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+            pa.field("source", pa.string()),
+        ]
+    )
+    empty = pa.table(
+        {
+            "vector": [],
+            "pdf_page": [],
+            "filename": [],
+            "pdf_basename": [],
+            "page_number": [],
+            "source_id": [],
+            "path": [],
+            "text": [],
+            "metadata": [],
+            "source": [],
+        },
+        schema=schema,
+    )
+    db.create_table(table_name, data=empty, schema=schema, mode="create")
 
 
 def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
@@ -114,17 +203,47 @@ def main(
         min=1,
         help="Batch size for PDF extraction stage.",
     ),
+    pdf_split_batch_size: int = typer.Option(
+        1,
+        "--pdf-split-batch-size",
+        min=1,
+        help="Batch size for PDF split stage.",
+    ),
+    page_elements_batch_size: int = typer.Option(
+        24,
+        "--page-elements-batch-size",
+        min=1,
+        help="Ray Data batch size for page-elements stage.",
+    ),
     ocr_workers: int = typer.Option(
         1,
         "--ocr-workers",
         min=1,
         help="Actor count for OCR stage.",
     ),
+    page_elements_workers: int = typer.Option(
+        1,
+        "--page-elements-workers",
+        min=1,
+        help="Actor count for page-elements stage.",
+    ),
     ocr_batch_size: int = typer.Option(
         16,
         "--ocr-batch-size",
         min=1,
         help="Ray Data batch size for OCR stage.",
+    ),
+    page_elements_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--page-elements-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per page-elements actor.",
+    ),
+    ocr_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--ocr-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per OCR actor.",
     ),
     embed_workers: int = typer.Option(
         1,
@@ -137,6 +256,12 @@ def main(
         "--embed-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
+    ),
+    embed_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--embed-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per embedding actor.",
     ),
     gpu_page_elements: float = typer.Option(
         0.5,
@@ -156,8 +281,54 @@ def main(
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
+    page_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--page-elements-invoke-url",
+        help="Optional remote endpoint URL for page-elements model inference.",
+    ),
+    ocr_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--ocr-invoke-url",
+        help="Optional remote endpoint URL for OCR model inference.",
+    ),
+    runtime_metrics_dir: Optional[Path] = typer.Option(
+        None,
+        "--runtime-metrics-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where Ray runtime metrics are written per run.",
+    ),
+    runtime_metrics_prefix: Optional[str] = typer.Option(
+        None,
+        "--runtime-metrics-prefix",
+        help="Optional filename prefix for per-run metrics artifacts.",
+    ),
+    lancedb_uri: str = typer.Option(
+        LANCEDB_URI,
+        "--lancedb-uri",
+        help="LanceDB URI/path for this run.",
+    ),
 ) -> None:
     os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
+    # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
+    lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
+    _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+
+    # Remote endpoints don't need local model GPUs for their stage.
+    if page_elements_invoke_url and float(gpu_page_elements) != 0.0:
+        print(
+            "[WARN] --page-elements-invoke-url is set; forcing --gpu-page-elements from "
+            f"{float(gpu_page_elements):.3f} to 0.0"
+        )
+        gpu_page_elements = 0.0
+
+    if ocr_invoke_url and float(gpu_ocr) != 0.0:
+        print(
+            "[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from "
+            f"{float(gpu_ocr):.3f} to 0.0"
+        )
+        gpu_ocr = 0.0
 
     # Resolve Ray: start a head node, connect to given address, or run in-process
     if start_ray:
@@ -173,37 +344,52 @@ def main(
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
             .embed(model_name="nemo_retriever_v1")
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
     else:
-        glob_pattern = str(input_dir / "*.pdf")
+        pdf_glob = str(input_dir / "*.pdf")
         ingestor = create_ingestor(run_mode="batch", ray_address=ray_address)
         ingestor = (
-            ingestor.files(glob_pattern)
+            ingestor.files(pdf_glob)
             .extract(
                 extract_text=True,
                 extract_tables=True,
                 extract_charts=True,
                 extract_infographics=False,
+                debug_run_id=str(runtime_metrics_prefix or "unknown"),
                 pdf_extract_workers=int(pdf_extract_workers),
                 pdf_extract_num_cpus=float(pdf_extract_num_cpus),
+                pdf_split_batch_size=int(pdf_split_batch_size),
                 pdf_extract_batch_size=int(pdf_extract_batch_size),
+                page_elements_batch_size=int(page_elements_batch_size),
+                page_elements_workers=int(page_elements_workers),
                 detect_workers=int(ocr_workers),
                 detect_batch_size=int(ocr_batch_size),
+                page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
+                ocr_cpus_per_actor=float(ocr_cpus_per_actor),
                 gpu_page_elements=float(gpu_page_elements),
                 gpu_ocr=float(gpu_ocr),
                 gpu_embed=float(gpu_embed),
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
             )
             .embed(
                 model_name="nemo_retriever_v1",
                 embed_workers=int(embed_workers),
                 embed_batch_size=int(embed_batch_size),
+                embed_cpus_per_actor=float(embed_cpus_per_actor),
             )
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
 
     print("Running extraction...")
-    ingestor.ingest()
+    ingest_start = time.perf_counter()
+    ingestor.ingest(
+        runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
+        runtime_metrics_prefix=runtime_metrics_prefix,
+    )
+    ingest_elapsed_s = time.perf_counter() - ingest_start
+    processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
     print("Extraction complete.")
 
     ray.shutdown()
@@ -214,15 +400,39 @@ def main(
     query_csv = Path(query_csv)
     if not query_csv.exists():
         print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+        _print_pages_per_second(processed_pages, ingest_elapsed_s)
         return
 
-    db = lancedb.connect(f"./{LANCEDB_URI}")
-    table = db.open_table(LANCEDB_TABLE)
+    db = lancedb.connect(lancedb_uri)
+    table = None
+    open_err: Optional[Exception] = None
+    for _ in range(3):
+        try:
+            table = db.open_table(LANCEDB_TABLE)
+            open_err = None
+            break
+        except Exception as e:
+            open_err = e
+            # Create table if missing, then retry open.
+            _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+            time.sleep(2)
+    if table is None:
+        raise RuntimeError(
+            f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
+            f"but it was not found."
+        ) from open_err
+    try:
+        if int(table.count_rows()) == 0:
+            print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+            _print_pages_per_second(processed_pages, ingest_elapsed_s)
+            return
+    except Exception:
+        pass
     unique_basenames = table.to_pandas()["pdf_basename"].unique()
     print(f"Unique basenames: {unique_basenames}")
 
     cfg = RecallConfig(
-        lancedb_uri=str(LANCEDB_URI),
+        lancedb_uri=str(lancedb_uri),
         lancedb_table=str(LANCEDB_TABLE),
         embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
         top_k=10,
@@ -283,6 +493,7 @@ def main(
     print("\nRecall metrics (matching retriever.recall.core):")
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
+    _print_pages_per_second(processed_pages, ingest_elapsed_s)
 
 
 if __name__ == "__main__":
