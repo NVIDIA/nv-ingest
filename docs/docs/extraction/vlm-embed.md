@@ -117,9 +117,102 @@ results = ingestor.ingest()
 ```
 
 
+## VLM Captioning for Infographics Example
+
+For documents that contain infographics (visual representations that combine text, images, charts, and diagrams), 
+you can use a vision-language model (VLM) to generate descriptive captions that capture the meaning and context of the infographic.
+This is particularly useful for infographics because they often contain complex visual information that benefits from natural language descriptions.
+
+!!! note
+
+To use VLM captioning feature, enable the `vlm` profile when you start the NeMo Retriever extraction services. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
+
+The following example demonstrates two different approaches for processing infographics:
+
+### Approach 1: Extract and Caption Infographics
+
+This approach extracts infographics from the document and generates text captions for them using a VLM.
+The captions describe the content and meaning of each infographic.
+
+Use this approach when you need searchable text descriptions of complex visual content. 
+
+- The `extract` method is configured with `extract_infographics=True` to identify and extract infographics.
+- The `caption` method calls a VLM to generate descriptive text for each infographic.
+
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,  # Extract infographics
+        extract_images=False,
+    )
+    .caption(
+        prompt="Describe the content and key information in this infographic:",
+        reasoning=True,  # Enable reasoning for better caption quality
+    )
+)
+results = ingestor.ingest()
+```
+
+### Approach 2: Extract and Embed Infographics as Images
+
+This approach treats infographics as visual elements and embeds them using the multimodal embedding model, 
+preserving their spatial and visual characteristics without generating text captions.
+
+Use this approach when you want to preserve the visual characteristics for similarity search.
+
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
+        extract_images=False,
+    )
+    .embed(
+        structured_elements_modality="image",  # Embed infographics as images
+    )
+)
+results = ingestor.ingest()
+```
+
+### Combining Both Approaches
+
+You can also combine captioning and embedding to get both text descriptions and visual embeddings.
+
+```python
+ingestor = (
+    Ingestor()
+    .files("./data/*.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
+        extract_images=False,
+    )
+    .caption(
+        prompt="Describe the content and key information in this infographic:",
+        reasoning=True,
+    )
+    .embed(
+        structured_elements_modality="image",
+    )
+)
+results = ingestor.ingest()
+```
+
 
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
 - [Use the NV-Ingest Python API](nv-ingest-python-api.md)
+- [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images)

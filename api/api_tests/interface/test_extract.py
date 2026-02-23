@@ -140,7 +140,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
             {
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
-                "yolox_auth_token": _AUTH_TOKEN,
+                "auth_token": _AUTH_TOKEN,
             }
         )
     elif extract_method == "llama":
@@ -149,7 +149,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
                 "llama_api_key": os.getenv("INGEST_LLAMA_API_KEY", "dummy-api-key"),
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
-                "yolox_auth_token": _AUTH_TOKEN,
+                "auth_token": _AUTH_TOKEN,
             }
         )
     elif extract_method == "unstructured_io":
@@ -158,7 +158,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
                 "unstructured_io_api_key": os.getenv("INGEST_UNSTRUCTURED_IO_API_KEY", "dummy-api-key"),
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
-                "yolox_auth_token": _AUTH_TOKEN,
+                "auth_token": _AUTH_TOKEN,
             }
         )
     elif extract_method == "nemotron_parse":
@@ -174,7 +174,7 @@ def test_extract_primitives_from_pdf_integration(extract_method):
                 # Also include YOLOX parameters for image processing capability
                 "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
                 "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
-                "yolox_auth_token": _AUTH_TOKEN,
+                "auth_token": _AUTH_TOKEN,
             }
         )
 
@@ -292,7 +292,7 @@ def test_extract_pdf_with_pdfium_integration():
         extract_charts=True,
         extract_infographics=True,
         text_depth="page",
-        yolox_auth_token=auth_token,
+        auth_token=auth_token,
         yolox_endpoints=(yolox_grpc_endpoint, yolox_http_endpoint),
         yolox_infer_protocol=yolox_protocol,
     )
@@ -407,7 +407,7 @@ def test_extract_pdf_with_nemotron_parse_integration():
         text_depth="page",
         yolox_endpoints=(yolox_grpc_endpoint, yolox_http_endpoint),
         yolox_infer_protocol=yolox_protocol,
-        yolox_auth_token=auth_token,
+        auth_token=auth_token,
         nemotron_parse_endpoints=(nemo_grpc_endpoint, nemo_http_endpoint),
         nemotron_parse_protocol=nemo_protocol,
         nemotron_parse_model_name=nemo_model_name,

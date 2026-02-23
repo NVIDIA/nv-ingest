@@ -19,6 +19,8 @@ cd tools/harness/
 uv pip install -e .
 ```
 
+**Vanilla pip:** Install the project with `pip install -e .` (from repo root, install `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` first if needed). The harness env already includes the nemotron packages; to get nightly versions from Test PyPI, install on top: `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps`.
+
 ### Run Your First Test
 
 ```bash
@@ -523,7 +525,7 @@ Metrics are also logged via `kv_event_log()`:
 
 ## Model Testing
 
-The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install includes the nemotron-* packages (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`).
+The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install (via `uv pip install -e .`) includes the nemotron-* packages from Test PyPI (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`). With vanilla pip, install the standard harness env first, then `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps` to get the nightly Nemotron packages from Test PyPI.
 
 ### Available Model Benchmarks
 
