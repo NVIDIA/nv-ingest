@@ -21,7 +21,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
+from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
