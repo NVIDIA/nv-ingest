@@ -20,6 +20,7 @@ from typing import Union
 
 import ray
 import ray.data as rd
+from retriever.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
 from retriever.pdf.extract import PDFExtractionActor
@@ -516,6 +517,26 @@ class BatchIngestor(Ingestor):
             detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
         if "page_elements_api_key" in kwargs:
             detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
+
+        # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
+        # LibreOffice process per file (batch_size=1).
+        self._rd_dataset = self._rd_dataset.map_batches(
+            DocToPdfConversionActor,
+            batch_size=1,
+            num_cpus=1,
+            num_gpus=0,
+            batch_format="pandas",
+        )
+
+        # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
+        # LibreOffice process per file (batch_size=1).
+        self._rd_dataset = self._rd_dataset.map_batches(
+            DocToPdfConversionActor,
+            batch_size=1,
+            num_cpus=1,
+            num_gpus=0,
+            batch_format="pandas",
+        )
 
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
