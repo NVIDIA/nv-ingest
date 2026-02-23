@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import typer
-import pandas as pd
 from rich.console import Console
 
-from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df
+from .core import RecallConfig, retrieve_and_score
 
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()
@@ -109,6 +108,11 @@ def recall_with_main(
     lancedb_uri: str = typer.Option("lancedb", "--lancedb-uri", help="LanceDB database URI (directory path)."),
     table_name: str = typer.Option("nv-ingest", "--table-name", help="LanceDB table name."),
     vector_column_name: str = typer.Option("vector", "--vector-column", help="Vector column name in the table."),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Use LanceDB hybrid retrieval (dense + FTS text). Requires FTS index on `text`.",
+    ),
     local_hf_device: Optional[str] = typer.Option(
         None,
         "--local-hf-device",
@@ -148,6 +152,7 @@ def recall_with_main(
         embedding_api_key=(embedding_api_key or ""),
         top_k=int(search_k),
         ks=metrics_ks,
+        hybrid=bool(hybrid),
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),
@@ -175,7 +180,7 @@ def recall_with_main(
         print(f"\tGold PDF: {g_pdf} - Gold Page: {g_page}")
         if has_separate_cols:
             print(f"\tOther PDF: {gold_pdfs[idx]} - Other Page: {gold_pages[idx]}")
-        print(f"\tTop-k Results:")
+        print("\tTop-k Results:")
 
         for i, h in enumerate(hits[:top_k]):
             meta = json.loads(h["metadata"]) if isinstance(h["metadata"], str) else h["metadata"]
@@ -204,6 +209,11 @@ def run(
     lancedb_uri: str = typer.Option("lancedb", "--lancedb-uri", help="LanceDB database URI (directory path)."),
     table_name: str = typer.Option("nv-ingest", "--table-name", help="LanceDB table name."),
     vector_column_name: str = typer.Option("vector", "--vector-column", help="Vector column name in the table."),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Use LanceDB hybrid retrieval (dense + FTS text). Requires FTS index on `text`.",
+    ),
     embedding_endpoint: Optional[str] = typer.Option(
         None,
         "--embedding-endpoint",
@@ -275,6 +285,7 @@ def run(
         embedding_api_key=(embedding_api_key or ""),
         top_k=int(search_k),
         ks=metrics_ks,
+        hybrid=bool(hybrid),
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),

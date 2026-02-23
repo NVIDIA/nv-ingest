@@ -40,6 +40,16 @@ def run(
     metric: str = typer.Option("l2", "--metric", help="Distance metric for the index."),
     num_partitions: int = typer.Option(16, "--num-partitions", min=1, help="Index partitions."),
     num_sub_vectors: int = typer.Option(256, "--num-sub-vectors", min=1, help="Index sub-vectors."),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Create FTS index on `text` and enable hybrid-ready LanceDB indexing.",
+    ),
+    fts_language: str = typer.Option(
+        "English",
+        "--fts-language",
+        help="Language for LanceDB full-text index when --hybrid is enabled.",
+    ),
 ) -> None:
     """
     Upload embeddings from `*.text_embeddings.json` into LanceDB.
@@ -59,6 +69,8 @@ def run(
         metric=str(metric),
         num_partitions=int(num_partitions),
         num_sub_vectors=int(num_sub_vectors),
+        hybrid=bool(hybrid),
+        fts_language=str(fts_language),
     )
 
     info = write_text_embeddings_dir_to_lancedb(
@@ -79,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

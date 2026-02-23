@@ -26,6 +26,7 @@ from retriever.table.config import load_table_extractor_schema_from_dict
 from retriever.table.stage import extract_table_data_from_primitives_df
 from retriever.text_embed.config import load_text_embedding_schema_from_dict
 from retriever.text_embed.stage import embed_text_from_primitives_df
+from retriever.vector_store.lancedb_store import create_lancedb_index
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(
@@ -385,6 +386,8 @@ class LanceDBUploadConfig:
     metric: str
     num_partitions: int
     num_sub_vectors: int
+    hybrid: bool = False
+    fts_language: str = "English"
 
 
 def _infer_vector_dim_from_lancedb_rows(rows: List[Dict[str, Any]]) -> int:
@@ -487,22 +490,17 @@ def _upload_embeddings_to_lancedb_driver_side(
         }
 
     if cfg.create_index:
-        try:
-            table.create_index(
-                index_type=str(cfg.index_type),
-                metric=str(cfg.metric),
-                num_partitions=int(cfg.num_partitions),
-                num_sub_vectors=int(cfg.num_sub_vectors),
-                vector_column_name="vector",
-            )
-            # Best-effort wait when supported.
-            try:
-                for stub in table.list_indices():
-                    table.wait_for_index([stub.name])
-            except Exception:
-                pass
-        except TypeError:
-            table.create_index(vector_column_name="vector")
+        create_lancedb_index(
+            lancedb_uri=str(cfg.uri),
+            table_name=str(cfg.table_name),
+            create_index=bool(cfg.create_index),
+            index_type=str(cfg.index_type),
+            metric=str(cfg.metric),
+            num_partitions=int(cfg.num_partitions),
+            num_sub_vectors=int(cfg.num_sub_vectors),
+            hybrid=bool(cfg.hybrid),
+            fts_language=str(cfg.fts_language),
+        )
 
     return {
         "uploaded": True,
@@ -746,6 +744,16 @@ def run(
     lancedb_metric: str = typer.Option("l2", "--metric", help="Distance metric for the index."),
     lancedb_num_partitions: int = typer.Option(16, "--num-partitions", min=1, help="Index partitions."),
     lancedb_num_sub_vectors: int = typer.Option(256, "--num-sub-vectors", min=1, help="Index sub-vectors."),
+    lancedb_hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Create LanceDB FTS index on `text` for hybrid retrieval.",
+    ),
+    lancedb_fts_language: str = typer.Option(
+        "English",
+        "--fts-language",
+        help="Language used when building LanceDB FTS index for hybrid retrieval.",
+    ),
     materialize: bool = typer.Option(
         True,
         "--materialize/--no-materialize",
@@ -964,6 +972,8 @@ def run(
                 metric=str(lancedb_metric),
                 num_partitions=int(lancedb_num_partitions),
                 num_sub_vectors=int(lancedb_num_sub_vectors),
+                hybrid=bool(lancedb_hybrid),
+                fts_language=str(lancedb_fts_language),
             ),
             batch_size=int(vdb_upload_batch_size),
         )

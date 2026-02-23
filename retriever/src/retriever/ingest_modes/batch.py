@@ -14,7 +14,6 @@ import os
 import time
 from pathlib import Path
 from typing import Any, List, Optional
-from datetime import timedelta
 
 from typing import Union
 
@@ -24,6 +23,7 @@ from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
 from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
+from retriever.vector_store.lancedb_store import create_lancedb_index
 
 from ..ingest import Ingestor
 
@@ -86,25 +86,24 @@ class _LanceDBWriteActor:
         self._table = None
         mode = "overwrite" if self._overwrite else "create"
         fields = [
-                pa.field("vector", pa.list_(pa.float32(), 2048)),
-                pa.field("pdf_page", pa.string()),
-                pa.field("filename", pa.string()),
-                pa.field("pdf_basename", pa.string()),
-                pa.field("page_number", pa.int32()),
-                pa.field("source_id", pa.string()),
-                pa.field("path", pa.string()),
-                pa.field("text", pa.string()),
-                pa.field("metadata", pa.string()),
-                pa.field("source", pa.string()),
-            ]
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+            pa.field("source", pa.string()),
+        ]
         self._schema = pa.schema(fields)
 
         self._table = self._db.create_table(
-                        self._table_name,
-                        schema=self._schema,
-                        mode=mode,
-                    )
-
+            self._table_name,
+            schema=self._schema,
+            mode=mode,
+        )
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch.
@@ -772,52 +771,26 @@ class BatchIngestor(Ingestor):
     def _create_lancedb_index(self) -> None:
         """Create the LanceDB vector index after streaming writes finish."""
         kw = self._vdb_upload_kwargs
-        if not kw.get("create_index", True):
-            return
-
-        lancedb_uri = str(kw.get("lancedb_uri", "lancedb"))
-        table_name = str(kw.get("table_name", "nv-ingest"))
-        index_type = str(kw.get("index_type", "IVF_HNSW_SQ"))
-        metric = str(kw.get("metric", "l2"))
-        num_partitions = int(kw.get("num_partitions", 16))
-        num_sub_vectors = int(kw.get("num_sub_vectors", 256))
-
         try:
-            import lancedb  # type: ignore
-        except Exception as e:
-            print(f"Warning: lancedb not available for index creation: {e}")
-            return
-
-        try:
-            db = lancedb.connect(uri=lancedb_uri)
-            table = db.open_table(table_name)
-            n_vecs = table.count_rows()
-        except Exception as e:
-            print(f"Warning: could not open LanceDB table for indexing: {e}")
-            return
-
-        if n_vecs < 2:
-            print("Skipping LanceDB index creation (not enough vectors).")
-            return
-
-        k = int(num_partitions)
-        if k >= n_vecs:
-            k = max(1, n_vecs - 1)
-
-        try:
-            table.create_index(
-                index_type=index_type,
-                metric=metric,
-                num_partitions=k,
-                num_sub_vectors=num_sub_vectors,
-                vector_column_name="vector",
+            info = create_lancedb_index(
+                lancedb_uri=str(kw.get("lancedb_uri", "lancedb")),
+                table_name=str(kw.get("table_name", "nv-ingest")),
+                create_index=bool(kw.get("create_index", True)),
+                index_type=str(kw.get("index_type", "IVF_HNSW_SQ")),
+                metric=str(kw.get("metric", "l2")),
+                num_partitions=int(kw.get("num_partitions", 16)),
+                num_sub_vectors=int(kw.get("num_sub_vectors", 256)),
+                hybrid=bool(kw.get("hybrid", False)),
+                fts_language=str(kw.get("fts_language", "English")),
             )
-        except TypeError:
-            table.create_index(vector_column_name="vector")
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+            return
 
-        for index_stub in table.list_indices():
-            table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
-
-        print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
+        if info.get("indexed"):
+            print(
+                "Wrote "
+                f"{info.get('rows', 0)} rows to LanceDB uri={kw.get('lancedb_uri', 'lancedb')!r} "
+                f"table={kw.get('table_name', 'nv-ingest')!r} "
+                f"hybrid={bool(kw.get('hybrid', False))}"
+            )

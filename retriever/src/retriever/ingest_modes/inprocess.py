@@ -21,11 +21,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
+from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
 from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
+from retriever.vector_store.lancedb_store import create_lancedb_index
 
 try:
     import pypdfium2 as pdfium
@@ -187,16 +189,18 @@ def embed_text_main_text_embed(
 
     # Build an embedder callable compatible with `create_text_embeddings_for_df`.
     # Only used when running with a local model (no NIM endpoint).
-    _embed = None
+    embedder: Optional[Callable[[Sequence[str]], Sequence[Sequence[float]]]] = None
     if _endpoint is None and model is not None:
 
-        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        def _embed_local(texts: Sequence[str]) -> Sequence[Sequence[float]]:
             prefixed = [f"passage: {t}" for t in texts]
             vecs = model.embed(prefixed, batch_size=int(inference_batch_size))
             tolist = getattr(vecs, "tolist", None)
             if callable(tolist):
                 return tolist()
             return vecs  # type: ignore[return-value]
+
+        embedder = _embed_local
 
     cfg = TextEmbeddingConfig(
         text_column=str(text_column),
@@ -222,7 +226,7 @@ def embed_text_main_text_embed(
         out_df, _info = create_text_embeddings_for_df(
             embed_df,
             task_config={
-                "embedder": _embed,
+                "embedder": embedder,
                 "endpoint_url": _endpoint,
                 "local_batch_size": int(inference_batch_size),
             },
@@ -440,6 +444,8 @@ def upload_embeddings_to_lancedb_inprocess(
     metric: str = "l2",
     num_partitions: int = 16,
     num_sub_vectors: int = 256,
+    hybrid: bool = False,
+    fts_language: str = "English",
     embedding_column: str = "text_embeddings_1b_v2",
     embedding_key: str = "embedding",
     include_text: bool = True,
@@ -461,6 +467,8 @@ def upload_embeddings_to_lancedb_inprocess(
     - **metric**: distance metric (e.g. `"l2"`, `"cosine"`)
     - **num_partitions**: index partitions
     - **num_sub_vectors**: index sub-vectors
+    - **hybrid**: if True, create a LanceDB FTS index on `text` for hybrid search
+    - **fts_language**: language used for LanceDB FTS when `hybrid=True`
     - **embedding_column**: column name containing embedding payload dicts
     - **embedding_key**: key inside payload dict to read embedding list from
     - **include_text**: if True, store `text_column` content alongside the vector
@@ -562,28 +570,21 @@ def upload_embeddings_to_lancedb_inprocess(
             table = db.create_table(str(table_name), data=list(rows), schema=schema, mode="create")
 
     if create_index:
-        # LanceDB IVF-based indexes train k-means with K=num_partitions. K must be < N vectors.
-        n_vecs = int(len(rows))
-        if n_vecs < 2:
-            print("Skipping LanceDB index creation (not enough vectors).")
-        else:
-            k = int(num_partitions)
-            if k >= n_vecs:
-                k = max(1, n_vecs - 1)
-            try:
-                table.create_index(
-                    index_type=str(index_type),
-                    metric=str(metric),
-                    num_partitions=int(k),
-                    num_sub_vectors=int(num_sub_vectors),
-                    vector_column_name="vector",
-                )
-            except TypeError:
-                # Older/newer LanceDB versions may have different signatures; fall back to minimal call.
-                table.create_index(vector_column_name="vector")
-            except Exception as e:
-                # Don't fail ingestion due to index training; users can rebuild later with more data.
-                print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+        try:
+            create_lancedb_index(
+                lancedb_uri=str(lancedb_uri),
+                table_name=str(table_name),
+                create_index=bool(create_index),
+                index_type=str(index_type),
+                metric=str(metric),
+                num_partitions=int(num_partitions),
+                num_sub_vectors=int(num_sub_vectors),
+                hybrid=bool(hybrid),
+                fts_language=str(fts_language),
+            )
+        except Exception as e:
+            # Don't fail ingestion due to index training; users can rebuild later with more data.
+            print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
 
     print(f"Wrote {len(rows)} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
     return df
@@ -831,6 +832,8 @@ class InProcessIngestor(Ingestor):
         - **metric**: str, default `"l2"`
         - **num_partitions**: int, default 16
         - **num_sub_vectors**: int, default 256
+        - **hybrid**: bool, default False (create FTS index on `text` for hybrid retrieval)
+        - **fts_language**: str, default `"English"` (FTS language when `hybrid=True`)
         - **embedding_column**: str, default `"text_embeddings_1b_v2"`
         - **embedding_key**: str, default `"embedding"`
         - **include_text**: bool, default False

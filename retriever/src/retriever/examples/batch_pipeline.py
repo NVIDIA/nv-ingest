@@ -2,6 +2,7 @@
 Batch ingestion pipeline with optional recall evaluation.
 Run with: uv run python -m retriever.examples.batch_pipeline <input-dir>
 """
+
 import json
 import os
 import subprocess
@@ -48,10 +49,7 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
         print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
         return
     if processed_pages is None:
-        print(
-            "Pages/sec: unavailable (could not estimate processed pages). "
-            f"Ingest time: {ingest_elapsed_s:.2f}s"
-        )
+        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
         return
 
     pps = processed_pages / ingest_elapsed_s
@@ -304,6 +302,11 @@ def main(
         "--lancedb-uri",
         help="LanceDB URI/path for this run.",
     ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
 ) -> None:
     os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
     # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
@@ -319,10 +322,7 @@ def main(
         gpu_page_elements = 0.0
 
     if ocr_invoke_url and float(gpu_ocr) != 0.0:
-        print(
-            "[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from "
-            f"{float(gpu_ocr):.3f} to 0.0"
-        )
+        print("[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from " f"{float(gpu_ocr):.3f} to 0.0")
         gpu_ocr = 0.0
 
     # Resolve Ray: start a head node, connect to given address, or run in-process
@@ -365,7 +365,13 @@ def main(
             embed_batch_size=int(embed_batch_size),
             embed_cpus_per_actor=float(embed_cpus_per_actor),
         )
-        .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+        .vdb_upload(
+            lancedb_uri=lancedb_uri,
+            table_name=LANCEDB_TABLE,
+            overwrite=True,
+            create_index=True,
+            hybrid=bool(hybrid),
+        )
     )
 
     print("Running extraction...")
@@ -404,8 +410,7 @@ def main(
             time.sleep(2)
     if table is None:
         raise RuntimeError(
-            f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
-            f"but it was not found."
+            f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
         ) from open_err
     try:
         if int(table.count_rows()) == 0:
@@ -423,6 +428,7 @@ def main(
         embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
         top_k=10,
         ks=(1, 5, 10),
+        hybrid=bool(hybrid),
     )
 
     _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
