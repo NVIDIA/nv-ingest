@@ -43,15 +43,27 @@ class _TeeStream:
     def isatty(self) -> bool:
         return bool(getattr(self._primary, "isatty", lambda: False)())
 
+    def fileno(self) -> int:
+        return int(getattr(self._primary, "fileno")())
 
-def _configure_logging(log_file: Optional[Path]) -> Optional[TextIO]:
+    def writable(self) -> bool:
+        return bool(getattr(self._primary, "writable", lambda: True)())
+
+    @property
+    def encoding(self) -> str:
+        return str(getattr(self._primary, "encoding", "utf-8"))
+
+
+def _configure_logging(log_file: Optional[Path]) -> tuple[Optional[TextIO], TextIO, TextIO]:
     """Configure root logging; optionally tee stdout/stderr into one file."""
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
     if log_file is None:
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         )
-        return None
+        return None, original_stdout, original_stderr
 
     target = Path(log_file).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +83,7 @@ def _configure_logging(log_file: Optional[Path]) -> Optional[TextIO]:
         force=True,
     )
     logging.getLogger(__name__).info("Writing combined pipeline logs to %s", str(target))
-    return fh
+    return fh, original_stdout, original_stderr
 
 
 def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
@@ -497,7 +509,7 @@ def main(
         help="Optional JSON file path to write end-of-run detection counts summary.",
     ),
 ) -> None:
-    log_handle = _configure_logging(log_file)
+    log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
         os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
@@ -683,6 +695,10 @@ def main(
             print(f"  {k}: {v:.4f}")
         _print_pages_per_second(processed_pages, ingest_elapsed_s)
     finally:
+        # Restore real stdio before closing the mirror file so exception hooks
+        # and late flushes never write to a closed stream wrapper.
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
         if log_handle is not None:
             try:
                 log_handle.flush()
