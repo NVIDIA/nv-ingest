@@ -60,3 +60,39 @@ CUDA_VISIBLE_DEVICES=0 ray start --head --num-gpus=1
 ```
 
 Then run your pipeline as above (e.g. `--ray-address auto` for the CLI, or `ray_address="auto"` in Python).
+
+### Running multiple NIM service instances on multi-GPU hosts
+
+If you want more than one `page-elements` and `ocr` instance on the same machine, run separate Docker Compose projects and pin each project to a specific physical GPU.
+
+From the `nv-ingest` repo root:
+
+```bash
+# GPU 0 stack
+GPU_ID=0 \
+PAGE_ELEMENTS_HTTP_PORT=8000 PAGE_ELEMENTS_GRPC_PORT=8001 PAGE_ELEMENTS_METRICS_PORT=8002 \
+OCR_HTTP_PORT=8019 OCR_GRPC_PORT=8010 OCR_METRICS_PORT=8011 \
+docker compose -p ingest-gpu0 up -d page-elements ocr
+
+# GPU 1 stack
+GPU_ID=1 \
+PAGE_ELEMENTS_HTTP_PORT=8100 PAGE_ELEMENTS_GRPC_PORT=8101 PAGE_ELEMENTS_METRICS_PORT=8102 \
+OCR_HTTP_PORT=8119 OCR_GRPC_PORT=8110 OCR_METRICS_PORT=8111 \
+docker compose -p ingest-gpu1 up -d page-elements ocr
+```
+
+The `-p` values create isolated stacks, while `GPU_ID` pins each stack to a different physical GPU. Distinct host ports prevent collisions and keep both stacks externally accessible.
+
+Useful checks:
+
+```bash
+docker compose -p ingest-gpu0 ps
+docker compose -p ingest-gpu1 ps
+```
+
+To stop and remove both stacks:
+
+```bash
+docker compose -p ingest-gpu0 down
+docker compose -p ingest-gpu1 down
+```
