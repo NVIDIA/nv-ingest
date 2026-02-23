@@ -156,6 +156,26 @@ class _LanceDBWriteActor:
             metadata_obj = {"page_number": int(page) if page is not None else -1}
             if pdf_page:
                 metadata_obj["pdf_page"] = pdf_page
+            # Persist per-page detection counters for end-of-run summaries.
+            # These may be duplicated across exploded content rows; downstream
+            # summary logic should dedupe by (source_id, page_number).
+            pe_num = getattr(row, "page_elements_v3_num_detections", None)
+            if pe_num is not None:
+                try:
+                    metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
+                except Exception:
+                    pass
+            pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
+            if isinstance(pe_counts, dict):
+                metadata_obj["page_elements_v3_counts_by_label"] = {
+                    str(k): int(v)
+                    for k, v in pe_counts.items()
+                    if isinstance(k, str) and v is not None
+                }
+            for ocr_col in ("table", "chart", "infographic"):
+                entries = getattr(row, ocr_col, None)
+                if isinstance(entries, list):
+                    metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
             source_obj = {"source_id": str(path)}
 
             row_out = {
@@ -237,13 +257,19 @@ class _BatchEmbedActor:
 class BatchIngestor(Ingestor):
     RUN_MODE = "batch"
 
-    def __init__(self, documents: Optional[List[str]] = None, ray_address: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        documents: Optional[List[str]] = None,
+        ray_address: Optional[str] = None,
+        ray_log_to_driver: bool = True,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(documents=documents, **kwargs)
 
         logging.basicConfig(level=logging.INFO)
 
         # Initialize Ray for distributed execution.
-        ray.init(address=ray_address or "local", ignore_reinit_error=True)
+        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver))
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
         ctx = rd.DataContext.get_current()
