@@ -11,15 +11,14 @@ services:
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v3}:${YOLOX_TAG:-1.7.0}
     shm_size: 16gb
-    ports:
-      - "8000:8000"
-      - "8001:8001"
-      - "8002:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-32}
       - NIM_TRITON_CPU_THREADS_PRE_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_PRE_PROCESSOR:-2}
       - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_POST_PROCESSOR:-1}
@@ -39,23 +38,22 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.6.0}
     shm_size: 16gb
-    ports:
-      - "8003:8000"
-      - "8004:8001"
-      - "8005:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NIM_TRITON_RATE_LIMIT=3
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-32}
       - NIM_TRITON_CUDA_MEMORY_POOL_MB=${GRAPHIC_ELEMENTS_CUDA_MEMORY_POOL_MB:-2048}
       - OMP_NUM_THREADS=1
@@ -64,23 +62,22 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.6.0}
     shm_size: 16gb
-    ports:
-      - "8006:8000"
-      - "8007:8001"
-      - "8008:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NIM_TRITON_RATE_LIMIT=3
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-32}
       - NIM_TRITON_CUDA_MEMORY_POOL_MB=${TABLE_STRUCTURE_CUDA_MEMORY_POOL_MB:-2048}
       - OMP_NUM_THREADS=1
@@ -89,30 +86,29 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
 
   ocr:
     image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-1.2.1}
     shm_size: 16gb
-    ports:
-      - "8019:8000"
-      - "8010:8001"
-      - "8011:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
       - OMP_NUM_THREADS=${OCR_OMP_NUM_THREADS:-8}
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${OCR_BATCH_SIZE:-32}
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
 
@@ -120,12 +116,11 @@ services:
     # NIM ON
     image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-1.10.1}
     shm_size: 16gb
-    ports:
-      - "8012:8000"
-      - "8013:8001"
-      - "8014:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
@@ -137,7 +132,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
 
@@ -145,19 +140,18 @@ services:
     # NIM ON
     image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-1.8.0}
     shm_size: 16gb
-    ports:
-      - "8020:8000"
+    expose:
+      - "8000"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
     profiles:
@@ -166,21 +160,20 @@ services:
   nemotron-parse:
     image: ${NEMOTRON_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMOTRON_PARSE_TAG:-1.5.0}
     shm_size: 16gb
-    ports:
-      - "8015:8000"
-      - "8016:8001"
-      - "8017:8002"
+    expose:
+      - "8000"
+      - "8001"
+      - "8002"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
     profiles:
@@ -189,13 +182,12 @@ services:
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.5.0}
     shm_size: 16gb
-    ports:
-      - "8018:8000"
+    expose:
+      - "8000"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
       # VLM will use all available VRAM on device
       # For more info
       # https://docs.nvidia.com/nim/vision-language-models/latest/configuration.html
@@ -205,7 +197,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
     profiles:
@@ -214,22 +206,21 @@ services:
   audio:
     image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-1.4.0}
     shm_size: 2gb
-    ports:
-      - "8021:50051"  # grpc
-      - "8022:9000"  # http
+    expose:
+      - "50051" # grpc
+      - "9000"  # http
     ulimits:
       nofile: 2048
     environment:
       - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-en-us,mode=ofl
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     runtime: nvidia
     profiles:
@@ -448,7 +439,6 @@ services:
   milvus:
     # Turn on to leverage the `vdb_upload` task
     restart: always
-    container_name: milvus-standalone
     image: milvusdb/milvus:v2.5.3-gpu
     command: [ "bash", "-c", "sed -i 's/bucketName: a-bucket/bucketName: ${MINIO_BUCKET:-nv-ingest}/' /milvus/configs/milvus.yaml && milvus run standalone" ]
     hostname: milvus
@@ -465,15 +455,15 @@ services:
       start_period: 90s
       timeout: 20s
       retries: 3
-    ports:
-      - "19530:19530"
-      - "9091:9091"
+    expose:
+      - "19530"
+      - "9091"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              count: 1
               capabilities: [gpu]
     depends_on:
       - "etcd"
