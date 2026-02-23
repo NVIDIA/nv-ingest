@@ -471,6 +471,11 @@ def main(
         "--ocr-invoke-url",
         help="Optional remote endpoint URL for OCR model inference.",
     ),
+    embed_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--embed-invoke-url",
+        help="Optional remote endpoint URL for embedding model inference.",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -532,6 +537,13 @@ def main(
             )
             gpu_ocr = 0.0
 
+        if embed_invoke_url and float(gpu_embed) != 0.0:
+            print(
+                "[WARN] --embed-invoke-url is set; forcing --gpu-embed from "
+                f"{float(gpu_embed):.3f} to 0.0"
+            )
+            gpu_embed = 0.0
+
         # Resolve Ray: start a head node, connect to given address, or run in-process
         if start_ray:
             subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
@@ -575,6 +587,7 @@ def main(
                 embed_workers=int(embed_workers),
                 embed_batch_size=int(embed_batch_size),
                 embed_cpus_per_actor=float(embed_cpus_per_actor),
+                embed_invoke_url=embed_invoke_url,
             )
             .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )

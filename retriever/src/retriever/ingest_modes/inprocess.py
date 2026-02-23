@@ -153,6 +153,7 @@ def embed_text_main_text_embed(
     # don't need to change for inprocess mode.
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
+    embed_invoke_url: Optional[str] = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -180,7 +181,7 @@ def embed_text_main_text_embed(
         raise ValueError("inference_batch_size must be > 0")
 
     # Resolve endpoint: strip whitespace, treat empty string as None.
-    _endpoint = (embedding_endpoint or "").strip() or None
+    _endpoint = (embedding_endpoint or embed_invoke_url or "").strip() or None
 
     if _endpoint is None and model is None:
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
@@ -753,7 +754,7 @@ class InProcessIngestor(Ingestor):
         This records an embedding task so call sites can chain `.embed(...)`
         after `.extract(...)`.
 
-        When ``embedding_endpoint`` is provided (e.g.
+        When ``embedding_endpoint`` (or ``embed_invoke_url``) is provided (e.g.
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
         embedding instead of the local HF model.
         """
@@ -762,9 +763,11 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((explode_content_to_rows, {}))
 
         embed_kwargs = dict(kwargs)
+        if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
+            embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
 
         # If a remote NIM endpoint is configured, skip local model creation.
-        endpoint = (embed_kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (embed_kwargs.get("embedding_endpoint") or embed_kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             embed_kwargs.setdefault("input_type", "passage")
             self._tasks.append((embed_text_main_text_embed, embed_kwargs))

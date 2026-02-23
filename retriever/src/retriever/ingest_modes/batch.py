@@ -221,9 +221,11 @@ class _BatchEmbedActor:
 
     def __init__(self, **kwargs: Any) -> None:
         self._kwargs = dict(kwargs)
+        if "embedding_endpoint" not in self._kwargs and kwargs.get("embed_invoke_url"):
+            self._kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
 
         # If a remote NIM endpoint is configured, skip local model creation.
-        endpoint = (kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             self._model = None
             return
@@ -601,14 +603,33 @@ class BatchIngestor(Ingestor):
         - ``embed_cpus_per_actor``: CPUs reserved per embedding actor (default 1).
         - ``device``, ``hf_cache_dir``, ``normalize``, ``max_length``:
           forwarded to ``LlamaNemotronEmbed1BV2Embedder``.
-        - ``embedding_endpoint``: optional NIM endpoint URL
+        - ``embedding_endpoint`` / ``embed_invoke_url``: optional NIM endpoint URL
           (e.g. ``"http://embedding:8000/v1"``).  When set, the actor
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
         """
+        def _endpoint_count(raw: Any) -> int:
+            s = str(raw or "").strip()
+            if not s:
+                return 0
+            return len([p for p in s.split(",") if p.strip()])
+
         embed_workers = kwargs.pop("embed_workers", 1)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
         embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
+
+        if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
+            kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+
+        endpoint_count = _endpoint_count(kwargs.get("embedding_endpoint"))
+        if endpoint_count > 0 and int(embed_workers) != int(endpoint_count):
+            logging.warning(
+                "embed endpoint list has %d endpoint(s); overriding embed_workers from %d to %d",
+                endpoint_count,
+                int(embed_workers),
+                int(endpoint_count),
+            )
+            embed_workers = int(endpoint_count)
 
         # Remaining kwargs are forwarded to the actor constructor.
         self._tasks.append(("embed", dict(kwargs)))
@@ -628,7 +649,7 @@ class BatchIngestor(Ingestor):
         )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
-        endpoint = (kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             gpu_per_stage = 0
         else:
