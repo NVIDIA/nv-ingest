@@ -555,7 +555,11 @@ def pdfium_extractor(
                     page_text = ""
                 else:
                     page_text = _extract_page_text(page)
-                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                image, _ = pdfium_pages_to_numpy(
+                    [page],
+                    scale_tuple=(16384, 16384),
+                    trace_info=execution_trace_log,
+                )
                 base64_image = numpy_to_base64(image[0])
                 if len(base64_image) > 2**24 - 1:
                     base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)

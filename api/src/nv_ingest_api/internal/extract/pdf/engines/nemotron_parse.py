@@ -516,7 +516,10 @@ def _convert_pdfium_page_to_numpy_for_parser(
     padding_tuple: Tuple[int, int] = (NEMOTRON_PARSE_MAX_WIDTH, NEMOTRON_PARSE_MAX_HEIGHT),
 ) -> np.ndarray:
     page_images, padding_offsets = pdfium_pages_to_numpy(
-        [page], render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
+        [page],
+        render_dpi=render_dpi,
+        scale_tuple=scale_tuple,
+        padding_tuple=padding_tuple,
     )
 
     return page_images[0], padding_offsets[0]
@@ -527,7 +530,11 @@ def _convert_pdfium_page_to_numpy_for_yolox(
     scale_tuple: Tuple[int, int] = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
     padding_tuple: Tuple[int, int] = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
 ) -> np.ndarray:
-    page_images, padding_offsets = pdfium_pages_to_numpy([page], scale_tuple=scale_tuple, padding_tuple=padding_tuple)
+    page_images, padding_offsets = pdfium_pages_to_numpy(
+        [page],
+        scale_tuple=scale_tuple,
+        padding_tuple=padding_tuple,
+    )
 
     return page_images[0], padding_offsets[0]
 

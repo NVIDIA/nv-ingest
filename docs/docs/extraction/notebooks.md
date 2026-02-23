@@ -7,6 +7,12 @@ To get started using [NeMo Retriever extraction](overview.md), you can try one o
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 
+## Dataset Downloads for Benchmarking
+
+If you plan to run benchmarking or evaluation tests, you must download the [Benchmark Datasets (Bo20, Bo767, Bo10k)](https://github.com/NVIDIA/nv-ingest/blob/main/evaluation/digital_corpora_download.ipynb) from Digital Corpora. This is a prerequisite for all benchmarking operations.
+
+## Getting Started
+
 To get started with the basics, try one of the following notebooks:
 
 - [NV-Ingest: CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb)

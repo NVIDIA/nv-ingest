@@ -376,6 +376,10 @@ You can use this to generate descriptions of unstructured images, infographics, 
 
 ### Basic Usage
 
+!!! tip
+
+    You can configure and use other vision language models for image captioning by specifying a different `model_name` and `endpoint_url` in the `caption` method. Choose a VLM that best fits your specific use case requirements.
+
 ```python
 ingestor = ingestor.caption()
 ```

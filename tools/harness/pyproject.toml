@@ -5,14 +5,20 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "click>=8.1.8",
     "docker>=7.1.0",
-    "milvus-lite==2.4.12",
-    "nv-ingest",
-    "nv-ingest-api",
-    "nv-ingest-client",
     "pyyaml>=6.0",
     "requests>=2.31.0",
     "pynvml>=11.5.0",
+    "nv-ingest",
+    "nv-ingest-api",
+    "nv-ingest-client",
+    "milvus-lite==2.4.12",
+    "pypdfium2",
+    "nemotron-page-elements-v3>=0.dev0",
+    "nemotron-graphic-elements-v1>=0.dev0",
+    "nemotron-table-structure-v1>=0.dev0",
+    "nemotron-ocr>=0.dev0",
 ]
 
 [project.scripts]
@@ -30,3 +36,12 @@ package = true
 nv-ingest = { path = "../../src", editable = true }
 nv-ingest-api = { path = "../../api/", editable = true }
 nv-ingest-client = { path = "../../client/", editable = true }
+nemotron-page-elements-v3 = { index = "test-pypi" }
+nemotron-graphic-elements-v1 = { index = "test-pypi" }
+nemotron-table-structure-v1 = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
+
+[[tool.uv.index]]
+name = "test-pypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
