@@ -71,6 +71,10 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
     preprocess_measurement = preprocess_timer.timeit(num_repeats)
 
     # Timer measures forward pass only using a preprocessed tensor
+    # Move the numpy array to CUDA device (if available)
+    if torch.cuda.is_available():
+        img = torch.as_tensor(img).to(torch.uint8).to("cuda")
+
     x = model.preprocess(img)
     forward_timer = Timer(
         stmt="model(x, img_shape)[0]",
