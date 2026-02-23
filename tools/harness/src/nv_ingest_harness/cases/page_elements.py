@@ -223,6 +223,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         print("Loading model...")
         model_load_start = time.perf_counter()
         model = define_model("page_element_v3")
+        model.to("cuda").eval()
         model_load_time = time.perf_counter() - model_load_start
         print(f"Model loaded in {model_load_time:.2f}s")
         print(f"Available labels: {model.labels}")
