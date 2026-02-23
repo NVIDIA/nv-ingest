@@ -68,7 +68,7 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
         globals={"model": model, "img": img},
         num_threads=1,
     )
-    preprocess_measurement = preprocess_timer.timeit(num_repeats)
+    _preprocess_measurement = preprocess_timer.timeit(num_repeats)
 
     # # Timer measures forward pass only using a preprocessed tensor
     # # Move the numpy array to CUDA device (if available)
@@ -85,8 +85,9 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
 
     # Run once more to get the actual predictions
     with torch.inference_mode():
-        x = model.preprocess(img)
-        preds = model(x, img.shape)[0]
+        with torch.autocast(device_type="cuda"):
+            x = model.preprocess(img)
+            preds = model(x, img.shape)[0]
 
     # total_inference_mean = preprocess_measurement.mean + forward_measurement.mean
     # return preds, total_inference_mean, preprocess_measurement.mean, forward_measurement.mean
