@@ -61,7 +61,7 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf' or 'txt'. Use 'txt' for a directory of .txt files (tokenizer-based chunking).",
+        help="Input format: 'pdf', 'txt', or 'doc'. Use 'txt' for .txt files. Use 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -87,6 +87,22 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
+            .embed(model_name="nemo_retriever_v1")
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+        )
+    elif input_type == "doc":
+        # DOCX/PPTX: same pipeline as PDF; inprocess loader converts to PDF then splits.
+        doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
+        ingestor = create_ingestor(run_mode="inprocess")
+        ingestor = (
+            ingestor.files(doc_globs)
+            .extract(
+                method="pdfium",
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+            )
             .embed(model_name="nemo_retriever_v1")
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
         )
@@ -155,7 +171,7 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
-            ext = ".txt" if input_type == "txt" else ".pdf"
+            ext = ".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf")
             print(f"\nQuery {i}: {q}")
             print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
@@ -170,7 +186,7 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            ext = ".txt" if input_type == "txt" else ".pdf"
+            ext = ".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf")
             missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
