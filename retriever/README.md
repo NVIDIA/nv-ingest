@@ -23,9 +23,20 @@ uv pip install -e ./retriever
 
 This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
 
-### OCR and CUDA 13 runtime (conda)
+### Non-PyPI dependencies (conda or Docker)
 
-The Nemotron OCR native extension requires **libcudart.so.13** (CUDA 13 runtime). If you see:
+Some dependencies are not on PyPI and must be provided by the system or a container:
+
+| Dependency | Purpose | Satisfied by |
+|------------|---------|---------------|
+| **CUDA 13 runtime** (`libcudart.so.13`) | Nemotron OCR native extension | Conda env (below) or Docker image |
+| **LibreOffice** (headless) | DOCX/PPTX → PDF conversion ([`retriever.convert.to_pdf`](src/retriever/convert/to_pdf.py)) | System `apt install libreoffice` or Docker image |
+
+**Option A — Docker (recommended)**  
+Use the [retriever Dockerfile](Dockerfile), which includes CUDA 13, LibreOffice, and the full Python environment. See [Running with Docker](#running-with-docker) below.
+
+**Option B — Conda (local CUDA 13 only)**  
+If you run locally and see:
 
 ```text
 ImportError: libcudart.so.13: cannot open shared object file: No such file or directory
@@ -44,14 +55,43 @@ your system CUDA Toolkit is missing or older than 13. Use the provided conda env
    conda activate retriever_libcudart
    ```
 
-3. Expose the conda env's CUDA runtime so the OCR extension can load it (needed because conda does not set `LD_LIBRARY_PATH` for this env by default):
+3. Expose the conda env's CUDA runtime so the OCR extension can load it (conda does not set `LD_LIBRARY_PATH` for this env by default):
    ```bash
    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
    ```
 
-4. Follow the **Installation** steps above unchanged: `uv venv .retriever`, `source .retriever/bin/activate`, `uv pip install -e ./retriever`. The conda env supplies the `uv` binary and the CUDA 13 runtime (the dynamic linker finds `libcudart.so.13` in the conda env's `lib`).
+4. Follow the **Installation** steps above: `uv venv .retriever`, `source .retriever/bin/activate`, `uv pip install -e ./retriever`. Install LibreOffice separately if you need docx/pptx conversion (e.g. `apt install libreoffice`).
 
-If your system already has a suitable CUDA 13 (or you are not using OCR), you can use the UV-only path above without the conda env.
+If your system already has CUDA 13 and LibreOffice (or you do not use OCR or docx/pptx), you can use the UV-only installation path without the conda env.
+
+## Running with Docker
+
+The [Dockerfile](Dockerfile) in this directory builds an image with CUDA 13 runtime, LibreOffice, and the retriever Python environment. The default command runs the in-process pipeline ([`inprocess_pipeline.py`](src/retriever/examples/inprocess_pipeline.py)).
+
+**Build** (from the **nv-ingest** repo root):
+
+```bash
+cd /path/to/nv-ingest
+docker build -f retriever/Dockerfile -t retriever .
+```
+
+**Run:**
+
+```bash
+# Show pipeline help
+docker run --rm retriever
+
+# Ingest PDFs from a host directory (GPU required for OCR)
+docker run --rm --gpus all -v /path/to/your/pdfs:/data retriever /data
+
+# Ingest DOCX/PPTX (uses LibreOffice in the image)
+docker run --rm --gpus all -v /path/to/docs:/data retriever /data --input-type doc
+
+# With recall evaluation (query CSV in mounted dir)
+docker run --rm --gpus all -v /path/to/data:/data retriever /data --query-csv /data/bo767_query_gt.csv
+```
+
+For OCR, the pipeline uses `NEMOTRON_OCR_MODEL_DIR` (defaults to `./nemotron-ocr-v1` in the container). To use a pre-downloaded model, mount it and set the env: `-e NEMOTRON_OCR_MODEL_DIR=/mnt/ocr-model` and `-v /host/models/nemotron-ocr-v1:/mnt/ocr-model`.
 
 ## Quick start
 
@@ -65,7 +105,7 @@ uv pip install -e ./retriever
 uv run python retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs
 ```
 
-Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. Recall is skipped if the query CSV file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, use the conda-based workflow under **OCR and CUDA 13 runtime (conda)** above.
+Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. Recall is skipped if the query CSV file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, see [Non-PyPI dependencies (conda or Docker)](#non-pypi-dependencies-conda-or-docker) or use the [Docker image](#running-with-docker).
 
 ### Starting a Ray cluster
 
