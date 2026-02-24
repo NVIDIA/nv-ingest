@@ -41,6 +41,7 @@ try:
 except Exception:  # pragma: no cover
     tqdm = None  # type: ignore[assignment]
 
+from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
 
@@ -723,15 +724,6 @@ class InProcessIngestor(Ingestor):
             ocr_flags["extract_tables"] = True
         if kwargs.get("extract_charts") is True:
             ocr_flags["extract_charts"] = True
-            print("Adding chart detection task")
-            # Run chart detection only on cropped "chart" regions from page-elements.
-            self._tasks.append(
-                (
-                    detect_graphic_elements_v1_from_page_elements_v3,
-                    _detect_kwargs_with_model(NemotronGraphicElementsV1(), stage_name="chart", allow_remote=False),
-                )
-            )
-
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
         ocr_flags.update(_stage_remote_kwargs("ocr"))
@@ -861,8 +853,12 @@ class InProcessIngestor(Ingestor):
 
         def _pdf_to_pages_df(path: str) -> pd.DataFrame:
             """
-            Convert a multi-page PDF at `path` into a DataFrame where each row
+            Convert a document at *path* into a DataFrame where each row
             contains a *single-page* PDF's raw bytes.
+
+            For ``.docx`` / ``.pptx`` files the document is first converted
+            to PDF via LibreOffice, then split into pages.  The original
+            *path* is preserved so downstream metadata tracks the source file.
 
             Columns:
             - bytes: single-page PDF bytes
@@ -870,10 +866,19 @@ class InProcessIngestor(Ingestor):
             - page_number: 1-indexed page number
             """
             abs_path = os.path.abspath(path)
+            ext = os.path.splitext(abs_path)[1].lower()
             out_rows: list[dict[str, Any]] = []
             doc = None
             try:
-                doc = pdfium.PdfDocument(abs_path)
+                if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+                    # Convert DOCX/PPTX to PDF bytes first.
+                    with open(abs_path, "rb") as f:
+                        file_bytes = f.read()
+                    pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
+                    doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
+                else:
+                    doc = pdfium.PdfDocument(abs_path)
+
                 for page_idx in range(len(doc)):
                     single = pdfium.PdfDocument.new()
                     try:
