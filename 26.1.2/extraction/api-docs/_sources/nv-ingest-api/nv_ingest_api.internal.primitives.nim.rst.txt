@@ -1,0 +1,45 @@
+nv\_ingest\_api.internal.primitives.nim package
+===============================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.primitives.nim.model_interface
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.primitives.nim.default\_values module
+--------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.default_values
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.primitives.nim.nim\_client module
+----------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.nim_client
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.primitives.nim.nim\_model\_interface module
+--------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim.nim_model_interface
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.primitives.nim
+   :members:
+   :show-inheritance:
+   :undoc-members:
