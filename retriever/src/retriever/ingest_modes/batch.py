@@ -528,16 +528,6 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
         )
 
-        # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
-        # LibreOffice process per file (batch_size=1).
-        self._rd_dataset = self._rd_dataset.map_batches(
-            DocToPdfConversionActor,
-            batch_size=1,
-            num_cpus=1,
-            num_gpus=0,
-            batch_format="pandas",
-        )
-
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
         pdf_split_actor = PDFSplitActor(**kwargs)
