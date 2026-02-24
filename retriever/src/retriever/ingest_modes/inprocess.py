@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 from nemotron_page_elements_v3.model import define_model
 
@@ -29,14 +29,6 @@ from retriever.ocr.ocr import ocr_page_elements
 from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
-    import pypdfium2 as pdfium
-except Exception as e:  # pragma: no cover
-    pdfium = None  # type: ignore[assignment]
-    _PDFIUM_IMPORT_ERROR = e
-else:  # pragma: no cover
-    _PDFIUM_IMPORT_ERROR = None
-
-try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
     tqdm = None  # type: ignore[assignment]
@@ -44,6 +36,8 @@ except Exception:  # pragma: no cover
 from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
+from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
+from ..txt import txt_file_to_chunks_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
@@ -605,6 +599,10 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
+        # Pipeline type: "pdf" (extract) or "txt" (extract_txt). Loader dispatch in ingest().
+        self._pipeline_type: Literal["pdf", "txt"] = "pdf"
+        self._extract_txt_kwargs: Dict[str, Any] = {}
+
     def files(self, documents: Union[str, List[str]]) -> "InProcessIngestor":
         """
         Add local files for in-process execution.
@@ -661,6 +659,7 @@ class InProcessIngestor(Ingestor):
                 for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")
             ):
                 extract_kwargs["extract_page_as_image"] = True
+        self._pipeline_type = "pdf"
         self._tasks.append((pdf_extraction, extract_kwargs))
 
         # Common, optional knobs shared by our detect_* helpers.
@@ -740,12 +739,34 @@ class InProcessIngestor(Ingestor):
 
         return self
 
+    def extract_txt(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """
+        Configure txt ingestion: tokenizer-based chunking only (no PDF extraction).
+
+        Use with .files("*.txt").extract_txt(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_txt().
+        """
+        self._pipeline_type = "txt"
+        self._extract_txt_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        return self
+
     def embed(self, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure embedding for in-process execution.
 
         This records an embedding task so call sites can chain `.embed(...)`
-        after `.extract(...)`.
+        after `.extract(...)` or `.extract_txt()`.
 
         When ``embedding_endpoint`` (or ``embed_invoke_url``) is provided (e.g.
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
@@ -847,69 +868,6 @@ class InProcessIngestor(Ingestor):
         return_traces: bool = False,
         **_: Any,
     ) -> list[Any]:
-
-        if pdfium is None:  # pragma: no cover
-            raise ImportError("pypdfium2 is required for inprocess ingestion.") from _PDFIUM_IMPORT_ERROR
-
-        def _pdf_to_pages_df(path: str) -> pd.DataFrame:
-            """
-            Convert a document at *path* into a DataFrame where each row
-            contains a *single-page* PDF's raw bytes.
-
-            For ``.docx`` / ``.pptx`` files the document is first converted
-            to PDF via LibreOffice, then split into pages.  The original
-            *path* is preserved so downstream metadata tracks the source file.
-
-            Columns:
-            - bytes: single-page PDF bytes
-            - path: original input path
-            - page_number: 1-indexed page number
-            """
-            abs_path = os.path.abspath(path)
-            ext = os.path.splitext(abs_path)[1].lower()
-            out_rows: list[dict[str, Any]] = []
-            doc = None
-            try:
-                if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
-                    # Convert DOCX/PPTX to PDF bytes first.
-                    with open(abs_path, "rb") as f:
-                        file_bytes = f.read()
-                    pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
-                    doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
-                else:
-                    doc = pdfium.PdfDocument(abs_path)
-
-                for page_idx in range(len(doc)):
-                    single = pdfium.PdfDocument.new()
-                    try:
-                        single.import_pages(doc, pages=[page_idx])
-                        buf = BytesIO()
-                        single.save(buf)
-                        out_rows.append(
-                            {
-                                "bytes": buf.getvalue(),
-                                "path": abs_path,
-                                "page_number": page_idx + 1,
-                            }
-                        )
-                    finally:
-                        try:
-                            single.close()
-                        except Exception:
-                            pass
-            except BaseException as e:
-                # Preserve shape expected downstream (pdf_extraction emits error
-                # records per-row, so we return a single row to trigger that).
-                out_rows.append({"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)})
-            finally:
-                try:
-                    if doc is not None:
-                        doc.close()
-                except Exception:
-                    pass
-
-            return pd.DataFrame(out_rows)
-
         # Tasks that run once on combined results (after all docs). All others run per-doc.
         _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
         per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
@@ -923,10 +881,40 @@ class InProcessIngestor(Ingestor):
         if show_progress and tqdm is not None:
             doc_iter = tqdm(docs, desc="Processing documents", unit="doc")
 
-        for doc_path in doc_iter:
-            pages_df = _pdf_to_pages_df(doc_path)
+        if self._pipeline_type == "pdf":
 
-            current: Any = pages_df
+            def _loader(p: str) -> pd.DataFrame:
+                """
+                Load a document as a per-page DataFrame. For .pdf use pdf_path_to_pages_df.
+                For .docx/.pptx convert to PDF via LibreOffice then split (same schema).
+                """
+                abs_path = os.path.abspath(p)
+                ext = os.path.splitext(abs_path)[1].lower()
+                if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+                    try:
+                        with open(abs_path, "rb") as f:
+                            file_bytes = f.read()
+                        pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
+                        pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+                        out_rows = [
+                            {"bytes": b, "path": abs_path, "page_number": i + 1}
+                            for i, b in enumerate(pages)
+                        ]
+                        return pd.DataFrame(out_rows)
+                    except BaseException as e:
+                        return pd.DataFrame(
+                            [{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}]
+                        )
+                return pdf_path_to_pages_df(p)
+
+        else:
+            def _loader(p: str) -> pd.DataFrame:
+                return txt_file_to_chunks_df(p, **self._extract_txt_kwargs)
+
+        for doc_path in doc_iter:
+            initial_df = _loader(doc_path)
+
+            current: Any = initial_df
             for func, kwargs in per_doc_tasks:
                 if func is pdf_extraction:
                     current = func(pdf_binary=current, **kwargs)

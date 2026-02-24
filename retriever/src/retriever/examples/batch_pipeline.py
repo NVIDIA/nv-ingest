@@ -331,9 +331,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs to ingest.",
+        help="Directory containing PDFs or .txt files to ingest.",
         path_type=Path,
         exists=True,
+    ),
+    input_type: str = typer.Option(
+        "pdf",
+        "--input-type",
+        help="Input format: 'pdf', 'txt', or 'doc'. Use 'txt' for .txt files (tokenizer chunking). Use 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -548,49 +553,102 @@ def main(
         if start_ray:
             subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
             ray_address = "auto"
-        # else: use ray_address as-is (None → in-process, or URL to existing cluster)
 
         input_dir = Path(input_dir)
-        pdf_glob = str(input_dir / "*.pdf")
-
-        ingestor = create_ingestor(
-            run_mode="batch",
-            ray_address=ray_address,
-            ray_log_to_driver=ray_log_to_driver,
-        )
-        ingestor = (
-            ingestor.files(pdf_glob)
-            .extract(
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=False,
-                debug_run_id=str(runtime_metrics_prefix or "unknown"),
-                pdf_extract_workers=int(pdf_extract_workers),
-                pdf_extract_num_cpus=float(pdf_extract_num_cpus),
-                pdf_split_batch_size=int(pdf_split_batch_size),
-                pdf_extract_batch_size=int(pdf_extract_batch_size),
-                page_elements_batch_size=int(page_elements_batch_size),
-                page_elements_workers=int(page_elements_workers),
-                detect_workers=int(ocr_workers),
-                detect_batch_size=int(ocr_batch_size),
-                page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
-                ocr_cpus_per_actor=float(ocr_cpus_per_actor),
-                gpu_page_elements=float(gpu_page_elements),
-                gpu_ocr=float(gpu_ocr),
-                gpu_embed=float(gpu_embed),
-                page_elements_invoke_url=page_elements_invoke_url,
-                ocr_invoke_url=ocr_invoke_url,
+        if input_type == "txt":
+            glob_pattern = str(input_dir / "*.txt")
+            ingestor = create_ingestor(
+                run_mode="batch",
+                ray_address=ray_address,
+                ray_log_to_driver=ray_log_to_driver,
             )
-            .embed(
-                model_name="nemo_retriever_v1",
-                embed_workers=int(embed_workers),
-                embed_batch_size=int(embed_batch_size),
-                embed_cpus_per_actor=float(embed_cpus_per_actor),
-                embed_invoke_url=embed_invoke_url,
+            ingestor = (
+                ingestor.files(glob_pattern)
+                .extract_txt(max_tokens=512, overlap_tokens=0)
+                .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
+                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
             )
-            .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
-        )
+        elif input_type == "doc":
+            # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
+            doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
+            ingestor = create_ingestor(
+                run_mode="batch",
+                ray_address=ray_address,
+                ray_log_to_driver=ray_log_to_driver,
+            )
+            ingestor = (
+                ingestor.files(doc_globs)
+                .extract(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    debug_run_id=str(runtime_metrics_prefix or "unknown"),
+                    pdf_extract_workers=int(pdf_extract_workers),
+                    pdf_extract_num_cpus=float(pdf_extract_num_cpus),
+                    pdf_split_batch_size=int(pdf_split_batch_size),
+                    pdf_extract_batch_size=int(pdf_extract_batch_size),
+                    page_elements_batch_size=int(page_elements_batch_size),
+                    page_elements_workers=int(page_elements_workers),
+                    detect_workers=int(ocr_workers),
+                    detect_batch_size=int(ocr_batch_size),
+                    page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
+                    ocr_cpus_per_actor=float(ocr_cpus_per_actor),
+                    gpu_page_elements=float(gpu_page_elements),
+                    gpu_ocr=float(gpu_ocr),
+                    gpu_embed=float(gpu_embed),
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                )
+                .embed(
+                    model_name="nemo_retriever_v1",
+                    embed_workers=int(embed_workers),
+                    embed_batch_size=int(embed_batch_size),
+                    embed_cpus_per_actor=float(embed_cpus_per_actor),
+                    embed_invoke_url=embed_invoke_url,
+                )
+                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            )
+        else:
+            pdf_glob = str(input_dir / "*.pdf")
+            ingestor = create_ingestor(
+                run_mode="batch",
+                ray_address=ray_address,
+                ray_log_to_driver=ray_log_to_driver,
+            )
+            ingestor = (
+                ingestor.files(pdf_glob)
+                .extract(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    debug_run_id=str(runtime_metrics_prefix or "unknown"),
+                    pdf_extract_workers=int(pdf_extract_workers),
+                    pdf_extract_num_cpus=float(pdf_extract_num_cpus),
+                    pdf_split_batch_size=int(pdf_split_batch_size),
+                    pdf_extract_batch_size=int(pdf_extract_batch_size),
+                    page_elements_batch_size=int(page_elements_batch_size),
+                    page_elements_workers=int(page_elements_workers),
+                    detect_workers=int(ocr_workers),
+                    detect_batch_size=int(ocr_batch_size),
+                    page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
+                    ocr_cpus_per_actor=float(ocr_cpus_per_actor),
+                    gpu_page_elements=float(gpu_page_elements),
+                    gpu_ocr=float(gpu_ocr),
+                    gpu_embed=float(gpu_embed),
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                )
+                .embed(
+                    model_name="nemo_retriever_v1",
+                    embed_workers=int(embed_workers),
+                    embed_batch_size=int(embed_batch_size),
+                    embed_cpus_per_actor=float(embed_cpus_per_actor),
+                    embed_invoke_url=embed_invoke_url,
+                )
+                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            )
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
@@ -659,6 +717,7 @@ def main(
         if not no_recall_details:
             print("\nPer-query retrieval details:")
         missed_gold: list[tuple[str, str]] = []
+        ext = ".txt" if input_type == "txt" else ".pdf"
         for i, (q, g, hits) in enumerate(
             zip(
                 _df_query["query"].astype(str).tolist(),
@@ -679,7 +738,7 @@ def main(
 
             if not no_recall_details:
                 print(f"\nQuery {i}: {q}")
-                print(f"  Gold: {g}  (file: {doc}.pdf, page: {page})")
+                print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
                 print(f"  Hit@{cfg.top_k}: {hit}")
                 print("  Top hits:")
                 if not scored_hits:
@@ -692,15 +751,15 @@ def main(
                             print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
             if not hit:
-                missed_gold.append((f"{doc}.pdf", str(page)))
+                missed_gold.append((f"{doc}{ext}", str(page)))
 
         missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-        print("\nMissed gold (unique pdf/page):")
+        print("\nMissed gold (unique doc/page):")
         if not missed_unique:
             print("  (none)")
         else:
-            for pdf, page in missed_unique:
-                print(f"  {pdf} page {page}")
+            for doc_page, page in missed_unique:
+                print(f"  {doc_page} page {page}")
         print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
         print("\nRecall metrics (matching retriever.recall.core):")
