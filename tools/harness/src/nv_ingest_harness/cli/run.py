@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -68,6 +69,10 @@ def run_datasets(
             print("Services failed to become ready")
             service_manager.stop()
             return 1
+
+        # Warm-up: let services stabilize and connect before running tests
+        print("Services ready! Sleeping 60s for warm-up...")
+        time.sleep(60)
 
     # Run each dataset
     for dataset_name in dataset_list:
@@ -279,14 +284,17 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
         def write(self, data):
             self.original.write(data)
-            self.file.write(data)
+            if not self.file.closed:
+                self.file.write(data)
 
         def flush(self):
             self.original.flush()
-            self.file.flush()
+            if not self.file.closed:
+                self.file.flush()
 
         def close(self):
-            self.file.close()
+            if not self.file.closed:
+                self.file.close()
 
     tee_stdout = TeeFile(stdout_path, sys.stdout)
     old_stdout = sys.stdout
@@ -426,7 +434,9 @@ def main(
     # Parse dataset(s) - handle single, comma-separated, and groups
     import yaml
 
-    config_path = Path(test_config_path) if test_config_path else Path(__file__).resolve().parents[3] / "test_configs.yaml"
+    config_path = (
+        Path(test_config_path) if test_config_path else Path(__file__).resolve().parents[3] / "test_configs.yaml"
+    )
     with open(config_path) as f:
         yaml_data = yaml.safe_load(f)
 

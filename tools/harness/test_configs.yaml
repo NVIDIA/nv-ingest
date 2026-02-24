@@ -100,6 +100,7 @@ recall:
   recall_top_k: 10
   ground_truth_dir: null
   enable_beir: false  # Enable BEIR metrics (NDCG, MAP, Precision) - requires beir package
+  language_filter: null  # Filter queries by language (e.g., "english") - Vidore only
 
 # Pre-configured datasets
 # Each dataset includes path, extraction settings, and recall evaluator
@@ -182,105 +183,113 @@ datasets:
   # Vidore V3 Benchmark Datasets
   # See: https://huggingface.co/collections/vidore/vidore-benchmark-667173f98e70a1c0fa4db00d
   vidore_v3_finance_en:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_finance_en
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_finance_en
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_finance_en
     enable_beir: true
 
   vidore_v3_industrial:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_industrial
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_industrial
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_industrial
     enable_beir: true
 
   vidore_v3_computer_science:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_computer_science
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_computer_science
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_computer_science
     enable_beir: true
 
   vidore_v3_pharmaceuticals:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_pharmaceuticals
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_pharmaceuticals
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_pharmaceuticals
     enable_beir: true
 
   vidore_v3_hr:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_hr
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_hr
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_hr
     enable_beir: true
 
   vidore_v3_energy:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_energy
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_energy
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_energy
     enable_beir: true
 
   vidore_v3_physics:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_physics
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_physics
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_physics
     enable_beir: true
 
   vidore_v3_finance_fr:
-    path: /datasets/nv-ingest/vidore_v3_corpus/vidore_v3_finance_fr
-    extract_text: false
-    extract_tables: false
-    extract_charts: false
+    path: /datasets/nv-ingest/vidore_v3_corpus_pdf/vidore_v3_finance_fr
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
     extract_images: false
-    extract_infographics: false
+    extract_infographics: true
     extract_page_as_image: true
-    extract_method: ocr
+    text_depth: page
+    table_output_format: markdown
     image_elements_modality: text_image
     recall_dataset: vidore_v3_finance_fr
     enable_beir: true
@@ -299,7 +308,7 @@ dataset_groups:
     - vidore_v3_physics
     - vidore_v3_finance_fr
 
-  # Vidore English-only
+  # Vidore English-only (set language_filter: english in recall section)
   vidore_english:
     - vidore_v3_finance_en
     - vidore_v3_industrial

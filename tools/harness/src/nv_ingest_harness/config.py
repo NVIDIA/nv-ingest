@@ -99,6 +99,7 @@ class TestConfig:
     ground_truth_dir: Optional[str] = None
     recall_dataset: Optional[str] = None
     enable_beir: bool = False  # Enable BEIR metrics (NDCG, MAP, Precision)
+    language_filter: Optional[str] = None  # Filter queries by language (e.g., "english")
 
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
@@ -354,6 +355,7 @@ def _load_env_overrides() -> dict:
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
         "RECALL_DATASET": ("recall_dataset", str),
         "ENABLE_BEIR": ("enable_beir", parse_bool),
+        "LANGUAGE_FILTER": ("language_filter", str),
     }
 
     overrides = {}

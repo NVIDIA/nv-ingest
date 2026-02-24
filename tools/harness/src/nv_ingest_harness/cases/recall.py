@@ -188,6 +188,9 @@ def main(config=None, log_path: str = "test_results") -> int:
             "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
             "enable_beir": config.enable_beir,
         }
+        language_filter = getattr(config, "language_filter", None)
+        if language_filter and recall_dataset.startswith("vidore_"):
+            evaluation_params["language_filter"] = language_filter
         if vdb_backend == "lancedb":
             evaluation_params["table_path"] = lancedb_path
 

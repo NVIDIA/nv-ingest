@@ -21,6 +21,7 @@ def _compute_beir_metrics(
     all_retrieved: List[List[Dict]],
     query_df: pd.DataFrame,
     k_values: List[int] = [1, 5, 10],
+    qrels_dict: Optional[Dict[str, Dict[str, float]]] = None,
 ) -> Optional[Dict[str, Dict[str, float]]]:
     """
     Compute BEIR metrics from retrieval results.
@@ -30,6 +31,8 @@ def _compute_beir_metrics(
                       dicts with 'entity' containing source info.
         query_df: DataFrame with 'query' and 'expected_pdf' columns, optionally 'query_id'.
         k_values: Cutoff values for evaluation (default [1, 5, 10]).
+        qrels_dict: Optional full qrels {query_id: {doc_id: relevance}}. If None, builds
+                    single-doc qrels from expected_pdf (for finance_bench etc).
 
     Returns:
         Dict with keys 'ndcg', 'map', 'recall', 'precision', each containing
@@ -54,19 +57,24 @@ def _compute_beir_metrics(
             source_id = r.get("entity", {}).get("source", {}).get("source_id", "")
             doc_id = os.path.basename(source_id).split(".")[0]
             score = (num_results - rank) / num_results if num_results > 0 else 0
-            results[query_id][doc_id] = score
+            # Keep first (highest-ranked) occurrence per doc — dedup multiple chunks from same PDF
+            if doc_id not in results[query_id]:
+                results[query_id][doc_id] = score
 
-    # Build qrels dict: {query_id: {doc_id: relevance}}
-    qrels = {}
-    for idx, row in query_df.iterrows():
-        if "query_id" in query_df.columns:
-            query_id = str(row["query_id"])
-        else:
-            query_id = str(idx)
-        qrels[query_id] = {str(row["expected_pdf"]): 1}
+    # Build qrels dict: use provided full qrels or fall back to single expected_pdf
+    if qrels_dict is not None:
+        qrels = qrels_dict
+    else:
+        qrels = {}
+        for idx, row in query_df.iterrows():
+            if "query_id" in query_df.columns:
+                query_id = str(row["query_id"])
+            else:
+                query_id = str(idx)
+            qrels[query_id] = {str(row["expected_pdf"]): 1}
 
     # Evaluate
-    ndcg, _map, recall, precision = EvaluateRetrieval.evaluate(qrels, results, k_values, ignore_identical_ids=True)
+    ndcg, _map, recall, precision = EvaluateRetrieval.evaluate(qrels, results, k_values)
 
     return {"ndcg": ndcg, "map": _map, "recall": recall, "precision": precision}
 
@@ -271,7 +279,11 @@ def get_recall_scores_pdf_only(
             reranker_kwargs["nv_ranker_model_name"] = nv_ranker_model_name
 
     queries = query_df["query"].to_list()
-    expected_pdfs = query_df["expected_pdf"].to_list()
+    # Support multi-doc ground truth (expected_pdfs) for Vidore; fallback to expected_pdf
+    if "expected_pdfs" in query_df.columns:
+        expected_pdfs = query_df["expected_pdfs"].to_list()
+    else:
+        expected_pdfs = [[ep] for ep in query_df["expected_pdf"].to_list()]
 
     # Process queries in batches to avoid gRPC message size limits
     num_queries = len(queries)
@@ -324,23 +336,27 @@ def get_recall_scores_pdf_only(
         if enable_beir:
             all_retrieved.extend(batch_answers)
 
-        for expected_pdf, retrieved_answers in zip(batch_expected_pdfs, batch_answers):
-            # Extract PDF names only (no page numbers)
-            retrieved_pdfs = [
-                os.path.basename(result.get("entity", {}).get("source", {}).get("source_id", "")).split(".")[0]
-                for result in retrieved_answers
-            ]
+        for expected_pdfs_for_query, retrieved_answers in zip(batch_expected_pdfs, batch_answers):
+            # Extract PDF names only (no page numbers), deduplicated to unique PDFs
+            retrieved_pdfs = list(
+                dict.fromkeys(
+                    os.path.basename(result.get("entity", {}).get("source", {}).get("source_id", "")).split(".")[0]
+                    for result in retrieved_answers
+                )
+            )
 
-            # Finance_bench uses k values [1, 5, 10]
+            # Hit = any relevant doc in top-k unique PDFs
             for k in [1, 5, 10]:
                 if k <= top_k:
-                    hits[k].append(expected_pdf in retrieved_pdfs[:k])
+                    hit = any(exp in retrieved_pdfs[:k] for exp in expected_pdfs_for_query)
+                    hits[k].append(hit)
 
     recall_scores = {k: np.mean(hits[k]) for k in hits if len(hits[k]) > 0}
 
     # Compute BEIR metrics if enabled
     if enable_beir:
-        beir_metrics = _compute_beir_metrics(all_retrieved, query_df, k_values=[1, 5, 10])
+        qrels_dict = query_df.attrs.get("qrels")
+        beir_metrics = _compute_beir_metrics(all_retrieved, query_df, k_values=[1, 5, 10], qrels_dict=qrels_dict)
         return {"recall": recall_scores, "beir": beir_metrics}
 
     return recall_scores
@@ -805,8 +821,8 @@ def vidore_load_ground_truth(
         language_filter: Optional language filter ("english" or None for all)
 
     Returns:
-        DataFrame with columns: 'query', 'expected_pdf', 'query_id'
-        expected_pdf contains corpus_id as string (matches PDF filename without extension)
+        DataFrame with columns: 'query', 'expected_pdf', 'expected_pdfs', 'query_id'
+        df.attrs["qrels"] contains full BEIR-compatible qrels dict with graded relevance
     """
     from datasets import load_dataset
 
@@ -816,9 +832,11 @@ def vidore_load_ground_truth(
     queries_ds = load_dataset(hf_name, data_dir="queries", split="test")
     qrels_ds = load_dataset(hf_name, data_dir="qrels", split="test")
 
-    # Build qrels lookup: query_id -> corpus_id
-    # Note: corpus_id is int in HuggingFace, but PDF filenames are {corpus_id}.pdf
-    qrels_map = {row["query_id"]: row["corpus_id"] for row in qrels_ds}
+    # Build full qrels: {query_id: {corpus_id: score}} — matches notebook's format_qrels
+    full_qrels = defaultdict(dict)
+    for row in qrels_ds:
+        full_qrels[str(row["query_id"])][str(row["corpus_id"])] = row["score"]
+    full_qrels = dict(full_qrels)
 
     rows = []
     for row in queries_ds:
@@ -828,19 +846,24 @@ def vidore_load_ground_truth(
         if language_filter and row.get("language", "").lower() != language_filter.lower():
             continue
 
-        if query_id in qrels_map:
+        qid_str = str(query_id)
+        if qid_str in full_qrels:
+            relevant_docs = sorted(full_qrels[qid_str].items(), key=lambda x: x[1], reverse=True)
             rows.append(
                 {
                     "query": row["query"],
-                    "expected_pdf": str(qrels_map[query_id]),
-                    "query_id": str(query_id),
+                    "expected_pdf": relevant_docs[0][0],
+                    "expected_pdfs": [doc_id for doc_id, _ in relevant_docs],
+                    "query_id": qid_str,
                 }
             )
 
     if not rows:
         raise ValueError(f"No valid queries found for {dataset_name}")
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df.attrs["qrels"] = full_qrels
+    return df
 
 
 def vidore_recall(
