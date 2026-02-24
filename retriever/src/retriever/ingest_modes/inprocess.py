@@ -21,7 +21,8 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
+from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
@@ -32,9 +33,10 @@ try:
 except Exception:  # pragma: no cover
     tqdm = None  # type: ignore[assignment]
 
+from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
 from ..pdf.extract import pdf_extraction
-from ..pdf.split import pdf_path_to_pages_df
+from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
@@ -147,6 +149,7 @@ def embed_text_main_text_embed(
     # don't need to change for inprocess mode.
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
+    embed_invoke_url: Optional[str] = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -174,7 +177,7 @@ def embed_text_main_text_embed(
         raise ValueError("inference_batch_size must be > 0")
 
     # Resolve endpoint: strip whitespace, treat empty string as None.
-    _endpoint = (embedding_endpoint or "").strip() or None
+    _endpoint = (embedding_endpoint or embed_invoke_url or "").strip() or None
 
     if _endpoint is None and model is None:
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
@@ -720,15 +723,6 @@ class InProcessIngestor(Ingestor):
             ocr_flags["extract_tables"] = True
         if kwargs.get("extract_charts") is True:
             ocr_flags["extract_charts"] = True
-            print("Adding chart detection task")
-            # Run chart detection only on cropped "chart" regions from page-elements.
-            self._tasks.append(
-                (
-                    detect_graphic_elements_v1_from_page_elements_v3,
-                    _detect_kwargs_with_model(NemotronGraphicElementsV1(), stage_name="chart", allow_remote=False),
-                )
-            )
-
         if kwargs.get("extract_infographics") is True:
             ocr_flags["extract_infographics"] = True
         ocr_flags.update(_stage_remote_kwargs("ocr"))
@@ -774,7 +768,7 @@ class InProcessIngestor(Ingestor):
         This records an embedding task so call sites can chain `.embed(...)`
         after `.extract(...)` or `.extract_txt()`.
 
-        When ``embedding_endpoint`` is provided (e.g.
+        When ``embedding_endpoint`` (or ``embed_invoke_url``) is provided (e.g.
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
         embedding instead of the local HF model.
         """
@@ -783,9 +777,11 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((explode_content_to_rows, {}))
 
         embed_kwargs = dict(kwargs)
+        if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
+            embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
 
         # If a remote NIM endpoint is configured, skip local model creation.
-        endpoint = (embed_kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (embed_kwargs.get("embedding_endpoint") or embed_kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             embed_kwargs.setdefault("input_type", "passage")
             self._tasks.append((embed_text_main_text_embed, embed_kwargs))
@@ -872,7 +868,6 @@ class InProcessIngestor(Ingestor):
         return_traces: bool = False,
         **_: Any,
     ) -> list[Any]:
-
         # Tasks that run once on combined results (after all docs). All others run per-doc.
         _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
         per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
@@ -887,8 +882,31 @@ class InProcessIngestor(Ingestor):
             doc_iter = tqdm(docs, desc="Processing documents", unit="doc")
 
         if self._pipeline_type == "pdf":
+
             def _loader(p: str) -> pd.DataFrame:
+                """
+                Load a document as a per-page DataFrame. For .pdf use pdf_path_to_pages_df.
+                For .docx/.pptx convert to PDF via LibreOffice then split (same schema).
+                """
+                abs_path = os.path.abspath(p)
+                ext = os.path.splitext(abs_path)[1].lower()
+                if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+                    try:
+                        with open(abs_path, "rb") as f:
+                            file_bytes = f.read()
+                        pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
+                        pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+                        out_rows = [
+                            {"bytes": b, "path": abs_path, "page_number": i + 1}
+                            for i, b in enumerate(pages)
+                        ]
+                        return pd.DataFrame(out_rows)
+                    except BaseException as e:
+                        return pd.DataFrame(
+                            [{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}]
+                        )
                 return pdf_path_to_pages_df(p)
+
         else:
             def _loader(p: str) -> pd.DataFrame:
                 return txt_file_to_chunks_df(p, **self._extract_txt_kwargs)

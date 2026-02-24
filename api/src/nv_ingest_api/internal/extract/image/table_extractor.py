@@ -593,7 +593,8 @@ def _local_nemotron_table_structure_cell_predictions(
 
             x = model.preprocess(t, (h, w))
             with torch.inference_mode():
-                preds = model.invoke(x, (h, w))
+                with torch.autocast(device_type="cuda"):
+                    preds = model.invoke(x, (h, w))
 
             # Normalize to (boxes, labels, scores)
             boxes = None

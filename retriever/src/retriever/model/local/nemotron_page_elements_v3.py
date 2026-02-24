@@ -94,8 +94,9 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         # The upstream model returns a container where index [0] is the predictions.
         with torch.inference_mode():
-            out = self._model(input_data, orig_shape)
-            return out
+            with torch.autocast(device_type="cuda"):
+                out = self._model(input_data, orig_shape)
+                return out
         # preds0: Any
         # if isinstance(out, (list, tuple)) and len(out) > 0:
         #     preds0 = out[0]

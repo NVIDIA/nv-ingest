@@ -564,7 +564,8 @@ def detect_page_elements_v3(
         try:
             # Best-effort: pass list of shapes for batching; fall back to per-image if unsupported.
             with torch.inference_mode():
-                preds = model(batch, orig_shapes) if len(pre_list) > 1 else model(batch, orig_shapes[0])
+                with torch.autocast(device_type="cuda"):
+                    preds = model(batch, orig_shapes) if len(pre_list) > 1 else model(batch, orig_shapes[0])
             # Some local wrappers return only the first prediction dict even for batched inputs.
             # Detect that and force per-image invocation so every row gets its own detections.
             if len(pre_list) > 1:
