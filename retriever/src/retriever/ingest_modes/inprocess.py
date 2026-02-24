@@ -11,14 +11,16 @@ import glob
 import json
 import os
 import re
+import time
 import uuid
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import BytesIO
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
-from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
 from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
@@ -32,6 +34,12 @@ try:
     from tqdm.auto import tqdm
 except Exception:  # pragma: no cover
     tqdm = None  # type: ignore[assignment]
+
+try:
+    import pypdfium2 as pdfium
+except Exception as e:  # pragma: no cover
+    pdfium = None  # type: ignore[assignment]
+    _PDFIUM_IMPORT_ERROR = e
 
 from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
@@ -535,6 +543,25 @@ def upload_embeddings_to_lancedb_inprocess(
         metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
         if pdf_page:
             metadata_obj["pdf_page"] = pdf_page
+        # Persist per-page detection counters for end-of-run summaries.
+        # Mirrors batch.py so LanceDB-based summary reads also work.
+        pe_num = getattr(r, "page_elements_v3_num_detections", None)
+        if pe_num is not None:
+            try:
+                metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
+            except Exception:
+                pass
+        pe_counts = getattr(r, "page_elements_v3_counts_by_label", None)
+        if isinstance(pe_counts, dict):
+            metadata_obj["page_elements_v3_counts_by_label"] = {
+                str(k): int(v)
+                for k, v in pe_counts.items()
+                if isinstance(k, str) and v is not None
+            }
+        for ocr_col in ("table", "chart", "infographic"):
+            entries = getattr(r, ocr_col, None)
+            if isinstance(entries, list):
+                metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
         source_obj: Dict[str, Any] = {"source_id": str(path)}
 
         row_out: Dict[str, Any] = {
@@ -633,6 +660,298 @@ def upload_embeddings_to_lancedb_inprocess(
 
     print(f"Wrote {len(rows)} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
     return df
+
+
+def pdf_to_pages_df(path: str) -> pd.DataFrame:
+    """
+    Convert a document at *path* into a DataFrame where each row
+    contains a *single-page* PDF's raw bytes.
+
+    For ``.docx`` / ``.pptx`` files the document is first converted
+    to PDF via LibreOffice, then split into pages.  The original
+    *path* is preserved so downstream metadata tracks the source file.
+
+    Columns:
+    - bytes: single-page PDF bytes
+    - path: original input path
+    - page_number: 1-indexed page number
+    """
+    if pdfium is None:  # pragma: no cover
+        raise ImportError("pypdfium2 is required for inprocess ingestion.") from _PDFIUM_IMPORT_ERROR
+
+    abs_path = os.path.abspath(path)
+    ext = os.path.splitext(abs_path)[1].lower()
+    out_rows: list[dict[str, Any]] = []
+    doc = None
+    try:
+        if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+            # Convert DOCX/PPTX to PDF bytes first.
+            with open(abs_path, "rb") as f:
+                file_bytes = f.read()
+            pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
+            doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
+        else:
+            doc = pdfium.PdfDocument(abs_path)
+
+        for page_idx in range(len(doc)):
+            single = pdfium.PdfDocument.new()
+            try:
+                single.import_pages(doc, pages=[page_idx])
+                buf = BytesIO()
+                single.save(buf)
+                out_rows.append(
+                    {
+                        "bytes": buf.getvalue(),
+                        "path": abs_path,
+                        "page_number": page_idx + 1,
+                    }
+                )
+            finally:
+                try:
+                    single.close()
+                except Exception:
+                    pass
+    except BaseException as e:
+        # Preserve shape expected downstream (pdf_extraction emits error
+        # records per-row, so we return a single row to trigger that).
+        out_rows.append({"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)})
+    finally:
+        try:
+            if doc is not None:
+                doc.close()
+        except Exception:
+            pass
+
+    return pd.DataFrame(out_rows)
+
+
+def _iter_page_chunks(path: str, chunk_size: int = 32) -> Iterator[pd.DataFrame]:
+    """Yield DataFrames of *chunk_size* pages from a document.
+
+    Reuses the same pdfium page-splitting logic as :func:`pdf_to_pages_df`
+    but yields incrementally so that downstream work can begin before the
+    entire document is split.  At most *chunk_size* single-page PDF blobs
+    are in memory per yield.
+
+    Handles DOCX/PPTX conversion (same as ``pdf_to_pages_df``).
+    """
+    if pdfium is None:  # pragma: no cover
+        raise ImportError("pypdfium2 is required for inprocess ingestion.") from _PDFIUM_IMPORT_ERROR
+
+    abs_path = os.path.abspath(path)
+    ext = os.path.splitext(abs_path)[1].lower()
+    doc = None
+    try:
+        if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+            with open(abs_path, "rb") as f:
+                pdf_bytes = convert_to_pdf_bytes(f.read(), ext)
+            doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
+        else:
+            doc = pdfium.PdfDocument(abs_path)
+
+        chunk: list[dict] = []
+        for page_idx in range(len(doc)):
+            single = pdfium.PdfDocument.new()
+            try:
+                single.import_pages(doc, pages=[page_idx])
+                buf = BytesIO()
+                single.save(buf)
+                chunk.append({"bytes": buf.getvalue(), "path": abs_path, "page_number": page_idx + 1})
+            finally:
+                try:
+                    single.close()
+                except Exception:
+                    pass
+            if len(chunk) >= chunk_size:
+                yield pd.DataFrame(chunk)
+                chunk = []
+        if chunk:
+            yield pd.DataFrame(chunk)
+    except BaseException as e:
+        yield pd.DataFrame([{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}])
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception:
+                pass
+
+
+def _process_doc_cpu(doc_path: str, cpu_tasks: list) -> pd.DataFrame:
+    """Worker function for ProcessPoolExecutor.
+
+    Runs ``pdf_to_pages_df`` followed by all CPU-bound pipeline tasks on a
+    single document.  All arguments are picklable (strings, module-level
+    functions, and dicts of simple types).
+    """
+    try:
+        current: Any = pdf_to_pages_df(doc_path)
+        for func, kwargs in cpu_tasks:
+            if func is pdf_extraction:
+                current = func(pdf_binary=current, **kwargs)
+            else:
+                current = func(current, **kwargs)
+        return current
+    except Exception as e:
+        # Return a minimal error DataFrame so one failed document does not
+        # halt the pipeline.
+        return pd.DataFrame(
+            [{"bytes": b"", "path": doc_path, "page_number": 0, "error": f"{type(e).__name__}: {e}"}]
+        )
+
+
+def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
+    """Worker function for ProcessPoolExecutor — page-chunk variant.
+
+    Runs CPU-bound pipeline tasks on a pre-split page-chunk DataFrame.
+    Similar to :func:`_process_doc_cpu` but skips ``pdf_to_pages_df``
+    since the page splitting has already been done by the caller.
+    """
+    try:
+        current: Any = chunk_df
+        for func, kwargs in cpu_tasks:
+            if func is pdf_extraction:
+                current = func(pdf_binary=current, **kwargs)
+            else:
+                current = func(current, **kwargs)
+        return current
+    except Exception as e:
+        return pd.DataFrame(
+            [{"bytes": b"", "path": "", "page_number": 0, "error": f"{type(e).__name__}: {e}"}]
+        )
+
+
+def _collect_summary_from_df(df: pd.DataFrame) -> dict:
+    """Compute detection summary from a result DataFrame.
+
+    Mirrors the batch pipeline's ``_collect_detection_summary`` but reads
+    directly from the in-memory DataFrame instead of LanceDB.  Rows are
+    deduplicated by ``(path, page_number)`` so exploded content rows don't
+    inflate counts.
+    """
+    per_page: dict[tuple, dict] = {}
+
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+
+        path = str(row_dict.get("path") or row_dict.get("source_id") or "")
+        page_number = -1
+        try:
+            page_number = int(row_dict.get("page_number", -1))
+        except (TypeError, ValueError):
+            pass
+
+        key = (path, page_number)
+
+        meta = row_dict.get("metadata")
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except Exception:
+                meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+
+        entry = per_page.setdefault(
+            key,
+            {
+                "pe": 0,
+                "ocr_table": 0,
+                "ocr_chart": 0,
+                "ocr_infographic": 0,
+                "pe_by_label": defaultdict(int),
+            },
+        )
+
+        # Check metadata first, then fall back to direct DataFrame columns.
+        # The batch pipeline stores these inside the metadata JSON, but the
+        # inprocess pipeline keeps them as top-level DataFrame columns.
+        try:
+            pe = int(
+                meta.get("page_elements_v3_num_detections")
+                or row_dict.get("page_elements_v3_num_detections")
+                or 0
+            )
+        except (TypeError, ValueError):
+            pe = 0
+        entry["pe"] = max(entry["pe"], pe)
+
+        for field, meta_key, col_key in [
+            ("ocr_table", "ocr_table_detections", "table"),
+            ("ocr_chart", "ocr_chart_detections", "chart"),
+            ("ocr_infographic", "ocr_infographic_detections", "infographic"),
+        ]:
+            try:
+                val = int(meta.get(meta_key, 0) or 0)
+            except (TypeError, ValueError):
+                val = 0
+            # Fall back to counting direct list columns (e.g. row["table"]).
+            if val == 0:
+                col_val = row_dict.get(col_key)
+                if isinstance(col_val, list):
+                    val = len(col_val)
+            entry[field] = max(entry[field], val)
+
+        label_counts = meta.get("page_elements_v3_counts_by_label") or row_dict.get("page_elements_v3_counts_by_label")
+        if isinstance(label_counts, dict):
+            for label, count in label_counts.items():
+                try:
+                    c = int(count or 0)
+                except (TypeError, ValueError):
+                    c = 0
+                entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
+
+    pe_by_label_totals: dict[str, int] = defaultdict(int)
+    pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
+    for e in per_page.values():
+        pe_total += e["pe"]
+        ocr_table_total += e["ocr_table"]
+        ocr_chart_total += e["ocr_chart"]
+        ocr_infographic_total += e["ocr_infographic"]
+        for label, count in e["pe_by_label"].items():
+            pe_by_label_totals[label] += count
+
+    return {
+        "pages_seen": len(per_page),
+        "page_elements_v3_total_detections": pe_total,
+        "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
+        "ocr_table_total_detections": ocr_table_total,
+        "ocr_chart_total_detections": ocr_chart_total,
+        "ocr_infographic_total_detections": ocr_infographic_total,
+    }
+
+
+def _print_ingest_summary(results: list, elapsed_s: float) -> None:
+    """Print end-of-ingest summary matching batch pipeline output format."""
+    dfs = [r for r in results if isinstance(r, pd.DataFrame) and not r.empty]
+    if not dfs:
+        print(f"\nIngest time: {elapsed_s:.2f}s (no documents processed)")
+        return
+
+    combined = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
+    summary = _collect_summary_from_df(combined)
+
+    print("\nDetection summary (deduped by source/page_number):")
+    print(f"  Pages seen: {summary['pages_seen']}")
+    print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
+    print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
+    print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
+    print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
+    print("  PageElements v3 counts by label:")
+    by_label = summary.get("page_elements_v3_counts_by_label", {})
+    if not by_label:
+        print("    (none)")
+    else:
+        for label, count in by_label.items():
+            print(f"    {label}: {count}")
+
+    pages = summary["pages_seen"]
+    if elapsed_s > 0 and pages > 0:
+        pps = pages / elapsed_s
+        print(f"Pages processed: {pages}")
+        print(f"Pages/sec: {pps:.2f}")
+    else:
+        print(f"\nIngest time: {elapsed_s:.2f}s")
 
 
 class InProcessIngestor(Ingestor):
@@ -759,7 +1078,7 @@ class InProcessIngestor(Ingestor):
                 (
                     detect_page_elements_v3,
                     _detect_kwargs_with_model(
-                        define_model("page_element_v3"),
+                        NemotronPageElementsV3(),
                         stage_name="page_elements",
                         allow_remote=True,
                     ),
@@ -929,14 +1248,249 @@ class InProcessIngestor(Ingestor):
         return_failures: bool = False,
         save_to_disk: bool = False,
         return_traces: bool = False,
+        parallel: bool = False,
+        max_workers: int | None = None,
+        gpu_devices: list[str] | None = None,
+        page_chunk_size: int = 32,
         **_: Any,
     ) -> list[Any]:
-        per_doc_tasks, post_tasks = self.get_pipeline_tasks()
 
-        # Iterate through all configured documents; for each file build a per-page
-        # DataFrame and run the per-doc task chain.
-        results: list[Any] = []
+        _start = time.perf_counter()
+
+        # -- Three-way task classification --------------------------------
+        _post_task_fns = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
+        _cpu_task_fns = (pdf_extraction,)
+
+        cpu_tasks = [(f, k) for f, k in self._tasks if f in _cpu_task_fns]
+        gpu_tasks = [(f, k) for f, k in self._tasks if f not in _cpu_task_fns and f not in _post_task_fns]
+        post_tasks = [(f, k) for f, k in self._tasks if f in _post_task_fns]
+
         docs = list(self._documents)
+
+        # -- Parallel execution branch ------------------------------------
+        if parallel:
+            if gpu_devices and len(gpu_devices) >= 1 and gpu_tasks:
+                # Pipelined: GPU workers load models while CPU runs,
+                # each completed chunk goes to GPU immediately.
+                from .gpu_pool import GPUWorkerPool, gpu_tasks_to_descriptors
+
+                descriptors = gpu_tasks_to_descriptors(gpu_tasks)
+                errors: list[str] = []
+
+                with GPUWorkerPool(gpu_devices, descriptors) as gpu_pool:
+                    # Split all docs into page chunks (main thread, cheap PDF byte splitting)
+                    chunks: list[pd.DataFrame] = []
+                    chunk_to_doc: list[str] = []
+                    doc_chunk_total: dict[str, int] = defaultdict(int)
+                    for doc in docs:
+                        for chunk_df in _iter_page_chunks(doc, page_chunk_size):
+                            chunk_to_doc.append(doc)
+                            doc_chunk_total[doc] += 1
+                            chunks.append(chunk_df)
+
+                    shard_id = 0
+                    progress = None
+                    if show_progress and tqdm is not None:
+                        progress = tqdm(total=len(docs), desc="Processing files", unit="file")
+
+                    shard_to_doc: dict[int, str] = {}
+                    doc_done: dict[str, int] = defaultdict(int)
+
+                    def _check_file_done(doc_path: str) -> None:
+                        if doc_done[doc_path] >= doc_chunk_total[doc_path]:
+                            if progress is not None:
+                                progress.update(1)
+
+                    with ProcessPoolExecutor(max_workers=max_workers) as cpu_pool:
+                        future_to_idx = {
+                            cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i
+                            for i, chunk in enumerate(chunks)
+                        }
+
+                        for future in as_completed(future_to_idx):
+                            idx = future_to_idx[future]
+                            doc = chunk_to_doc[idx]
+                            try:
+                                result = future.result()
+                                if isinstance(result, pd.DataFrame) and not result.empty:
+                                    shard_to_doc[shard_id] = doc
+                                    gpu_pool.submit(shard_id, result)
+                                    shard_id += 1
+                                else:
+                                    doc_done[doc] += 1
+                                    _check_file_done(doc)
+                            except Exception as e:
+                                errors.append(f"chunk {idx}: {type(e).__name__}: {e}")
+                                print(f"Warning: failed to process chunk {idx}: {e}")
+                                doc_done[doc] += 1
+                                _check_file_done(doc)
+
+                    if errors:
+                        print(f"Warning: {len(errors)} chunk(s) failed CPU extraction")
+
+                    # All CPU done, collect remaining GPU results
+                    def _on_gpu_done(sid: int) -> None:
+                        d = shard_to_doc.get(sid, "")
+                        if d:
+                            doc_done[d] += 1
+                            _check_file_done(d)
+
+                    combined = gpu_pool.collect_all(on_shard_done=_on_gpu_done)
+
+                    if progress is not None:
+                        progress.close()
+
+                if combined.empty:
+                    results: list = []
+                    if show_progress:
+                        _print_ingest_summary(results, time.perf_counter() - _start)
+                    return results
+
+                for func, kwargs in post_tasks:
+                    combined = func(combined, **kwargs)
+
+                results = [combined]
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+            else:
+                # Single-GPU or no-GPU path: CPU parallel on chunks, then sequential GPU
+                chunks: list[pd.DataFrame] = []
+                chunk_to_doc: list[str] = []
+                doc_chunk_total: dict[str, int] = defaultdict(int)
+                for doc in docs:
+                    for chunk_df in _iter_page_chunks(doc, page_chunk_size):
+                        chunk_to_doc.append(doc)
+                        doc_chunk_total[doc] += 1
+                        chunks.append(chunk_df)
+
+                cpu_results: list[pd.DataFrame] = []
+                errors: list[str] = []
+
+                progress = None
+                if show_progress and tqdm is not None:
+                    progress = tqdm(total=len(docs), desc="Processing files", unit="file")
+
+                doc_done: dict[str, int] = defaultdict(int)
+
+                with ProcessPoolExecutor(max_workers=max_workers) as pool:
+                    future_to_idx = {
+                        pool.submit(_process_chunk_cpu, c, cpu_tasks): i
+                        for i, c in enumerate(chunks)
+                    }
+
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        doc = chunk_to_doc[idx]
+                        try:
+                            result = future.result()
+                            if isinstance(result, pd.DataFrame) and not result.empty:
+                                cpu_results.append(result)
+                        except Exception as e:
+                            errors.append(f"chunk {idx}: {type(e).__name__}: {e}")
+                            print(f"Warning: failed to process chunk {idx}: {e}")
+                        doc_done[doc] += 1
+                        if doc_done[doc] >= doc_chunk_total[doc] and progress is not None:
+                            progress.update(1)
+
+                if progress is not None:
+                    progress.close()
+
+                if errors:
+                    print(f"Warning: {len(errors)} chunk(s) failed CPU extraction")
+
+                if not cpu_results:
+                    results = []
+                    if show_progress:
+                        _print_ingest_summary(results, time.perf_counter() - _start)
+                    return results
+
+                combined = pd.concat(cpu_results, ignore_index=True)
+                for func, kwargs in gpu_tasks:
+                    combined = func(combined, **kwargs)
+
+                for func, kwargs in post_tasks:
+                    combined = func(combined, **kwargs)
+
+                results = [combined]
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+        # -- Sequential execution branch (default) ------------------------
+        use_multi_gpu_seq = gpu_devices and len(gpu_devices) >= 1 and gpu_tasks
+
+        if use_multi_gpu_seq:
+            # Pipelined: GPU workers process earlier chunks while CPU
+            # extracts later chunks of the same (or next) document.
+            cpu_and_extract = [(f, k) for f, k in self._tasks if f in _cpu_task_fns]
+
+            from .gpu_pool import GPUWorkerPool, gpu_tasks_to_descriptors
+
+            descriptors = gpu_tasks_to_descriptors(gpu_tasks)
+
+            with GPUWorkerPool(gpu_devices, descriptors) as gpu_pool:
+                shard_id = 0
+                shard_to_doc: dict[int, str] = {}
+                doc_chunk_total: dict[str, int] = defaultdict(int)
+                doc_done: dict[str, int] = defaultdict(int)
+
+                for doc_path in docs:
+                    for chunk_df in _iter_page_chunks(doc_path, page_chunk_size):
+                        doc_chunk_total[doc_path] += 1
+                        current: Any = chunk_df
+                        for func, kwargs in cpu_and_extract:
+                            if func is pdf_extraction:
+                                current = func(pdf_binary=current, **kwargs)
+                            else:
+                                current = func(current, **kwargs)
+                        if isinstance(current, pd.DataFrame) and not current.empty:
+                            shard_to_doc[shard_id] = doc_path
+                            gpu_pool.submit(shard_id, current)
+                            shard_id += 1
+                        else:
+                            doc_done[doc_path] += 1
+
+                progress = None
+                if show_progress and tqdm is not None:
+                    # Docs whose chunks all failed CPU are already done
+                    already_done = sum(
+                        1 for d in docs
+                        if d not in doc_chunk_total or doc_done.get(d, 0) >= doc_chunk_total[d]
+                    )
+                    progress = tqdm(total=len(docs), desc="Processing files", unit="file", initial=already_done)
+
+                def _on_gpu_done(sid: int) -> None:
+                    d = shard_to_doc.get(sid, "")
+                    if d:
+                        doc_done[d] += 1
+                        if doc_done[d] >= doc_chunk_total[d] and progress is not None:
+                            progress.update(1)
+
+                combined = gpu_pool.collect_all(on_shard_done=_on_gpu_done)
+
+                if progress is not None:
+                    progress.close()
+
+            if combined.empty:
+                results = []
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+            for func, kwargs in post_tasks:
+                combined = func(combined, **kwargs)
+
+            results = [combined]
+            if show_progress:
+                _print_ingest_summary(results, time.perf_counter() - _start)
+            return results
+
+        # Fully sequential: per-document CPU + GPU + post tasks
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_task_fns]
+
+        results: list[Any] = []
         doc_iter = docs
         if show_progress and tqdm is not None:
             doc_iter = tqdm(docs, desc="Processing documents", unit="doc")
@@ -982,5 +1536,6 @@ class InProcessIngestor(Ingestor):
             for func, kwargs in post_tasks:
                 combined = func(combined, **kwargs)
 
-        _ = (show_progress, return_failures, save_to_disk, return_traces)  # reserved for future use
+        if show_progress:
+            _print_ingest_summary(results, time.perf_counter() - _start)
         return results

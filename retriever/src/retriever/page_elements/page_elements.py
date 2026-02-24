@@ -438,7 +438,7 @@ def detect_page_elements_v3(
 
     label_names = _labels_from_model(model) if model is not None else list(_RETRIEVER_LABEL_NAMES)
     if model is not None and hasattr(model, "thresholds_per_class"):
-        thresholds_per_class = list(getattr(model, "thresholds_per_class"))
+        thresholds_per_class = getattr(model, "thresholds_per_class")
     else:
         thresholds_per_class = [0.0 for _ in label_names]
 
@@ -609,7 +609,7 @@ def detect_page_elements_v3(
                         continue
                     b_np, l_np, s_np = postprocess_preds_page_element(
                         p,
-                        list(thresholds_per_class),
+                        thresholds_per_class,
                         label_names,
                     )
                     boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))

@@ -4,7 +4,9 @@ Run with: uv run python -m retriever.examples.inprocess_pipeline <input-dir>
 """
 import json
 import os
+import time
 from pathlib import Path
+from typing import Optional
 
 import lancedb
 import typer
@@ -15,6 +17,44 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
+    """
+    Estimate pages processed by counting unique (source_id, page_number) pairs.
+
+    Falls back to table row count if page-level fields are unavailable.
+    """
+    try:
+        db = lancedb.connect(uri)
+        table = db.open_table(table_name)
+    except Exception:
+        return None
+
+    try:
+        df = table.to_pandas()[["source_id", "page_number"]]
+        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
+    except Exception:
+        try:
+            return int(table.count_rows())
+        except Exception:
+            return None
+
+
+def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
+    if ingest_elapsed_s <= 0:
+        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
+        return
+    if processed_pages is None:
+        print(
+            "Pages/sec: unavailable (could not estimate processed pages). "
+            f"Ingest time: {ingest_elapsed_s:.2f}s"
+        )
+        return
+
+    pps = processed_pages / ingest_elapsed_s
+    print(f"Pages processed: {processed_pages}")
+    print(f"Pages/sec (ingest only): {pps:.2f}")
 
 
 def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
@@ -74,11 +114,37 @@ def main(
         "--no-recall-details",
         help="Do not print per-query retrieval details (query, gold, hits). Only the missed-gold summary and recall metrics are printed.",
     ),
+    max_workers: int = typer.Option(
+        16,
+        "--max-workers",
+        help="Maximum number of parallel ingest workers.",
+    ),
+    gpu_devices: Optional[str] = typer.Option(
+        None,
+        "--gpu-devices",
+        help="Comma-separated GPU device IDs (e.g. --gpu-devices 0,1,2). Mutually exclusive with --num-gpus.",
+    ),
+    num_gpus: Optional[int] = typer.Option(
+        None,
+        "--num-gpus",
+        help="Number of GPUs to use, starting from device 0 (e.g. --num-gpus 2 → GPUs 0,1). Mutually exclusive with --gpu-devices.",
+    ),
 ) -> None:
     if input_type == "txt":
         pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt
     else:
         os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
+
+    if gpu_devices is not None and num_gpus is not None:
+        raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")
+    if gpu_devices is not None:
+        gpu_device_list = [d.strip() for d in gpu_devices.split(",") if d.strip()]
+    elif num_gpus is not None:
+        gpu_device_list = [str(i) for i in range(num_gpus)] if num_gpus > 0 else ["0"]
+    else:
+        gpu_device_list = ["0"]
+
+    os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
 
     input_dir = Path(input_dir)
     if input_type == "txt":
@@ -88,7 +154,7 @@ def main(
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
             .embed(model_name="nemo_retriever_v1")
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
     elif input_type == "doc":
         # DOCX/PPTX: same pipeline as PDF; inprocess loader converts to PDF then splits.
@@ -104,7 +170,7 @@ def main(
                 extract_infographics=False,
             )
             .embed(model_name="nemo_retriever_v1")
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
     else:
         glob_pattern = str(input_dir / "*.pdf")
@@ -119,11 +185,19 @@ def main(
                 extract_infographics=False,
             )
             .embed(model_name="nemo_retriever_v1")
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
 
     print("Running extraction...")
-    ingestor.ingest(show_progress=True)
+    ingest_start = time.perf_counter()
+    ingestor.ingest(
+        parallel=True,
+        max_workers=max_workers,
+        gpu_devices=gpu_device_list,
+        show_progress=True,
+    )
+    ingest_elapsed_s = time.perf_counter() - ingest_start
+    processed_pages = _estimate_processed_pages(LANCEDB_URI, LANCEDB_TABLE)
     print("Extraction complete.")
 
     # ---------------------------------------------------------------------------
@@ -132,6 +206,7 @@ def main(
     query_csv = Path(query_csv)
     if not query_csv.exists():
         print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+        _print_pages_per_second(processed_pages, ingest_elapsed_s)
         return
 
     db = lancedb.connect(f"./{LANCEDB_URI}")
@@ -201,6 +276,7 @@ def main(
     print("\nRecall metrics (matching retriever.recall.core):")
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
+    _print_pages_per_second(processed_pages, ingest_elapsed_s)
 
 
 if __name__ == "__main__":
