@@ -28,8 +28,8 @@ ARG GPL_LIBS="\
     libhyphen0 \
     libdbus-1-3 \
 "
+# Keep libfreetype6 so LibreOffice (soffice.bin) can load; omit from force-remove.
 ARG FORCE_REMOVE_PKGS="\
-    libfreetype6 \
     ucf \
     liblangtag-common \
     libjbig0 \
