@@ -57,11 +57,12 @@ def extract_primitives_from_pdf(
     adobe_client_secret: Optional[str] = None,
     # LLama
     llama_api_key: Optional[str] = None,
+    # Parameter shared by PDFium and Nemotron Parse:
+    auth_token: Optional[str] = None,
     # PDFium-specific parameters:
-    yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
-    # Nemoretriver Parse parameters:
+    # Nemotron Parse-specific parameters:
     nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
     nemotron_parse_protocol: str = "http",
     nemotron_parse_model_name: str = None,
@@ -78,9 +79,10 @@ def extract_primitives_from_pdf(
     It processes a DataFrame containing base64-encoded PDF data and returns a new DataFrame
     with structured information about the extracted elements.
 
-    The function uses a decorator pattern to dynamically validate configuration parameters
-    and invoke the appropriate extraction pipeline. This design allows for flexible
-    engine-specific configuration while maintaining a consistent interface.
+    The function uses a decorator pattern (`extraction_interface_relay_constructor`) that
+    validates parameters against the method-specific Pydantic schema (e.g. PDFiumConfigSchema
+    for pdfium, NemotronParseConfigSchema for nemotron_parse) and passes only schema-defined
+    keys into the backend.
 
     Parameters
     ----------
@@ -137,8 +139,10 @@ def extract_primitives_from_pdf(
     llama_api_key : str, optional
         API key for LlamaParse service. Required when extract_method="llama".
 
-    yolox_auth_token : str, optional
-        Authentication token for YOLOX inference services.
+    auth_token : str, optional
+        Authentication token for method-specific services. Used for pdfium (YOLOX/page-elements
+        and related NVIDIA CV APIs) and for nemotron_parse (NVIDIA API). Required when using
+        NVIDIA-hosted endpoints (e.g. ai.api.nvidia.com, integrate.api.nvidia.com).
 
     yolox_endpoints : tuple of (str, str), optional
         A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
@@ -186,16 +190,15 @@ def extract_primitives_from_pdf(
 
     Notes
     -----
-    The function uses a decorator pattern through `extraction_interface_relay_constructor`
-    which dynamically processes the parameters and validates them against the appropriate
-    configuration schema. The actual extraction work is delegated to the
-    `extract_primitives_from_pdf_internal` function.
+    The decorator validates parameters against the schema for the chosen ``extract_method`` (e.g. PDFiumConfigSchema
+    for pdfium) and passes the resulting config to `extract_primitives_from_pdf_internal`. Only parameters that exist
+    as fields on that schema are passed through.
 
     For each extraction method, specific parameters are required:
-    - pdfium: yolox_endpoints
+    - pdfium: yolox_endpoints; auth_token for NVIDIA-hosted YOLOX (e.g. page-elements)
     - adobe: adobe_client_id, adobe_client_secret
     - llama: llama_api_key
-    - nemotron_parse: nemotron_parse_endpoints
+    - nemotron_parse: nemotron_parse_endpoints; auth_token for NVIDIA API
     - unstructured_io: unstructured_io_api_key
     - tika: tika_server_url
 
@@ -239,7 +242,7 @@ def extract_primitives_from_pdf_pdfium(
     extract_charts: bool = True,
     extract_infographics: bool = True,
     text_depth: str = "page",
-    yolox_auth_token: Optional[str] = None,
+    auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
 ) -> pd.DataFrame:
@@ -275,8 +278,9 @@ def extract_primitives_from_pdf_pdfium(
         Whether to extract infographics
     text_depth : str, default "page"
         Level of text granularity (page, block, paragraph, line)
-    yolox_auth_token : str, optional
-        Authentication token for YOLOX inference services
+    auth_token : str, optional
+        Authentication token for YOLOX inference services (NVIDIA CV APIs, e.g. page-elements).
+        Passed into the pdfium config schema; required for NVIDIA-hosted endpoints.
     yolox_endpoints : tuple of (str, str), optional
         Tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services
     yolox_infer_protocol : str, default "http"
@@ -296,7 +300,7 @@ def extract_primitives_from_pdf_pdfium(
         extract_charts=extract_charts,
         extract_infographics=extract_infographics,
         text_depth=text_depth,
-        yolox_auth_token=yolox_auth_token,
+        auth_token=auth_token,
         yolox_endpoints=yolox_endpoints,
         yolox_infer_protocol=yolox_infer_protocol,
     )
@@ -311,7 +315,7 @@ def extract_primitives_from_pdf_nemotron_parse(
     extract_charts: bool = True,
     extract_infographics: bool = True,
     text_depth: str = "page",
-    yolox_auth_token: Optional[str] = None,
+    auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
     nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
@@ -369,9 +373,9 @@ def extract_primitives_from_pdf_nemotron_parse(
         - "paragraph" : Text extracted at paragraph level (semantic units)
         - "line" : Text extracted at line level (finest granularity)
 
-    yolox_auth_token : Optional[str], default None
-        Authentication token for YOLOX inference services used for image processing.
-        Required if the YOLOX services need authentication.
+    auth_token : Optional[str], default None
+        Authentication token used for both YOLOX inference (image processing) and Nemotron
+        Parse (NVIDIA API). Required when using NVIDIA-hosted endpoints.
 
     yolox_endpoints : Optional[Tuple[Optional[str], Optional[str]]], default None
         A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
@@ -469,7 +473,7 @@ def extract_primitives_from_pdf_nemotron_parse(
         extract_infographics=extract_infographics,
         text_depth=text_depth,
         yolox_endpoints=yolox_endpoints,
-        yolox_auth_token=yolox_auth_token,
+        auth_token=auth_token,
         yolox_infer_protocol=yolox_infer_protocol,
         nemotron_parse_endpoints=nemotron_parse_endpoints,
         nemotron_parse_protocol=nemotron_parse_protocol,
