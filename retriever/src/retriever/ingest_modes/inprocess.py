@@ -190,6 +190,12 @@ def embed_text_main_text_embed(
     if _endpoint is None and model is None:
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
 
+    # Map NIM aliases to the actual model ID expected by the remote endpoint.
+    _NIM_MODEL_ALIASES = {
+        "nemo_retriever_v1": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+    }
+    _resolved_model_name = _NIM_MODEL_ALIASES.get(model_name, model_name) if model_name else model_name
+
     # Build an embedder callable compatible with `create_text_embeddings_for_df`.
     # Only used when running with a local model (no NIM endpoint).
     _embed = None
@@ -216,7 +222,7 @@ def embed_text_main_text_embed(
         truncate="END",
         dimensions=None,
         embedding_nim_endpoint=_endpoint or "http://localhost:8012/v1",
-        embedding_model=model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model=_resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
     )
 
     # Rows should already be exploded (one row per page text / table / chart)
@@ -235,6 +241,9 @@ def embed_text_main_text_embed(
         )
     except BaseException as e:
         # Fail-soft: preserve batch shape and set an error payload per-row.
+        import traceback as _tb
+        print(f"Warning: embedding failed: {type(e).__name__}: {e}")
+        _tb.print_exc()
         err_payload = {"embedding": None, "error": {"stage": "embed", "type": e.__class__.__name__, "message": str(e)}}
         out_df = batch_df.copy()
         if output_column:
@@ -1014,8 +1023,6 @@ class InProcessIngestor(Ingestor):
         # NOTE: `kwargs` passed to `.extract()` are intended primarily for PDF extraction
         # (e.g. `extract_text`, `dpi`, etc). Downstream model stages do NOT necessarily
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
-        print(f"Type kwargs: {type(kwargs)}")
-        print(f"kwargs: {kwargs}")
 
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
@@ -1074,11 +1081,13 @@ class InProcessIngestor(Ingestor):
             kwargs.get(k) is True for k in ("extract_text", "extract_tables", "extract_charts", "extract_infographics")
         ):
             print("Adding page elements task")
+            pe_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url", ""))
+            pe_model = None if pe_invoke_url else NemotronPageElementsV3()
             self._tasks.append(
                 (
                     detect_page_elements_v3,
                     _detect_kwargs_with_model(
-                        NemotronPageElementsV3(),
+                        pe_model,
                         stage_name="page_elements",
                         allow_remote=True,
                     ),
@@ -1097,13 +1106,17 @@ class InProcessIngestor(Ingestor):
 
         if ocr_flags:
             print("Adding OCR extraction task")
-            ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-            if not ocr_model_dir:
-                raise RuntimeError(
-                    "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-                    "the path of the Nemotron OCR v1 model directory."
-                )
-            self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
+            ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+            if ocr_invoke_url:
+                self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
+            else:
+                ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
+                if not ocr_model_dir:
+                    raise RuntimeError(
+                        "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
+                        "the path of the Nemotron OCR v1 model directory."
+                    )
+                self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
 
         return self
 

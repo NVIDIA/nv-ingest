@@ -129,6 +129,21 @@ def main(
         "--num-gpus",
         help="Number of GPUs to use, starting from device 0 (e.g. --num-gpus 2 → GPUs 0,1). Mutually exclusive with --gpu-devices.",
     ),
+    page_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--page-elements-invoke-url",
+        help="Optional remote endpoint URL for page-elements model inference.",
+    ),
+    ocr_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--ocr-invoke-url",
+        help="Optional remote endpoint URL for OCR model inference.",
+    ),
+    embed_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--embed-invoke-url",
+        help="Optional remote endpoint URL for embedding model inference.",
+    ),
 ) -> None:
     if input_type == "txt":
         pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt
@@ -153,7 +168,7 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
-            .embed(model_name="nemo_retriever_v1")
+            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
     elif input_type == "doc":
@@ -168,8 +183,10 @@ def main(
                 extract_tables=True,
                 extract_charts=True,
                 extract_infographics=False,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
             )
-            .embed(model_name="nemo_retriever_v1")
+            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
     else:
@@ -183,8 +200,13 @@ def main(
                 extract_tables=True,
                 extract_charts=True,
                 extract_infographics=False,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
             )
-            .embed(model_name="nemo_retriever_v1")
+            .embed(
+                model_name="nemo_retriever_v1",
+                embed_invoke_url=embed_invoke_url,
+            )
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
 
@@ -218,6 +240,7 @@ def main(
         lancedb_uri=str(LANCEDB_URI),
         lancedb_table=str(LANCEDB_TABLE),
         embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_http_endpoint=embed_invoke_url,
         top_k=10,
         ks=(1, 5, 10),
     )

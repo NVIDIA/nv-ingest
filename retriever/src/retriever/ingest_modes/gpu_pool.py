@@ -115,9 +115,13 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
     from .inprocess import embed_text_main_text_embed, explode_content_to_rows
 
     if func is detect_page_elements_v3:
+        if kwargs.get("invoke_url"):
+            return None  # Remote endpoint, no local model
         return PageElementsModelConfig()
 
     if func is ocr_page_elements:
+        if kwargs.get("invoke_url"):
+            return None  # Remote endpoint, no local model
         model = kwargs.get("model")
         model_dir = ""
         if model is not None and hasattr(model, "_model_dir"):
