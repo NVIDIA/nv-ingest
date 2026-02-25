@@ -35,15 +35,15 @@ def test_both_endpoints_provided():
 
 
 def test_invalid_yolox_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=("grpc_ocr", None))
-    assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
+    config = ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=("grpc_ocr", None))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_invalid_ocr_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=("  ", '   "  '))
-    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
+    config = ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=("  ", '   "  '))
+    assert config.ocr_endpoints == (None, None)
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_protocol_case_insensitive():
@@ -78,6 +78,15 @@ def test_protocol_auto_inference_from_endpoints():
     )
     assert config.yolox_infer_protocol == "http"
     assert config.ocr_infer_protocol == "grpc"
+
+
+def test_protocol_defaults_to_local_if_endpoints_empty():
+    config = ChartExtractorConfigSchema(
+        yolox_endpoints=(None, None),
+        ocr_endpoints=(None, None),
+    )
+    assert config.yolox_infer_protocol == "local"
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_extra_fields_forbidden_in_chart_extractor_config():

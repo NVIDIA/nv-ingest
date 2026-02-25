@@ -86,16 +86,17 @@ class InfographicExtractorConfigSchema(LowercaseProtocolMixin):
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 
-            if not grpc_service and not http_service:
-                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
-
             values[endpoint_name] = (grpc_service, http_service)
 
             # Auto-infer protocol from endpoints if not specified
             protocol_name = endpoint_name.replace("_endpoints", "_infer_protocol")
             protocol_value = values.get(protocol_name)
             if not protocol_value:
-                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+                # If both endpoints are empty, default to local.
+                protocol_value = "http" if http_service else "grpc" if grpc_service else "local"
+            elif not grpc_service and not http_service:
+                # If protocol was explicitly set but endpoints are empty, force local.
+                protocol_value = "local"
             values[protocol_name] = protocol_value
 
         return values

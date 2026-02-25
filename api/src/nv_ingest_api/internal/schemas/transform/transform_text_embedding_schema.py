@@ -18,7 +18,9 @@ class TextEmbeddingSchema(BaseModel):
     api_key: str = Field(default="", repr=False)
     batch_size: int = Field(default=4)
     embedding_model: str = Field(default="nvidia/llama-3.2-nv-embedqa-1b-v2")
-    embedding_nim_endpoint: str = Field(default="http://embedding:8000/v1")
+    # When null/empty, callers may choose to run a local embedding backend instead of a remote endpoint.
+    # Keep the historical default so existing configs continue to work unchanged.
+    embedding_nim_endpoint: Optional[str] = Field(default="http://embedding:8000/v1")
     encoding_format: str = Field(default="float")
     httpx_log_level: LogLevel = Field(default=LogLevel.WARNING)
     input_type: str = Field(default="passage")
@@ -43,6 +45,15 @@ class TextEmbeddingSchema(BaseModel):
     @classmethod
     def _coerce_api_key_none(cls, v):
         return "" if v is None else v
+
+    @field_validator("embedding_nim_endpoint", mode="before")
+    @classmethod
+    def _coerce_empty_endpoint_to_none(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     @model_validator(mode="before")
     @classmethod

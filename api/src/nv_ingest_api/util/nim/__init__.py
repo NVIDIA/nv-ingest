@@ -2,13 +2,15 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Tuple, Optional
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Tuple, Optional
 import re
 import logging
 
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.text_embedding import EmbeddingModelInterface
-from nv_ingest_api.internal.primitives.nim.nim_client import NimClientManager
 from nv_ingest_api.internal.primitives.nim.nim_client import get_nim_client_manager
 from nv_ingest_api.internal.primitives.nim.nim_model_interface import ModelInterface
 
@@ -16,6 +18,36 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ["create_inference_client", "infer_microservice"]
+
+_VALID_INFER_PROTOCOLS = ("grpc", "http", "local")
+
+
+@dataclass(frozen=True)
+class LocalInferenceClient:
+    """
+    Small adapter that mimics NimClient's `infer()` surface, but runs locally.
+
+    It delegates to `model_interface.infer(data, **kwargs)`.
+    """
+
+    model_interface: ModelInterface
+
+    @property
+    def protocol(self) -> str:
+        return "local"
+
+    def infer(self, data: dict, model_name: Optional[str] = None, **kwargs) -> Any:
+        # `model_name` is accepted for API compatibility but may be unused by local implementations.
+        infer_fn = getattr(self.model_interface, "infer", None)
+        if not callable(infer_fn):
+            raise RuntimeError(
+                f"Local inference requested but model_interface '{self.model_interface.name()}' "
+                "does not implement infer()."
+            )
+        return infer_fn(data, **kwargs)
+
+    def close(self) -> None:
+        return None
 
 
 def create_inference_client(
@@ -26,7 +58,7 @@ def create_inference_client(
     timeout: float = 120.0,
     max_retries: int = 10,
     **kwargs,
-) -> NimClientManager:
+) -> Any:
     """
     Create a NimClientManager for interfacing with a model inference server.
 
@@ -60,13 +92,28 @@ def create_inference_client(
 
     grpc_endpoint, http_endpoint = endpoints
 
-    if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
-        infer_protocol = "grpc"
-    elif infer_protocol is None and http_endpoint:
-        infer_protocol = "http"
+    infer_protocol = (infer_protocol or "").strip().lower() or None
 
-    if infer_protocol not in ["grpc", "http"]:
-        raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
+    # Auto-infer protocol from endpoints if not specified.
+    if infer_protocol is None:
+        if grpc_endpoint and str(grpc_endpoint).strip():
+            infer_protocol = "grpc"
+        elif http_endpoint and str(http_endpoint).strip():
+            infer_protocol = "http"
+        else:
+            infer_protocol = "local"
+
+    if infer_protocol not in _VALID_INFER_PROTOCOLS:
+        raise ValueError("Invalid infer_protocol specified. Must be 'grpc', 'http', or 'local'.")
+
+    if infer_protocol == "local":
+        # If the interface has a backend attribute, force it to local.
+        try:
+            if hasattr(model_interface, "backend"):
+                setattr(model_interface, "backend", "local")
+        except Exception:
+            pass
+        return LocalInferenceClient(model_interface=model_interface)
 
     manager = get_nim_client_manager()
     client = manager.get_client(
