@@ -444,7 +444,7 @@ For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the overri
 Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
 
 To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
-```
+```shell
 docker compose \
   -f docker-compose.yaml \
   --profile retrieval \
