@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Union
 from typing import Dict
@@ -19,7 +20,7 @@ from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graph
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -29,6 +30,114 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 logger = logging.getLogger(f"ray.{__name__}")
+
+
+def _local_nemotron_ocr_boxes_texts(
+    base64_images: List[str],
+    *,
+    merge_level: str = "paragraph",
+    trace_info: Optional[Dict] = None,
+) -> List[List[Any]]:
+    """
+    Local OCR fallback using the Nemotron OCR v1 pipeline via:
+      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+
+    Returns list aligned with base64_images:
+      [bounding_boxes, text_predictions, conf_scores]
+    """
+    model_dir = (
+        os.getenv("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+    )
+
+    # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
+    try:
+        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "Local chart OCR fallback requires the `retriever` package to be importable "
+            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+        ) from e
+
+    if trace_info is not None:
+        trace_info.setdefault("ocr", {})
+        trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
+        trace_info["ocr"]["model_dir"] = model_dir or None
+
+    ocr = NemotronOCRV1(model_dir=model_dir) if model_dir else NemotronOCRV1()
+
+    results: List[List[Any]] = []
+    for b64 in base64_images:
+        try:
+            arr = base64_to_numpy(b64)
+            h, w = int(arr.shape[0]), int(arr.shape[1])
+            preds = ocr.invoke(b64, merge_level=merge_level)
+
+            boxes: List[List[List[float]]] = []
+            texts: List[str] = []
+            confs: List[float] = []
+
+            # Common per-line dict form: left/right/upper/lower in [0,1] plus text.
+            if isinstance(preds, list):
+                for item in preds:
+                    if not isinstance(item, dict):
+                        continue
+                    txt = item.get("text")
+                    if not isinstance(txt, str) or not txt.strip() or txt.strip() == "nan":
+                        continue
+
+                    if all(k in item for k in ("left", "right", "upper", "lower")):
+                        try:
+                            x1 = float(item["left"]) * float(w)
+                            x2 = float(item["right"]) * float(w)
+                            # nemotron_ocr uses (lower, upper) y coords.
+                            y1 = float(item["lower"]) * float(h)
+                            y2 = float(item["upper"]) * float(h)
+                            quad = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+                        except Exception:
+                            quad = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]
+                    else:
+                        quad = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]
+
+                    texts.append(txt.strip())
+                    boxes.append(quad)
+                    confs.append(
+                        float(item.get("confidence")) if isinstance(item.get("confidence"), (int, float)) else 1.0
+                    )
+
+            # Fallback: stringify unknown output.
+            if not texts:
+                s = ""
+                try:
+                    s = str(preds).strip()
+                except Exception:
+                    s = ""
+                if s and s.lower() not in {"none", "null"}:
+                    texts = [s]
+                    boxes = [[[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]]
+                    confs = [1.0]
+
+            results.append([boxes, texts, confs])
+        except Exception:
+            logger.exception("Local Nemotron OCR failed for chart image.")
+            results.append([[], [], []])
+
+    return results
+
+
+class _LocalNemotronOCRClient:
+    @property
+    def protocol(self) -> str:
+        return "local"
+
+    def infer(self, data: Dict[str, Any], **kwargs: Any) -> Any:
+        base64_images = data.get("base64_images") or []
+        if not isinstance(base64_images, list):
+            raise ValueError("Expected data['base64_images'] to be a list.")
+        merge_level = kwargs.get("merge_level", "paragraph")
+        trace_info = kwargs.get("trace_info")
+        return _local_nemotron_ocr_boxes_texts(base64_images, merge_level=merge_level, trace_info=trace_info)
 
 
 def _filter_valid_chart_images(
@@ -93,21 +202,25 @@ def _run_chart_inference(
         stage_name="chart_extraction",
         trace_info=trace_info,
     )
-    if ocr_model_name == "paddle":
-        future_ocr_kwargs.update(
-            model_name="paddle",
-            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
-        )
-    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
-        future_ocr_kwargs.update(
-            model_name=ocr_model_name,
-            input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
-            output_names=["OUTPUT"],
-            dtypes=["BYTES", "BYTES"],
-            merge_level="paragraph",
-        )
+    if str(getattr(ocr_client, "protocol", "")).lower() == "local":
+        # Local Nemotron OCR path (model_name/input_names/etc. are ignored by the local adapter).
+        future_ocr_kwargs.update(merge_level="paragraph")
     else:
-        raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
+        if ocr_model_name == "paddle":
+            future_ocr_kwargs.update(
+                model_name="paddle",
+                max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+            )
+        elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+            future_ocr_kwargs.update(
+                model_name=ocr_model_name,
+                input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
+                output_names=["OUTPUT"],
+                dtypes=["BYTES", "BYTES"],
+                merge_level="paragraph",
+            )
+        else:
+            raise ValueError(f"Unknown OCR model name: {ocr_model_name}")
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
@@ -217,7 +330,7 @@ def _update_chart_metadata(
 
 
 def _create_yolox_client(
-    yolox_endpoints: Tuple[str, str],
+    yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_protocol: str,
     auth_token: str,
 ) -> NimClient:
@@ -234,7 +347,7 @@ def _create_yolox_client(
 
 
 def _create_ocr_client(
-    ocr_endpoints: Tuple[str, str],
+    ocr_endpoints: Tuple[Optional[str], Optional[str]],
     ocr_protocol: str,
     ocr_model_name: str,
     auth_token: str,
@@ -300,10 +413,6 @@ def extract_chart_data_from_image_internal(
 
     endpoint_config = extraction_config.endpoint_config
 
-    # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-
     try:
         # 1) Identify rows that meet criteria in a single pass
         #    - metadata exists
@@ -341,18 +450,35 @@ def extract_chart_data_from_image_internal(
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
         # 3) Call our bulk _update_metadata to get all results.
-        yolox_client = _create_yolox_client(
-            endpoint_config.yolox_endpoints,
-            endpoint_config.yolox_infer_protocol,
-            endpoint_config.auth_token,
-        )
+        # Extract endpoints (may be empty/None -> local fallback).
+        yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+        yolox_protocol = "local"
+        ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+        ocr_protocol = "local"
+        auth_token = ""
+        workers = 5
+        if endpoint_config is not None:
+            yolox_endpoints = getattr(endpoint_config, "yolox_endpoints", (None, None))
+            yolox_protocol = getattr(endpoint_config, "yolox_infer_protocol", "") or "local"
+            ocr_endpoints = getattr(endpoint_config, "ocr_endpoints", (None, None))
+            ocr_protocol = getattr(endpoint_config, "ocr_infer_protocol", "") or "local"
+            auth_token = getattr(endpoint_config, "auth_token", "") or ""
+            workers = int(getattr(endpoint_config, "workers_per_progress_engine", 5) or 5)
 
-        ocr_client = _create_ocr_client(
-            endpoint_config.ocr_endpoints,
-            endpoint_config.ocr_infer_protocol,
-            ocr_model_name,
-            endpoint_config.auth_token,
-        )
+        has_ocr_endpoint = bool((ocr_endpoints[0] or ocr_endpoints[1]))
+
+        yolox_client = _create_yolox_client(yolox_endpoints, yolox_protocol, auth_token)
+
+        # If OCR endpoints are not configured (or protocol is local), use local Nemotron OCR.
+        if (not has_ocr_endpoint) or str(ocr_protocol).lower() == "local":
+            ocr_client = _LocalNemotronOCRClient()
+            ocr_model_name = "local"
+        else:
+            # Get the grpc endpoint to determine the model if needed
+            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
+            # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+            ocr_model_name = "scene_text_ensemble"
+            ocr_client = _create_ocr_client(ocr_endpoints, ocr_protocol, ocr_model_name, auth_token)
 
         bulk_results = _update_chart_metadata(
             base64_images=base64_images,
@@ -360,7 +486,7 @@ def extract_chart_data_from_image_internal(
             yolox_model_name=yolox_client.model_interface.model_name,
             ocr_client=ocr_client,
             ocr_model_name=ocr_model_name,
-            worker_pool_size=endpoint_config.workers_per_progress_engine,
+            worker_pool_size=workers,
             trace_info=execution_trace_log,
         )
 

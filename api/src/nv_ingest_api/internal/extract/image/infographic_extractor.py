@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -171,6 +172,100 @@ def _create_ocr_client(
     return ocr_client
 
 
+def _local_nemotron_ocr_text_predictions(
+    base64_images: List[str],
+    *,
+    merge_level: str = "paragraph",
+    trace_info: Optional[Dict] = None,
+) -> List[Tuple[str, Optional[Any], Optional[Any]]]:
+    """
+    Local OCR fallback using the Nemotron OCR v1 pipeline via:
+      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+
+    Returns list of tuples aligned with base64_images:
+      (base64_image, bounding_boxes_or_none, text_predictions_or_none)
+
+    This mirrors the shape consumed by the caller in this module.
+    """
+    # Keep the same "skip tiny images" behavior as the NIM path.
+    valid_images, valid_indices, results = _filter_infographic_images(base64_images)
+
+    model_dir = (
+        os.getenv("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+    )
+
+    # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
+    try:
+        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "Local infographic OCR fallback requires the `retriever` package to be importable "
+            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+        ) from e
+
+    if trace_info is not None:
+        trace_info.setdefault("ocr", {})
+        trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
+        trace_info["ocr"]["model_dir"] = model_dir or None
+
+    ocr = NemotronOCRV1(model_dir=model_dir) if model_dir else NemotronOCRV1()
+
+    for idx, b64 in enumerate(valid_images):
+        original_index = valid_indices[idx]
+        try:
+            # Pass base64 directly; NemotronOCR supports base64 bytes.
+            preds = ocr.invoke(b64, merge_level=merge_level)
+
+            # Best-effort extraction of text strings from Nemotron OCR outputs.
+            texts: List[str] = []
+            if isinstance(preds, dict):
+                if isinstance(preds.get("text"), str):
+                    texts.append(preds["text"])
+                if isinstance(preds.get("texts"), list):
+                    texts.extend([x for x in preds["texts"] if isinstance(x, str)])
+                if isinstance(preds.get("words"), list):
+                    for w in preds["words"]:
+                        if isinstance(w, dict) and isinstance(w.get("text"), str):
+                            texts.append(w["text"])
+            elif isinstance(preds, list):
+                for item in preds:
+                    if isinstance(item, str):
+                        if item.strip():
+                            texts.append(item.strip())
+                        continue
+                    if isinstance(item, dict):
+                        if isinstance(item.get("text"), str) and item["text"].strip() and item["text"].strip() != "nan":
+                            texts.append(item["text"].strip())
+                            continue
+                        if isinstance(item.get("texts"), list):
+                            texts.extend([x.strip() for x in item["texts"] if isinstance(x, str) and x.strip()])
+                            continue
+                        if isinstance(item.get("words"), list):
+                            for w in item["words"]:
+                                if isinstance(w, dict) and isinstance(w.get("text"), str) and w["text"].strip():
+                                    texts.append(w["text"].strip())
+
+            # Fallback: stringify unknown shapes.
+            if not texts:
+                try:
+                    s = str(preds).strip()
+                    if s and s.lower() not in {"none", "null"}:
+                        texts = [s]
+                except Exception:
+                    texts = []
+
+            # The rest of the pipeline expects `text_predictions` to be a list of strings.
+            text_predictions = texts if texts else None
+            results[original_index] = (base64_images[original_index], None, text_predictions)
+        except Exception:
+            logger.exception("Local Nemotron OCR failed for infographic image index=%s", original_index)
+            results[original_index] = (base64_images[original_index], None, None)
+
+    return results
+
+
 def _meets_infographic_criteria(row: pd.Series) -> bool:
     """
     Determines if a DataFrame row meets the criteria for infographic extraction.
@@ -243,10 +338,6 @@ def extract_infographic_data_from_image_internal(
 
     endpoint_config = extraction_config.endpoint_config
 
-    # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-
     try:
         # Identify rows that meet the infographic criteria.
         mask = df_extraction_ledger.apply(_meets_infographic_criteria, axis=1)
@@ -259,21 +350,44 @@ def extract_infographic_data_from_image_internal(
         # Extract base64 images from valid rows.
         base64_images = [df_extraction_ledger.at[idx, "metadata"]["content"] for idx in valid_indices]
 
-        # Call bulk update to extract infographic data.
-        ocr_client = _create_ocr_client(
-            endpoint_config.ocr_endpoints,
-            endpoint_config.ocr_infer_protocol,
-            ocr_model_name,
-            endpoint_config.auth_token,
-        )
+        # If endpoints are not configured, fall back to local Nemotron OCR.
+        ocr_endpoints = (None, None)
+        ocr_protocol = "local"
+        auth_token = ""
+        workers = 5
+        if endpoint_config is not None:
+            ocr_endpoints = getattr(endpoint_config, "ocr_endpoints", (None, None))
+            ocr_protocol = getattr(endpoint_config, "ocr_infer_protocol", "") or "local"
+            auth_token = getattr(endpoint_config, "auth_token", "") or ""
+            workers = int(getattr(endpoint_config, "workers_per_progress_engine", 5) or 5)
 
-        bulk_results = _update_infographic_metadata(
-            base64_images=base64_images,
-            ocr_client=ocr_client,
-            ocr_model_name=ocr_model_name,
-            worker_pool_size=endpoint_config.workers_per_progress_engine,
-            trace_info=execution_trace_log,
-        )
+        has_endpoint = bool((ocr_endpoints[0] or ocr_endpoints[1]))
+        if not has_endpoint or str(ocr_protocol).lower() == "local":
+            bulk_results = _local_nemotron_ocr_text_predictions(
+                base64_images,
+                merge_level="paragraph",
+                trace_info=execution_trace_log,
+            )
+        else:
+            # Get the grpc endpoint to determine the model if needed
+            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+
+            # Call bulk update to extract infographic data via NIM endpoints.
+            ocr_client = _create_ocr_client(
+                ocr_endpoints,
+                ocr_protocol,
+                ocr_model_name,
+                auth_token,
+            )
+
+            bulk_results = _update_infographic_metadata(
+                base64_images=base64_images,
+                ocr_client=ocr_client,
+                ocr_model_name=ocr_model_name,
+                worker_pool_size=workers,
+                trace_info=execution_trace_log,
+            )
 
         # Write the extracted results back into the DataFrame.
         for result_idx, df_idx in enumerate(valid_indices):
