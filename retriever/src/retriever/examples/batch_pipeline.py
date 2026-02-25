@@ -331,14 +331,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', or 'doc'. Use 'txt' for .txt files (tokenizer chunking). Use 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
+        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -568,6 +568,19 @@ def main(
                 .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
                 .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
             )
+        elif input_type == "html":
+            glob_pattern = str(input_dir / "*.html")
+            ingestor = create_ingestor(
+                run_mode="batch",
+                ray_address=ray_address,
+                ray_log_to_driver=ray_log_to_driver,
+            )
+            ingestor = (
+                ingestor.files(glob_pattern)
+                .extract_html(max_tokens=512, overlap_tokens=0)
+                .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
+                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            )
         elif input_type == "doc":
             # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
             doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
@@ -717,7 +730,7 @@ def main(
         if not no_recall_details:
             print("\nPer-query retrieval details:")
         missed_gold: list[tuple[str, str]] = []
-        ext = ".txt" if input_type == "txt" else ".pdf"
+        ext = ".html" if input_type == "html" else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
         for i, (q, g, hits) in enumerate(
             zip(
                 _df_query["query"].astype(str).tolist(),

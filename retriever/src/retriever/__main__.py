@@ -12,6 +12,7 @@ from .benchmark import app as benchmark_app
 from .vector_store import app as vector_store_app
 from .recall import app as recall_app
 from .txt import __main__ as txt_main
+from .html import __main__ as html_main
 from .online import __main__ as online_main
 from .version import get_version_info
 
@@ -25,6 +26,7 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(vector_store_app, name="vector-store")
 app.add_typer(recall_app, name="recall")
 app.add_typer(txt_main.app, name="txt")
+app.add_typer(html_main.app, name="html")
 app.add_typer(online_main.app, name="online")
 
 

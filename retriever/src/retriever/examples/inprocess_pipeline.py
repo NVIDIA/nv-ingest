@@ -94,14 +94,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', or 'doc'. Use 'txt' for .txt files. Use 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
+        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -145,8 +145,8 @@ def main(
         help="Optional remote endpoint URL for embedding model inference.",
     ),
 ) -> None:
-    if input_type == "txt":
-        pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt
+    if input_type in ("txt", "html"):
+        pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt or .html
     else:
         os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
 
@@ -159,8 +159,6 @@ def main(
     else:
         gpu_device_list = ["0"]
 
-    os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
-
     input_dir = Path(input_dir)
     if input_type == "txt":
         glob_pattern = str(input_dir / "*.txt")
@@ -168,6 +166,15 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(max_tokens=512, overlap_tokens=0)
+            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
+            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+        )
+    elif input_type == "html":
+        glob_pattern = str(input_dir / "*.html")
+        ingestor = create_ingestor(run_mode="inprocess")
+        ingestor = (
+            ingestor.files(glob_pattern)
+            .extract_html(max_tokens=512, overlap_tokens=0)
             .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
             .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
@@ -269,7 +276,7 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
-            ext = ".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf")
+            ext = ".txt" if input_type == "txt" else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
             print(f"\nQuery {i}: {q}")
             print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
@@ -284,7 +291,7 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            ext = ".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf")
+            ext = ".txt" if input_type == "txt" else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
             missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
