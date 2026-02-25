@@ -26,8 +26,13 @@ class TextEmbeddingSchema(BaseModel):
     input_type: str = Field(default="passage")
     raise_on_failure: bool = Field(default=False)
     truncate: str = Field(default="END")
+    embed_text_elements: bool = Field(default=True)
+    embed_structured_elements: bool = Field(default=True)
+    embed_image_elements: bool = Field(default=True)
+    embed_audio_elements: bool = Field(default=True)
     text_elements_modality: str = Field(default="text")
     image_elements_modality: str = Field(default="text")
+    image_elements_aggregate_page_content: bool = Field(default=False)
     structured_elements_modality: str = Field(default="text")
     audio_elements_modality: str = Field(default="text")
     custom_content_field: Optional[str] = None
