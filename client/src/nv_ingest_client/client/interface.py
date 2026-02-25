@@ -1524,6 +1524,8 @@ class Ingestor:
             "prompt": task_options.prompt,
             "system_prompt": task_options.system_prompt,
             "model_name": task_options.model_name,
+            "context_text_max_chars": task_options.context_text_max_chars,
+            "temperature": task_options.temperature,
         }
         caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
