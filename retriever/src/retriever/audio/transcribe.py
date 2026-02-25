@@ -121,7 +121,7 @@ def _build_rows(
                     "text": text,
                     "content": text,
                     "path": path,
-                    "page_number": i + 1,
+                    # "page_number": None,
                     "metadata": {
                         "source_path": path,
                         "chunk_index": i,
@@ -149,7 +149,7 @@ def _build_rows(
                     "text": chunk,
                     "content": chunk,
                     "path": path,
-                    "page_number": i + 1,
+                    # "page_number": None,
                     "metadata": {
                         "source_path": path,
                         "chunk_index": i,
@@ -164,7 +164,7 @@ def _build_rows(
                 "text": transcript,
                 "content": transcript,
                 "path": path,
-                "page_number": 1,
+                # "page_number": None,
                 "metadata": {
                     "source_path": path,
                     "chunk_index": 0,

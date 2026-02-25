@@ -100,7 +100,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, .doc/.pptx, or audio files to ingest.",
+        help="Directory containing PDFs, .txt, .html, .doc/.pptx, or .mp3/.wav files to ingest.",
         path_type=Path,
         exists=True,
     ),

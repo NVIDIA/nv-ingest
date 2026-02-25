@@ -878,6 +878,8 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
                 "ocr_chart": 0,
                 "ocr_infographic": 0,
                 "pe_by_label": defaultdict(int),
+                "is_audio": False,
+                "audio_words": 0,
             },
         )
 
@@ -917,8 +919,20 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
                     c = 0
                 entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
 
+        content_type = None
+        content_meta = meta.get("content_metadata")
+        if isinstance(content_meta, dict):
+            content_type = content_meta.get("type")
+        if content_type == "audio":
+            entry["is_audio"] = True
+            text = str(row_dict.get("text") or "")
+            entry["audio_words"] = max(entry["audio_words"], len(text.split()))
+
     pe_by_label_totals: dict[str, int] = defaultdict(int)
     pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
+    audio_files = 0
+    audio_segments = 0
+    audio_words_total = 0
     for e in per_page.values():
         pe_total += e["pe"]
         ocr_table_total += e["ocr_table"]
@@ -926,6 +940,12 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
         ocr_infographic_total += e["ocr_infographic"]
         for label, count in e["pe_by_label"].items():
             pe_by_label_totals[label] += count
+        if e["is_audio"]:
+            audio_segments += 1
+            audio_words_total += e["audio_words"]
+
+    audio_paths = {k[0] for k, e in per_page.items() if e["is_audio"]}
+    audio_files = len(audio_paths)
 
     return {
         "pages_seen": len(per_page),
@@ -934,6 +954,9 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
         "ocr_table_total_detections": ocr_table_total,
         "ocr_chart_total_detections": ocr_chart_total,
         "ocr_infographic_total_detections": ocr_infographic_total,
+        "audio_files": audio_files,
+        "audio_segments": audio_segments,
+        "audio_words_total": audio_words_total,
     }
 
 
@@ -961,6 +984,12 @@ def _print_ingest_summary(results: list, elapsed_s: float) -> None:
         for label, count in by_label.items():
             print(f"    {label}: {count}")
 
+    audio_files = summary.get("audio_files", 0)
+    if audio_files > 0:
+        print(f"  Audio files transcribed: {audio_files}")
+        print(f"  Audio transcript segments: {summary.get('audio_segments', 0)}")
+        print(f"  Audio transcript words: {summary.get('audio_words_total', 0)}")
+
     pages = summary["pages_seen"]
     if elapsed_s > 0 and pages > 0:
         pps = pages / elapsed_s
@@ -983,7 +1012,8 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract), "txt" (extract_txt), "html" (extract_html), or "audio" (extract_audio). Loader dispatch in ingest().
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), "html" (extract_html),
+        # or "audio" (extract_audio). Loader dispatch in ingest().
         self._pipeline_type: Literal["pdf", "txt", "html", "audio"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
         self._extract_html_kwargs: Dict[str, Any] = {}
@@ -1313,8 +1343,14 @@ class InProcessIngestor(Ingestor):
 
         docs = list(self._documents)
 
+        # Page-level chunking (_iter_page_chunks) relies on pdfium and only
+        # works for PDF (and DOCX/PPTX converted to PDF).  Other pipeline
+        # types (txt, html, audio) use _loader dispatch in the fully-
+        # sequential path below.
+        _supports_page_chunks = self._pipeline_type == "pdf"
+
         # -- Parallel execution branch ------------------------------------
-        if parallel:
+        if parallel and _supports_page_chunks:
             if gpu_devices and len(gpu_devices) >= 1 and gpu_tasks:
                 # Pipelined: GPU workers load models while CPU runs,
                 # each completed chunk goes to GPU immediately.
@@ -1461,7 +1497,7 @@ class InProcessIngestor(Ingestor):
                 return results
 
         # -- Sequential execution branch (default) ------------------------
-        use_multi_gpu_seq = gpu_devices and len(gpu_devices) >= 1 and gpu_tasks
+        use_multi_gpu_seq = _supports_page_chunks and gpu_devices and len(gpu_devices) >= 1 and gpu_tasks
 
         if use_multi_gpu_seq:
             # Pipelined: GPU workers process earlier chunks while CPU
