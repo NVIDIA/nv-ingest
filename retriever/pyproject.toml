@@ -7,7 +7,7 @@ managed = true
 package = true
 
 [project]
-name = "retriever"
+name = "nemo-retriever"
 dynamic = ["version"]
 description = "A modern RAG ingestion pipeline from Nvidia"
 readme = "README.md"
