@@ -10,7 +10,7 @@ try:
     from nv_ingest.framework.orchestration.morpheus.modules.injectors.task_injection import on_data
 
     morpheus_import = True
-except:
+except ImportError:
     morpheus_import = False
 
 
