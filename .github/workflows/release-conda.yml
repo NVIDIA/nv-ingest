@@ -1,0 +1,102 @@
+name: Release - Conda
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: false
+        type: string
+      channel:
+        description: 'The RapidsAI Conda channel to publish to'
+        required: false
+        type: choice
+        default: 'main'
+        options:
+          - dev
+          - main
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+
+jobs:
+  determine-version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.channel.outputs.channel }}
+      source-ref: ${{ steps.source.outputs.source-ref }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Extract from branch name (release/X.Y.Z -> X.Y.Z)
+            VERSION="${GITHUB_REF#refs/heads/release/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+      - name: Determine channel
+        id: channel
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.channel }}" ]; then
+            CHANNEL="${{ inputs.channel }}"
+          else
+            # Default to main channel for release branches
+            CHANNEL="main"
+          fi
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "Publishing to channel: $CHANNEL"
+
+      - name: Determine source ref
+        id: source
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SOURCE_REF="${{ inputs.source-ref }}"
+          else
+            SOURCE_REF="${GITHUB_REF}"
+          fi
+          echo "source-ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+          echo "Building from: $SOURCE_REF"
+
+  build:
+    name: Build Conda Packages
+    needs: determine-version
+    uses: ./.github/workflows/reusable-conda-build.yml
+    with:
+      version: ${{ needs.determine-version.outputs.version }}
+      source-ref: ${{ needs.determine-version.outputs.source-ref }}
+      runner: 'linux-large-disk'
+      upload-artifacts: true
+
+  publish:
+    name: Publish Conda Packages
+    needs:
+      - determine-version
+      - build
+    uses: ./.github/workflows/reusable-conda-publish.yml
+    with:
+      channel: ${{ needs.determine-version.outputs.channel }}
+      force-upload: true
+    secrets:
+      NVIDIA_CONDA_TOKEN: ${{ secrets.NVIDIA_CONDA_TOKEN }}
+
+  summary:
+    name: Release Summary
+    needs:
+      - determine-version
+      - publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "Published Conda packages:"
+          echo "  Version: ${{ needs.determine-version.outputs.version }}"
+          echo "  Channel: ${{ needs.determine-version.outputs.channel }}"
+          echo "  Source: ${{ needs.determine-version.outputs.source-ref }}"

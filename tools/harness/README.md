@@ -6,19 +6,25 @@ A configurable, dataset-agnostic testing framework for end-to-end validation of 
 
 ### Prerequisites
 - Docker and Docker Compose running
-- Python environment with nv-ingest-client
+- Python 3.12+ environment
 - Access to test datasets
+
+### Installation
+
+```bash
+# Navigate to the harness directory
+cd tools/harness/
+
+# Install the harness (includes nv-ingest packages, milvus-lite, pypdfium2, and nemotron-* model packages)
+uv pip install -e .
+```
+
+**Vanilla pip:** Install the project with `pip install -e .` (from repo root, install `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` first if needed). The harness env already includes the nemotron packages; to get nightly versions from Test PyPI, install on top: `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps`.
 
 ### Run Your First Test
 
 ```bash
-# 1. Navigate to the tests directory
-cd tools/harness/
-
-# 2. Install dependencies
-uv sync
-
-# 3. Run with a pre-configured dataset (assumes services are running)
+# Run with a pre-configured dataset (assumes services are running)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 # Or use a custom path that uses the "active" configuration
@@ -94,6 +100,15 @@ datasets:
     extract_infographics: false
     recall_dataset: bo767  # Evaluator for recall testing
   
+  jp20:
+    path: /path/to/jp20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: jp20  # bo10k evaluator filtered to jp20 subset
+
   bo20:
     path: /raid/jioffe/bo20
     extract_text: true
@@ -135,6 +150,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
 | Dataset | Text | Tables | Charts | Images | Infographics | Recall |
 |---------|------|--------|--------|--------|--------------|--------|
 | `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| `jp20` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -274,6 +290,10 @@ DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 | `e2e_with_llm_summary` | E2E with LLM summarization via UDF | `active` section only | ✅ Available (YAML config) |
 | `recall` | Recall evaluation against existing collections | `active` + `recall` sections | ✅ Available (YAML config) |
 | `e2e_recall` | Fresh ingestion + recall evaluation | `active` + `recall` sections | ✅ Available (YAML config) |
+| `page_elements` | nemotron-page-elements-v3 model benchmarking (PyPi) | None | ✅ Available |
+| `graphic_elements` | nemotron-graphic-elements-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `table_structure` | nemotron-table-structure-v1 model benchmarking (PyPi) | None | ✅ Available |
+| `ocr` | nemotron-ocr model benchmarking (PyPi) | None | ✅ Available |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
@@ -503,6 +523,115 @@ Metrics are also logged via `kv_event_log()`:
 - `recall_eval_time_s_no_reranker`
 - `recall_eval_time_s_with_reranker`
 
+## Model Testing
+
+The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install (via `uv pip install -e .`) includes the nemotron-* packages from Test PyPI (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`). With vanilla pip, install the standard harness env first, then `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps` to get the nightly Nemotron packages from Test PyPI.
+
+### Available Model Benchmarks
+
+| Case | Model | Package | Description |
+|------|-------|---------|-------------|
+| `page_elements` | [Nemotron Page Element v3](https://huggingface.co/nvidia/nemotron-page-elements-v3) | nemotron_page_elements_v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
+| `table_structure` | [Nemotron Table Structure v1](https://huggingface.co/nvidia/nemotron-table-structure-v1) | nemotron_table_structure_v1 | Table cell, row, and column detection |
+| `graphic_elements` | [Nemotron Graphic Element v1](https://huggingface.co/nvidia/nemotron-graphic-elements-v1) | nemotron_graphic_elements_v1 | Chart and graphic element detection |
+| `ocr` | [Nemotron OCR v1](https://huggingface.co/nvidia/nemotron-ocr-v1) | nemotron_ocr | Optical character recognition (text extraction with bounding boxes) |
+
+### Usage
+
+Model benchmarks don't require managed services - they run the model directly on GPU:
+
+```bash
+# Page elements benchmark
+uv run nv-ingest-harness-run --case=page_elements --dataset=/path/to/page_images
+
+# Table structure benchmark  
+uv run nv-ingest-harness-run --case=table_structure --dataset=/path/to/table_images
+
+# Graphic elements benchmark
+uv run nv-ingest-harness-run --case=graphic_elements --dataset=/path/to/chart_images
+
+# Nemotron OCR benchmark
+uv run nv-ingest-harness-run --case=ocr --dataset=/path/to/images
+```
+
+### Configuration
+
+Model benchmarks use `dataset_dir` from the config to locate images. Images are discovered recursively with extensions: `.png`, `.jpg`, `.jpeg`, `.webp`.
+
+**Optional config parameters:**
+- `num_repeats` (default: 1): Number of times to run inference per image for timing accuracy
+
+### Benchmark Method
+
+All model benchmarks use `torch.utils.benchmark.Timer` for accurate timing:
+
+- **Automatic CUDA synchronization**: Timer handles GPU sync internally
+- **Warmup**: Uses `blocked_autorange()` for stable initial timing calibration
+- **Per-image timing**: Measures preprocessing + forward pass together
+
+### Output Metrics
+
+Results are written to `results.json`:
+
+| Metric | Description |
+|--------|-------------|
+| `num_images` | Total images processed |
+| `total_detections` | Sum of all detections across images (or `total_text_regions` for OCR) |
+| `mean_inference_time_ms` | Mean inference time per image |
+| `std_inference_time_ms` | Standard deviation of inference times |
+| `min_inference_time_ms` | Fastest inference time |
+| `max_inference_time_ms` | Slowest inference time |
+| `median_inference_time_ms` | Median inference time |
+| `iqr_inference_time_ms` | Interquartile range (75th - 25th percentile) |
+| `total_inference_time_ms` | Total time for all images |
+| `throughput_images_per_sec` | Processing throughput |
+| `model_load_time_s` | Time to load the model |
+
+### Example Output
+
+```
+=== Page Elements Benchmark ===
+Dataset: /path/to/images
+Timing repeats per image: 1
+Using torch.utils.benchmark.Timer
+================================
+Found 100 image(s) to process
+Loading model...
+Model loaded in 2.34s
+Available labels: ['text', 'title', 'table', 'figure', ...]
+Running warmup with torch.utils.benchmark...
+Warmup complete. Estimated per-image time: 15.23 ms
+Processing images: 100%|████████████████| 100/100 [00:01<00:00, 65.2img/s]
+```
+
+Results in `artifacts/<dataset>_<timestamp>/results.json`:
+
+```json
+{
+  "test_config": {
+    "test_name": "page_images",
+    "dataset_dir": "/path/to/images",
+    "num_repeats": 1,
+    "model": "page_element_v3",
+    "benchmark_method": "torch.utils.benchmark.Timer"
+  },
+  "results": {
+    "num_images": 100,
+    "total_detections": 1523,
+    "mean_inference_time_ms": 15.34,
+    "std_inference_time_ms": 2.18,
+    "min_inference_time_ms": 12.45,
+    "max_inference_time_ms": 28.91,
+    "median_inference_time_ms": 14.89,
+    "iqr_inference_time_ms": 2.34,
+    "total_inference_time_ms": 1534.21,
+    "throughput_images_per_sec": 65.18,
+    "model_load_time_s": 2.34
+  },
+  "per_image_results": [...]
+}
+```
+
 ## Sweeping Parameters
 
 ### Dataset Sweeping (Recommended)
@@ -546,6 +675,72 @@ EXTRACT_TABLES=false uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 
 **Note**: Each test run creates a new timestamped artifact directory, so you can compare results across sweeps.
 
+## Deployment Types
+
+The harness supports two deployment orchestrators for managing nv-ingest services:
+
+### Docker Compose (Default)
+
+Docker Compose is the default deployment type and is ideal for local development and testing:
+
+```bash
+# Default - uses Docker Compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
+
+# Explicitly specify Docker Compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=compose
+```
+
+**Features:**
+- Local container orchestration
+- Fast startup and rebuild
+- GPU-specific configuration via `--sku` option (A10G, L40S, A100-40GB)
+- Profile-based service selection
+- Docker volume management
+
+### Helm (Kubernetes)
+
+Helm deployment is for Kubernetes-based testing (MicroK8s, K3s, cloud K8s):
+
+```bash
+# Use Helm deployment
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
+```
+
+**Features:**
+- Kubernetes-native deployment
+- Automatic port-forwarding with auto-restart for resilience
+- Supports both remote charts (from Helm repos) and local `./helm` chart
+- Pod log collection with previous logs on restart
+- Namespace isolation
+
+**Configuration:**
+Set deployment type in `test_configs.yaml` or use `--deployment-type` CLI flag:
+
+```yaml
+active:
+  deployment_type: compose  # or "helm"
+  
+  # Docker Compose settings
+  profiles: [retrieval, reranker]
+  
+  # Helm settings (only used when deployment_type: helm)
+  helm_bin: helm  # or "microk8s helm", "k3s helm"
+  helm_chart: nim-nvstaging/nv-ingest
+  helm_chart_version: 26.1.0-RC7
+  helm_release: nv-ingest
+  helm_namespace: nv-ingest
+  helm_values_file: .helm-env
+```
+
+**CLI flag overrides YAML setting:**
+```bash
+# Override to Helm even if YAML has deployment_type: compose
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --deployment-type=helm
+```
+
+For detailed Helm and Docker Compose configuration, see `plans/SERVICE_MANAGER.md`.
+
 ## Execution Modes
 
 ### Attach Mode (Default)
@@ -558,7 +753,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767
 - Runs test case only (no service management)
 - Faster for iterative testing
 - Use when Docker services are already up
-- `--no-build` and `--keep-up` flags are ignored in attach mode
+- `--no-build`, `--keep-up`, and `--sku` flags are ignored in attach mode
 
 ### Managed Mode
 
@@ -569,7 +764,7 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed
 - Starts Docker services automatically
 - Waits for service readiness (configurable timeout)
 - Runs test case
-- Collects artifacts
+- Collects artifacts and service logs
 - Stops services after test (unless `--keep-up`)
 
 **Managed mode options:**
@@ -579,7 +774,39 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-build
 
 # Keep services running after test (useful for multi-test scenarios)
 uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --keep-up
+
+# Use GPU-specific configuration (A10G, L40S, A100-40GB)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
+
+# Disable service log dumping (enabled by default)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
 ```
+
+### GPU-Specific Configuration (SKU Override)
+
+The harness supports GPU-specific configuration overrides for Docker Compose deployments via the `--sku` option:
+
+```bash
+# A10G GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a10g
+
+# L40S GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=l40s
+
+# A100 40GB GPU settings
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --sku=a100-40gb
+```
+
+**How it works:**
+- Loads GPU-specific override file: `docker-compose.<sku>.yaml`
+- Merges with base `docker-compose.yaml` configuration
+- Override settings take precedence (typically batch sizes, memory limits, etc.)
+- Only applies to Docker Compose deployments (ignored for Helm)
+
+**Available SKUs:**
+- `a10g` - NVIDIA A10G GPU settings
+- `l40s` - NVIDIA L40S GPU settings
+- `a100-40gb` - NVIDIA A100 40GB GPU settings
 
 ## Nightly Benchmarks
 
@@ -635,6 +862,50 @@ tools/harness/artifacts/<test_name>_<timestamp>_UTC/
 ```
 
 **Note**: Artifact directories use timestamps for tracking test runs over time, while collection names are deterministic (no timestamps) to enable collection reuse and recall evaluation.
+
+### Service Logs
+
+When running in managed mode (`--managed`), service logs are automatically dumped to the artifacts directory before services are stopped (enabled by default):
+
+```
+tools/harness/artifacts/<session_or_run>/service_logs/
+├── container_nv-ingest-1.log           # Docker Compose: individual container logs
+├── container_redis-1.log
+├── docker_compose_combined.log         # Docker Compose: combined logs
+├── pod_nv-ingest-ms-runtime-xxx.log   # Helm: pod logs
+├── pod_redis-master-0.log
+├── pod_status.txt                      # Helm: pod status
+└── pod_events.txt                      # Helm: Kubernetes events
+```
+
+**Disabling log dumping:**
+```bash
+# Skip log collection if not needed (saves time)
+uv run nv-ingest-harness-run --case=e2e --dataset=bo767 --managed --no-dump-logs
+
+# Or for nightly runs
+uv run nv-ingest-harness-nightly --managed --no-dump-logs
+```
+
+**Log collection features:**
+- **Automatic**: Logs are captured before services are stopped
+- **Comprehensive**: Includes all containers/pods in the deployment
+- **Timestamped**: Container/pod logs include timestamps for correlation
+- **Previous logs**: For Helm, also captures previous container logs if pods restarted
+- **Debugging aids**: Helm logs include pod status and events for troubleshooting
+
+**Docker Compose logs include:**
+- Individual container logs with container names
+- Combined logs from all services
+- Stderr and stdout streams
+
+**Helm logs include:**
+- Logs from each container in each pod
+- Previous logs if containers restarted
+- Pod status information (`kubectl get pods`)
+- Kubernetes events (`kubectl get events`)
+
+This feature is particularly useful for debugging test failures and understanding service behavior during test runs.
 
 ### Results Structure
 
@@ -706,12 +977,18 @@ This provides:
   - Merges ingestion and recall metrics in results
 
 **4. Shared Utilities**
-- `interact.py` - Common testing utilities
+- `interact.py` - Common testing utilities (no external model dependencies)
   - `embed_info()` - Embedding model detection
-  - `milvus_chunks()` - Vector database statistics
   - `segment_results()` - Result categorization by type
   - `kv_event_log()` - Structured logging
+  - `run_cmd()` - Command execution helpers
+- `milvus.py` - Milvus/vector database utilities
+  - `milvus_chunks()` - Vector database statistics
+  - `load_collection()` - Load Milvus collection
+  - `unload_collection()` - Unload Milvus collection
+- `pdfium.py` - PDF utilities
   - `pdf_page_count()` - Dataset page counting
+  - `pdf_page_count_glob()` - Glob-based PDF page counting
 
 ### Configuration Flow
 

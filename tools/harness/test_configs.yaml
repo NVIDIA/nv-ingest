@@ -19,7 +19,6 @@ active:
   compose:
     profiles:
       - retrieval
-      - table-structure
       - reranker  # Required for recall evaluation
 
   # Helm configuration
@@ -28,7 +27,7 @@ active:
     sudo: true  # Prepend sudo to helm commands (needed for microk8s/k3s without user in group)
     kubectl_bin: microk8s kubectl  # kubectl binary command (e.g., "kubectl", "microk8s kubectl")
     kubectl_sudo: null  # Prepend sudo to kubectl commands (null = same as helm_sudo)
-    chart: nim-nvstaging/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
+    chart: nemo-microservices/nv-ingest  # Remote chart reference (set to null to use local chart from ./helm)
     chart_version: 26.1.2  # Chart version (required for remote charts)
     release: nv-ingest
     namespace: nv-ingest
@@ -57,10 +56,11 @@ active:
       nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled: true
 
   # Runtime configuration
-  sparse: false  # Use sparse embeddings
+  sparse: false  # Use sparse embeddings (Milvus only)
   gpu_search: false  # Use GPU for search
   embedding_model: auto  # auto-detect or specify model name
-  vdb_backend: milvus  # milvus or lancedb
+  vdb_backend: lancedb  # milvus or lancedb
+  hybrid: false  # LanceDB hybrid retrieval (FTS + vector)
 
   # Extraction configuration
   extract_text: true
@@ -94,7 +94,7 @@ active:
 # docker compose --profile reranker up -d
 recall:
   recall_dataset: null
-  reranker_mode: none  # Options: "none", "with", "both"
+  reranker_mode: both  # Options: "none", "with", "both"
 
   # Recall evaluation settings
   recall_top_k: 10
@@ -168,3 +168,12 @@ datasets:
     extract_images: false
     extract_infographics: true
     recall_dataset: bo10k
+
+  jp20:
+    path: /path/to/jp20
+    extract_text: true
+    extract_tables: true
+    extract_charts: true
+    extract_images: false
+    extract_infographics: true
+    recall_dataset: jp20

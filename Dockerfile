@@ -94,7 +94,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
-    conda install -y mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
+    conda install -y python=3.12 mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
 COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
@@ -213,6 +213,13 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 # Set entrypoint to tini with a custom entrypoint script
 ENTRYPOINT ["/opt/conda/envs/nv_ingest_runtime/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
+FROM runtime AS test
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && WHEEL="$(ls ./api/dist/*.whl)" \
+    && pip install "${WHEEL}[test]"
+
 FROM nv_ingest_install AS development
 
 RUN source activate nv_ingest_runtime && \
@@ -226,12 +233,14 @@ CMD ["/bin/bash"]
 FROM nv_ingest_install AS docs
 
 # Install dependencies needed for docs generation
-# Clear stale apt lists and use --fix-missing to handle repository issues
-RUN rm -rf /var/lib/apt/lists/* \
-    && apt-get update --fix-missing \
-    && apt-get install -y --no-install-recommends make \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+#
+# NOTE: The nv_ingest_install base image may carry a broken apt/dpkg state
+# (e.g., partially-installed libreoffice dependencies). Installing `make`
+# via conda avoids apt entirely and is more reliable on CI runners.
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    source activate nv_ingest_runtime \
+    && mamba install -y make \
+    && mamba clean -afy
 
 COPY docs docs
 

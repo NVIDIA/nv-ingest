@@ -249,6 +249,12 @@ class Ingestor:
         self._output_config = None
         self._created_temp_output_dir = None
 
+        # Track extraction settings for auto-dedup
+        self._has_structured_extraction = False
+        self._has_image_extraction = False
+        self._has_dedup = False
+        self._auto_dedup = True  # Can be disabled via extract(auto_dedup=False)
+
     def __enter__(self):
         return self
 
@@ -940,9 +946,17 @@ class Ingestor:
 
         If no tasks are specified in `_job_specs`, this method invokes `all_tasks()` to add
         a default set of tasks to the job specification.
+
+        Auto-enables bbox deduplication when structured extraction (tables/charts/infographics)
+        and captioning are both enabled, even if `.dedup()` was not explicitly called.
         """
         if (not self._job_specs.tasks) or all(not tasks for tasks in self._job_specs.tasks.values()):
             self.all_tasks()
+
+        # Auto-enable bbox dedup when both structured and image extraction are enabled
+        if self._auto_dedup and self._has_structured_extraction and self._has_image_extraction and not self._has_dedup:
+            logger.info("Auto-enabling bbox deduplication (structured + image extraction detected)")
+            self.dedup()
 
     def all_tasks(self) -> "Ingestor":
         """
@@ -975,7 +989,12 @@ class Ingestor:
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the DedupTask.
+            Parameters specific to the DedupTask:
+            - content_type: str, content type to deduplicate (default "text")
+            - filter: bool, legacy filter parameter (default False)
+            - enable_bbox_dedup: bool, enable bounding box deduplication (default True)
+            - iou_threshold: float, IoU threshold for bbox dedup (default 0.45)
+            - prefer_structured: bool, keep structured elements over images (default True)
 
         Returns
         -------
@@ -997,9 +1016,15 @@ class Ingestor:
         dedup_params = {
             "content_type": task_options.content_type,
             "filter": task_options.params.filter,
+            "enable_bbox_dedup": task_options.params.enable_bbox_dedup,
+            "iou_threshold": task_options.params.iou_threshold,
+            "prefer_structured": task_options.params.bbox_dedup_prefer_structured,
         }
         dedup_task = DedupTask(**dedup_params)
         self._job_specs.add_task(dedup_task)
+
+        # Track that dedup was explicitly added
+        self._has_dedup = True
 
         return self
 
@@ -1038,7 +1063,16 @@ class Ingestor:
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the ExtractTask.
+            Parameters specific to the ExtractTask:
+            - extract_text: bool, extract text content (default True)
+            - extract_images: bool, extract images (default True)
+            - extract_tables: bool, extract tables (default True)
+            - extract_charts: bool, extract charts (default True)
+            - extract_infographics: bool, extract infographics (default False)
+            - extract_page_as_image: bool, extract full page as image (default False)
+            - table_output_format: str, format for table output (default "markdown")
+            - auto_dedup: bool, auto-enable bbox deduplication when extracting both
+              structured elements and images (default True). Set to False to disable.
 
         Returns
         -------
@@ -1055,6 +1089,17 @@ class Ingestor:
         # Defaulting to False since enabling infographic extraction reduces throughput.
         # Users have to set to True if infographic extraction is required.
         extract_infographics = kwargs.pop("extract_infographics", False)
+
+        # Auto-dedup: enabled by default when extracting both structured elements and images
+        # Users can disable with auto_dedup=False
+        auto_dedup = kwargs.pop("auto_dedup", True)
+        self._auto_dedup = auto_dedup
+
+        # Track extraction settings for auto-dedup
+        if extract_tables or extract_charts or extract_infographics:
+            self._has_structured_extraction = True
+        if extract_images:
+            self._has_image_extraction = True
 
         for file_type in self._job_specs.file_types:
             # Let user override document_type if user explicitly sets document_type.
@@ -1479,6 +1524,8 @@ class Ingestor:
             "prompt": task_options.prompt,
             "system_prompt": task_options.system_prompt,
             "model_name": task_options.model_name,
+            "context_text_max_chars": task_options.context_text_max_chars,
+            "temperature": task_options.temperature,
         }
         caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)

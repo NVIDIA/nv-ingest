@@ -105,13 +105,13 @@ tmpDirSize: 50Gi
 ## @param envVars.INGEST_LOG_LEVEL [default: "DEFAULT"] Log level for the ingest service
 ## @param envVars.INGEST_EDGE_BUFFER_SIZE [default: "64"] Size of the edge buffer for ingestion
 ## @param envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD [default: "0.80"] Dynamic memory threshold for ingestion
-## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
+## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "32"] Maximum Ingestion worker processes
 ## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differing REST endpoint host
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port
 ## @param envVars.MESSAGE_CLIENT_TYPE [default: "redis"] Type of message client to use
 ## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"] Name of the Redis queue for ingest tasks
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests
-## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
+## @param envVars.NV_INGEST_MAX_UTIL [default: "32"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
@@ -149,8 +149,8 @@ envVars:
   OMP_NUM_THREADS: 1
   RAY_num_grpc_threads: 1
 
-  MAX_INGEST_PROCESS_WORKERS: 16
-  NV_INGEST_MAX_UTIL: 48
+  MAX_INGEST_PROCESS_WORKERS: 32
+  NV_INGEST_MAX_UTIL: 32
   INGEST_DYNAMIC_MEMORY_THRESHOLD: 0.80
   INGEST_EDGE_BUFFER_SIZE: 64
   INGEST_DISABLE_DYNAMIC_SCALING: true
@@ -206,8 +206,6 @@ envVars:
   # To use the NGC hosted NIM (Build API), manually set this value to "https://integrate.api.nvidia.com/v1/chat/completions".
   # VLM_CAPTION_ENDPOINT: "DO_NOT_USE_HERE_FOR_REFERENCE_ONLY"
   VLM_CAPTION_MODEL_NAME: "nvidia/nemotron-nano-12b-v2-vl"
-  VLM_CAPTION_PROMPT: "Caption the content of this image:"
-  VLM_CAPTION_SYSTEM_PROMPT: "/no_think"
 
 
   # "ready" check configuration.
@@ -669,12 +667,8 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
-      - name: NIM_TRITON_RATE_LIMIT
-        value: "3"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
-      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "2048"
       - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
         value: "2"
       - name: OMP_NUM_THREADS
@@ -787,9 +781,9 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "3072"
+        value: "2048"
       - name: OMP_NUM_THREADS
-        value: "8"
+        value: "1"
 
   ## @param embedqa [object] Configuration for EmbedQA NIM
   ## @param embedqa.enabled [bool] Enable the EmbedQA service
@@ -845,8 +839,8 @@ nimOperator:
   nemoretriever_ocr_v1:
     enabled: true
     image:
-      repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
-      tag: 1.1.0
+      repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
+      tag: 1.2.1
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -872,14 +866,8 @@ nimOperator:
         value: "8000"
       - name: NIM_TRITON_LOG_VERBOSE
         value: "1"
-      - name: NIM_TRITON_RATE_LIMIT
-        value: "3"
-      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
-        value: "8192"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
-      - name: NIM_TRITON_ENABLE_MODEL_CONTROL
-        value: "1"
 
   ## @param llama_3_2_nv_rerankqa_1b_v2 [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
   ## @param llama_3_2_nv_rerankqa_1b_v2.enabled [bool] Enable this NIM
@@ -913,7 +901,11 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
-    env: []
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
 
   ## @param nemotron_nano_12b_v2_vl [object] Configuration for Nemotron Nano 12B v2 VL NIM
   ## @param nemotron_nano_12b_v2_vl.enabled [bool] Enable this NIM
@@ -953,6 +945,11 @@ nimOperator:
         type: ClusterIP
         port: 8000
         grpcPort: 8001
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
 
   ## @param nemotron_parse [object] Configuration for Nemotron Parse NIM
   ## @param nemotron_parse.enabled [bool] Enable or disable the Nemotron Parse NIM deployment.

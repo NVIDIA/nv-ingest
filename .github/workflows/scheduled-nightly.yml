@@ -1,0 +1,137 @@
+name: Nightly Builds & Publishing
+
+on:
+  schedule:
+    # Runs every day at 11:30PM UTC
+    - cron: "30 23 * * *"
+  workflow_dispatch:
+    inputs:
+      skip-docker:
+        description: 'Skip Docker build/publish'
+        required: false
+        type: boolean
+        default: false
+      skip-conda:
+        description: 'Skip Conda build/publish'
+        required: false
+        type: boolean
+        default: false
+      skip-pypi:
+        description: 'Skip PyPI build/publish'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Generate version for all nightly builds
+  determine-version:
+    name: Determine Nightly Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      docker-tag: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        uses: ./.github/actions/determine-version
+        with:
+          date-format: '%Y.%m.%d'
+
+  # Build and publish Docker nightly
+  docker-build-publish:
+    name: Docker Nightly Build & Publish
+    if: ${{ !inputs.skip-docker }}
+    needs: determine-version
+    runs-on: linux-large-disk
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+        with:
+          use-qemu: 'true'
+          platforms: 'linux/amd64,linux/arm64'
+
+      - name: Login to NGC
+        uses: ./.github/actions/docker-login-ngc
+        with:
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Multi-platform Image
+        run: |
+          docker buildx create --use
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push \
+            --target runtime \
+            --build-arg HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }} \
+            --build-arg DOWNLOAD_LLAMA_TOKENIZER=True \
+            --build-arg GIT_COMMIT=${GITHUB_SHA} \
+            -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.docker-tag }} \
+            .
+
+  # Build and publish Conda packages
+  conda-build:
+    name: Conda Nightly Build
+    if: ${{ !inputs.skip-conda }}
+    uses: ./.github/workflows/reusable-conda-build.yml
+    with:
+      source-ref: 'main'
+      runner: 'linux-large-disk'
+      upload-artifacts: true
+
+  conda-publish:
+    name: Conda Nightly Publish
+    if: ${{ !inputs.skip-conda }}
+    needs: conda-build
+    uses: ./.github/workflows/reusable-conda-publish.yml
+    with:
+      channel: 'dev'
+      force-upload: true
+    secrets:
+      NVIDIA_CONDA_TOKEN: ${{ secrets.NVIDIA_CONDA_TOKEN }}
+
+  # Build and publish PyPI wheels
+  pypi-build:
+    name: PyPI Nightly Build
+    if: ${{ !inputs.skip-pypi }}
+    needs: determine-version
+    uses: ./.github/workflows/reusable-pypi-build.yml
+    with:
+      version: ${{ needs.determine-version.outputs.version }}
+      release-type: 'dev'
+      source-ref: 'main'
+      runner: 'linux-large-disk'
+
+  pypi-publish:
+    name: PyPI Nightly Publish
+    if: ${{ !inputs.skip-pypi }}
+    needs: pypi-build
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+  # Summary
+  nightly-complete:
+    name: Nightly Build Complete
+    needs:
+      - determine-version
+      - docker-build-publish
+      - conda-publish
+      - pypi-publish
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report status
+        run: |
+          echo "Nightly build completed for version: ${{ needs.determine-version.outputs.version }}"
+          echo "Docker: ${{ needs.docker-build-publish.result }}"
+          echo "Conda: ${{ needs.conda-publish.result }}"
+          echo "PyPI: ${{ needs.pypi-publish.result }}"

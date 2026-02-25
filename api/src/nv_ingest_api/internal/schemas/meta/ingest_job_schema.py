@@ -113,6 +113,8 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     prompt: Optional[str] = None
     system_prompt: Optional[str] = None
     model_name: Optional[str] = None
+    context_text_max_chars: Optional[int] = None
+    temperature: Optional[float] = None
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -130,6 +132,9 @@ class IngestTaskFilterSchema(BaseModelNoExt):
 
 class IngestTaskDedupParams(BaseModelNoExt):
     filter: bool = False
+    enable_bbox_dedup: bool = True
+    iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    bbox_dedup_prefer_structured: bool = True
 
 
 class IngestTaskDedupSchema(BaseModelNoExt):

@@ -1,0 +1,64 @@
+name: Reusable Conda Publish
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: 'Conda channel to publish to (dev or main)'
+        required: true
+        type: string
+      package-path:
+        description: 'Path to conda packages'
+        required: false
+        type: string
+        default: './conda/output_conda_channel/linux-64/*.conda'
+      force-upload:
+        description: 'Force upload (overwrite existing)'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      NVIDIA_CONDA_TOKEN:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Python (for anaconda-client)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download artifacts (if available)
+        if: ${{ inputs.package-path == './conda/output_conda_channel/linux-64/*.conda' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: conda-packages
+          path: ./conda/output_conda_channel
+        continue-on-error: true
+
+      - name: Install anaconda-client
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install anaconda-client
+
+      - name: Validate channel
+        run: |
+          if [[ "${{ inputs.channel }}" != "dev" && "${{ inputs.channel }}" != "main" ]]; then
+            echo "Error: channel must be 'dev' or 'main'"
+            exit 1
+          fi
+
+      - name: Publish conda packages
+        run: |
+          FORCE_FLAG=""
+          if [ "${{ inputs.force-upload }}" = "true" ]; then
+            FORCE_FLAG="--force"
+          fi
+
+          anaconda -t "${{ secrets.NVIDIA_CONDA_TOKEN }}" upload \
+            $FORCE_FLAG \
+            --label ${{ inputs.channel }} \
+            ${{ inputs.package-path }}
