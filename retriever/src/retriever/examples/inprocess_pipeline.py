@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 In-process ingestion pipeline (no Ray) with optional recall evaluation.
 Run with: uv run python -m retriever.examples.inprocess_pipeline <input-dir>
@@ -143,10 +147,7 @@ def main(
         help="Optional remote endpoint URL for embedding model inference.",
     ),
 ) -> None:
-    if input_type in ("txt", "html"):
-        pass  # No NEMOTRON_OCR_MODEL_DIR needed for .txt or .html
-    else:
-        os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
+    _ = input_type
 
     if gpu_devices is not None and num_gpus is not None:
         raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")

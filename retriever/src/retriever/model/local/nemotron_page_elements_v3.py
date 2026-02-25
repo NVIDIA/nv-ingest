@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 
 from torch import nn

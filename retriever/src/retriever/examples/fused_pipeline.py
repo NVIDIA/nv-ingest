@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Fused ingestion pipeline with optional recall evaluation.
 Run with: uv run python -m retriever.examples.fused_pipeline <input-dir>
@@ -160,7 +164,6 @@ def main(
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
-        os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)

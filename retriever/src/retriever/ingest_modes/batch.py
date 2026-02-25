@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Batch runmode.
 
@@ -20,7 +24,7 @@ from typing import Union
 
 import ray
 import ray.data as rd
-from retriever.convert import DocToPdfConversionActor
+from retriever.utils.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
 from retriever.pdf.extract import PDFExtractionActor

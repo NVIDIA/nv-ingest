@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Multi-GPU worker pool for distributing GPU pipeline stages across devices.
 
@@ -126,8 +130,6 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
         model_dir = ""
         if model is not None and hasattr(model, "_model_dir"):
             model_dir = str(model._model_dir)
-        if not model_dir:
-            model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
         return OCRModelConfig(model_dir=model_dir)
 
     if func is embed_text_main_text_embed:

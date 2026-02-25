@@ -46,15 +46,10 @@ def _local_nemotron_ocr_boxes_texts(
       [bounding_boxes, text_predictions, conf_scores]
     """
     model_dir = (
-        os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        os.getenv("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
         or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
-        or os.getenv("SLIMGEST_NEMOTRON_OCR_MODEL_DIR", "").strip()
     )
-    if not model_dir:
-        raise ValueError(
-            "Local chart OCR requested but no model directory was configured. "
-            "Set $NEMOTRON_OCR_MODEL_DIR (or $NEMOTRON_OCR_V1_MODEL_DIR) to the Nemotron OCR model directory."
-        )
 
     # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
     try:
@@ -68,9 +63,9 @@ def _local_nemotron_ocr_boxes_texts(
     if trace_info is not None:
         trace_info.setdefault("ocr", {})
         trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
-        trace_info["ocr"]["model_dir"] = model_dir
+        trace_info["ocr"]["model_dir"] = model_dir or None
 
-    ocr = NemotronOCRV1(model_dir=model_dir)
+    ocr = NemotronOCRV1(model_dir=model_dir) if model_dir else NemotronOCRV1()
 
     results: List[List[Any]] = []
     for b64 in base64_images:

@@ -365,15 +365,10 @@ def _local_nemotron_ocr_boxes_texts(
         return results
 
     model_dir = (
-        os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        os.getenv("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
         or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
-        or os.getenv("SLIMGEST_NEMOTRON_OCR_MODEL_DIR", "").strip()
     )
-    if not model_dir:
-        raise ValueError(
-            "Local table OCR requested but no model directory was configured. "
-            "Set $NEMOTRON_OCR_MODEL_DIR (or $NEMOTRON_OCR_V1_MODEL_DIR) to the Nemotron OCR model directory."
-        )
 
     # Lazy import to avoid hard dependency when running pure API package.
     try:
@@ -387,10 +382,10 @@ def _local_nemotron_ocr_boxes_texts(
     if trace_info is not None:
         trace_info.setdefault("ocr", {})
         trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
-        trace_info["ocr"]["model_dir"] = model_dir
+        trace_info["ocr"]["model_dir"] = model_dir or None
 
     # Instantiate local OCR model once per call.
-    ocr = NemotronOCRV1(model_dir=model_dir)
+    ocr = NemotronOCRV1(model_dir=model_dir) if model_dir else NemotronOCRV1()
 
     def _xyxy_to_quad(xyxy: List[float]) -> List[List[float]]:
         x1, y1, x2, y2 = [float(v) for v in xyxy]

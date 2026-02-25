@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unified ingestion pipeline: inprocess (local) or online (REST API) with optional recall.
 
@@ -102,8 +106,7 @@ def main(
         typer.echo("Online mode currently supports PDF only; use --input-type pdf.", err=True)
         raise typer.Exit(1)
 
-    if input_type != "txt":
-        os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
+    _ = input_type
 
     input_dir = Path(input_dir)
 

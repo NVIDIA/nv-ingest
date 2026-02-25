@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from typing import Any, Dict, List, Optional, Tuple, Union  # noqa: F401
 
 import base64
@@ -36,7 +40,7 @@ class NemotronOCRV1(BaseModel):
         # NemotronOCR is a high-level pipeline (not an nn.Module). We can optionally
         # TensorRT-compile individual submodules (e.g. the detector backbone) but
         # must keep post-processing (NMS, box decoding, etc.) in eager PyTorch/C++.
-        self._enable_trt = os.getenv("SLIMGEST_ENABLE_TORCH_TRT", "").strip().lower() in {"1", "true", "yes", "on"}
+        self._enable_trt = os.getenv("RETRIEVER_ENABLE_TORCH_TRT", "").strip().lower() in {"1", "true", "yes", "on"}
         if self._enable_trt and self._model is not None:
             self._maybe_compile_submodules()
 

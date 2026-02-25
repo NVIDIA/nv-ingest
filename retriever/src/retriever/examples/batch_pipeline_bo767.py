@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import json
 import os
 from pathlib import Path
@@ -6,7 +10,6 @@ import ray
 from retriever import create_ingestor
 from retriever.recall.core import RecallConfig, retrieve_and_score
 
-os.environ["NEMOTRON_OCR_MODEL_DIR"] = str(Path.cwd() / "nemotron-ocr-v1")
 ray.init(num_gpus=1, ignore_reinit_error=True)
 
 ingestor = create_ingestor(run_mode="batch")

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 """
@@ -586,12 +590,6 @@ class OCRActor:
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
     ) -> None:
-        # model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-        # if not model_dir:
-        #     raise RuntimeError(
-        #         "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-        #         "the path of the Nemotron OCR v1 model directory."
-        #     )
         self._invoke_url = (ocr_invoke_url or invoke_url or "").strip()
         self._api_key = api_key
         self._request_timeout_s = float(request_timeout_s)
@@ -600,7 +598,6 @@ class OCRActor:
         else:
             from retriever.model.local import NemotronOCRV1
 
-            # self._model = NemotronOCRV1(model_dir=model_dir)
             self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)

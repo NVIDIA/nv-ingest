@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import base64
@@ -793,11 +797,6 @@ def run(
     ray.init(
         address=ray_address,
         ignore_reinit_error=True,
-        runtime_env={
-            "env_vars": {
-                "NEMOTRON_OCR_MODEL_DIR": "/home/local/jdyer/Development/nv-ingest/models/nemotron-ocr-v1/checkpoints/"
-            }
-        },
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

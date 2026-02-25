@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -157,7 +161,7 @@ def _postprocess_to_per_image_detections(
     """
     Convert model postprocess outputs into a list of per-image detection dicts.
 
-    Expected detection format matches the "stage2 page_elements_v3 json" used by `retriever.image.render`.
+    Expected detection format matches the "stage2 page_elements_v3 json" used by `retriever.utils.image.render`.
     """
     if torch is None:  # pragma: no cover
         raise ImportError("torch is required for page element detection postprocess.")

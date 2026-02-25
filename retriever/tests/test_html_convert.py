@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unit tests for retriever.html.convert: html_to_markdown, html_file_to_chunks_df, html_bytes_to_chunks_df.
 """

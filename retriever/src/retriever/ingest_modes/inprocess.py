@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 In-process runmode.
 
@@ -1102,13 +1106,14 @@ class InProcessIngestor(Ingestor):
             if ocr_invoke_url:
                 self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
             else:
-                ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-                if not ocr_model_dir:
-                    raise RuntimeError(
-                        "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-                        "the path of the Nemotron OCR v1 model directory."
-                    )
-                self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                )
+                model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
 
         return self
 

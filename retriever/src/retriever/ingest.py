@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 System-facing ingestion interface.
 
@@ -15,6 +19,8 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+from retriever.application.modes.factory import create_runmode_ingestor
+
 RunMode = Literal["inprocess", "batch", "fused", "online"]
 
 
@@ -22,23 +28,7 @@ def create_ingestor(*, run_mode: RunMode = "inprocess", **kwargs: Any) -> "Inges
     """
     Factory for selecting an ingestion runmode implementation.
     """
-    if run_mode == "inprocess":
-        from .ingest_modes.inprocess import InProcessIngestor
-
-        return InProcessIngestor(**kwargs)
-    if run_mode == "batch":
-        from .ingest_modes.batch import BatchIngestor
-
-        return BatchIngestor(**kwargs)
-    if run_mode == "fused":
-        from .ingest_modes.fused import FusedIngestor
-
-        return FusedIngestor(**kwargs)
-    if run_mode == "online":
-        from .ingest_modes.online import OnlineIngestor
-
-        return OnlineIngestor(**kwargs)
-    raise ValueError(f"Unknown run_mode: {run_mode!r}")
+    return create_runmode_ingestor(run_mode=run_mode, **kwargs)
 
 
 class Ingestor:

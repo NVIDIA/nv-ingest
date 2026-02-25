@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Chart extraction stage (pure Python + Ray Data adapters).
 
@@ -6,9 +10,8 @@ This stage enriches existing STRUCTURED/chart primitives by populating
 """
 
 from .config import ChartExtractionStageConfig, load_chart_extractor_schema_from_dict
-from .stage import extract_chart_data_from_primitives_df
-
-from .__main__ import app
+from .commands import app
+from .processor import extract_chart_data_from_primitives_df
 
 __all__ = [
     "app",

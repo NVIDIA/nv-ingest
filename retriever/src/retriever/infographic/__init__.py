@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Infographic extraction stage (pure Python + Ray Data adapters).
 
@@ -12,11 +16,13 @@ __all__ = ["InfographicDetectionActor", "detect_infographic_elements_v1"]
 # Optional imports: infographic *extraction* depends on nv-ingest-api (and its deps).
 # We keep detection importable even in lightweight environments.
 try:  # pragma: no cover
+    from .commands import app
     from .config import InfographicExtractionStageConfig, load_infographic_extractor_schema_from_dict
+    from .processor import extract_infographic_data_from_primitives_df
     from .ray_data import extract_infographic_data_ray_data
-    from .stage import extract_infographic_data_from_primitives_df
 
     __all__ += [
+        "app",
         "InfographicExtractionStageConfig",
         "extract_infographic_data_from_primitives_df",
         "extract_infographic_data_ray_data",
