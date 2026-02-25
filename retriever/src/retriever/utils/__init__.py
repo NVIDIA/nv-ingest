@@ -3,4 +3,3 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Utility command/tooling subpackages for retriever."""
-

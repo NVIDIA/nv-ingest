@@ -21,7 +21,6 @@ except ImportError:
     serve = None  # type: ignore[assignment]
 
 app = None
-RetrieverAPIDeployment = None
 
 if serve is not None:
     from fastapi import FastAPI, File, HTTPException, UploadFile

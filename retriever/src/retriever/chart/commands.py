@@ -80,7 +80,8 @@ def render_graphic_elements(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help="Optional YAML config file. If set, values are loaded from YAML; explicitly passed CLI flags override YAML.",
+        help="Optional YAML config file. If set, values are loaded from YAML; "
+        "explicitly passed CLI flags override YAML.",
     ),
     input_dir: Optional[Path] = typer.Option(
         None,
