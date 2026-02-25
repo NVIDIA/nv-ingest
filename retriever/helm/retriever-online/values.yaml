@@ -1,0 +1,96 @@
+# Default values for retriever-online.
+# Deploys the Retriever online ingest Ray Serve API; service is exposed on port 7670.
+
+# -- Number of replicas
+replicaCount: 1
+
+# -- Image for the retriever online ingest container (built from retriever/Dockerfile)
+image:
+  repository: retriever-online
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Optional image pull secrets (e.g. for a private registry)
+imagePullSecrets: []
+
+# -- Override the full name of resources
+fullnameOverride: ""
+# -- Override the name used by the chart
+nameOverride: ""
+
+# -- Service: exposed on port 7670 (targets container port 8000)
+service:
+  type: ClusterIP
+  port: 7670
+  # targetPort matches container port 7670
+  annotations: {}
+  labels: {}
+
+# -- Pod annotations
+podAnnotations: {}
+# -- Extra pod labels
+podLabels: {}
+
+# -- Security context for the pod
+podSecurityContext:
+  fsGroup: 1000
+# -- Security context for the container
+containerSecurityContext: {}
+
+# -- Node selector (e.g. for GPU: nvidia.com/gpu.present: "true")
+nodeSelector: {}
+# -- Tolerations
+tolerations: []
+# -- Affinity
+affinity: {}
+
+# -- Resource limits and requests
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "8Gi"
+    cpu: "4000m"
+
+# -- Environment variables for the online ingest service
+env:
+  # LanceDB directory inside the container (mount a PVC or use emptyDir)
+  ONLINE_LANCEDB_URI: /data/lancedb
+  ONLINE_LANCEDB_TABLE: nv-ingest
+  # Nemotron OCR model path (mount a volume or set to your model path)
+  NEMOTRON_OCR_MODEL_DIR: /workspace/models/nemotron-ocr-v1
+  # Optional: remote embedding NIM URL (unset = use local model)
+  # ONLINE_EMBED_ENDPOINT: "http://embedding:8000/v1"
+
+# -- Extra env from a ConfigMap (name of the ConfigMap)
+envFromConfigMap: ""
+# -- Extra env from a Secret (name of the Secret)
+envFromSecret: ""
+
+# -- Persistent volume for LanceDB data (recommended for production)
+persistence:
+  enabled: false
+  # storageClass: ""  # use default StorageClass if not set
+  size: 10Gi
+  # existingClaim: ""  # use existing PVC name instead of creating one
+
+# -- Optional volume mount for Nemotron OCR model (read-only)
+modelVolume:
+  enabled: false
+  # existingClaim: ""  # PVC name that contains the model
+  mountPath: /workspace/models/nemotron-ocr-v1
+
+# -- Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: ""  # optional
+
+# -- ServiceAccount
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}

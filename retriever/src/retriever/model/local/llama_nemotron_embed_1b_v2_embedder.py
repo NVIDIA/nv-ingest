@@ -68,23 +68,24 @@ class LlamaNemotronEmbed1BV2Embedder:
 
         outs: List[torch.Tensor] = []
         with torch.inference_mode():
-            for i in range(0, len(texts), max(1, int(batch_size))):
-                chunk = texts[i : i + max(1, int(batch_size))]
-                batch = self._tokenizer(
-                    chunk,
-                    padding=True,
-                    truncation=True,
-                    max_length=max(1, int(self.max_length)),
-                    return_tensors="pt",
-                ).to(dev)
-                out = self._model(**batch)
-                lhs = out.last_hidden_state  # [B, S, D]
-                mask = batch["attention_mask"].unsqueeze(-1)  # [B, S, 1]
-                vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)  # [B, D]
-                vec = vec.detach().to("cpu")
-                if self.normalize:
-                    vec = _l2_normalize(vec)
-                outs.append(vec)
+            with torch.autocast(device_type="cuda"):
+                for i in range(0, len(texts), max(1, int(batch_size))):
+                    chunk = texts[i : i + max(1, int(batch_size))]
+                    batch = self._tokenizer(
+                        chunk,
+                        padding=True,
+                        truncation=True,
+                        max_length=max(1, int(self.max_length)),
+                        return_tensors="pt",
+                    ).to(dev)
+                    out = self._model(**batch)
+                    lhs = out.last_hidden_state  # [B, S, D]
+                    mask = batch["attention_mask"].unsqueeze(-1)  # [B, S, 1]
+                    vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)  # [B, D]
+                    vec = vec.detach().to("cpu")
+                    if self.normalize:
+                        vec = _l2_normalize(vec)
+                    outs.append(vec)
 
         return torch.cat(outs, dim=0) if outs else torch.empty((0, 0), dtype=torch.float32)
 

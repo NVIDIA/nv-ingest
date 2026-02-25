@@ -19,12 +19,15 @@ import base64
 import json
 import os
 import time
+from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import requests
 import torch
-from torch.utils.benchmark import Timer
 from PIL import Image
+from torch.utils.benchmark import Timer
 from tqdm import tqdm
 
 from nv_ingest_harness.utils.interact import kv_event_log
@@ -44,7 +47,7 @@ def get_image_paths(input_path: str, extensions: tuple = (".png", ".jpg", ".jpeg
         raise ValueError(f"Invalid path: {input_path}")
 
 
-def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[dict, float]:
+def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[dict, float, float, float]:
     """
     Run inference on a single image using torch.utils.benchmark.Timer.
 
@@ -56,24 +59,39 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
         num_repeats: Number of times to run inference for timing (default: 1)
 
     Returns:
-        Tuple of (predictions dict, mean inference time in seconds)
+        Tuple of (predictions dict, total mean inference time in seconds,
+        preprocess mean time in seconds, forward mean time in seconds)
     """
-    # Timer measures preprocessing + forward pass together
-    timer = Timer(
-        stmt="model(model.preprocess(img), img.shape)[0]",
+    # Timer measures preprocessing only
+    preprocess_timer = Timer(
+        stmt="model.preprocess(img)",
         globals={"model": model, "img": img},
         num_threads=1,
     )
+    _preprocess_measurement = preprocess_timer.timeit(num_repeats)
 
-    # Run timed inference
-    measurement = timer.timeit(num_repeats)
+    # # Timer measures forward pass only using a preprocessed tensor
+    # # Move the numpy array to CUDA device (if available)
+    # if torch.cuda.is_available():
+    #     img = torch.as_tensor(img).to(torch.uint8).to("cuda")
+
+    # x = model.preprocess(img)
+    # forward_timer = Timer(
+    #     stmt="model(x, img_shape)[0]",
+    #     globals={"model": model, "x": x, "img_shape": img.shape},
+    #     num_threads=1,
+    # )
+    # forward_measurement = forward_timer.timeit(num_repeats)
 
     # Run once more to get the actual predictions
     with torch.inference_mode():
-        x = model.preprocess(img)
-        preds = model(x, img.shape)[0]
+        with torch.autocast(device_type="cuda"):
+            x = model.preprocess(img)
+            preds = model(x, img.shape)[0]
 
-    return preds, measurement.mean
+    # total_inference_mean = preprocess_measurement.mean + forward_measurement.mean
+    # return preds, total_inference_mean, preprocess_measurement.mean, forward_measurement.mean
+    return preds, 0.0, 0.0, 0.0
 
 
 def _encode_image_to_base64_png(img: np.ndarray) -> str:
@@ -207,6 +225,7 @@ def main(config=None, log_path: str = "test_results") -> int:
         print("Loading model...")
         model_load_start = time.perf_counter()
         model = define_model("page_element_v3")
+        model.to("cuda").eval()
         model_load_time = time.perf_counter() - model_load_start
         print(f"Model loaded in {model_load_time:.2f}s")
         print(f"Available labels: {model.labels}")
@@ -227,8 +246,10 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Process each image
     results = []
     inference_times = []
+    preprocess_times = []
+    postprocess_times = []
     total_detections = 0
-    
+
     start_time = time.perf_counter()
 
     for img_path in tqdm(image_paths, desc="Processing images", unit="page"):
@@ -245,25 +266,35 @@ def main(config=None, log_path: str = "test_results") -> int:
                 num_repeats=num_repeats,
             )
             num_detections = count_detections_from_remote_response(response_json)
+            preprocess_time = 0.0
+            postprocess_time = 0.0
         else:
             # Run benchmarked inference
-            preds, inference_time = benchmark_inference(model, img, num_repeats=num_repeats)
+            preds, inference_time, preprocess_time, _forward_time = benchmark_inference(
+                model, img, num_repeats=num_repeats
+            )
 
             # Post-processing
+            postprocess_start = time.perf_counter()
             boxes, labels, scores = postprocess_preds_page_element(preds, model.thresholds_per_class, model.labels)
+            postprocess_time = time.perf_counter() - postprocess_start
             num_detections = len(boxes)
         total_detections += num_detections
         inference_times.append(inference_time * 1000)  # Convert to ms
+        preprocess_times.append(preprocess_time * 1000)  # Convert to ms
+        postprocess_times.append(postprocess_time * 1000)  # Convert to ms
 
         # Store result
         result = {
             "image_path": str(img_path),
             "image_name": img_path.name,
             "inference_time_ms": inference_time * 1000,
+            "preprocess_time_ms": preprocess_time * 1000,
+            "postprocess_time_ms": postprocess_time * 1000,
             "num_detections": num_detections,
         }
         results.append(result)
-        
+
     end_time = time.perf_counter()
     total_time = end_time - start_time
 
@@ -281,6 +312,18 @@ def main(config=None, log_path: str = "test_results") -> int:
     q75, q25 = np.percentile(times, [75, 25])
     iqr_time = q75 - q25
 
+    preprocess_mean_time = None
+    preprocess_total_time = None
+    postprocess_mean_time = None
+    postprocess_total_time = None
+    if not use_remote:
+        preprocess_np = np.array(preprocess_times)
+        postprocess_np = np.array(postprocess_times)
+        preprocess_mean_time = float(np.mean(preprocess_np))
+        preprocess_total_time = float(np.sum(preprocess_np))
+        postprocess_mean_time = float(np.mean(postprocess_np))
+        postprocess_total_time = float(np.sum(postprocess_np))
+
     # Log metrics
     kv_event_log("total_detections", total_detections, log_path)
     kv_event_log("mean_inference_time_ms", mean_time, log_path)
@@ -291,6 +334,20 @@ def main(config=None, log_path: str = "test_results") -> int:
     kv_event_log("iqr_inference_time_ms", iqr_time, log_path)
     kv_event_log("total_inference_time_ms", total_time, log_path)
     kv_event_log("throughput_images_per_sec", throughput, log_path)
+    if preprocess_mean_time is not None and preprocess_total_time is not None:
+        kv_event_log("mean_preprocess_time_ms", preprocess_mean_time, log_path)
+        kv_event_log("total_preprocess_time_ms", preprocess_total_time, log_path)
+    if postprocess_mean_time is not None and postprocess_total_time is not None:
+        kv_event_log("mean_postprocess_time_ms", postprocess_mean_time, log_path)
+        kv_event_log("total_postprocess_time_ms", postprocess_total_time, log_path)
+
+    if not use_remote:
+        print("=== Local Runtime Breakdown ===")
+        print(f"Pre-processing mean: {preprocess_mean_time:.3f} ms")
+        print(f"Pre-processing total: {preprocess_total_time:.3f} ms")
+        print(f"Post-processing mean: {postprocess_mean_time:.3f} ms")
+        print(f"Post-processing total: {postprocess_total_time:.3f} ms")
+        print("================================")
 
     # Build test results for consolidation
     test_name = config.test_name or os.path.basename(data_dir.rstrip("/"))
@@ -316,6 +373,10 @@ def main(config=None, log_path: str = "test_results") -> int:
             "total_inference_time_ms": total_time,
             "throughput_images_per_sec": throughput,
             "model_load_time_s": model_load_time,
+            "mean_preprocess_time_ms": preprocess_mean_time,
+            "total_preprocess_time_ms": preprocess_total_time,
+            "mean_postprocess_time_ms": postprocess_mean_time,
+            "total_postprocess_time_ms": postprocess_total_time,
         },
         "per_image_results": results,
     }

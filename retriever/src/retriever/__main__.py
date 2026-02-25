@@ -13,6 +13,8 @@ from .vector_store import app as vector_store_app
 from .recall import app as recall_app
 from .txt import __main__ as txt_main
 from .html import __main__ as html_main
+from .online import __main__ as online_main
+from .version import get_version_info
 
 app = typer.Typer(help="Retriever")
 app.add_typer(image_app, name="image")
@@ -25,7 +27,29 @@ app.add_typer(vector_store_app, name="vector-store")
 app.add_typer(recall_app, name="recall")
 app.add_typer(txt_main.app, name="txt")
 app.add_typer(html_main.app, name="html")
+app.add_typer(online_main.app, name="online")
+
+
+def _version_callback(value: bool) -> None:
+    if not value:
+        return
+    info = get_version_info()
+    typer.echo(info["full_version"])
+    raise typer.Exit()
 
 
 def main():
     app()
+
+
+@app.callback()
+def _callback(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        help="Show retriever version metadata and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    )
+) -> None:
+    _ = version

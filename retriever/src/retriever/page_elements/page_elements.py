@@ -303,6 +303,37 @@ def _annotation_dict_to_detections(
     return dets
 
 
+def _bounding_boxes_to_detections(
+    bb_dict: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Convert a bounding_boxes dict (NIM API format) to detection dicts.
+
+    Input format: {"label": [{"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ..., "confidence": ...}, ...]}
+    """
+    dets: List[Dict[str, Any]] = []
+    for api_name, entries in bb_dict.items():
+        retriever_name = _API_TO_RETRIEVER.get(api_name, api_name)
+        try:
+            label_id = _RETRIEVER_LABEL_NAMES.index(retriever_name)
+        except ValueError:
+            label_id = None
+        for entry in entries:
+            dets.append(
+                {
+                    "bbox_xyxy_norm": [
+                        float(entry["x_min"]),
+                        float(entry["y_min"]),
+                        float(entry["x_max"]),
+                        float(entry["y_max"]),
+                    ],
+                    "label": label_id,
+                    "label_name": retriever_name,
+                    "score": float(entry.get("confidence", 0.0)),
+                }
+            )
+    return dets
+
+
 def _apply_page_elements_v3_postprocess(
     dets: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
@@ -355,6 +386,19 @@ def _remote_response_to_detections(
             return _apply_page_elements_v3_postprocess(dets)
         except Exception:
             pass
+
+    # NIM bounding_boxes format:
+    # {"index": 0, "bounding_boxes": {"title": [{"x_min": ..., "y_min": ..., ...}]}}
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+        bb = cand.get("bounding_boxes")
+        if isinstance(bb, dict):
+            try:
+                dets = _bounding_boxes_to_detections(bb)
+                return _apply_page_elements_v3_postprocess(dets)
+            except Exception:
+                pass
 
     # Fall back to API-style annotation dict:
     # {"table": [[x0,y0,x1,y1,conf], ...], "paragraph": [...]}
@@ -438,7 +482,7 @@ def detect_page_elements_v3(
 
     label_names = _labels_from_model(model) if model is not None else list(_RETRIEVER_LABEL_NAMES)
     if model is not None and hasattr(model, "thresholds_per_class"):
-        thresholds_per_class = list(getattr(model, "thresholds_per_class"))
+        thresholds_per_class = getattr(model, "thresholds_per_class")
     else:
         thresholds_per_class = [0.0 for _ in label_names]
 
@@ -511,6 +555,7 @@ def detect_page_elements_v3(
                 }
         except BaseException as e:
             elapsed = time.perf_counter() - t0
+            print(f"Warning: page_elements remote inference failed: {type(e).__name__}: {e}")
             for row_i in valid_indices:
                 row_payloads[row_i] = _error_payload(stage="remote_inference", exc=e) | {
                     "timing": {"seconds": float(elapsed)}
@@ -564,7 +609,8 @@ def detect_page_elements_v3(
         try:
             # Best-effort: pass list of shapes for batching; fall back to per-image if unsupported.
             with torch.inference_mode():
-                preds = model(batch, orig_shapes) if len(pre_list) > 1 else model(batch, orig_shapes[0])
+                with torch.autocast(device_type="cuda"):
+                    preds = model(batch, orig_shapes) if len(pre_list) > 1 else model(batch, orig_shapes[0])
             # Some local wrappers return only the first prediction dict even for batched inputs.
             # Detect that and force per-image invocation so every row gets its own detections.
             if len(pre_list) > 1:
@@ -608,7 +654,7 @@ def detect_page_elements_v3(
                         continue
                     b_np, l_np, s_np = postprocess_preds_page_element(
                         p,
-                        list(thresholds_per_class),
+                        thresholds_per_class,
                         label_names,
                     )
                     boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))

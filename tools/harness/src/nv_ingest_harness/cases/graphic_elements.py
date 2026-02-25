@@ -69,8 +69,9 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
 
     # Run once more to get the actual predictions
     with torch.inference_mode():
-        x = model.preprocess(img)
-        preds = model(x, img.shape)[0]
+        with torch.autocast(device_type="cuda"):
+            x = model.preprocess(img)
+            preds = model(x, img.shape)[0]
 
     return preds, measurement.mean
 
