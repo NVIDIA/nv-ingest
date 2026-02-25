@@ -9,6 +9,7 @@ Run with:
   uv run python -m retriever.examples.online_pipeline <input-dir>
   uv run python -m retriever.examples.online_pipeline <input-dir> --run-mode online --base-url http://localhost:7670
 """
+
 import json
 import os
 from pathlib import Path

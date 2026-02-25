@@ -2,6 +2,7 @@
 Batch ingestion pipeline with optional recall evaluation.
 Run with: uv run python -m retriever.examples.batch_pipeline <input-dir>
 """
+
 import json
 import logging
 import os
@@ -233,10 +234,7 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
         print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
         return
     if processed_pages is None:
-        print(
-            "Pages/sec: unavailable (could not estimate processed pages). "
-            f"Ingest time: {ingest_elapsed_s:.2f}s"
-        )
+        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
         return
 
     pps = processed_pages / ingest_elapsed_s
@@ -338,7 +336,7 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
+        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -536,17 +534,11 @@ def main(
             gpu_page_elements = 0.0
 
         if ocr_invoke_url and float(gpu_ocr) != 0.0:
-            print(
-                "[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from "
-                f"{float(gpu_ocr):.3f} to 0.0"
-            )
+            print("[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from " f"{float(gpu_ocr):.3f} to 0.0")
             gpu_ocr = 0.0
 
         if embed_invoke_url and float(gpu_embed) != 0.0:
-            print(
-                "[WARN] --embed-invoke-url is set; forcing --gpu-embed from "
-                f"{float(gpu_embed):.3f} to 0.0"
-            )
+            print("[WARN] --embed-invoke-url is set; forcing --gpu-embed from " f"{float(gpu_embed):.3f} to 0.0")
             gpu_embed = 0.0
 
         # Resolve Ray: start a head node, connect to given address, or run in-process
@@ -704,8 +696,7 @@ def main(
                 time.sleep(2)
         if table is None:
             raise RuntimeError(
-                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
-                f"but it was not found."
+                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
             ) from open_err
         try:
             if int(table.count_rows()) == 0:
@@ -730,7 +721,11 @@ def main(
         if not no_recall_details:
             print("\nPer-query retrieval details:")
         missed_gold: list[tuple[str, str]] = []
-        ext = ".html" if input_type == "html" else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
+        ext = (
+            ".html"
+            if input_type == "html"
+            else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
+        )
         for i, (q, g, hits) in enumerate(
             zip(
                 _df_query["query"].astype(str).tolist(),

@@ -93,11 +93,7 @@ def _git_sha_short() -> str:
 def _build_number() -> str:
     # Prefer explicit CI build numbers; fall back to timestamp so local builds
     # naturally produce monotonically increasing dev versions.
-    candidate = (
-        os.getenv("RETRIEVER_BUILD_NUMBER")
-        or os.getenv("GITHUB_RUN_NUMBER")
-        or os.getenv("NV_INGEST_REV")
-    )
+    candidate = os.getenv("RETRIEVER_BUILD_NUMBER") or os.getenv("GITHUB_RUN_NUMBER") or os.getenv("NV_INGEST_REV")
     if candidate and candidate.isdigit():
         return candidate
     return _build_datetime().strftime("%Y%m%d%H%M%S")
@@ -105,20 +101,12 @@ def _build_number() -> str:
 
 @lru_cache(maxsize=1)
 def _base_version() -> str:
-    return (
-        os.getenv("RETRIEVER_VERSION")
-        or os.getenv("NV_INGEST_VERSION")
-        or _build_datetime().strftime("%Y.%m.%d")
-    )
+    return os.getenv("RETRIEVER_VERSION") or os.getenv("NV_INGEST_VERSION") or _build_datetime().strftime("%Y.%m.%d")
 
 
 def get_build_version() -> str:
     """Return a PEP 440 compliant version string for packaging."""
-    release_type = (
-        os.getenv("RETRIEVER_RELEASE_TYPE")
-        or os.getenv("NV_INGEST_RELEASE_TYPE")
-        or "dev"
-    ).lower()
+    release_type = (os.getenv("RETRIEVER_RELEASE_TYPE") or os.getenv("NV_INGEST_RELEASE_TYPE") or "dev").lower()
 
     base_version = _base_version()
     build_number = _build_number()
@@ -128,10 +116,7 @@ def get_build_version() -> str:
     if release_type == "dev":
         return f"{base_version}.dev{build_number}"
 
-    raise ValueError(
-        "Invalid release type. Expected one of: dev, release. "
-        f"Received: {release_type!r}"
-    )
+    raise ValueError("Invalid release type. Expected one of: dev, release. " f"Received: {release_type!r}")
 
 
 def _installed_version() -> str | None:

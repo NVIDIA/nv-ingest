@@ -238,4 +238,3 @@ embedding:
 
   # Optional: request embedding vector size if the backend supports it
   # dimensions: 1024
-

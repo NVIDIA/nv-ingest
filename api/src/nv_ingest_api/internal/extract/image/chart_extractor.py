@@ -20,7 +20,7 @@ from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graph
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -480,7 +480,7 @@ def extract_chart_data_from_image_internal(
             ocr_model_name = "local"
         else:
             # Get the grpc endpoint to determine the model if needed
-            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
             # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
             ocr_model_name = "scene_text_ensemble"
             ocr_client = _create_ocr_client(ocr_endpoints, ocr_protocol, ocr_model_name, auth_token)

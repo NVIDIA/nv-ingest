@@ -56,8 +56,7 @@ class Ingestor:
 
     def _not_implemented(self, method_name: str) -> "None":
         raise NotImplementedError(
-            f"{self.__class__.__name__}.{method_name}() is not implemented yet "
-            f"(run_mode={self.RUN_MODE})."
+            f"{self.__class__.__name__}.{method_name}() is not implemented yet " f"(run_mode={self.RUN_MODE})."
         )
 
     def files(self, documents: Union[str, List[str]]) -> "Ingestor":

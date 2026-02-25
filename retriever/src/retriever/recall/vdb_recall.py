@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import typer
-import pandas as pd
+import pandas as pd  # noqa: F401
 from rich.console import Console
 
-from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df
+from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df  # noqa: F401
 
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()
@@ -175,7 +175,7 @@ def recall_with_main(
         print(f"\tGold PDF: {g_pdf} - Gold Page: {g_page}")
         if has_separate_cols:
             print(f"\tOther PDF: {gold_pdfs[idx]} - Other Page: {gold_pages[idx]}")
-        print(f"\tTop-k Results:")
+        print(f"\tTop-k Results:")  # noqa: F541
 
         for i, h in enumerate(hits[:top_k]):
             meta = json.loads(h["metadata"]) if isinstance(h["metadata"], str) else h["metadata"]

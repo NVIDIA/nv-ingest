@@ -22,9 +22,7 @@ app = typer.Typer(help="Benchmark `PDFExtractionActor` throughput (rows/sec).")
 @app.command("run")
 def run(
     pdf_path: Path = typer.Option(..., "--pdf-path", exists=True, dir_okay=False, file_okay=True, help="Input PDF."),
-    rows: int = typer.Option(
-        256, "--rows", min=1, help="How many page rows to synthesize for each benchmark trial."
-    ),
+    rows: int = typer.Option(256, "--rows", min=1, help="How many page rows to synthesize for each benchmark trial."),
     workers: str = typer.Option("1,2,4", "--workers", help="Comma-separated worker counts to try."),
     batch_sizes: str = typer.Option("1,2,4,8,16", "--batch-sizes", help="Comma-separated Ray batch sizes to try."),
     dpi: int = typer.Option(200, "--dpi", min=72, help="Render DPI for page image extraction."),

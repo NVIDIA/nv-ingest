@@ -288,10 +288,7 @@ class GPUWorkerPool:
                 )
             # Check if worker died during startup
             if not self._workers[idx].is_alive():
-                raise RuntimeError(
-                    f"GPU worker {idx} (device {self._gpu_devices[idx]}) "
-                    f"died during startup"
-                )
+                raise RuntimeError(f"GPU worker {idx} (device {self._gpu_devices[idx]}) " f"died during startup")
 
         self._started = True
 

@@ -7,4 +7,3 @@ __all__ = [
     "write_embeddings_to_lancedb",
     "write_text_embeddings_dir_to_lancedb",
 ]
-

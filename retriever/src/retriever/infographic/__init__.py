@@ -24,4 +24,3 @@ try:  # pragma: no cover
     ]
 except Exception:
     pass
-

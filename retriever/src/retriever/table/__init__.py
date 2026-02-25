@@ -13,4 +13,3 @@ __all__ = [
     "extract_table_data_from_primitives_df",
     "load_table_extractor_schema_from_dict",
 ]
-

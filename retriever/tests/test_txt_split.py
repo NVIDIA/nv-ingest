@@ -2,7 +2,7 @@
 Unit tests for retriever.txt.split: split_text_by_tokens and txt_file_to_chunks_df.
 """
 
-import tempfile
+import tempfile  # noqa: F401
 from pathlib import Path
 
 import pandas as pd

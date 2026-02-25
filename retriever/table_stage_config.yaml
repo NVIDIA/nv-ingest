@@ -36,4 +36,3 @@ endpoint_config:
   # Optional performance knobs
   nim_batch_size: 2
   workers_per_progress_engine: 5
-

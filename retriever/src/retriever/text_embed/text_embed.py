@@ -12,7 +12,7 @@ It mirrors the "pure pandas batch fn + Ray-friendly actor" pattern used by:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence  # noqa: F401
 
 import time
 import traceback
@@ -156,7 +156,11 @@ def embed_text_1b_v2(
     out = batch_df.copy()
     out[output_column] = payloads
     out[embedding_dim_column] = [
-        int(len((p or {}).get("embedding") or [])) if isinstance(p, dict) and isinstance(p.get("embedding"), list) else 0
+        (
+            int(len((p or {}).get("embedding") or []))
+            if isinstance(p, dict) and isinstance(p.get("embedding"), list)
+            else 0
+        )
         for p in payloads
     ]
     out[has_embedding_column] = [bool(d > 0) for d in out[embedding_dim_column].tolist()]
@@ -204,4 +208,3 @@ class TextEmbedActor:
                 out["text_embeddings_1b_v2_has_embedding"] = [False for _ in range(len(out.index))]
                 return out
             return [{"text_embeddings_1b_v2": _error_payload(stage="actor_call", exc=e)}]
-

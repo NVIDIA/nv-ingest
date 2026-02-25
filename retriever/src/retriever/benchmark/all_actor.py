@@ -20,9 +20,7 @@ def run(
     ),
     rows_ocr: int = typer.Option(128, "--rows-ocr", min=1, help="Synthetic rows per OCR benchmark trial."),
     workers: str = typer.Option("1,2", "--workers", help="Comma-separated worker counts used by all stages."),
-    batch_sizes: str = typer.Option(
-        "1,2,4,8", "--batch-sizes", help="Comma-separated batch sizes used by all stages."
-    ),
+    batch_sizes: str = typer.Option("1,2,4,8", "--batch-sizes", help="Comma-separated batch sizes used by all stages."),
     dpi: int = typer.Option(200, "--dpi", min=72, help="Seed extraction DPI for extraction/detection/OCR stages."),
     inference_batch_size: int = typer.Option(
         8, "--inference-batch-size", min=1, help="Internal model inference batch size for page-elements stage."

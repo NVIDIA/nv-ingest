@@ -138,4 +138,3 @@ def load_ingest_config_section(
         print(f"--- end ingest config section: {section} ---", file=sys.stderr)
 
     return sub
-

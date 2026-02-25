@@ -87,25 +87,24 @@ class _LanceDBWriteActor:
         self._table = None
         mode = "overwrite" if self._overwrite else "create"
         fields = [
-                pa.field("vector", pa.list_(pa.float32(), 2048)),
-                pa.field("pdf_page", pa.string()),
-                pa.field("filename", pa.string()),
-                pa.field("pdf_basename", pa.string()),
-                pa.field("page_number", pa.int32()),
-                pa.field("source_id", pa.string()),
-                pa.field("path", pa.string()),
-                pa.field("text", pa.string()),
-                pa.field("metadata", pa.string()),
-                pa.field("source", pa.string()),
-            ]
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+            pa.field("source", pa.string()),
+        ]
         self._schema = pa.schema(fields)
 
         self._table = self._db.create_table(
-                        self._table_name,
-                        schema=self._schema,
-                        mode=mode,
-                    )
-
+            self._table_name,
+            schema=self._schema,
+            mode=mode,
+        )
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch.
@@ -169,9 +168,7 @@ class _LanceDBWriteActor:
             pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
             if isinstance(pe_counts, dict):
                 metadata_obj["page_elements_v3_counts_by_label"] = {
-                    str(k): int(v)
-                    for k, v in pe_counts.items()
-                    if isinstance(k, str) and v is not None
+                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
                 }
             for ocr_col in ("table", "chart", "infographic"):
                 entries = getattr(row, ocr_col, None)
@@ -292,8 +289,8 @@ class BatchIngestor(Ingestor):
         self._tasks: List[tuple[str, dict[str, Any]]] = []
         self._intermediate_output_dir: Optional[str] = None
         self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
-        self._extract_txt_kwargs: Dict[str, Any] = {}
-        self._extract_html_kwargs: Dict[str, Any] = {}
+        self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
+        self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -691,6 +688,7 @@ class BatchIngestor(Ingestor):
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
         """
+
         def _endpoint_count(raw: Any) -> int:
             s = str(raw or "").strip()
             if not s:

@@ -29,7 +29,6 @@ except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
 
 
-
 def _render_page_to_base64(page: Any, *, dpi: int = 200, image_format: str = "png") -> Dict[str, Any]:
     """
     Render a page to an image and return base64 plus minimal metadata.
@@ -148,6 +147,7 @@ def _is_scanned_page(page) -> bool:
 
     return num_chars == 0 and num_images > 0
 
+
 def _extract_page_text(page) -> str:
     """
     Always extract text from the given page and return it as a raw string.
@@ -155,6 +155,7 @@ def _extract_page_text(page) -> str:
     """
     textpage = page.get_textpage()
     return textpage.get_text_bounded()
+
 
 def pdf_extraction(
     pdf_binary: Any,
@@ -167,14 +168,15 @@ def pdf_extraction(
     image_format: str = "png",
     text_extraction_method: str = "pdfium_hybrid",
     text_depth: str = "page",
-    **kwargs: Any) -> Any:
+    **kwargs: Any,
+) -> Any:
     """
     Here are the steps for pdf extraction that should be implemented:
     1. Load the pdf from the binary data using pypdfium2
     2. Iterate through each page of the pdf using pypdfium2
     3. Extract the text from each page and save each page's text to a list of strings if extract_text is True
-    4. If extract_images, extract_tables, extract_charts, or extract_infographics are True, convert the page to a numpy array using pypdfium2 and convert it to a base64 string and save it to a list of strings.
-    5. IF extract_text is True but pypdfium2 does not detect text on the page also convert the page to a numpy array using pypdfium2 so that it can later be passed to a OCR model and indicate this in the metadata.
+    4. If extract_images, extract_tables, extract_charts, or extract_infographics are True, convert the page to a numpy array using pypdfium2 and convert it to a base64 string and save it to a list of strings.  # noqa: E501, W505
+    5. IF extract_text is True but pypdfium2 does not detect text on the page also convert the page to a numpy array using pypdfium2 so that it can later be passed to a OCR model and indicate this in the metadata.  # noqa: E501, W505
     6. Return a list of dictionaries containing the text, images, tables, charts, infographics, and page numbers.
     """
 
@@ -191,7 +193,11 @@ def pdf_extraction(
                     _error_record(
                         source_path=str(pdf_path) if pdf_path is not None else None,
                         stage="import_pypdfium2",
-                        exc=_PDFIUM_IMPORT_ERROR if _PDFIUM_IMPORT_ERROR is not None else RuntimeError("pypdfium2 unavailable"),
+                        exc=(
+                            _PDFIUM_IMPORT_ERROR
+                            if _PDFIUM_IMPORT_ERROR is not None
+                            else RuntimeError("pypdfium2 unavailable")
+                        ),
                         page_number=0,
                         dpi=dpi,
                     )
@@ -227,10 +233,13 @@ def pdf_extraction(
                     is_scanned_page = _is_scanned_page(page)
 
                     ocr_extraction_needed_for_text = extract_text and (
-                        (text_extraction_method == "pdfium_hybrid" and is_scanned_page) or text_extraction_method == "ocr"
+                        (text_extraction_method == "pdfium_hybrid" and is_scanned_page)
+                        or text_extraction_method == "ocr"
                     )
 
-                    extraction_needed_for_structured = extract_tables or extract_charts or extract_infographics
+                    # extraction_needed_for_structured = (
+                    #     extract_tables or extract_charts or extract_infographics
+                    # )  # noqa: F841
 
                     # Default to empty so scanned/OCR pages don't hit a NameError below.
                     text = ""
@@ -247,7 +256,11 @@ def pdf_extraction(
                     has_text = bool(text.strip()) if extract_text else False
 
                     want_any_raster = bool(
-                        extract_images or extract_tables or extract_charts or extract_infographics or ocr_extraction_needed_for_text
+                        extract_images
+                        or extract_tables
+                        or extract_charts
+                        or extract_infographics
+                        or ocr_extraction_needed_for_text
                     )
                     render_info: Optional[Dict[str, Any]] = None
                     if want_any_raster:

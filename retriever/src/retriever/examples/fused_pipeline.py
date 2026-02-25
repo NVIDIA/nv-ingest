@@ -236,8 +236,7 @@ def main(
                 time.sleep(2)
         if table is None:
             raise RuntimeError(
-                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
-                f"but it was not found."
+                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
             ) from open_err
         try:
             if int(table.count_rows()) == 0:

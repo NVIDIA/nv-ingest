@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union  # noqa: F401
 
 import base64
 import io
 import os
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 
 import numpy as np
 import torch
@@ -118,7 +118,7 @@ class NemotronOCRV1(BaseModel):
         else:
             x = x.clamp(0, 255).to(dtype=torch.uint8)
 
-        c, h, w = int(x.shape[0]), int(x.shape[1]), int(x.shape[2])
+        c, h, w = int(x.shape[0]), int(x.shape[1]), int(x.shape[2])  # noqa: F841
         if c == 1:
             arr = x.squeeze(0).numpy()
             pil = Image.fromarray(arr, mode="L").convert("RGB")
@@ -243,7 +243,7 @@ class NemotronOCRV1(BaseModel):
             "type": "ocr_results",
             "format": "structured",
             "structure": {
-                "boxes": "List[List[List[float]]] - quadrilateral bounding box coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]",
+                "boxes": "List[List[List[float]]] - quadrilateral bounding box coordinates [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]",  # noqa: E501
                 "texts": "List[str] - recognized text strings",
                 "confidences": "List[float] - confidence scores per detection",
             },

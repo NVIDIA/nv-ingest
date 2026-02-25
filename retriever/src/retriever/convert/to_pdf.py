@@ -79,9 +79,7 @@ def convert_to_pdf_bytes(file_bytes: bytes, extension: str) -> bytes:
 
         pdf_path = os.path.join(tmp_dir, "input.pdf")
         if not os.path.exists(pdf_path):
-            raise RuntimeError(
-                f"LibreOffice conversion produced no output for {extension} file"
-            )
+            raise RuntimeError(f"LibreOffice conversion produced no output for {extension} file")
 
         with open(pdf_path, "rb") as f:
             return f.read()
@@ -97,9 +95,7 @@ def convert_batch_to_pdf(batch_df: Any) -> pd.DataFrame:
     is emitted (matching the pattern in ``pdf/split.py``).
     """
     if not isinstance(batch_df, pd.DataFrame):
-        raise NotImplementedError(
-            "convert_batch_to_pdf currently only supports pandas.DataFrame input."
-        )
+        raise NotImplementedError("convert_batch_to_pdf currently only supports pandas.DataFrame input.")
 
     out_rows: List[Dict[str, Any]] = []
     for _, row in batch_df.iterrows():

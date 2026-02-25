@@ -614,10 +614,14 @@ def transform_create_text_embeddings_internal(
     """
     # Allow task_config to explicitly override values with None by checking key presence.
     api_key = task_config["api_key"] if "api_key" in task_config else transform_config.api_key
-    endpoint_url = task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
+    endpoint_url = (
+        task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
+    )
     model_name = task_config["model_name"] if "model_name" in task_config else transform_config.embedding_model
     custom_content_field = (
-        task_config["custom_content_field"] if "custom_content_field" in task_config else transform_config.custom_content_field
+        task_config["custom_content_field"]
+        if "custom_content_field" in task_config
+        else transform_config.custom_content_field
     )
     dimensions = task_config["dimensions"] if "dimensions" in task_config else transform_config.dimensions
 

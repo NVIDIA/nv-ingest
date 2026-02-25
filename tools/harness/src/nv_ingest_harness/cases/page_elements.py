@@ -68,7 +68,7 @@ def benchmark_inference(model, img: np.ndarray, num_repeats: int = 1) -> tuple[d
         globals={"model": model, "img": img},
         num_threads=1,
     )
-    _preprocess_measurement = preprocess_timer.timeit(num_repeats)
+    _preprocess_measurement = preprocess_timer.timeit(num_repeats)  # noqa: F841
 
     # # Timer measures forward pass only using a preprocessed tensor
     # # Move the numpy array to CUDA device (if available)

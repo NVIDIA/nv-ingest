@@ -196,9 +196,7 @@ def test_transform_create_text_embeddings_internal_with_only_empty_text(mock_asy
 
 
 @patch(f"{MODULE_UNDER_TEST}._async_runner")
-def test_transform_create_text_embeddings_internal_uses_callable_embedder_when_no_endpoint(
-    mock_async_runner, dummy_df
-):
+def test_transform_create_text_embeddings_internal_uses_callable_embedder_when_no_endpoint(mock_async_runner, dummy_df):
     def _local_embedder(texts):
         return [[0.9, 0.8]] * len(list(texts))
 

@@ -124,13 +124,13 @@ def _decode_b64_image_to_np_array(image_b64: str) -> Tuple["np.array", Tuple[int
 
 def _labels_from_model(_model: Any) -> List[str]:
     return [
-            "table",
-            "chart",
-            "title",
-            "infographic",
-            "text",
-            "header_footer",
-        ]
+        "table",
+        "chart",
+        "title",
+        "infographic",
+        "text",
+        "header_footer",
+    ]
 
 
 def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
@@ -538,8 +538,7 @@ def detect_page_elements_v3(
 
             if len(response_items) != len(valid_indices):
                 raise RuntimeError(
-                    "Remote response count mismatch: "
-                    f"expected {len(valid_indices)}, got {len(response_items)}"
+                    "Remote response count mismatch: " f"expected {len(valid_indices)}, got {len(response_items)}"
                 )
 
             for local_i, row_i in enumerate(valid_indices):
@@ -562,7 +561,7 @@ def detect_page_elements_v3(
                 }
 
     for chunk_start in range(0, len(valid_indices), int(inference_batch_size)):
-        chunk_idx = valid_indices[chunk_start:chunk_start + int(inference_batch_size)]
+        chunk_idx = valid_indices[chunk_start : chunk_start + int(inference_batch_size)]
         if not chunk_idx:
             continue
 
@@ -624,7 +623,7 @@ def detect_page_elements_v3(
             print(f"Error invoking model: {ex}")
             preds_list: List[Any] = []
             for j in range(int(batch.shape[0])):
-                preds_list.append(model(batch[j:j + 1], orig_shapes[j]))
+                preds_list.append(model(batch[j : j + 1], orig_shapes[j]))
             preds = preds_list
         elapsed = time.perf_counter() - t0
 
@@ -737,4 +736,3 @@ class PageElementDetectionActor:
                 out["page_elements_v3_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"page_elements_v3": _error_payload(stage="actor_call", exc=e)}]
-

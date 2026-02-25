@@ -470,9 +470,7 @@ def ocr_page_elements(
                         max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
                     )
                     if len(response_items) != len(crop_meta):
-                        raise RuntimeError(
-                            f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}"
-                        )
+                        raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")
 
                     for i, (label_name, bbox) in enumerate(crop_meta):
                         preds = _extract_remote_ocr_item(response_items[i])
@@ -602,7 +600,7 @@ class OCRActor:
         else:
             from retriever.model.local import NemotronOCRV1
 
-            #self._model = NemotronOCRV1(model_dir=model_dir)
+            # self._model = NemotronOCRV1(model_dir=model_dir)
             self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)

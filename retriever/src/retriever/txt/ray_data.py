@@ -4,7 +4,7 @@ Ray Data adapter for .txt: TxtSplitActor turns bytes+path batches into chunk row
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List  # noqa: F401
 
 import pandas as pd
 

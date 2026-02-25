@@ -47,9 +47,7 @@ def _normalize_batch_response(response_json: Any, expected_count: int) -> List[A
         out.append(item)
 
     if len(out) != int(expected_count):
-        raise RuntimeError(
-            f"Remote response count mismatch: expected {expected_count}, got {len(out)}"
-        )
+        raise RuntimeError(f"Remote response count mismatch: expected {expected_count}, got {len(out)}")
     return out
 
 

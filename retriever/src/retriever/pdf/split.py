@@ -46,7 +46,9 @@ def _split_pdf_to_single_page_bytes(pdf_binary: Any) -> List[bytes]:
     Split a PDF into single-page PDFs (raw bytes) using pypdfium2.
     """
     if pdfium is None:  # pragma: no cover
-        raise ImportError("pypdfium2 is required for PDF splitting but could not be imported.") from _PDFIUM_IMPORT_ERROR
+        raise ImportError(
+            "pypdfium2 is required for PDF splitting but could not be imported."
+        ) from _PDFIUM_IMPORT_ERROR
 
     try:
         doc = pdfium.PdfDocument(pdf_binary)
@@ -88,7 +90,9 @@ def pdf_path_to_pages_df(path: str) -> pd.DataFrame:
     Compatible with pdf_extraction and downstream inprocess/batch stages.
     """
     if pdfium is None:  # pragma: no cover
-        raise ImportError("pypdfium2 is required for PDF splitting but could not be imported.") from _PDFIUM_IMPORT_ERROR
+        raise ImportError(
+            "pypdfium2 is required for PDF splitting but could not be imported."
+        ) from _PDFIUM_IMPORT_ERROR
 
     abs_path = str(Path(path).resolve())
     out_rows: List[Dict[str, Any]] = []
@@ -104,9 +108,7 @@ def pdf_path_to_pages_df(path: str) -> pd.DataFrame:
                 }
             )
     except BaseException as e:
-        out_rows.append(
-            {"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}
-        )
+        out_rows.append({"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)})
     return pd.DataFrame(out_rows)
 
 
@@ -186,4 +188,3 @@ def split_pdf(pdf_ds: Any, **kwargs: Any) -> Any:
 
     # Note: returning a Dataset here creates the new dataset representing pages.
     return pdf_ds.map_batches(PDFSplitActor(**kwargs), batch_format="pandas")
-

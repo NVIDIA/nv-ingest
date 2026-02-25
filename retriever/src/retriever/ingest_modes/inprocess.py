@@ -23,8 +23,8 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
-from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
-from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3
+from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3  # noqa: F401
+from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3  # noqa: F401
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
@@ -202,7 +202,7 @@ def embed_text_main_text_embed(
     _embed = None
     if _endpoint is None and model is not None:
 
-        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:  # noqa: F811
             prefixed = [f"passage: {t}" for t in texts]
             vecs = model.embed(prefixed, batch_size=int(inference_batch_size))
             tolist = getattr(vecs, "tolist", None)
@@ -243,6 +243,7 @@ def embed_text_main_text_embed(
     except BaseException as e:
         # Fail-soft: preserve batch shape and set an error payload per-row.
         import traceback as _tb
+
         print(f"Warning: embedding failed: {type(e).__name__}: {e}")
         _tb.print_exc()
         err_payload = {"embedding": None, "error": {"stage": "embed", "type": e.__class__.__name__, "message": str(e)}}
@@ -346,10 +347,7 @@ def pages_df_from_pdf_bytes(pdf_bytes: Union[bytes, bytearray], source_path: str
     received via REST. Columns: bytes, path, page_number.
     """
     pages = _split_pdf_to_single_page_bytes(pdf_bytes)
-    out_rows = [
-        {"bytes": b, "path": source_path, "page_number": i + 1}
-        for i, b in enumerate(pages)
-    ]
+    out_rows = [{"bytes": b, "path": source_path, "page_number": i + 1} for i, b in enumerate(pages)]
     return pd.DataFrame(out_rows)
 
 
@@ -564,9 +562,7 @@ def upload_embeddings_to_lancedb_inprocess(
         pe_counts = getattr(r, "page_elements_v3_counts_by_label", None)
         if isinstance(pe_counts, dict):
             metadata_obj["page_elements_v3_counts_by_label"] = {
-                str(k): int(v)
-                for k, v in pe_counts.items()
-                if isinstance(k, str) and v is not None
+                str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
             }
         for ocr_col in ("table", "chart", "infographic"):
             entries = getattr(r, ocr_col, None)
@@ -805,9 +801,7 @@ def _process_doc_cpu(doc_path: str, cpu_tasks: list) -> pd.DataFrame:
     except Exception as e:
         # Return a minimal error DataFrame so one failed document does not
         # halt the pipeline.
-        return pd.DataFrame(
-            [{"bytes": b"", "path": doc_path, "page_number": 0, "error": f"{type(e).__name__}: {e}"}]
-        )
+        return pd.DataFrame([{"bytes": b"", "path": doc_path, "page_number": 0, "error": f"{type(e).__name__}: {e}"}])
 
 
 def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
@@ -826,9 +820,7 @@ def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
                 current = func(current, **kwargs)
         return current
     except Exception as e:
-        return pd.DataFrame(
-            [{"bytes": b"", "path": "", "page_number": 0, "error": f"{type(e).__name__}: {e}"}]
-        )
+        return pd.DataFrame([{"bytes": b"", "path": "", "page_number": 0, "error": f"{type(e).__name__}: {e}"}])
 
 
 def _collect_summary_from_df(df: pd.DataFrame) -> dict:
@@ -878,9 +870,7 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
         # inprocess pipeline keeps them as top-level DataFrame columns.
         try:
             pe = int(
-                meta.get("page_elements_v3_num_detections")
-                or row_dict.get("page_elements_v3_num_detections")
-                or 0
+                meta.get("page_elements_v3_num_detections") or row_dict.get("page_elements_v3_num_detections") or 0
             )
         except (TypeError, ValueError):
             pe = 0
@@ -1340,8 +1330,7 @@ class InProcessIngestor(Ingestor):
 
                     with ProcessPoolExecutor(max_workers=max_workers) as cpu_pool:
                         future_to_idx = {
-                            cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i
-                            for i, chunk in enumerate(chunks)
+                            cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i for i, chunk in enumerate(chunks)
                         }
 
                         for future in as_completed(future_to_idx):
@@ -1412,10 +1401,7 @@ class InProcessIngestor(Ingestor):
                 doc_done: dict[str, int] = defaultdict(int)
 
                 with ProcessPoolExecutor(max_workers=max_workers) as pool:
-                    future_to_idx = {
-                        pool.submit(_process_chunk_cpu, c, cpu_tasks): i
-                        for i, c in enumerate(chunks)
-                    }
+                    future_to_idx = {pool.submit(_process_chunk_cpu, c, cpu_tasks): i for i, c in enumerate(chunks)}
 
                     for future in as_completed(future_to_idx):
                         idx = future_to_idx[future]
@@ -1493,8 +1479,7 @@ class InProcessIngestor(Ingestor):
                 if show_progress and tqdm is not None:
                     # Docs whose chunks all failed CPU are already done
                     already_done = sum(
-                        1 for d in docs
-                        if d not in doc_chunk_total or doc_done.get(d, 0) >= doc_chunk_total[d]
+                        1 for d in docs if d not in doc_chunk_total or doc_done.get(d, 0) >= doc_chunk_total[d]
                     )
                     progress = tqdm(total=len(docs), desc="Processing files", unit="file", initial=already_done)
 
@@ -1547,15 +1532,10 @@ class InProcessIngestor(Ingestor):
                             file_bytes = f.read()
                         pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
                         pages = _split_pdf_to_single_page_bytes(pdf_bytes)
-                        out_rows = [
-                            {"bytes": b, "path": abs_path, "page_number": i + 1}
-                            for i, b in enumerate(pages)
-                        ]
+                        out_rows = [{"bytes": b, "path": abs_path, "page_number": i + 1} for i, b in enumerate(pages)]
                         return pd.DataFrame(out_rows)
                     except BaseException as e:
-                        return pd.DataFrame(
-                            [{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}]
-                        )
+                        return pd.DataFrame([{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}])
                 return pdf_path_to_pages_df(p)
 
         elif self._pipeline_type == "html":

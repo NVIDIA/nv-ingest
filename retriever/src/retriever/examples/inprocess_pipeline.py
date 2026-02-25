@@ -2,6 +2,7 @@
 In-process ingestion pipeline (no Ray) with optional recall evaluation.
 Run with: uv run python -m retriever.examples.inprocess_pipeline <input-dir>
 """
+
 import json
 import os
 import time
@@ -46,10 +47,7 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
         print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
         return
     if processed_pages is None:
-        print(
-            "Pages/sec: unavailable (could not estimate processed pages). "
-            f"Ingest time: {ingest_elapsed_s:.2f}s"
-        )
+        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
         return
 
     pps = processed_pages / ingest_elapsed_s
@@ -101,18 +99,18 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
+        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
         "--query-csv",
         path_type=Path,
-        help="Path to query CSV for recall evaluation. Default: bo767_query_gt.csv (current directory). Recall is skipped if the file does not exist.",
+        help="Path to query CSV for recall evaluation. Default: bo767_query_gt.csv (current directory). Recall is skipped if the file does not exist.",  # noqa: E501
     ),
     no_recall_details: bool = typer.Option(
         False,
         "--no-recall-details",
-        help="Do not print per-query retrieval details (query, gold, hits). Only the missed-gold summary and recall metrics are printed.",
+        help="Do not print per-query retrieval details (query, gold, hits). Only the missed-gold summary and recall metrics are printed.",  # noqa: E501
     ),
     max_workers: int = typer.Option(
         16,
@@ -127,7 +125,7 @@ def main(
     num_gpus: Optional[int] = typer.Option(
         None,
         "--num-gpus",
-        help="Number of GPUs to use, starting from device 0 (e.g. --num-gpus 2 → GPUs 0,1). Mutually exclusive with --gpu-devices.",
+        help="Number of GPUs to use, starting from device 0 (e.g. --num-gpus 2 → GPUs 0,1). Mutually exclusive with --gpu-devices.",  # noqa: E501
     ),
     page_elements_invoke_url: Optional[str] = typer.Option(
         None,
@@ -276,7 +274,11 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
-            ext = ".txt" if input_type == "txt" else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
+            ext = (
+                ".txt"
+                if input_type == "txt"
+                else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
+            )
             print(f"\nQuery {i}: {q}")
             print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
@@ -291,7 +293,11 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            ext = ".txt" if input_type == "txt" else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
+            ext = (
+                ".txt"
+                if input_type == "txt"
+                else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
+            )
             missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
