@@ -195,7 +195,7 @@ def create_lancedb_index(
     """
     Create LanceDB vector index and optional FTS index for hybrid search.
     """
-    if not bool(create_index):
+    if not create_index:
         return {"indexed": False, "reason": "disabled"}
 
     try:
@@ -203,33 +203,33 @@ def create_lancedb_index(
     except Exception as e:
         raise RuntimeError("LanceDB index creation requested but `lancedb` is unavailable.") from e
 
-    db = lancedb.connect(uri=str(lancedb_uri))
-    table = db.open_table(str(table_name))
-    n_vecs = int(table.count_rows())
+    db = lancedb.connect(uri=lancedb_uri)
+    table = db.open_table(table_name)
+    n_vecs = table.count_rows()
     if n_vecs < 2:
         logger.info("Skipping LanceDB index creation (not enough vectors): rows=%s", n_vecs)
         return {"indexed": False, "reason": "not_enough_vectors", "rows": n_vecs}
 
     # LanceDB IVF training requires num_partitions < num_vectors.
-    k = int(num_partitions)
+    k = num_partitions
     if k >= n_vecs:
         k = max(1, n_vecs - 1)
 
     try:
         table.create_index(
-            index_type=str(index_type),
-            metric=str(metric),
-            num_partitions=int(k),
-            num_sub_vectors=int(num_sub_vectors),
-            vector_column_name=str(vector_column_name),
+            index_type=index_type,
+            metric=metric,
+            num_partitions=k,
+            num_sub_vectors=num_sub_vectors,
+            vector_column_name=vector_column_name,
         )
     except TypeError:
-        table.create_index(vector_column_name=str(vector_column_name))
+        table.create_index(vector_column_name=vector_column_name)
 
     created_fts = False
-    if bool(hybrid):
+    if hybrid:
         try:
-            table.create_fts_index(str(fts_text_column_name), language=str(fts_language))
+            table.create_fts_index(fts_text_column_name, language=fts_language)
             created_fts = True
         except Exception:
             logger.warning(
@@ -241,7 +241,7 @@ def create_lancedb_index(
 
     try:
         for index_stub in table.list_indices():
-            table.wait_for_index([index_stub.name], timeout=timedelta(seconds=int(wait_timeout_seconds)))
+            table.wait_for_index([index_stub.name], timeout=timedelta(seconds=wait_timeout_seconds))
     except Exception:
         # Keep indexing robust across LanceDB versions that differ in wait/list APIs.
         logger.debug("LanceDB index wait API unavailable; continuing without wait.", exc_info=True)
@@ -249,8 +249,8 @@ def create_lancedb_index(
     return {
         "indexed": True,
         "rows": n_vecs,
-        "num_partitions": int(k),
-        "hybrid": bool(hybrid),
+        "num_partitions": k,
+        "hybrid": hybrid,
         "fts_index_created": created_fts,
     }
 
@@ -294,14 +294,14 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
         create_lancedb_index(
             lancedb_uri=cfg.uri,
             table_name=cfg.table_name,
-            create_index=bool(cfg.create_index),
-            index_type=str(cfg.index_type),
-            metric=str(cfg.metric),
-            num_partitions=int(cfg.num_partitions),
-            num_sub_vectors=int(cfg.num_sub_vectors),
-            hybrid=bool(cfg.hybrid),
-            fts_language=str(cfg.fts_language),
-            wait_timeout_seconds=int(cfg.wait_timeout_seconds),
+            create_index=cfg.create_index,
+            index_type=cfg.index_type,
+            metric=cfg.metric,
+            num_partitions=cfg.num_partitions,
+            num_sub_vectors=cfg.num_sub_vectors,
+            hybrid=cfg.hybrid,
+            fts_language=cfg.fts_language,
+            wait_timeout_seconds=cfg.wait_timeout_seconds,
         )
 
 
@@ -377,32 +377,11 @@ def write_text_embeddings_dir_to_lancedb(
             fts_language=cfg.fts_language,
         )
 
-    # all_rows: List[Dict[str, Any]] = []
-    # for p in files:
-    #     try:
-    #         df = _read_text_embeddings_json_df(p)
-    #         if df.empty:
-    #             skipped += 1
-    #             continue
-    #         rows = _build_lancedb_rows_from_df(df)
-    #         if not rows:
-    #             skipped += 1
-    #             continue
-    #         all_rows.extend(rows)
-    #         processed += 1
-    #     except Exception:
-    #         failed += 1
-    #         logger.exception("Failed reading embeddings from %s", p)
-
-    # # Write once so --overwrite behaves as expected.
-    # _write_rows_to_lancedb(all_rows, cfg=cfg)
-
     return {
         "input_dir": str(input_dir),
         "n_files": len(files),
         "processed": processed,
         "skipped": skipped,
         "failed": failed,
-        # "rows_written": len(all_rows),
         "lancedb": {"uri": cfg.uri, "table_name": cfg.table_name, "overwrite": cfg.overwrite},
     }

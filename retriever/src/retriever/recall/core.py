@@ -200,7 +200,7 @@ def _search_lancedb(
                     .text(query_text)
                     .nprobes(effective_nprobes)
                     .refine_factor(refine_factor)
-                    .select(["text", "metadata", "source", "_distance"])
+                    .select(["text", "metadata", "source"])
                     .limit(top_k)
                     .rerank(reranker)
                     .to_list()

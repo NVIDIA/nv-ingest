@@ -321,7 +321,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
     key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
     return key, dist
 
 
