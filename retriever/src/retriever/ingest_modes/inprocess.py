@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
-# All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 """
 In-process runmode.
 
@@ -47,16 +43,11 @@ except Exception as e:  # pragma: no cover
 
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
-from ..params import EmbedParams
-from ..params import ExtractParams
-from ..params import HtmlChunkParams
-from ..params import IngestExecuteParams
-from ..params import TextChunkParams
-from ..params import VdbUploadParams
 from ..pdf.extract import pdf_extraction
 from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
 from ..html import html_file_to_chunks_df
+from ..audio import audio_file_to_transcript_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
@@ -975,8 +966,8 @@ def _print_ingest_summary(results: list, elapsed_s: float) -> None:
 class InProcessIngestor(Ingestor):
     RUN_MODE = "inprocess"
 
-    def __init__(self, documents: Optional[List[str]] = None) -> None:
-        super().__init__(documents=documents)
+    def __init__(self, documents: Optional[List[str]] = None, **kwargs: Any) -> None:
+        super().__init__(documents=documents, **kwargs)
 
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
         # by ensuring both names refer to the same list.
@@ -1122,14 +1113,13 @@ class InProcessIngestor(Ingestor):
             if ocr_invoke_url:
                 self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
             else:
-                ocr_model_dir = (
-                    kwargs.get("ocr_model_dir")
-                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
-                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
-                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
-                )
-                model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
-                self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
+                ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
+                if not ocr_model_dir:
+                    raise RuntimeError(
+                        "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
+                        "the path of the Nemotron OCR v1 model directory."
+                    )
+                self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
 
         return self
 
@@ -1155,6 +1145,42 @@ class InProcessIngestor(Ingestor):
         self._pipeline_type = "html"
         resolved = _coerce_params(params, HtmlChunkParams, kwargs)
         self._extract_html_kwargs = resolved.model_dump(mode="python")
+        return self
+
+    def extract_audio(
+        self,
+        grpc_endpoint: str = "audio:50051",
+        auth_token: Optional[str] = None,
+        function_id: Optional[str] = None,
+        use_ssl: Optional[bool] = None,
+        ssl_cert: Optional[str] = None,
+        segment_audio: bool = False,
+        max_tokens: Optional[int] = None,
+        overlap_tokens: int = 0,
+        tokenizer_model_id: Optional[str] = None,
+        tokenizer_cache_dir: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """
+        Configure audio ingestion: transcribe via Riva/Parakeet NIM.
+
+        Use with .files("*.mp3").extract_audio(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_audio().
+        """
+        self._pipeline_type = "audio"
+        self._extract_audio_kwargs = {
+            "grpc_endpoint": grpc_endpoint,
+            "auth_token": auth_token,
+            "function_id": function_id,
+            "use_ssl": use_ssl,
+            "ssl_cert": ssl_cert,
+            "segment_audio": segment_audio,
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "tokenizer_model_id": tokenizer_model_id,
+            "tokenizer_cache_dir": tokenizer_cache_dir,
+            **kwargs,
+        }
         return self
 
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1551,12 +1577,17 @@ class InProcessIngestor(Ingestor):
         elif self._pipeline_type == "html":
 
             def _loader(p: str) -> pd.DataFrame:
-                return html_file_to_chunks_df(p, params=HtmlChunkParams(**self._extract_html_kwargs))
+                return html_file_to_chunks_df(p, **self._extract_html_kwargs)
+
+        elif self._pipeline_type == "audio":
+
+            def _loader(p: str) -> pd.DataFrame:
+                return audio_file_to_transcript_df(p, **self._extract_audio_kwargs)
 
         else:
 
             def _loader(p: str) -> pd.DataFrame:
-                return txt_file_to_chunks_df(p, params=TextChunkParams(**self._extract_txt_kwargs))
+                return txt_file_to_chunks_df(p, **self._extract_txt_kwargs)
 
         for doc_path in doc_iter:
             initial_df = _loader(doc_path)

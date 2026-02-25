@@ -72,6 +72,19 @@ class HtmlChunkParams(TextChunkParams):
     pass
 
 
+class AudioExtractParams(_ParamsModel):
+    grpc_endpoint: str = "audio:50051"
+    auth_token: Optional[str] = None
+    function_id: Optional[str] = None
+    use_ssl: Optional[bool] = None
+    ssl_cert: Optional[str] = None
+    segment_audio: bool = False
+    max_tokens: Optional[int] = None
+    overlap_tokens: int = 0
+    tokenizer_model_id: Optional[str] = None
+    tokenizer_cache_dir: Optional[str] = None
+
+
 class LanceDbParams(_ParamsModel):
     lancedb_uri: str = "lancedb"
     table_name: str = "nv-ingest"

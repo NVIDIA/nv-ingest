@@ -100,14 +100,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        help="Directory containing PDFs, .txt, .html, .doc/.pptx, or audio files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
+        help="Input format: 'pdf', 'txt', 'html', 'doc', or 'audio'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice), 'audio' for .mp3/.wav (transcribed via Riva/Parakeet).",  # noqa: E501
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -149,6 +149,16 @@ def main(
         None,
         "--embed-invoke-url",
         help="Optional remote endpoint URL for embedding model inference.",
+    ),
+    audio_grpc_endpoint: str = typer.Option(
+        "audio:50051",
+        "--audio-grpc-endpoint",
+        help="Riva/Parakeet gRPC endpoint for audio transcription (used with --input-type audio).",
+    ),
+    segment_audio: bool = typer.Option(
+        False,
+        "--segment-audio",
+        help="If set, each speech segment becomes its own row (used with --input-type audio).",
     ),
 ) -> None:
     _ = input_type
@@ -197,6 +207,28 @@ def main(
                         "create_index": True,
                     }
                 )
+            )
+        )
+    elif input_type == "audio":
+        import glob as _glob
+
+        audio_exts = ("*.mp3", "*.wav")
+        audio_files = [f for ext in audio_exts for f in _glob.glob(str(input_dir / ext))]
+        if not audio_files:
+            raise typer.BadParameter(f"No audio files found in {input_dir}")
+        ingestor = create_ingestor(run_mode="inprocess")
+        ingestor = (
+            ingestor.files(audio_files)
+            .extract_audio(
+                grpc_endpoint=audio_grpc_endpoint,
+                segment_audio=segment_audio,
+            )
+            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
+            .vdb_upload(
+                lancedb_uri=LANCEDB_URI,
+                table_name=LANCEDB_TABLE,
+                overwrite=True,
+                create_index=True,
             )
         )
     elif input_type == "doc":
@@ -318,11 +350,12 @@ def main(
         hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
         if not no_recall_details:
-            ext = (
-                ".txt"
-                if input_type == "txt"
-                else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
-            )
+            ext = {
+                "txt": ".txt",
+                "html": ".html",
+                "doc": ".docx",
+                "audio": ".mp3",
+            }.get(input_type, ".pdf")
             print(f"\nQuery {i}: {q}")
             print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
             print(f"  Hit@{cfg.top_k}: {hit}")
@@ -337,11 +370,12 @@ def main(
                         print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
         if not hit:
-            ext = (
-                ".txt"
-                if input_type == "txt"
-                else (".html" if input_type == "html" else (".docx" if input_type == "doc" else ".pdf"))
-            )
+            ext = {
+                "txt": ".txt",
+                "html": ".html",
+                "doc": ".docx",
+                "audio": ".mp3",
+            }.get(input_type, ".pdf")
             missed_gold.append((f"{doc}{ext}", str(page)))
 
     missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))

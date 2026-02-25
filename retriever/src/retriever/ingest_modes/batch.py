@@ -31,6 +31,7 @@ from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
+from ..params import AudioExtractParams
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import HtmlChunkParams
@@ -683,6 +684,29 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
             num_gpus=0,
             fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
+        )
+        return self
+
+    def extract_audio(self, params: AudioExtractParams) -> "BatchIngestor":
+        """
+        Configure audio pipeline: read_binary_files -> AudioTranscribeActor (bytes -> transcript rows).
+
+        Use with .files("*.mp3|*.wav").extract_audio(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_audio().
+        """
+        from retriever.audio.ray_data import AudioTranscribeActor
+
+        self._pipeline_type = "audio"
+        self._extract_audio_kwargs = params.model_dump(mode="python")
+        self._tasks.append(("extract_audio", dict(self._extract_audio_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            AudioTranscribeActor,
+            batch_size=1,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": AudioExtractParams(**self._extract_audio_kwargs)},
         )
         return self
 

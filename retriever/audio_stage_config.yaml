@@ -1,0 +1,49 @@
+# Example config for:
+#   - `retriever audio stage run --config <this.yaml> --input <primitives.parquet>`
+#
+# This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_audio_schema.AudioExtractorSchema`
+# via `retriever.audio.config.load_audio_extractor_schema_from_dict`.
+#
+# IMPORTANT:
+# `audio_extraction_config.audio_endpoints` must provide at least one endpoint
+# (gRPC or HTTP). Both cannot be null/empty. HTTP is not supported for audio;
+# use gRPC.
+
+# Optional worker settings
+max_queue_size: 1
+n_workers: 2
+raise_on_failure: false
+
+# Audio extraction configuration (Riva / Parakeet NIM).
+audio_extraction_config:
+  # Optional auth token for secured services (NIM / NVCF)
+  auth_token: null
+
+  # Tuple/list in the form: [grpc, http]
+  # Riva/Parakeet ASR endpoint. Only gRPC is supported for audio.
+  #
+  # For the provided docker-compose.yaml the host-mapped ports are:
+  #   - gRPC: audio:50051  (inside docker network)
+  #   - gRPC: localhost:50051  (from host)
+  #
+  # For NVCF hosted endpoints:
+  #   - gRPC: grpc.nvcf.nvidia.com:443
+  # audio_endpoints: ["audio:50051", null]
+  audio_endpoints: ["localhost:50051", null]
+
+
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # Only "grpc" is supported for audio.
+  audio_infer_protocol: grpc
+
+  # Optional NVCF function ID (required when using grpc.nvcf.nvidia.com)
+  function_id: null
+
+  # SSL settings (auto-detected for NVCF endpoints)
+  use_ssl: null
+  ssl_cert: null
+
+  # If true, each speech segment (sentence) becomes a separate row with
+  # start_time / end_time metadata. If false (default), one row per file
+  # containing the full transcript.
+  segment_audio: false

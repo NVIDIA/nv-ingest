@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from .models import AudioExtractParams
 from .models import BatchTuningParams
 from .models import ChartParams
 from .models import EmbedParams
@@ -25,6 +26,7 @@ from .models import TextChunkParams
 from .models import VdbUploadParams
 
 __all__ = [
+    "AudioExtractParams",
     "BatchTuningParams",
     "ChartParams",
     "EmbedParams",
