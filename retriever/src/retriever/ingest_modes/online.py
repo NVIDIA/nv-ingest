@@ -84,34 +84,37 @@ class OnlineIngestor(Ingestor):
         """No-op for API compatibility."""
         return self
 
-    def extract(self, params: ExtractParams) -> "OnlineIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record extraction config (server uses its own config). API compatibility."""
-        _ = params
+        _ = params or ExtractParams(**kwargs)
         return self
 
-    def extract_txt(self, params: ExtractParams) -> "OnlineIngestor":
+    def extract_txt(self, params: ExtractParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record txt config. API compatibility. Online mode typically serves PDF only."""
-        _ = params
+        _ = params or ExtractParams(**kwargs)
         return self
 
-    def embed(self, params: EmbedParams) -> "OnlineIngestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record embed config (server uses its own config). API compatibility."""
-        _ = params
+        _ = params or EmbedParams(**kwargs)
         return self
 
-    def vdb_upload(self, params: VdbUploadParams | None = None) -> "OnlineIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record vdb config (server uses its own config). API compatibility."""
-        _ = params
+        _ = params or VdbUploadParams(
+            purge_results_after_upload=bool(kwargs.get("purge_results_after_upload", True)),
+            lancedb={k: v for k, v in kwargs.items() if k != "purge_results_after_upload"},
+        )
         return self
 
-    def ingest(self, params: IngestExecuteParams | None = None) -> List[Dict[str, Any]]:
+    def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Submit each configured file (and buffer) to the online ingest REST API.
 
         Returns a list of response dicts (one per document) with ok, total_duration_sec,
         stages, rows_written, and optional error.
         """
-        _ = params
+        _ = params or IngestExecuteParams(**kwargs)
         import httpx
 
         ingest_url = f"{self._base_url}/ingest"

@@ -28,11 +28,31 @@ from retriever.params import RunMode
 from retriever.params import VdbUploadParams
 
 
-def create_ingestor(*, run_mode: RunMode = "inprocess", params: IngestorCreateParams | None = None) -> "Ingestor":
+def _merge_params[T](params: T | None, kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return kwargs  # type: ignore[return-value]
+    if not kwargs:
+        return params
+    if hasattr(params, "model_copy"):
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
+
+
+def create_ingestor(
+    *,
+    run_mode: RunMode = "inprocess",
+    params: IngestorCreateParams | None = None,
+    **kwargs: Any,
+) -> "Ingestor":
     """
     Factory for selecting an ingestion runmode implementation.
     """
-    return create_runmode_ingestor(run_mode=run_mode, params=params or IngestorCreateParams())
+    merged = _merge_params(params, kwargs)
+    if isinstance(merged, IngestorCreateParams):
+        parsed = merged
+    else:
+        parsed = IngestorCreateParams(**merged)
+    return create_runmode_ingestor(run_mode=run_mode, params=parsed)
 
 
 class Ingestor:
@@ -70,11 +90,15 @@ class Ingestor:
         """
         self._not_implemented("load")
 
-    def ingest(self, params: IngestExecuteParams | None = None) -> Union[List[Any], Tuple[Any, ...]]:
+    def ingest(
+        self,
+        params: IngestExecuteParams | None = None,
+        **kwargs: Any,
+    ) -> Union[List[Any], Tuple[Any, ...]]:
         """
         Execute the configured ingestion pipeline (placeholder).
         """
-        _ = params
+        _ = _merge_params(params, kwargs)
         self._not_implemented("ingest")
 
     def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False) -> Any:
@@ -89,14 +113,14 @@ class Ingestor:
         """Record a dedup task configuration."""
         self._not_implemented("dedup")
 
-    def embed(self, params: EmbedParams) -> "Ingestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record an embedding task configuration."""
-        _ = params
+        _ = _merge_params(params, kwargs)
         self._not_implemented("embed")
 
-    def extract(self, params: ExtractParams) -> "Ingestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record an extract task configuration."""
-        _ = params
+        _ = _merge_params(params, kwargs)
         self._not_implemented("extract")
 
     def filter(self) -> "Ingestor":
@@ -127,9 +151,9 @@ class Ingestor:
         """Record a UDF task configuration."""
         self._not_implemented("udf")
 
-    def vdb_upload(self, params: VdbUploadParams | None = None) -> "Ingestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record a vector DB upload configuration (execution TBD)."""
-        _ = params
+        _ = _merge_params(params, kwargs)
         self._not_implemented("vdb_upload")
 
     def save_intermediate_results(self, output_dir: str) -> "Ingestor":

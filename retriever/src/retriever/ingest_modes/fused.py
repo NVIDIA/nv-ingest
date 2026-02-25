@@ -114,17 +114,20 @@ class FusedIngestor(BatchIngestor):
     RUN_MODE = "fused"
     _fused_extract_flags: Dict[str, Any] = {}
 
-    def extract(self, params: ExtractParams) -> "FusedIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
         """
         Configure extraction for fused execution.
 
         In fused mode, PDF split/extract are separate CPU stages, but all model
         stages (page-elements, OCR, embedding) run in one actor in `.embed()`.
         """
+        resolved = params or ExtractParams(**kwargs)
+        if params is not None and kwargs:
+            resolved = params.model_copy(update=kwargs)
         kwargs = {
-            **params.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
-            **params.remote_retry.model_dump(mode="python", exclude_none=True),
-            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
+            **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
+            **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
         _assert_no_remote_endpoints(dict(kwargs), context="extract")
 
@@ -170,17 +173,22 @@ class FusedIngestor(BatchIngestor):
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=64)
         return self
 
-    def embed(self, params: EmbedParams) -> "FusedIngestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "FusedIngestor":
         """
         Run page-elements + OCR + explode + embed in one GPU actor stage.
 
         `fused` mode intentionally does not support remote NIM invocation.
         """
+        resolved = params or EmbedParams(**kwargs)
+        if params is not None and kwargs:
+            resolved = params.model_copy(update=kwargs)
         kwargs = {
-            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
-            **params.runtime.model_dump(mode="python", exclude_none=True),
-            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
-            **params.fused_tuning.model_dump(mode="python", exclude_none=True),
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+            **resolved.fused_tuning.model_dump(mode="python", exclude_none=True),
         }
         _assert_no_remote_endpoints(dict(kwargs), context="embed")
 

@@ -61,6 +61,14 @@ from ..html import html_file_to_chunks_df
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
 
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return model_cls(**kwargs)
+    if kwargs:
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
+
+
 def _combine_text_with_content(row, text_column, content_columns):
     """Combine page text with OCR content text for embedding."""
     parts = []
@@ -1014,7 +1022,7 @@ class InProcessIngestor(Ingestor):
 
         return self
 
-    def extract(self, params: ExtractParams) -> "InProcessIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure extraction for in-process execution (skeleton).
 
@@ -1026,7 +1034,8 @@ class InProcessIngestor(Ingestor):
         # (e.g. `extract_text`, `dpi`, etc). Downstream model stages do NOT necessarily
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
 
-        kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        kwargs = resolved.model_dump(mode="python")
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
@@ -1124,7 +1133,7 @@ class InProcessIngestor(Ingestor):
 
         return self
 
-    def extract_txt(self, params: TextChunkParams) -> "InProcessIngestor":
+    def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure txt ingestion: tokenizer-based chunking only (no PDF extraction).
 
@@ -1132,10 +1141,11 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_txt().
         """
         self._pipeline_type = "txt"
-        self._extract_txt_kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._extract_txt_kwargs = resolved.model_dump(mode="python")
         return self
 
-    def extract_html(self, params: HtmlChunkParams) -> "InProcessIngestor":
+    def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure HTML ingestion: markitdown -> markdown -> tokenizer chunking (no PDF extraction).
 
@@ -1143,10 +1153,11 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_html().
         """
         self._pipeline_type = "html"
-        self._extract_html_kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, HtmlChunkParams, kwargs)
+        self._extract_html_kwargs = resolved.model_dump(mode="python")
         return self
 
-    def embed(self, params: EmbedParams) -> "InProcessIngestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure embedding for in-process execution.
 
@@ -1161,9 +1172,12 @@ class InProcessIngestor(Ingestor):
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
         self._tasks.append((explode_content_to_rows, {}))
 
+        resolved = _coerce_params(params, EmbedParams, kwargs)
         embed_kwargs = {
-            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
-            **params.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
         }
         if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
             embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
@@ -1218,7 +1232,7 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((save_dataframe_to_disk_json, {"output_directory": str(output_directory)}))
         return self
 
-    def vdb_upload(self, params: VdbUploadParams | None = None) -> "InProcessIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Upload the (embedding-enriched) results to a vector DB (LanceDB).
 
@@ -1245,6 +1259,12 @@ class InProcessIngestor(Ingestor):
         - `purge_results_after_upload` is accepted for API parity but is not used in inprocess mode.
         """
         p = params or VdbUploadParams()
+        if kwargs:
+            lancedb_kwargs = {k: v for k, v in kwargs.items() if k != "purge_results_after_upload"}
+            if lancedb_kwargs:
+                p = p.model_copy(update={"lancedb": p.lancedb.model_copy(update=lancedb_kwargs)})
+            if "purge_results_after_upload" in kwargs:
+                p = p.model_copy(update={"purge_results_after_upload": bool(kwargs["purge_results_after_upload"])})
         _ = p.purge_results_after_upload  # parity with interface; inprocess does not purge by default
         self._tasks.append((upload_embeddings_to_lancedb_inprocess, p.lancedb.model_dump(mode="python")))
         return self
@@ -1263,8 +1283,8 @@ class InProcessIngestor(Ingestor):
         post_tasks = [(f, k) for f, k in self._tasks if f in self._POST_TASKS]
         return per_doc_tasks, post_tasks
 
-    def ingest(self, params: IngestExecuteParams | None = None) -> list[Any]:
-        run_params = params or IngestExecuteParams()
+    def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> list[Any]:
+        run_params = _coerce_params(params, IngestExecuteParams, kwargs)
         show_progress = run_params.show_progress
         _ = (run_params.return_failures, run_params.save_to_disk, run_params.return_traces)
         parallel = run_params.parallel

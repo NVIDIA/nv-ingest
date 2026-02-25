@@ -42,6 +42,14 @@ from ..params import VdbUploadParams
 DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
 
 
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return model_cls(**kwargs)
+    if kwargs:
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
+
+
 # region agent log
 def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
     payload = {
@@ -341,7 +349,7 @@ class BatchIngestor(Ingestor):
 
         return self
 
-    def extract(self, params: ExtractParams) -> "BatchIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure extraction for batch processing (builder only).
 
@@ -361,10 +369,11 @@ class BatchIngestor(Ingestor):
         - ``ocr_cpus_per_actor``: CPUs reserved per OCR actor (default 1).
         """
 
+        resolved = _coerce_params(params, ExtractParams, kwargs)
         kwargs = {
-            **params.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
-            **params.remote_retry.model_dump(mode="python", exclude_none=True),
-            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
+            **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
+            **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
@@ -629,7 +638,7 @@ class BatchIngestor(Ingestor):
 
         return self
 
-    def extract_txt(self, params: TextChunkParams) -> "BatchIngestor":
+    def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure txt-only pipeline: read_binary_files -> TxtSplitActor (bytes -> chunk rows).
 
@@ -639,7 +648,8 @@ class BatchIngestor(Ingestor):
         from retriever.txt.ray_data import TxtSplitActor
 
         self._pipeline_type = "txt"
-        self._extract_txt_kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._extract_txt_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -652,7 +662,7 @@ class BatchIngestor(Ingestor):
         )
         return self
 
-    def extract_html(self, params: HtmlChunkParams) -> "BatchIngestor":
+    def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure HTML-only pipeline: read_binary_files -> HtmlSplitActor (bytes -> chunk rows).
 
@@ -662,7 +672,8 @@ class BatchIngestor(Ingestor):
         from retriever.html.ray_data import HtmlSplitActor
 
         self._pipeline_type = "html"
-        self._extract_html_kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, HtmlChunkParams, kwargs)
+        self._extract_html_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -675,7 +686,7 @@ class BatchIngestor(Ingestor):
         )
         return self
 
-    def embed(self, params: EmbedParams) -> "BatchIngestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
 
@@ -693,10 +704,13 @@ class BatchIngestor(Ingestor):
           and no GPU is requested for this stage.
         """
 
+        resolved = _coerce_params(params, EmbedParams, kwargs)
         kwargs = {
-            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
-            **params.runtime.model_dump(mode="python", exclude_none=True),
-            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
 
         def _endpoint_count(raw: Any) -> int:
@@ -756,12 +770,12 @@ class BatchIngestor(Ingestor):
             num_cpus=embed_cpus_per_actor,
             num_gpus=gpu_per_stage,
             compute=rd.ActorPoolStrategy(size=embed_workers),
-            fn_constructor_kwargs={"params": params},
+            fn_constructor_kwargs={"params": resolved},
         )
 
         return self
 
-    def vdb_upload(self, params: VdbUploadParams | None = None) -> "BatchIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a streaming LanceDB upload stage to the batch pipeline.
 
@@ -774,6 +788,12 @@ class BatchIngestor(Ingestor):
         ``inprocess.upload_embeddings_to_lancedb_inprocess``.
         """
         p = params or VdbUploadParams()
+        if kwargs:
+            lancedb_kwargs = {k: v for k, v in kwargs.items() if k != "purge_results_after_upload"}
+            if lancedb_kwargs:
+                p = p.model_copy(update={"lancedb": p.lancedb.model_copy(update=lancedb_kwargs)})
+            if "purge_results_after_upload" in kwargs:
+                p = p.model_copy(update={"purge_results_after_upload": bool(kwargs["purge_results_after_upload"])})
         _ = p.purge_results_after_upload
         vdb_kwargs = p.lancedb.model_dump(mode="python")
         self._tasks.append(("vdb_upload", dict(vdb_kwargs)))
@@ -828,7 +848,7 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
-    def ingest(self, params: IngestExecuteParams | None = None) -> int:
+    def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
 
@@ -837,7 +857,7 @@ class BatchIngestor(Ingestor):
         pipeline finishes, we create the LanceDB vector index (which must happen
         after all writes are complete).
         """
-        run_params = params or IngestExecuteParams()
+        run_params = _coerce_params(params, IngestExecuteParams, kwargs)
         _ = (
             run_params.show_progress,
             run_params.return_failures,
