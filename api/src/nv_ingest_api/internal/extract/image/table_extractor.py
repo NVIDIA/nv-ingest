@@ -19,7 +19,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTabl
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
@@ -420,7 +420,9 @@ def _local_nemotron_ocr_boxes_texts(
                                     boxes.append([[float(x), float(y)] for x, y in b])  # type: ignore[misc]
                                 elif len(b) == 8 and all(isinstance(v, (int, float)) for v in b):
                                     pts = [float(v) for v in b]
-                                    boxes.append([[pts[0], pts[1]], [pts[2], pts[3]], [pts[4], pts[5]], [pts[6], pts[7]]])
+                                    boxes.append(
+                                        [[pts[0], pts[1]], [pts[2], pts[3]], [pts[4], pts[5]], [pts[6], pts[7]]]
+                                    )
                                 elif len(b) == 4 and all(isinstance(v, (int, float)) for v in b):
                                     boxes.append(_xyxy_to_quad([float(v) for v in b]))
 
@@ -497,14 +499,14 @@ def _local_nemotron_ocr_boxes_texts(
                     s = ""
                 if s and s.lower() not in {"none", "null"}:
                     texts = [s]
-                    boxes = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]  # type: ignore[assignment]
+                    boxes = [[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]]  # type: ignore[assignment]  # noqa: E501
 
             if texts and not boxes:
                 # Provide a dummy full-image box per text.
                 boxes = [[[0.0, 0.0], [float(w), 0.0], [float(w), float(h)], [0.0, float(h)]] for _ in texts]
 
             results[original_index] = (base64_images[original_index], None, boxes, texts)
-        except Exception as ex:
+        except Exception as ex:  # noqa: F841
             logger.exception("Local Nemotron OCR failed for table image index=%s", original_index)
             results[original_index] = (base64_images[original_index], None, None, None)
 
@@ -593,7 +595,8 @@ def _local_nemotron_table_structure_cell_predictions(
 
             x = model.preprocess(t, (h, w))
             with torch.inference_mode():
-                preds = model.invoke(x, (h, w))
+                with torch.autocast(device_type="cuda"):
+                    preds = model.invoke(x, (h, w))
 
             # Normalize to (boxes, labels, scores)
             boxes = None
@@ -798,7 +801,7 @@ def extract_table_data_from_image_internal(
             except Exception:
                 pass
             # Get the grpc endpoint to determine the model if needed
-            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
             # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
             ocr_model_name = "scene_text_ensemble"
 

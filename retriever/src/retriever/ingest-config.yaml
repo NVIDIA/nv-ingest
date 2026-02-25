@@ -59,6 +59,20 @@ pdf:
   # Optionally limit number of PDFs processed
   limit: null
 
+# Optional config for `retriever txt run` and .extract_txt() API
+txt:
+  max_tokens: 512
+  overlap_tokens: 0
+  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  encoding: utf-8
+
+# Optional config for `retriever html run` and .extract_html() API
+html:
+  max_tokens: 512
+  overlap_tokens: 0
+  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  encoding: utf-8
+
 table:
   # Example config for:
   #   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`
@@ -224,4 +238,3 @@ embedding:
 
   # Optional: request embedding vector size if the backend supports it
   # dimensions: 1024
-

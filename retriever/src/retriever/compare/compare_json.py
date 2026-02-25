@@ -74,7 +74,9 @@ def _iter_rows(a_lines: list[str], b_lines: list[str]) -> tuple[list[_DiffRow], 
     stats = {"equal": 0, "replace": 0, "delete": 0, "insert": 0}
 
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        stats[tag] = stats.get(tag, 0) + (max(i2 - i1, j2 - j1) if tag == "replace" else (i2 - i1) if tag in {"equal", "delete"} else (j2 - j1))
+        stats[tag] = stats.get(tag, 0) + (
+            max(i2 - i1, j2 - j1) if tag == "replace" else (i2 - i1) if tag in {"equal", "delete"} else (j2 - j1)
+        )
 
         if tag == "equal":
             for k in range(i2 - i1):
@@ -218,7 +220,11 @@ def _render_side_by_side(
         flush_gap()
         m, m_style = _marker_style(r.marker)
         a_style = "dim" if r.marker == " " else ("yellow" if r.marker == "~" else ("red" if r.marker == "-" else ""))
-        b_style = "dim" if r.marker == " " else ("yellow" if r.marker == "~" else ("" if r.marker == "-" else "green" if r.marker == "+" else ""))
+        b_style = (
+            "dim"
+            if r.marker == " "
+            else ("yellow" if r.marker == "~" else ("" if r.marker == "-" else "green" if r.marker == "+" else ""))
+        )
 
         table.add_row(
             Text(m, style=m_style),
@@ -309,4 +315,3 @@ def compare_json(
         no_color=no_color,
     )
     raise typer.Exit(code=1)
-

@@ -15,7 +15,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.schemas.extract.extract_ocr_schema import OCRExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -356,7 +356,7 @@ def extract_text_data_from_image_internal(
     endpoint_config = extraction_config.endpoint_config
 
     # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]  # noqa: F841
     # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
     ocr_model_name = "scene_text_ensemble"
 

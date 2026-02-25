@@ -12,4 +12,3 @@ __all__ = [
     "detect_page_elements_v3",
     "PageElementDetectionActor",
 ]
-

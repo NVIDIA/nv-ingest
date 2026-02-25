@@ -352,9 +352,7 @@ def detect_table_structure_v1(
         except BaseException as e:
             elapsed = time.perf_counter() - t0
             for row_i in valid:
-                payloads[row_i] = _error_payload(stage="remote_invoke", exc=e) | {
-                    "timing": {"seconds": float(elapsed)}
-                }
+                payloads[row_i] = _error_payload(stage="remote_invoke", exc=e) | {"timing": {"seconds": float(elapsed)}}
 
     for chunk_start in range(0, len(valid), int(inference_batch_size)):
         if use_remote:
@@ -655,7 +653,9 @@ def detect_table_structure_v1_from_page_elements_v3(
                     elapsed = time.perf_counter() - t0
                     preds_list = preds if isinstance(preds, list) else [preds]
                     if len(preds_list) != len(idxs):
-                        raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
+                        raise RuntimeError(
+                            "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                        )
                     for local_j, crop_i in enumerate(idxs):
                         dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
                         crop_payloads[crop_i] = {
@@ -700,7 +700,12 @@ def detect_table_structure_v1_from_page_elements_v3(
             else:
                 region_ref["detections"] = []
                 region_ref["timing"] = None
-                region_ref["error"] = {"stage": "invoke", "type": "TypeError", "message": "Unexpected payload type", "traceback": ""}
+                region_ref["error"] = {
+                    "stage": "invoke",
+                    "type": "TypeError",
+                    "message": "Unexpected payload type",
+                    "traceback": "",
+                }
 
     # Aggregate per-page totals.
     for row_i, page_payload in enumerate(out_payloads):
@@ -776,9 +781,10 @@ class TableStructureActor:
             if isinstance(batch_df, pd.DataFrame):
                 out = batch_df.copy()
                 payload = _error_payload(stage="actor_call", exc=e)
-                out["table_structure_v1"] = [{"regions": [], "timing": None, "error": payload.get("error")} for _ in range(len(out.index))]
+                out["table_structure_v1"] = [
+                    {"regions": [], "timing": None, "error": payload.get("error")} for _ in range(len(out.index))
+                ]
                 out["table_structure_v1_num_detections"] = [0 for _ in range(len(out.index))]
                 out["table_structure_v1_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"table_structure_v1": _error_payload(stage="actor_call", exc=e)}]
-

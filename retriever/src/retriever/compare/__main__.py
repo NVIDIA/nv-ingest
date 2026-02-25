@@ -12,4 +12,3 @@ app.add_typer(compare_results.app, name="results")
 
 def main() -> None:
     app()
-

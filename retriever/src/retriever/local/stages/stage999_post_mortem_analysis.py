@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# flake8: noqa
+
 import csv
 import json
 import textwrap

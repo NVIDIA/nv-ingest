@@ -21,7 +21,7 @@ ingestor = (
         extract_text=True,
         extract_tables=True,
         extract_charts=True,
-        #extract_infographics=True,
+        # extract_infographics=True,
         extract_infographics=False,
     )
     .embed(model_name="nemo_retriever_v1")

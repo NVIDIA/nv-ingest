@@ -454,7 +454,8 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
                     "Local YOLOX backend requested but 'retriever' package is not importable. "
-                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or run with infer_protocol='grpc'/'http'."
+                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or "
+                    "run with infer_protocol='grpc'/'http' and backend='local'."  # noqa: E501
                 ) from e
 
             # Choose device (default: cuda if available else cpu).
@@ -554,23 +555,28 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         # Best-effort batching (mirrors retriever local stage behavior).
         per_image_preds: Optional[List[Any]] = None
         with torch.inference_mode():
-            try:
-                batch_tensor = torch.stack(tensors, dim=0)
-                m = model.model  # may raise if remote-only
+            with torch.autocast(device_type="cuda"):
                 try:
-                    raw = m(batch_tensor, list(orig_shapes_hw))
+                    batch_tensor = torch.stack(tensors, dim=0)
+                    m = model.model  # may raise if remote-only
+                    try:
+                        raw = m(batch_tensor, list(orig_shapes_hw))
+                    except Exception:
+                        raw = m(batch_tensor, orig_shapes_hw[0])
+                    raw0 = raw[0] if isinstance(raw, (tuple, list)) and len(raw) > 0 else raw
+                    if isinstance(raw0, list) and len(raw0) == int(batch_tensor.shape[0]):
+                        per_image_preds = raw0
                 except Exception:
-                    raw = m(batch_tensor, orig_shapes_hw[0])
-                raw0 = raw[0] if isinstance(raw, (tuple, list)) and len(raw) > 0 else raw
-                if isinstance(raw0, list) and len(raw0) == int(batch_tensor.shape[0]):
-                    per_image_preds = raw0
-            except Exception:
-                per_image_preds = None
+                    per_image_preds = None
 
-            annotation_dicts: List[Dict[str, Any]] = []
-            for i in range(len(tensors)):
-                preds = per_image_preds[i] if per_image_preds is not None else model.invoke(tensors[i], orig_shapes_hw[i])
-                boxes, labels, scores = model.postprocess(preds)
+                annotation_dicts: List[Dict[str, Any]] = []
+                for i in range(len(tensors)):
+                    preds = (
+                        per_image_preds[i]
+                        if per_image_preds is not None
+                        else model.invoke(tensors[i], orig_shapes_hw[i])
+                    )
+                    boxes, labels, scores = model.postprocess(preds)
 
                 ann: Dict[str, List[List[float]]] = {lab: [] for lab in YOLOX_PAGE_V3_CLASS_LABELS}
                 for box, lab, score in zip(boxes, labels, scores):
@@ -599,7 +605,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
                     except Exception:
                         s = 0.0
 
-                    ann[label_name].append([float(box_list[0]), float(box_list[1]), float(box_list[2]), float(box_list[3]), s])
+                    ann[label_name].append(
+                        [float(box_list[0]), float(box_list[1]), float(box_list[2]), float(box_list[3]), s]
+                    )
 
                 annotation_dicts.append(ann)
 
@@ -893,7 +901,8 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             x = model.preprocess(t)
 
             with torch.inference_mode():
-                preds = model.invoke(x, (h, w))
+                with torch.autocast(device_type="cuda"):
+                    preds = model.invoke(x, (h, w))
 
             boxes, labels, scores = _extract_boxes_labels_scores(preds)
             boxes_l = _to_list(boxes) if boxes is not None else []

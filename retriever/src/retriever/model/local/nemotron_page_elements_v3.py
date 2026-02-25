@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Sequence, Tuple, Union, cast
+from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 
 from torch import nn
 import torch
@@ -94,8 +94,9 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         # The upstream model returns a container where index [0] is the predictions.
         with torch.inference_mode():
-            out = self._model(input_data, orig_shape)
-            return out
+            with torch.autocast(device_type="cuda"):
+                out = self._model(input_data, orig_shape)
+                return out
         # preds0: Any
         # if isinstance(out, (list, tuple)) and len(out) > 0:
         #     preds0 = out[0]
@@ -129,7 +130,7 @@ class NemotronPageElementsV3(HuggingFaceModel):
         def _one(p: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             b_np, l_np, s_np = postprocess_preds_page_element(p, self._model.thresholds_per_class, self._model.labels)
             b = torch.as_tensor(b_np, dtype=torch.float32)
-            l = torch.as_tensor(l_np, dtype=torch.int64)
+            l = torch.as_tensor(l_np, dtype=torch.int64)  # noqa: E741
             s = torch.as_tensor(s_np, dtype=torch.float32)
             return b, l, s
 

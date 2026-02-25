@@ -11,4 +11,3 @@ def endpoints_from_yaml(value: Any) -> Tuple[Optional[str], Optional[str]]:
         a, b = value[0], value[1]
         return (a or None, b or None)
     raise ValueError(f"Expected endpoints as [grpc, http] (len=2), got: {value!r}")
-

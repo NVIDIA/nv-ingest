@@ -104,3 +104,4 @@ jobs:
           echo "  - nv-ingest-api"
           echo "  - nv-ingest-client"
           echo "  - nv-ingest"
+          echo "  - retriever"

@@ -98,7 +98,7 @@ class NemotronGraphicElementsV1(BaseModel):
             "format": "RGB",
             "dimensions": "(1024, 1024)",
             "expected_content": "chart_or_graph",
-            "description": "Chart/graph image in RGB format, resized to 1024x1024. Should be cropped from document using page element detection.",
+            "description": "Chart/graph image in RGB format, resized to 1024x1024. Should be cropped from document using page element detection.",  # noqa: E501
             "preprocessing_recommendation": "Use Nemotron Page Elements v3 to detect and crop chart regions",
         }
 

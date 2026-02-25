@@ -19,6 +19,7 @@ from typing import Union
 
 import ray
 import ray.data as rd
+from retriever.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
 from retriever.pdf.extract import PDFExtractionActor
@@ -155,6 +156,24 @@ class _LanceDBWriteActor:
             metadata_obj = {"page_number": int(page) if page is not None else -1}
             if pdf_page:
                 metadata_obj["pdf_page"] = pdf_page
+            # Persist per-page detection counters for end-of-run summaries.
+            # These may be duplicated across exploded content rows; downstream
+            # summary logic should dedupe by (source_id, page_number).
+            pe_num = getattr(row, "page_elements_v3_num_detections", None)
+            if pe_num is not None:
+                try:
+                    metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
+                except Exception:
+                    pass
+            pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
+            if isinstance(pe_counts, dict):
+                metadata_obj["page_elements_v3_counts_by_label"] = {
+                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
+                }
+            for ocr_col in ("table", "chart", "infographic"):
+                entries = getattr(row, ocr_col, None)
+                if isinstance(entries, list):
+                    metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
             source_obj = {"source_id": str(path)}
 
             row_out = {
@@ -200,9 +219,11 @@ class _BatchEmbedActor:
 
     def __init__(self, **kwargs: Any) -> None:
         self._kwargs = dict(kwargs)
+        if "embedding_endpoint" not in self._kwargs and kwargs.get("embed_invoke_url"):
+            self._kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
 
         # If a remote NIM endpoint is configured, skip local model creation.
-        endpoint = (kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             self._model = None
             return
@@ -236,13 +257,19 @@ class _BatchEmbedActor:
 class BatchIngestor(Ingestor):
     RUN_MODE = "batch"
 
-    def __init__(self, documents: Optional[List[str]] = None, ray_address: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        documents: Optional[List[str]] = None,
+        ray_address: Optional[str] = None,
+        ray_log_to_driver: bool = True,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(documents=documents, **kwargs)
 
         logging.basicConfig(level=logging.INFO)
 
         # Initialize Ray for distributed execution.
-        ray.init(address=ray_address or "local", ignore_reinit_error=True)
+        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver))
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
         ctx = rd.DataContext.get_current()
@@ -261,6 +288,9 @@ class BatchIngestor(Ingestor):
         self._rd_dataset: rd.Dataset = None  # Ray Data dataset created from input documents.
         self._tasks: List[tuple[str, dict[str, Any]]] = []
         self._intermediate_output_dir: Optional[str] = None
+        self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
+        self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
+        self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -463,6 +493,7 @@ class BatchIngestor(Ingestor):
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
 
+        self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
 
         # Stage-specific kwargs: upstream PDF stages accept many options (dpi, extract_*),
@@ -487,6 +518,16 @@ class BatchIngestor(Ingestor):
             detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
         if "page_elements_api_key" in kwargs:
             detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
+
+        # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
+        # LibreOffice process per file (batch_size=1).
+        self._rd_dataset = self._rd_dataset.map_batches(
+            DocToPdfConversionActor,
+            batch_size=1,
+            num_cpus=1,
+            num_gpus=0,
+            batch_format="pandas",
+        )
 
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
@@ -562,6 +603,74 @@ class BatchIngestor(Ingestor):
 
         return self
 
+    def extract_txt(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure txt-only pipeline: read_binary_files -> TxtSplitActor (bytes -> chunk rows).
+
+        Use with .files("*.txt").extract_txt(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_txt().
+        """
+        from retriever.txt.ray_data import TxtSplitActor
+
+        self._pipeline_type = "txt"
+        self._extract_txt_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            TxtSplitActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs=dict(self._extract_txt_kwargs),
+        )
+        return self
+
+    def extract_html(
+        self,
+        max_tokens: int = 512,
+        overlap_tokens: int = 0,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure HTML-only pipeline: read_binary_files -> HtmlSplitActor (bytes -> chunk rows).
+
+        Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_html().
+        """
+        from retriever.html.ray_data import HtmlSplitActor
+
+        self._pipeline_type = "html"
+        self._extract_html_kwargs = {
+            "max_tokens": max_tokens,
+            "overlap_tokens": overlap_tokens,
+            "encoding": encoding,
+            **kwargs,
+        }
+        self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            HtmlSplitActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs=dict(self._extract_html_kwargs),
+        )
+        return self
+
     def embed(self, **kwargs: Any) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
@@ -574,14 +683,34 @@ class BatchIngestor(Ingestor):
         - ``embed_cpus_per_actor``: CPUs reserved per embedding actor (default 1).
         - ``device``, ``hf_cache_dir``, ``normalize``, ``max_length``:
           forwarded to ``LlamaNemotronEmbed1BV2Embedder``.
-        - ``embedding_endpoint``: optional NIM endpoint URL
+        - ``embedding_endpoint`` / ``embed_invoke_url``: optional NIM endpoint URL
           (e.g. ``"http://embedding:8000/v1"``).  When set, the actor
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
         """
+
+        def _endpoint_count(raw: Any) -> int:
+            s = str(raw or "").strip()
+            if not s:
+                return 0
+            return len([p for p in s.split(",") if p.strip()])
+
         embed_workers = kwargs.pop("embed_workers", 1)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
         embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
+
+        if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
+            kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+
+        endpoint_count = _endpoint_count(kwargs.get("embedding_endpoint"))
+        if endpoint_count > 0 and int(embed_workers) != int(endpoint_count):
+            logging.warning(
+                "embed endpoint list has %d endpoint(s); overriding embed_workers from %d to %d",
+                endpoint_count,
+                int(embed_workers),
+                int(endpoint_count),
+            )
+            embed_workers = int(endpoint_count)
 
         # Remaining kwargs are forwarded to the actor constructor.
         self._tasks.append(("embed", dict(kwargs)))
@@ -601,7 +730,7 @@ class BatchIngestor(Ingestor):
         )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
-        endpoint = (kwargs.get("embedding_endpoint") or "").strip()
+        endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             gpu_per_stage = 0
         else:

@@ -86,9 +86,7 @@ def make_seed_page_elements_row(pdf_path: Path, *, dpi: int) -> Dict[str, Any]:
     out = extracted_df.iloc[0].to_dict()
     page_image = out.get("page_image") if isinstance(out, dict) else None
     if not (
-        isinstance(page_image, dict)
-        and isinstance(page_image.get("image_b64"), str)
-        and page_image.get("image_b64")
+        isinstance(page_image, dict) and isinstance(page_image.get("image_b64"), str) and page_image.get("image_b64")
     ):
         raise RuntimeError("Seed extraction row does not contain page_image.image_b64.")
     return out

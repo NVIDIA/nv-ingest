@@ -129,7 +129,7 @@ def render_page_element_detections_for_image(
         console.print(f"[yellow]Skip[/yellow] missing stage2 json: {stage2_json_path}")
         return None
 
-    payload = read_json(stage2_json_path)
+    payload = read_json(stage2_json_path)  # noqa: F821
     dets = list(_iter_page_element_detections(payload))
     if not dets:
         console.print(f"[yellow]Skip[/yellow] no detections in: {stage2_json_path}")
@@ -183,7 +183,7 @@ def render_page_element_detections_for_dir(
     draw_labels: bool = True,
     limit: Optional[int] = None,
 ) -> List[Path]:
-    imgs = iter_images(input_dir)
+    imgs = iter_images(input_dir)  # noqa: F821
     if limit is not None:
         imgs = imgs[: int(limit)]
 

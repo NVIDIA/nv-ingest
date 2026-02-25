@@ -193,6 +193,10 @@ def _np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
 
 def _extract_remote_ocr_item(response_item: Any) -> Any:
     if isinstance(response_item, dict):
+        # NIM text_detections format: return full list (not v[0])
+        td = response_item.get("text_detections")
+        if isinstance(td, list) and td:
+            return td
         for k in ("prediction", "predictions", "output", "outputs", "data"):
             v = response_item.get(k)
             if isinstance(v, list) and v:
@@ -244,6 +248,26 @@ def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
                     blocks.append({"text": item.strip(), "sort_y": 0.0, "sort_x": 0.0})
                 continue
             if not isinstance(item, dict):
+                continue
+
+            # NIM text_detections format:
+            # {"text_prediction": {"text": "...", "confidence": ...},
+            #  "bounding_box": {"points": [{"x": ..., "y": ...}, ...]}}
+            tp = item.get("text_prediction")
+            if isinstance(tp, dict):
+                txt0 = str(tp.get("text") or "").strip()
+                if txt0 and txt0 != "nan":
+                    sort_y, sort_x = 0.0, 0.0
+                    bb = item.get("bounding_box")
+                    if isinstance(bb, dict):
+                        pts = bb.get("points")
+                        if isinstance(pts, list) and pts:
+                            try:
+                                sort_x = float(pts[0].get("x", 0.0))
+                                sort_y = float(pts[0].get("y", 0.0))
+                            except Exception:
+                                pass
+                    blocks.append({"text": txt0, "sort_y": sort_y, "sort_x": sort_x})
                 continue
 
             # Nemotron OCR normalized-coord form
@@ -446,9 +470,7 @@ def ocr_page_elements(
                         max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
                     )
                     if len(response_items) != len(crop_meta):
-                        raise RuntimeError(
-                            f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}"
-                        )
+                        raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")
 
                     for i, (label_name, bbox) in enumerate(crop_meta):
                         preds = _extract_remote_ocr_item(response_items[i])
@@ -493,6 +515,7 @@ def ocr_page_elements(
                         infographic_items.append(entry)
 
         except BaseException as e:
+            print(f"Warning: OCR failed: {type(e).__name__}: {e}")
             row_error = {
                 "stage": "ocr_page_elements",
                 "type": e.__class__.__name__,
@@ -577,7 +600,7 @@ class OCRActor:
         else:
             from retriever.model.local import NemotronOCRV1
 
-            #self._model = NemotronOCRV1(model_dir=model_dir)
+            # self._model = NemotronOCRV1(model_dir=model_dir)
             self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)

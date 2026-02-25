@@ -42,7 +42,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse  # noqa: F401
 
 import pandas as pd
 
@@ -442,7 +442,9 @@ def create_text_embeddings_for_df(
 
     # Allow task_config to explicitly override values with None by checking key presence (API parity).
     api_key = task_config["api_key"] if "api_key" in task_config else transform_config.api_key
-    endpoint_url = task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
+    endpoint_url = (
+        task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
+    )
     model_name = task_config["model_name"] if "model_name" in task_config else transform_config.embedding_model
     dimensions = task_config["dimensions"] if "dimensions" in task_config else transform_config.dimensions
 
@@ -460,10 +462,9 @@ def create_text_embeddings_for_df(
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
     # Extract content and normalize empty or non-str to None (adapted for retriever-local schema).
-    extracted_content = (
-        df_transform_ledger.apply(lambda r: _text_from_row(r, text_column=str(transform_config.text_column)), axis=1)
-        .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
-    )
+    extracted_content = df_transform_ledger.apply(
+        lambda r: _text_from_row(r, text_column=str(transform_config.text_column)), axis=1
+    ).apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
 
     df_content = df_transform_ledger.copy()
     df_content["_content"] = extracted_content
@@ -521,4 +522,3 @@ def create_text_embeddings_for_df(
         df_content = df_content.drop(columns=["_content"])
 
     return df_content, {"trace_info": execution_trace_log}
-

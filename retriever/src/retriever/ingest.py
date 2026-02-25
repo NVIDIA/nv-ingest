@@ -6,6 +6,7 @@ Concrete implementations are provided by runmodes:
 
 - inprocess: local Python process, no framework assumptions
 - batch: large-scale batch execution
+- fused: low-latency single-actor GPU model fusion
 - online: low-latency, multi-request serving
 """
 
@@ -14,7 +15,7 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-RunMode = Literal["inprocess", "batch", "online"]
+RunMode = Literal["inprocess", "batch", "fused", "online"]
 
 
 def create_ingestor(*, run_mode: RunMode = "inprocess", **kwargs: Any) -> "Ingestor":
@@ -29,6 +30,10 @@ def create_ingestor(*, run_mode: RunMode = "inprocess", **kwargs: Any) -> "Inges
         from .ingest_modes.batch import BatchIngestor
 
         return BatchIngestor(**kwargs)
+    if run_mode == "fused":
+        from .ingest_modes.fused import FusedIngestor
+
+        return FusedIngestor(**kwargs)
     if run_mode == "online":
         from .ingest_modes.online import OnlineIngestor
 
@@ -51,8 +56,7 @@ class Ingestor:
 
     def _not_implemented(self, method_name: str) -> "None":
         raise NotImplementedError(
-            f"{self.__class__.__name__}.{method_name}() is not implemented yet "
-            f"(run_mode={self.RUN_MODE})."
+            f"{self.__class__.__name__}.{method_name}() is not implemented yet " f"(run_mode={self.RUN_MODE})."
         )
 
     def files(self, documents: Union[str, List[str]]) -> "Ingestor":
