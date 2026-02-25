@@ -84,7 +84,7 @@ jobs:
             'pymilvus[bulk_writer, model]' \
             'milvus-lite==2.4.12' \
             'nvidia-riva-client==2.20.0' \
-            unstructured-client \
+            'unstructured-client>=0.25.9' \
             tritonclient \
             markitdown \
             glom
