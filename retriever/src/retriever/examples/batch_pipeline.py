@@ -331,7 +331,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
     key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
     return key, dist
 
 
@@ -507,6 +507,11 @@ def main(
         "--lancedb-uri",
         help="LanceDB URI/path for this run.",
     ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
     log_file: Optional[Path] = typer.Option(
         None,
         "--log-file",
@@ -573,6 +578,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -594,6 +600,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -651,6 +658,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -707,6 +715,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -773,6 +782,7 @@ def main(
             embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
             top_k=10,
             ks=(1, 5, 10),
+            hybrid=hybrid,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)

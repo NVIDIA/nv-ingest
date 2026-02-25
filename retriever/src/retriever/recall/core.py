@@ -41,6 +41,8 @@ class RecallConfig:
     # top candidates with full-precision vectors to eliminate SQ quantization error.
     nprobes: int = 0
     refine_factor: int = 10
+    # Search mode toggle.
+    hybrid: bool = False
     # Local HF knobs (only used when endpoints are missing).
     local_hf_device: Optional[str] = None
     local_hf_cache_dir: Optional[str] = None
@@ -153,10 +155,12 @@ def _search_lancedb(
     lancedb_uri: str,
     table_name: str,
     query_vectors: List[List[float]],
+    query_texts: Optional[List[str]] = None,
     top_k: int,
     vector_column_name: str = "vector",
     nprobes: int = 0,
     refine_factor: int = 10,
+    hybrid: bool = False,
 ) -> List[List[Dict[str, Any]]]:
     import lancedb  # type: ignore
 
@@ -179,17 +183,46 @@ def _search_lancedb(
         if effective_nprobes <= 0:
             effective_nprobes = 16  # safe fallback matching default index config
 
+    if hybrid:
+        if not query_texts:
+            raise ValueError("Hybrid LanceDB search requires query_texts.")
+        if len(query_texts) != len(query_vectors):
+            raise ValueError("Hybrid LanceDB search requires query_texts and query_vectors to have the same length.")
+        from lancedb.rerankers import RRFReranker
+
+        reranker = RRFReranker()
+
     results: List[List[Dict[str, Any]]] = []
-    for v in query_vectors:
+    for i, v in enumerate(query_vectors):
         q = np.asarray(v, dtype="float32")
-        hits = (
-            table.search(q, vector_column_name=vector_column_name)
-            .nprobes(effective_nprobes)
-            .refine_factor(refine_factor)
-            .select(["text", "metadata", "source", "_distance"])
-            .limit(top_k)
-            .to_list()
-        )
+        if hybrid:
+            query_text = query_texts[i]
+            try:
+                hits = (
+                    table.search(query_type="hybrid")
+                    .vector(q.tolist())
+                    .text(query_text)
+                    .nprobes(effective_nprobes)
+                    .refine_factor(refine_factor)
+                    .select(["text", "metadata", "source"])
+                    .limit(top_k)
+                    .rerank(reranker)
+                    .to_list()
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    "Hybrid LanceDB search failed. Ensure the table has an FTS index on the `text` column. "
+                    "Ingest with hybrid indexing enabled (`--hybrid`)."
+                ) from e
+        else:
+            hits = (
+                table.search(q, vector_column_name=vector_column_name)
+                .nprobes(effective_nprobes)
+                .refine_factor(refine_factor)
+                .select(["text", "metadata", "source", "_distance"])
+                .limit(top_k)
+                .to_list()
+            )
         results.append(hits)
     return results
 
@@ -280,10 +313,12 @@ def retrieve_and_score(
         lancedb_uri=cfg.lancedb_uri,
         table_name=cfg.lancedb_table,
         query_vectors=vectors,
+        query_texts=queries,
         top_k=int(cfg.top_k),
         vector_column_name=vector_column_name,
         nprobes=int(cfg.nprobes),
         refine_factor=int(cfg.refine_factor),
+        hybrid=bool(cfg.hybrid),
     )
     retrieved_keys = _hits_to_keys(raw_hits)
     metrics = {f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k)) for k in cfg.ks}
