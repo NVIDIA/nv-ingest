@@ -800,6 +800,16 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
+    # Reject non-text modalities — image/multimodal embedding support has been removed.
+    _NON_TEXT_MODALITIES = frozenset({"image", "text_image", "image_text"})
+    for _ct, _mod in task_type_to_modality.items():
+        if isinstance(_mod, str) and _mod in _NON_TEXT_MODALITIES:
+            raise ValueError(
+                f"Modality {_mod!r} for {_ct.value} elements is not supported. "
+                f"Only 'text' modality is supported for embedding. "
+                f"Image and multimodal embedding support has been removed."
+            )
+
     # Determine which content types to embed
     # When aggregating page content, automatically skip TEXT and STRUCTURED unless explicitly set
     def _get_embed_flag(content_type: ContentTypeEnum) -> bool:
