@@ -687,7 +687,7 @@ class BatchIngestor(Ingestor):
         )
         return self
 
-    def extract_audio(self, params: AudioExtractParams) -> "BatchIngestor":
+    def extract_audio(self, params: AudioExtractParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure audio pipeline: read_binary_files -> AudioTranscribeActor (bytes -> transcript rows).
 
@@ -697,7 +697,8 @@ class BatchIngestor(Ingestor):
         from retriever.audio.ray_data import AudioTranscribeActor
 
         self._pipeline_type = "audio"
-        self._extract_audio_kwargs = params.model_dump(mode="python")
+        resolved = _coerce_params(params, AudioExtractParams, kwargs)
+        self._extract_audio_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_audio", dict(self._extract_audio_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(

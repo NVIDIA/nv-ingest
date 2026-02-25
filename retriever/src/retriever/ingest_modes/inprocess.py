@@ -43,6 +43,13 @@ except Exception as e:  # pragma: no cover
 
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
+from ..params import EmbedParams
+from ..params import ExtractParams
+from ..params import HtmlChunkParams
+from ..params import IngestExecuteParams
+from ..params import TextChunkParams
+from ..params import VdbUploadParams
+from ..params import AudioExtractParams
 from ..pdf.extract import pdf_extraction
 from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
@@ -976,8 +983,8 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract), "txt" (extract_txt), or "html" (extract_html). Loader dispatch in ingest().
-        self._pipeline_type: Literal["pdf", "txt", "html"] = "pdf"
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), "html" (extract_html), or "audio" (extract_audio). Loader dispatch in ingest().
+        self._pipeline_type: Literal["pdf", "txt", "html", "audio"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
         self._extract_html_kwargs: Dict[str, Any] = {}
 
@@ -1147,20 +1154,7 @@ class InProcessIngestor(Ingestor):
         self._extract_html_kwargs = resolved.model_dump(mode="python")
         return self
 
-    def extract_audio(
-        self,
-        grpc_endpoint: str = "audio:50051",
-        auth_token: Optional[str] = None,
-        function_id: Optional[str] = None,
-        use_ssl: Optional[bool] = None,
-        ssl_cert: Optional[str] = None,
-        segment_audio: bool = False,
-        max_tokens: Optional[int] = None,
-        overlap_tokens: int = 0,
-        tokenizer_model_id: Optional[str] = None,
-        tokenizer_cache_dir: Optional[str] = None,
-        **kwargs: Any,
-    ) -> "InProcessIngestor":
+    def extract_audio(self, params: AudioExtractParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure audio ingestion: transcribe via Riva/Parakeet NIM.
 
@@ -1168,19 +1162,8 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_audio().
         """
         self._pipeline_type = "audio"
-        self._extract_audio_kwargs = {
-            "grpc_endpoint": grpc_endpoint,
-            "auth_token": auth_token,
-            "function_id": function_id,
-            "use_ssl": use_ssl,
-            "ssl_cert": ssl_cert,
-            "segment_audio": segment_audio,
-            "max_tokens": max_tokens,
-            "overlap_tokens": overlap_tokens,
-            "tokenizer_model_id": tokenizer_model_id,
-            "tokenizer_cache_dir": tokenizer_cache_dir,
-            **kwargs,
-        }
+        resolved = _coerce_params(params, AudioExtractParams, kwargs)
+        self._extract_audio_kwargs = resolved.model_dump(mode="python")
         return self
 
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "InProcessIngestor":
