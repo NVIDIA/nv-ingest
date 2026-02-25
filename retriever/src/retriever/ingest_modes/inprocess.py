@@ -320,6 +320,55 @@ def _safe_stem(name: str) -> str:
     return s[:160] if len(s) > 160 else s
 
 
+def pages_df_from_pdf_bytes(pdf_bytes: Union[bytes, bytearray], source_path: str) -> pd.DataFrame:
+    """
+    Build a per-page DataFrame from raw PDF bytes (same schema as pdf_path_to_pages_df).
+
+    Used by the online ingest mode to run the same pipeline on document bytes
+    received via REST. Columns: bytes, path, page_number.
+    """
+    pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+    out_rows = [
+        {"bytes": b, "path": source_path, "page_number": i + 1}
+        for i, b in enumerate(pages)
+    ]
+    return pd.DataFrame(out_rows)
+
+
+def run_pipeline_tasks_on_df(
+    initial_df: pd.DataFrame,
+    per_doc_tasks: Sequence[Tuple[Callable[..., Any], Dict[str, Any]]],
+    post_tasks: Optional[Sequence[Tuple[Callable[..., Any], Dict[str, Any]]]] = None,
+) -> Tuple[Any, List[Dict[str, Any]]]:
+    """
+    Run the inprocess pipeline task chain on a single document DataFrame.
+
+    Returns (final_result, metrics) where metrics is a list of
+    {"stage": str, "duration_sec": float} for each stage. Used by both
+    InProcessIngestor.ingest() and the online Ray Serve deployment.
+    """
+    import time
+
+    metrics: List[Dict[str, Any]] = []
+    current: Any = initial_df
+    for func, kwargs in per_doc_tasks:
+        t0 = time.perf_counter()
+        if func is pdf_extraction:
+            current = func(pdf_binary=current, **kwargs)
+        else:
+            current = func(current, **kwargs)
+        metrics.append({"stage": getattr(func, "__name__", "unknown"), "duration_sec": time.perf_counter() - t0})
+
+    if post_tasks and current is not None:
+        combined = current if isinstance(current, pd.DataFrame) else pd.concat(current, ignore_index=True)
+        for func, kwargs in post_tasks:
+            t0 = time.perf_counter()
+            combined = func(combined, **kwargs)
+            metrics.append({"stage": getattr(func, "__name__", "unknown"), "duration_sec": time.perf_counter() - t0})
+        return combined, metrics
+    return current, metrics
+
+
 def save_dataframe_to_disk_json(df: Any, *, output_directory: str) -> Any:
     """
     Pipeline task: persist a pandas DataFrame as a timestamped JSON file.
@@ -860,6 +909,20 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((upload_embeddings_to_lancedb_inprocess, dict(kwargs)))
         return self
 
+    # Tasks that run once on combined results (after all docs). All others run per-doc.
+    _POST_TASKS = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
+
+    def get_pipeline_tasks(
+        self,
+    ) -> Tuple[List[Tuple[Callable[..., Any], Dict[str, Any]]], List[Tuple[Callable[..., Any], Dict[str, Any]]]]:
+        """
+        Return (per_doc_tasks, post_tasks) for use by ingest() or by the online
+        serve deployment to run the same pipeline on a single document.
+        """
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in self._POST_TASKS]
+        post_tasks = [(f, k) for f, k in self._tasks if f in self._POST_TASKS]
+        return per_doc_tasks, post_tasks
+
     def ingest(
         self,
         show_progress: bool = False,
@@ -868,10 +931,7 @@ class InProcessIngestor(Ingestor):
         return_traces: bool = False,
         **_: Any,
     ) -> list[Any]:
-        # Tasks that run once on combined results (after all docs). All others run per-doc.
-        _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
-        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
-        post_tasks = [(f, k) for f, k in self._tasks if f in _post_tasks]
+        per_doc_tasks, post_tasks = self.get_pipeline_tasks()
 
         # Iterate through all configured documents; for each file build a per-page
         # DataFrame and run the per-doc task chain.
@@ -913,13 +973,7 @@ class InProcessIngestor(Ingestor):
 
         for doc_path in doc_iter:
             initial_df = _loader(doc_path)
-
-            current: Any = initial_df
-            for func, kwargs in per_doc_tasks:
-                if func is pdf_extraction:
-                    current = func(pdf_binary=current, **kwargs)
-                else:
-                    current = func(current, **kwargs)
+            current, _ = run_pipeline_tasks_on_df(initial_df, per_doc_tasks, None)
             results.append(current)
 
         # Run upload/save once on combined results so overwrite=True keeps full corpus.
