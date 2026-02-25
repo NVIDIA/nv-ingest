@@ -45,7 +45,7 @@ except Exception as e:  # pragma: no cover
     pdfium = None  # type: ignore[assignment]
     _PDFIUM_IMPORT_ERROR = e
 
-from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
+from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
 from ..params import EmbedParams
 from ..params import ExtractParams

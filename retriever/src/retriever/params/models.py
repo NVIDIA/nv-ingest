@@ -151,6 +151,7 @@ class ExtractParams(_ParamsModel):
 
 
 class EmbedParams(_ParamsModel):
+    model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
     input_type: str = "passage"
