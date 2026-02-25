@@ -21,6 +21,7 @@ import traceback
 
 import numpy as np
 import pandas as pd
+from retriever.params import RemoteRetryParams
 from retriever.nim.nim import invoke_image_inference_batches
 
 try:
@@ -375,8 +376,14 @@ def ocr_page_elements(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron OCR v1 on cropped regions detected by PageElements v3.
 
@@ -469,9 +476,9 @@ def ocr_page_elements(
                         api_key=api_key,
                         timeout_s=float(request_timeout_s),
                         max_batch_size=int(kwargs.get("inference_batch_size", 8)),
-                        max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                        max_retries=int(kwargs.get("remote_max_retries", 10)),
-                        max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                        max_pool_workers=int(retry.remote_max_pool_workers),
+                        max_retries=int(retry.remote_max_retries),
+                        max_429_retries=int(retry.remote_max_429_retries),
                     )
                     if len(response_items) != len(crop_meta):
                         raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")

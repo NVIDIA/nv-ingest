@@ -21,6 +21,7 @@ import time
 import traceback
 
 import pandas as pd
+from retriever.params import RemoteRetryParams
 from retriever.nim.nim import invoke_image_inference_batches
 
 try:
@@ -266,8 +267,14 @@ def detect_infographic_elements_v1(
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Graphic Elements v1 on an infographic image source.
 
@@ -329,9 +336,9 @@ def detect_infographic_elements_v1(
                 api_key=api_key,
                 timeout_s=float(request_timeout_s),
                 max_batch_size=int(inference_batch_size),
-                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                max_retries=int(kwargs.get("remote_max_retries", 10)),
-                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                max_pool_workers=int(retry.remote_max_pool_workers),
+                max_retries=int(retry.remote_max_retries),
+                max_429_retries=int(retry.remote_max_429_retries),
             )
             elapsed = time.perf_counter() - t0
             if len(response_items) != len(valid):
@@ -440,8 +447,14 @@ def detect_infographic_elements_v1_from_page_elements_v3(
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Graphic Elements v1 only on cropped infographic/title regions.
 
@@ -566,9 +579,9 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                     api_key=api_key,
                     timeout_s=float(request_timeout_s),
                     max_batch_size=int(inference_batch_size),
-                    max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                    max_retries=int(kwargs.get("remote_max_retries", 10)),
-                    max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
                 )
                 elapsed = time.perf_counter() - t0
                 if len(response_items) != len(crop_b64s):

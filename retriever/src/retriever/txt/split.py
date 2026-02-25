@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from retriever.params import TextChunkParams
 
 DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-3.2-nv-embedqa-1b-v2"
 DEFAULT_MAX_TOKENS = 512
@@ -88,14 +89,15 @@ def split_text_by_tokens(
 
 def txt_file_to_chunks_df(
     path: str,
-    *,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
-    tokenizer_model_id: Optional[str] = None,
-    encoding: str = "utf-8",
-    tokenizer_cache_dir: Optional[str] = None,
-    **kwargs: Any,
+    params: TextChunkParams | None = None,
 ) -> pd.DataFrame:
+    chunk_params = params or TextChunkParams()
+    max_tokens = chunk_params.max_tokens
+    overlap_tokens = chunk_params.overlap_tokens
+    tokenizer_model_id = chunk_params.tokenizer_model_id
+    encoding = chunk_params.encoding
+    tokenizer_cache_dir = chunk_params.tokenizer_cache_dir
+
     """
     Read a .txt file and return a DataFrame of chunks (one row per chunk).
 
@@ -160,14 +162,15 @@ def txt_file_to_chunks_df(
 def txt_bytes_to_chunks_df(
     content_bytes: bytes,
     path: str,
-    *,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
-    tokenizer_model_id: Optional[str] = None,
-    encoding: str = "utf-8",
-    tokenizer_cache_dir: Optional[str] = None,
-    **kwargs: Any,
+    params: TextChunkParams | None = None,
 ) -> pd.DataFrame:
+    chunk_params = params or TextChunkParams()
+    max_tokens = chunk_params.max_tokens
+    overlap_tokens = chunk_params.overlap_tokens
+    tokenizer_model_id = chunk_params.tokenizer_model_id
+    encoding = chunk_params.encoding
+    tokenizer_cache_dir = chunk_params.tokenizer_cache_dir
+
     """
     Decode bytes to text and return a DataFrame of chunks (same shape as txt_file_to_chunks_df).
 

@@ -21,6 +21,9 @@ from retriever.page_elements import detect_page_elements_v3
 
 from ..pdf.extract import PDFExtractionActor
 from ..pdf.split import PDFSplitActor
+from ..params import EmbedParams
+from ..params import ExtractParams
+from ..params import PdfSplitParams
 from .batch import BatchIngestor
 from .inprocess import embed_text_main_text_embed, explode_content_to_rows
 
@@ -111,13 +114,18 @@ class FusedIngestor(BatchIngestor):
     RUN_MODE = "fused"
     _fused_extract_flags: Dict[str, Any] = {}
 
-    def extract(self, **kwargs: Any) -> "FusedIngestor":
+    def extract(self, params: ExtractParams) -> "FusedIngestor":
         """
         Configure extraction for fused execution.
 
         In fused mode, PDF split/extract are separate CPU stages, but all model
         stages (page-elements, OCR, embedding) run in one actor in `.embed()`.
         """
+        kwargs = {
+            **params.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
+            **params.remote_retry.model_dump(mode="python", exclude_none=True),
+            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
         _assert_no_remote_endpoints(dict(kwargs), context="extract")
 
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
@@ -136,7 +144,12 @@ class FusedIngestor(BatchIngestor):
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
         }
 
-        pdf_split_actor = PDFSplitActor(**kwargs)
+        pdf_split_actor = PDFSplitActor(
+            split_params=PdfSplitParams(
+                start_page=kwargs.get("start_page"),
+                end_page=kwargs.get("end_page"),
+            )
+        )
         self._rd_dataset = self._rd_dataset.map_batches(
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
@@ -157,12 +170,18 @@ class FusedIngestor(BatchIngestor):
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=64)
         return self
 
-    def embed(self, **kwargs: Any) -> "FusedIngestor":
+    def embed(self, params: EmbedParams) -> "FusedIngestor":
         """
         Run page-elements + OCR + explode + embed in one GPU actor stage.
 
         `fused` mode intentionally does not support remote NIM invocation.
         """
+        kwargs = {
+            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
+            **params.runtime.model_dump(mode="python", exclude_none=True),
+            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
+            **params.fused_tuning.model_dump(mode="python", exclude_none=True),
+        }
         _assert_no_remote_endpoints(dict(kwargs), context="embed")
 
         fused_workers = int(kwargs.pop("fused_workers", kwargs.pop("embed_workers", 1)))

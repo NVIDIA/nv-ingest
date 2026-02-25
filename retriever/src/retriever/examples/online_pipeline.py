@@ -15,12 +15,17 @@ Run with:
 """
 
 import json
-import os
 from pathlib import Path
 
 import lancedb
 import typer
 from retriever import create_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
+from retriever.params import TextChunkParams
+from retriever.params import VdbUploadParams
 from retriever.recall.core import RecallConfig, retrieve_and_score
 
 app = typer.Typer()
@@ -111,19 +116,22 @@ def main(
     input_dir = Path(input_dir)
 
     if run_mode == "online":
-        ingestor = create_ingestor(run_mode="online", base_url=base_url)
+        ingestor = create_ingestor(run_mode="online", params=IngestorCreateParams(base_url=base_url))
         glob_pattern = str(input_dir / "*.pdf")
         ingestor = (
             ingestor.files(glob_pattern)
-            .extract(
-                method="pdfium",
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=False,
+            .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+            .embed(EmbedParams(model_name="nemo_retriever_v1"))
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": LANCEDB_URI,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": False,
+                        "create_index": True,
+                    }
+                )
             )
-            .embed(model_name="nemo_retriever_v1")
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
         )
         typer.echo("Submitting documents to online ingest service...")
         results = ingestor.ingest()
@@ -141,42 +149,57 @@ def main(
             ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
                 ingestor.files(glob_pattern)
-                .extract_txt(max_tokens=512, overlap_tokens=0)
-                .embed(model_name="nemo_retriever_v1")
-                .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
+                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
+                .embed(EmbedParams(model_name="nemo_retriever_v1"))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": LANCEDB_URI,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": False,
+                            "create_index": True,
+                        }
+                    )
+                )
             )
         elif input_type == "doc":
             doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
             ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
                 ingestor.files(doc_globs)
-                .extract(
-                    method="pdfium",
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
+                .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+                .embed(EmbedParams(model_name="nemo_retriever_v1"))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": LANCEDB_URI,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": False,
+                            "create_index": True,
+                        }
+                    )
                 )
-                .embed(model_name="nemo_retriever_v1")
-                .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
             )
         else:
             glob_pattern = str(input_dir / "*.pdf")
             ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
                 ingestor.files(glob_pattern)
-                .extract(
-                    method="pdfium",
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
+                .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+                .embed(EmbedParams(model_name="nemo_retriever_v1"))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": LANCEDB_URI,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": False,
+                            "create_index": True,
+                        }
+                    )
                 )
-                .embed(model_name="nemo_retriever_v1")
-                .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=False, create_index=True)
             )
         typer.echo("Running inprocess extraction...")
-        ingestor.ingest(show_progress=True)
+        ingestor.ingest(params=IngestExecuteParams(show_progress=True))
         typer.echo("Extraction complete.")
 
     # Recall evaluation (same for both modes)

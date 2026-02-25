@@ -3,11 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-import os
 from pathlib import Path
 
 import ray
 from retriever import create_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import VdbUploadParams
 from retriever.recall.core import RecallConfig, retrieve_and_score
 
 ray.init(num_gpus=1, ignore_reinit_error=True)
@@ -20,15 +22,13 @@ LANCEDB_TABLE = "nv-ingest"
 
 ingestor = (
     ingestor.files("/raid/data/bo767/*.pdf")
-    .extract(
-        extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
-        # extract_infographics=True,
-        extract_infographics=False,
+    .extract(ExtractParams(extract_text=True, extract_tables=True, extract_charts=True, extract_infographics=False))
+    .embed(EmbedParams(model_name="nemo_retriever_v1"))
+    .vdb_upload(
+        VdbUploadParams(
+            lancedb={"lancedb_uri": LANCEDB_URI, "table_name": LANCEDB_TABLE, "overwrite": True, "create_index": True}
+        )
     )
-    .embed(model_name="nemo_retriever_v1")
-    .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
 )
 
 print("Running extraction...")

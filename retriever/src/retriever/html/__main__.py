@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import typer
 from rich.console import Console
+from retriever.params import HtmlChunkParams
 
 from . import html_file_to_chunks_df
 
@@ -77,9 +78,11 @@ def run(
         try:
             df = html_file_to_chunks_df(
                 str(path),
-                max_tokens=max_tokens,
-                overlap_tokens=overlap,
-                encoding=encoding,
+                params=HtmlChunkParams(
+                    max_tokens=max_tokens,
+                    overlap_tokens=overlap,
+                    encoding=encoding,
+                ),
             )
         except Exception as e:
             console.print(f"[red]Failed[/red] {path}: {e}")

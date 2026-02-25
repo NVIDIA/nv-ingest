@@ -13,6 +13,7 @@ import traceback
 
 from nemotron_page_elements_v3.utils import postprocess_preds_page_element
 import pandas as pd
+from retriever.params import RemoteRetryParams
 
 try:
     import numpy as np
@@ -430,8 +431,14 @@ def detect_page_elements_v3(
     output_column: str = "page_elements_v3",
     num_detections_column: str = "page_elements_v3_num_detections",
     counts_by_label_column: str = "page_elements_v3_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Page Elements v3 on a pandas batch.
 
@@ -534,9 +541,9 @@ def detect_page_elements_v3(
                 api_key=api_key,
                 timeout_s=float(request_timeout_s),
                 max_batch_size=int(inference_batch_size),
-                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                max_retries=int(kwargs.get("remote_max_retries", 10)),
-                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                max_pool_workers=int(retry.remote_max_pool_workers),
+                max_retries=int(retry.remote_max_retries),
+                max_429_retries=int(retry.remote_max_429_retries),
             )
             elapsed = time.perf_counter() - t0
 

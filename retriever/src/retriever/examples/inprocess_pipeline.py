@@ -8,7 +8,6 @@ Run with: uv run python -m retriever.examples.inprocess_pipeline <input-dir>
 """
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -16,6 +15,11 @@ from typing import Optional
 import lancedb
 import typer
 from retriever import create_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import IngestExecuteParams
+from retriever.params import TextChunkParams
+from retriever.params import VdbUploadParams
 from retriever.recall.core import RecallConfig, retrieve_and_score
 
 app = typer.Typer()
@@ -164,18 +168,36 @@ def main(
         ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
             ingestor.files(glob_pattern)
-            .extract_txt(max_tokens=512, overlap_tokens=0)
-            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
+            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": LANCEDB_URI,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": True,
+                        "create_index": True,
+                    }
+                )
+            )
         )
     elif input_type == "html":
         glob_pattern = str(input_dir / "*.html")
         ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
             ingestor.files(glob_pattern)
-            .extract_html(max_tokens=512, overlap_tokens=0)
-            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
+            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": LANCEDB_URI,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": True,
+                        "create_index": True,
+                    }
+                )
+            )
         )
     elif input_type == "doc":
         # DOCX/PPTX: same pipeline as PDF; inprocess loader converts to PDF then splits.
@@ -184,16 +206,27 @@ def main(
         ingestor = (
             ingestor.files(doc_globs)
             .extract(
-                method="pdfium",
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=False,
-                page_elements_invoke_url=page_elements_invoke_url,
-                ocr_invoke_url=ocr_invoke_url,
+                ExtractParams(
+                    method="pdfium",
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                )
             )
-            .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": LANCEDB_URI,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": True,
+                        "create_index": True,
+                    }
+                )
+            )
         )
     else:
         glob_pattern = str(input_dir / "*.pdf")
@@ -201,28 +234,38 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract(
-                method="pdfium",
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=False,
-                page_elements_invoke_url=page_elements_invoke_url,
-                ocr_invoke_url=ocr_invoke_url,
+                ExtractParams(
+                    method="pdfium",
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                )
             )
-            .embed(
-                model_name="nemo_retriever_v1",
-                embed_invoke_url=embed_invoke_url,
+            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": LANCEDB_URI,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": True,
+                        "create_index": True,
+                    }
+                )
             )
-            .vdb_upload(lancedb_uri=LANCEDB_URI, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
         )
 
     print("Running extraction...")
     ingest_start = time.perf_counter()
     ingestor.ingest(
-        parallel=True,
-        max_workers=max_workers,
-        gpu_devices=gpu_device_list,
-        show_progress=True,
+        params=IngestExecuteParams(
+            parallel=True,
+            max_workers=max_workers,
+            gpu_devices=gpu_device_list,
+            show_progress=True,
+        )
     )
     ingest_elapsed_s = time.perf_counter() - ingest_start
     processed_pages = _estimate_processed_pages(LANCEDB_URI, LANCEDB_TABLE)

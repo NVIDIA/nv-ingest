@@ -4,26 +4,34 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from retriever.params import IngestorCreateParams
+from retriever.params import RunMode
 
-RunMode = Literal["inprocess", "batch", "fused", "online"]
 
-
-def create_runmode_ingestor(*, run_mode: RunMode = "inprocess", **kwargs: Any):
+def create_runmode_ingestor(*, run_mode: RunMode = "inprocess", params: IngestorCreateParams | None = None):
+    p = params or IngestorCreateParams()
     if run_mode == "inprocess":
         from retriever.ingest_modes.inprocess import InProcessIngestor
 
-        return InProcessIngestor(**kwargs)
+        return InProcessIngestor(documents=p.documents)
     if run_mode == "batch":
         from retriever.ingest_modes.batch import BatchIngestor
 
-        return BatchIngestor(**kwargs)
+        return BatchIngestor(
+            documents=p.documents,
+            ray_address=p.ray_address,
+            ray_log_to_driver=p.ray_log_to_driver,
+        )
     if run_mode == "fused":
         from retriever.ingest_modes.fused import FusedIngestor
 
-        return FusedIngestor(**kwargs)
+        return FusedIngestor(
+            documents=p.documents,
+            ray_address=p.ray_address,
+            ray_log_to_driver=p.ray_log_to_driver,
+        )
     if run_mode == "online":
         from retriever.ingest_modes.online import OnlineIngestor
 
-        return OnlineIngestor(**kwargs)
+        return OnlineIngestor(documents=p.documents, base_url=p.base_url)
     raise ValueError(f"Unknown run_mode: {run_mode!r}")

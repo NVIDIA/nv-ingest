@@ -17,10 +17,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+from retriever.params import HtmlChunkParams
 
 from ..txt.split import (
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_OVERLAP_TOKENS,
     DEFAULT_TOKENIZER_MODEL_ID,
     split_text_by_tokens,
 )
@@ -60,14 +59,14 @@ def html_to_markdown(html_content: Union[str, bytes, Path]) -> str:
 
 def html_file_to_chunks_df(
     path: str,
-    *,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
-    tokenizer_model_id: Optional[str] = None,
-    encoding: str = "utf-8",
-    tokenizer_cache_dir: Optional[str] = None,
-    **kwargs: Any,
+    params: HtmlChunkParams | None = None,
 ) -> pd.DataFrame:
+    chunk_params = params or HtmlChunkParams()
+    max_tokens = chunk_params.max_tokens
+    overlap_tokens = chunk_params.overlap_tokens
+    tokenizer_model_id = chunk_params.tokenizer_model_id
+    tokenizer_cache_dir = chunk_params.tokenizer_cache_dir
+
     """
     Read an .html file, convert to markdown via markitdown, chunk by tokens.
 
@@ -107,21 +106,20 @@ def html_file_to_chunks_df(
         overlap_tokens=overlap_tokens,
         tokenizer_model_id=tokenizer_model_id,
         tokenizer_cache_dir=tokenizer_cache_dir,
-        **kwargs,
     )
 
 
 def html_bytes_to_chunks_df(
     content_bytes: bytes,
     path: str,
-    *,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
-    tokenizer_model_id: Optional[str] = None,
-    encoding: str = "utf-8",
-    tokenizer_cache_dir: Optional[str] = None,
-    **kwargs: Any,
+    params: HtmlChunkParams | None = None,
 ) -> pd.DataFrame:
+    chunk_params = params or HtmlChunkParams()
+    max_tokens = chunk_params.max_tokens
+    overlap_tokens = chunk_params.overlap_tokens
+    tokenizer_model_id = chunk_params.tokenizer_model_id
+    tokenizer_cache_dir = chunk_params.tokenizer_cache_dir
+
     """
     Convert HTML bytes to markdown and return a DataFrame of chunks (same shape as html_file_to_chunks_df).
 
@@ -147,7 +145,6 @@ def html_bytes_to_chunks_df(
         overlap_tokens=overlap_tokens,
         tokenizer_model_id=tokenizer_model_id,
         tokenizer_cache_dir=tokenizer_cache_dir,
-        **kwargs,
     )
 
 
@@ -159,7 +156,6 @@ def _markdown_to_chunks_df(
     overlap_tokens: int,
     tokenizer_model_id: Optional[str],
     tokenizer_cache_dir: Optional[str],
-    **kwargs: Any,
 ) -> pd.DataFrame:
     """Shared logic: markdown string -> tokenizer split -> chunk DataFrame."""
     if not markdown_text or not markdown_text.strip():

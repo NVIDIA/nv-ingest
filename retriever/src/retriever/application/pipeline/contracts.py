@@ -11,7 +11,9 @@ import pandas as pd
 
 
 class StageProcessor(Protocol):
-    def __call__(self, df_primitives: pd.DataFrame, **kwargs: Any) -> Tuple[pd.DataFrame, Dict[str, Any]]: ...
+    def __call__(
+        self, df_primitives: pd.DataFrame, params: Any | None = None
+    ) -> Tuple[pd.DataFrame, Dict[str, Any]]: ...
 
 
 @dataclass(frozen=True)

@@ -4,10 +4,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
 
 from .executor import run_mode_ingest
 
 
-def run_online(**kwargs: Any) -> Any:
-    return run_mode_ingest(run_mode="online", **kwargs)
+def run_online(
+    *,
+    create_params: IngestorCreateParams | None = None,
+    ingest_params: IngestExecuteParams | None = None,
+) -> object:
+    return run_mode_ingest(run_mode="online", create_params=create_params, ingest_params=ingest_params)

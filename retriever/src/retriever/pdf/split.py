@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import traceback
 
 import pandas as pd
+from retriever.params import PdfSplitParams
 
 try:
     import pypdfium2 as pdfium
@@ -116,7 +117,7 @@ def pdf_path_to_pages_df(path: str) -> pd.DataFrame:
     return pd.DataFrame(out_rows)
 
 
-def split_pdf_batch(pdf_batch: Any, **kwargs: Any) -> pd.DataFrame:
+def split_pdf_batch(pdf_batch: Any, params: PdfSplitParams | None = None) -> pd.DataFrame:
     """
     Split a batch of PDFs into per-page single-page PDFs (bytes), without rendering.
 
@@ -127,8 +128,9 @@ def split_pdf_batch(pdf_batch: Any, **kwargs: Any) -> pd.DataFrame:
         raise NotImplementedError("split_pdf_batch currently only supports pandas.DataFrame input.")
 
     # Optional bounds (1-indexed inclusive).
-    start_page = kwargs.get("start_page", None)
-    end_page = kwargs.get("end_page", None)
+    split_params = params or PdfSplitParams()
+    start_page = split_params.start_page
+    end_page = split_params.end_page
 
     out_rows: List[Dict[str, Any]] = []
     for _, row in pdf_batch.iterrows():
@@ -169,16 +171,16 @@ def split_pdf_batch(pdf_batch: Any, **kwargs: Any) -> pd.DataFrame:
 
 @dataclass(slots=True)
 class PDFSplitActor:
-    split_kwargs: Dict[str, Any]
+    split_params: PdfSplitParams
 
-    def __init__(self, **split_kwargs: Any) -> None:
-        self.split_kwargs = dict(split_kwargs)
+    def __init__(self, split_params: PdfSplitParams | None = None) -> None:
+        self.split_params = split_params or PdfSplitParams()
 
-    def __call__(self, pdf_batch: Any, **override_kwargs: Any) -> Any:
-        return split_pdf_batch(pdf_batch, **self.split_kwargs, **override_kwargs)
+    def __call__(self, pdf_batch: Any) -> Any:
+        return split_pdf_batch(pdf_batch, params=self.split_params)
 
 
-def split_pdf(pdf_ds: Any, **kwargs: Any) -> Any:
+def split_pdf(pdf_ds: Any, params: PdfSplitParams | None = None) -> Any:
     """
     Dataset-level splitter.
 
@@ -191,4 +193,4 @@ def split_pdf(pdf_ds: Any, **kwargs: Any) -> Any:
         raise ImportError("split_pdf() requires Ray Data (`ray`).") from e
 
     # Note: returning a Dataset here creates the new dataset representing pages.
-    return pdf_ds.map_batches(PDFSplitActor(**kwargs), batch_format="pandas")
+    return pdf_ds.map_batches(PDFSplitActor(split_params=params), batch_format="pandas")

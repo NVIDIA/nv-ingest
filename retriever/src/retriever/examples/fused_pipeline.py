@@ -19,6 +19,11 @@ import lancedb
 import ray
 import typer
 from retriever import create_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
+from retriever.params import VdbUploadParams
 from retriever.examples.batch_pipeline import (
     LANCEDB_TABLE,
     LANCEDB_URI,
@@ -177,36 +182,54 @@ def main(
 
         ingestor = create_ingestor(
             run_mode="fused",
-            ray_address=ray_address,
-            ray_log_to_driver=ray_log_to_driver,
+            params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
         )
         ingestor = (
             ingestor.files(pdf_glob)
             .extract(
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=False,
-                pdf_extract_workers=int(pdf_extract_workers),
-                pdf_extract_num_cpus=float(pdf_extract_num_cpus),
-                pdf_split_batch_size=int(pdf_split_batch_size),
-                pdf_extract_batch_size=int(pdf_extract_batch_size),
+                ExtractParams(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    batch_tuning={
+                        "pdf_extract_workers": int(pdf_extract_workers),
+                        "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                        "pdf_split_batch_size": int(pdf_split_batch_size),
+                        "pdf_extract_batch_size": int(pdf_extract_batch_size),
+                    },
+                )
             )
             .embed(
-                model_name="nemo_retriever_v1",
-                fused_workers=int(fused_workers),
-                fused_batch_size=int(fused_batch_size),
-                fused_cpus_per_actor=float(fused_cpus_per_actor),
-                fused_gpus_per_actor=float(fused_gpus_per_actor),
+                EmbedParams(
+                    model_name="nemo_retriever_v1",
+                    fused_tuning={
+                        "fused_workers": int(fused_workers),
+                        "fused_batch_size": int(fused_batch_size),
+                        "fused_cpus_per_actor": float(fused_cpus_per_actor),
+                        "fused_gpus_per_actor": float(fused_gpus_per_actor),
+                    },
+                )
             )
-            .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+            .vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": lancedb_uri,
+                        "table_name": LANCEDB_TABLE,
+                        "overwrite": True,
+                        "create_index": True,
+                    }
+                )
+            )
         )
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
         ingestor.ingest(
-            runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
-            runtime_metrics_prefix=runtime_metrics_prefix,
+            params=IngestExecuteParams(
+                runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
+                runtime_metrics_prefix=runtime_metrics_prefix,
+            )
         )
         ingest_elapsed_s = time.perf_counter() - ingest_start
         processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)

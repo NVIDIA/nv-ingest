@@ -19,6 +19,10 @@ from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..ingest import Ingestor
+from ..params import EmbedParams
+from ..params import ExtractParams
+from ..params import IngestExecuteParams
+from ..params import VdbUploadParams
 
 
 class OnlineIngestor(Ingestor):
@@ -38,9 +42,8 @@ class OnlineIngestor(Ingestor):
         self,
         documents: Optional[List[str]] = None,
         base_url: str = "http://localhost:7670",
-        **kwargs: Any,
     ) -> None:
-        super().__init__(documents=documents, **kwargs)
+        super().__init__(documents=documents)
         self._base_url = base_url.rstrip("/")
         self._input_documents: List[str] = self._documents
 
@@ -77,40 +80,38 @@ class OnlineIngestor(Ingestor):
             self._buffers.append((str(name), buf))
         return self
 
-    def load(self, **_: Any) -> "OnlineIngestor":
+    def load(self) -> "OnlineIngestor":
         """No-op for API compatibility."""
         return self
 
-    def extract(self, **kwargs: Any) -> "OnlineIngestor":
+    def extract(self, params: ExtractParams) -> "OnlineIngestor":
         """Record extraction config (server uses its own config). API compatibility."""
+        _ = params
         return self
 
-    def extract_txt(self, **kwargs: Any) -> "OnlineIngestor":
+    def extract_txt(self, params: ExtractParams) -> "OnlineIngestor":
         """Record txt config. API compatibility. Online mode typically serves PDF only."""
+        _ = params
         return self
 
-    def embed(self, **kwargs: Any) -> "OnlineIngestor":
+    def embed(self, params: EmbedParams) -> "OnlineIngestor":
         """Record embed config (server uses its own config). API compatibility."""
+        _ = params
         return self
 
-    def vdb_upload(self, purge_results_after_upload: bool = True, **kwargs: Any) -> "OnlineIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None) -> "OnlineIngestor":
         """Record vdb config (server uses its own config). API compatibility."""
+        _ = params
         return self
 
-    def ingest(
-        self,
-        show_progress: bool = False,
-        return_failures: bool = False,
-        save_to_disk: bool = False,
-        return_traces: bool = False,
-        **_: Any,
-    ) -> List[Dict[str, Any]]:
+    def ingest(self, params: IngestExecuteParams | None = None) -> List[Dict[str, Any]]:
         """
         Submit each configured file (and buffer) to the online ingest REST API.
 
         Returns a list of response dicts (one per document) with ok, total_duration_sec,
         stages, rows_written, and optional error.
         """
+        _ = params
         import httpx
 
         ingest_url = f"{self._base_url}/ingest"
@@ -171,19 +172,19 @@ class OnlineIngestor(Ingestor):
     def all_tasks(self) -> "OnlineIngestor":
         return self
 
-    def dedup(self, **kwargs: Any) -> "OnlineIngestor":
+    def dedup(self) -> "OnlineIngestor":
         return self
 
-    def filter(self, **kwargs: Any) -> "OnlineIngestor":
+    def filter(self) -> "OnlineIngestor":
         return self
 
-    def split(self, **kwargs: Any) -> "OnlineIngestor":
+    def split(self) -> "OnlineIngestor":
         return self
 
-    def store(self, **kwargs: Any) -> "OnlineIngestor":
+    def store(self) -> "OnlineIngestor":
         return self
 
-    def store_embed(self, **kwargs: Any) -> "OnlineIngestor":
+    def store_embed(self) -> "OnlineIngestor":
         return self
 
     def udf(self, *args: Any, **kwargs: Any) -> "OnlineIngestor":
@@ -192,10 +193,11 @@ class OnlineIngestor(Ingestor):
     def save_intermediate_results(self, output_dir: str) -> "OnlineIngestor":
         return self
 
-    def save_to_disk(self, *args: Any, **kwargs: Any) -> "OnlineIngestor":
+    def save_to_disk(self, *args: Any) -> "OnlineIngestor":
+        _ = args
         return self
 
-    def caption(self, **kwargs: Any) -> "OnlineIngestor":
+    def caption(self) -> "OnlineIngestor":
         return self
 
     def pdf_split_config(self, pages_per_chunk: int = 32) -> "OnlineIngestor":

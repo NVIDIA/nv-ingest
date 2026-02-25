@@ -4,11 +4,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
+from retriever.params import RunMode
 
-from .factory import RunMode, create_runmode_ingestor
+from .factory import create_runmode_ingestor
 
 
-def run_mode_ingest(*, run_mode: RunMode, create_kwargs: dict[str, Any] | None = None, **ingest_kwargs: Any) -> Any:
-    ingestor = create_runmode_ingestor(run_mode=run_mode, **(create_kwargs or {}))
-    return ingestor.ingest(**ingest_kwargs)
+def run_mode_ingest(
+    *,
+    run_mode: RunMode,
+    create_params: IngestorCreateParams | None = None,
+    ingest_params: IngestExecuteParams | None = None,
+) -> object:
+    ingestor = create_runmode_ingestor(run_mode=run_mode, params=create_params)
+    return ingestor.ingest(params=ingest_params)
