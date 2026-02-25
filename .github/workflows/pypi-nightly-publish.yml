@@ -76,6 +76,26 @@ jobs:
         run: |
           cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
+      - name: Build retriever wheel
+        run: |
+          cd retriever
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path("src/retriever/_build_info.py").write_text(
+              '"""Build metadata written by CI before packaging."""\n\n'
+              'BUILD_GIT_SHA = "${{ github.sha }}"\n'
+              f'BUILD_DATE = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n',
+              encoding="utf-8",
+          )
+          PY
+          RETRIEVER_RELEASE_TYPE=${{ env.RELEASE_TYPE }} \
+          RETRIEVER_VERSION=${{ env.VERSION }} \
+          RETRIEVER_BUILD_NUMBER=${{ github.run_number }} \
+          RETRIEVER_GIT_SHA=${{ github.sha }} \
+          python -m build
+
       - name: Publish wheels to Artifactory
         env:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
@@ -84,4 +104,5 @@ jobs:
         run: |
           twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
           && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/* \
-          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/*
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/* \
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD retriever/dist/*
