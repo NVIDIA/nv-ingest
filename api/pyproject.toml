@@ -29,7 +29,11 @@ dependencies = [
     "ffmpeg-python==0.2.0",
     "tritonclient",
     "glom",
+<<<<<<< Updated upstream
     "pypdfium2==4.30.0",
+=======
+    "pypdfium2>=4.30.0,<5.0.0",
+>>>>>>> Stashed changes
 ]
 
 [project.optional-dependencies]
