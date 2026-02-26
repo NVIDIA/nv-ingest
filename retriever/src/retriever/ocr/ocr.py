@@ -110,12 +110,14 @@ def _crop_b64_image_by_norm_bbox(
 
 
 def _crop_all_from_page(
-    page_image_b64: str,
+    page_image: Any,
     detections: List[Dict[str, Any]],
     wanted_labels: set,
 ) -> List[Tuple[str, List[float], np.ndarray]]:
     """
     Decode the page image **once** and crop all matching detections.
+
+    *page_image* may be a numpy HWC uint8 array or a base64-encoded PNG string.
 
     Returns a list of ``(label_name, bbox_xyxy_norm, crop_array)`` tuples for
     detections whose ``label_name`` is in *wanted_labels* and whose crop is
@@ -127,15 +129,17 @@ def _crop_all_from_page(
     if Image is None:  # pragma: no cover
         raise ImportError("Cropping requires pillow.")
 
-    if not isinstance(page_image_b64, str) or not page_image_b64:
-        return []
-
-    try:
-        raw = base64.b64decode(page_image_b64)
-        im0 = Image.open(io.BytesIO(raw))
-        im = im0.convert("RGB")
-        im0.close()
-    except Exception:
+    if isinstance(page_image, np.ndarray):
+        im = Image.fromarray(page_image.astype(np.uint8), mode="RGB")
+    elif isinstance(page_image, str) and page_image:
+        try:
+            raw = base64.b64decode(page_image)
+            im0 = Image.open(io.BytesIO(raw))
+            im = im0.convert("RGB")
+            im0.close()
+        except Exception:
+            return []
+    else:
         return []
 
     w, h = im.size
@@ -448,11 +452,15 @@ def ocr_page_elements(
                 dets = []
 
             # --- get page image ---
-            page_image = getattr(row, "page_image", None) or {}
-            page_image_b64 = page_image.get("image_b64") if isinstance(page_image, dict) else None
+            page_image_data = getattr(row, "page_image", None) or {}
+            if isinstance(page_image_data, dict) and isinstance(page_image_data.get("image_array"), np.ndarray):
+                page_img = page_image_data["image_array"]
+            elif isinstance(page_image_data, dict):
+                page_img = page_image_data.get("image_b64")
+            else:
+                page_img = None
 
-            if not isinstance(page_image_b64, str) or not page_image_b64:
-                # No image available — nothing to crop/OCR.
+            if page_img is None:
                 all_table.append(table_items)
                 all_chart.append(chart_items)
                 all_infographic.append(infographic_items)
@@ -460,7 +468,7 @@ def ocr_page_elements(
                 continue
 
             # --- decode page image once, crop all matching detections ---
-            crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
+            crops = _crop_all_from_page(page_img, dets, wanted_labels)
 
             if use_remote:
                 crop_b64s: List[str] = []

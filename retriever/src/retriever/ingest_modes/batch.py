@@ -27,15 +27,13 @@ import ray.data as rd
 from retriever.utils.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
-from retriever.pdf.extract import PDFExtractionActor
-from retriever.pdf.split import PDFSplitActor
+from retriever.pdf.extract import PDFSplitAndExtractActor
 
 from ..ingest import Ingestor
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import HtmlChunkParams
 from ..params import IngestExecuteParams
-from ..params import PdfSplitParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
 
@@ -80,11 +78,6 @@ class _LanceDBWriteActor:
     """
 
     def __init__(self, params: VdbUploadParams | None = None) -> None:
-        import json
-        from pathlib import Path
-
-        self._json = json
-        self._Path = Path
         lancedb_params = (params or VdbUploadParams()).lancedb
 
         self._lancedb_uri = lancedb_params.lancedb_uri
@@ -126,108 +119,134 @@ class _LanceDBWriteActor:
             mode=mode,
         )
 
-    def _build_rows(self, df: Any) -> list:
-        """Build LanceDB rows from a pandas DataFrame batch.
+    def _build_arrow_table(self, df: Any) -> Any:
+        """Build a PyArrow table from a pandas DataFrame batch (vectorized)."""
+        import pandas as pd
 
-        Mirrors the row-building logic from
-        ``upload_embeddings_to_lancedb_inprocess`` in inprocess.py.
-        """
-        rows: list = []
-        for row in df.itertuples(index=False):
-            # Extract embedding
-            emb = None
-            meta = getattr(row, "metadata", None)
-            if isinstance(meta, dict):
-                emb = meta.get("embedding")
-                if not (isinstance(emb, list) and emb):
-                    emb = None
-            if emb is None:
-                payload = getattr(row, self._embedding_column, None)
-                if isinstance(payload, dict):
-                    emb = payload.get(self._embedding_key)
-                    if not (isinstance(emb, list) and emb):
-                        emb = None
-            if emb is None:
-                continue
+        pa = self._pa
+        n = len(df)
+        if n == 0:
+            return None
 
-            # Extract source path and page number
-            path = ""
-            page = -1
-            v = getattr(row, "path", None)
-            if isinstance(v, str) and v.strip():
-                path = v.strip()
-            v = getattr(row, "page_number", None)
-            try:
-                if v is not None:
-                    page = int(v)
-            except Exception:
-                pass
-            if isinstance(meta, dict):
-                sp = meta.get("source_path")
-                if isinstance(sp, str) and sp.strip():
-                    path = sp.strip()
+        # --- Extract embeddings ---
+        meta_col = df.get("metadata", pd.Series([None] * n))
 
-            p = self._Path(path) if path else None
-            filename = p.name if p is not None else ""
-            pdf_basename = p.stem if p is not None else ""
-            pdf_page = f"{pdf_basename}_{page}" if (pdf_basename and page >= 0) else ""
-            source_id = path or filename or pdf_basename
+        emb_from_meta = meta_col.map(lambda m: m.get("embedding") if isinstance(m, dict) else None)
+        valid_meta = emb_from_meta.map(lambda x: isinstance(x, list) and len(x) > 0)
+        emb_from_meta = emb_from_meta.where(valid_meta)
 
-            metadata_obj = {"page_number": int(page) if page is not None else -1}
+        if self._embedding_column in df.columns:
+            emb_from_col = df[self._embedding_column].map(
+                lambda p: p.get(self._embedding_key) if isinstance(p, dict) else None
+            )
+            valid_col = emb_from_col.map(lambda x: isinstance(x, list) and len(x) > 0)
+            emb_from_col = emb_from_col.where(valid_col)
+        else:
+            emb_from_col = pd.Series([None] * n, index=df.index)
+
+        embeddings = emb_from_meta.fillna(emb_from_col)
+        mask = embeddings.notna()
+        if not mask.any():
+            return None
+
+        df = df[mask].reset_index(drop=True)
+        embeddings = embeddings[mask].reset_index(drop=True)
+        nr = len(df)
+
+        # --- Paths with metadata override ---
+        meta_col = df.get("metadata", pd.Series([None] * nr))
+        raw_paths = df.get("path", pd.Series([""] * nr)).fillna("").astype(str).str.strip()
+        source_paths = meta_col.map(lambda m: m.get("source_path", "").strip() if isinstance(m, dict) else "")
+        paths = source_paths.where(source_paths.astype(bool), raw_paths)
+
+        # --- Derived columns ---
+        page_numbers = (
+            pd.to_numeric(df.get("page_number", pd.Series([None] * nr)), errors="coerce").fillna(-1).astype(int)
+        )
+
+        filenames = paths.map(lambda p: Path(p).name if p else "")
+        pdf_basenames = paths.map(lambda p: Path(p).stem if p else "")
+
+        has_basename = pdf_basenames.astype(bool)
+        has_page = page_numbers >= 0
+        pdf_pages = (pdf_basenames + "_" + page_numbers.astype(str)).where(has_basename & has_page, "")
+
+        source_ids = paths.where(paths.astype(bool), filenames)
+        source_ids = source_ids.where(source_ids.astype(bool), pdf_basenames)
+
+        # --- Text ---
+        if self._include_text and self._text_column in df.columns:
+            texts = df[self._text_column].map(lambda t: str(t) if isinstance(t, str) else "")
+        else:
+            texts = pd.Series([""] * nr)
+
+        # --- Metadata JSON ---
+        pe_nums = df.get("page_elements_v3_num_detections", pd.Series([None] * nr))
+        pe_counts_col = df.get("page_elements_v3_counts_by_label", pd.Series([None] * nr))
+        ocr_tables = df.get("table", pd.Series([None] * nr))
+        ocr_charts = df.get("chart", pd.Series([None] * nr))
+        ocr_infos = df.get("infographic", pd.Series([None] * nr))
+
+        def _meta_json(page, pdf_page, pe_num, pe_count, tbl, chart, info):
+            obj = {"page_number": int(page)}
             if pdf_page:
-                metadata_obj["pdf_page"] = pdf_page
-            # Persist per-page detection counters for end-of-run summaries.
-            # These may be duplicated across exploded content rows; downstream
-            # summary logic should dedupe by (source_id, page_number).
-            pe_num = getattr(row, "page_elements_v3_num_detections", None)
+                obj["pdf_page"] = pdf_page
             if pe_num is not None:
                 try:
-                    metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
+                    obj["page_elements_v3_num_detections"] = int(pe_num)
                 except Exception:
                     pass
-            pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
-            if isinstance(pe_counts, dict):
-                metadata_obj["page_elements_v3_counts_by_label"] = {
-                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
+            if isinstance(pe_count, dict):
+                obj["page_elements_v3_counts_by_label"] = {
+                    str(k): int(v) for k, v in pe_count.items() if isinstance(k, str) and v is not None
                 }
-            for ocr_col in ("table", "chart", "infographic"):
-                entries = getattr(row, ocr_col, None)
+            for name, entries in [("table", tbl), ("chart", chart), ("infographic", info)]:
                 if isinstance(entries, list):
-                    metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
-            source_obj = {"source_id": str(path)}
+                    obj[f"ocr_{name}_detections"] = len(entries)
+            return json.dumps(obj, ensure_ascii=False)
 
-            row_out = {
-                "vector": emb,
-                "pdf_page": pdf_page,
-                "filename": filename,
-                "pdf_basename": pdf_basename,
-                "page_number": int(page) if page is not None else -1,
-                "source_id": str(source_id),
-                "path": str(path),
-                "metadata": self._json.dumps(metadata_obj, ensure_ascii=False),
-                "source": self._json.dumps(source_obj, ensure_ascii=False),
-            }
+        metadata_jsons = [
+            _meta_json(pn, pp, pen, pec, ot, oc, oi)
+            for pn, pp, pen, pec, ot, oc, oi in zip(
+                page_numbers,
+                pdf_pages,
+                pe_nums,
+                pe_counts_col,
+                ocr_tables,
+                ocr_charts,
+                ocr_infos,
+            )
+        ]
 
-            if self._include_text:
-                t = getattr(row, self._text_column, None)
-                row_out["text"] = str(t) if isinstance(t, str) else ""
-            else:
-                row_out["text"] = ""
+        # --- Source JSON ---
+        source_jsons = paths.map(lambda p: json.dumps({"source_id": str(p)})).tolist()
 
-            rows.append(row_out)
-        return rows
+        # --- Build PyArrow table ---
+        return pa.table(
+            {
+                "vector": pa.array(embeddings.tolist(), type=pa.list_(pa.float32(), 2048)),
+                "pdf_page": pa.array(pdf_pages.tolist(), type=pa.string()),
+                "filename": pa.array(filenames.tolist(), type=pa.string()),
+                "pdf_basename": pa.array(pdf_basenames.tolist(), type=pa.string()),
+                "page_number": pa.array(page_numbers.tolist(), type=pa.int32()),
+                "source_id": pa.array(source_ids.astype(str).tolist(), type=pa.string()),
+                "path": pa.array(paths.astype(str).tolist(), type=pa.string()),
+                "text": pa.array(texts.tolist(), type=pa.string()),
+                "metadata": pa.array(metadata_jsons, type=pa.string()),
+                "source": pa.array(source_jsons, type=pa.string()),
+            },
+            schema=self._schema,
+        )
 
     def __call__(self, batch_df: Any) -> Any:
-        rows = self._build_rows(batch_df)
-        if rows:
-            # Infer schema from first batch
-            if self._table is None:
-                self._table = self._db.open_table(self._table_name)
-            self._table.add(rows)
+        import pandas as pd
 
-            self._total_rows += len(rows)
+        arrow_table = self._build_arrow_table(batch_df)
+        if arrow_table is not None and arrow_table.num_rows > 0:
+            self._table.add(arrow_table)
+            self._total_rows += arrow_table.num_rows
 
-        return batch_df
+        return pd.DataFrame({"_written": range(len(batch_df))})
 
 
 class _BatchEmbedActor:
@@ -393,8 +412,8 @@ class BatchIngestor(Ingestor):
             return len([p for p in s.split(",") if p.strip()])
 
         debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
-        pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
-        pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
+        pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 4)
+        kwargs.pop("pdf_extract_batch_size", None)  # consumed but unused after fusing split+extract
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
         page_elements_batch_size = kwargs.pop("page_elements_batch_size", 24)
         detect_batch_size = kwargs.pop("detect_batch_size", 24)
@@ -568,33 +587,21 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
         )
 
-        # Splitting pdfs is broken into a separate stage to help amortize downstream
-        # processing if PDFs have vastly different numbers of pages.
-        pdf_split_actor = PDFSplitActor(
-            split_params=PdfSplitParams(
-                start_page=kwargs.get("start_page"),
-                end_page=kwargs.get("end_page"),
-            )
-        )
+        # Fused split + extraction: open each multi-page PDF once and
+        # extract per-page text/images in a single pass. Eliminates the
+        # redundant single-page PDF serialization from the old Split stage.
+        fused_kwargs = dict(kwargs)
+        fused_kwargs["start_page"] = kwargs.get("start_page")
+        fused_kwargs["end_page"] = kwargs.get("end_page")
         self._rd_dataset = self._rd_dataset.map_batches(
-            pdf_split_actor,
+            PDFSplitAndExtractActor,
             batch_size=pdf_split_batch_size,
-            num_cpus=1,
-            num_gpus=0,
-            batch_format="pandas",
-        )
-
-        # Pre-split pdfs are now ready for extraction — the main CPU bottleneck.
-        extraction_actor = PDFExtractionActor(**kwargs)
-        self._rd_dataset = self._rd_dataset.map_batches(
-            extraction_actor,
-            batch_size=pdf_extract_batch_size,
             batch_format="pandas",
             num_cpus=pdf_extract_num_cpus,
             num_gpus=0,
-            compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
+            compute=rd.ActorPoolStrategy(size=pdf_extract_workers),
+            fn_constructor_kwargs=fused_kwargs,
         )
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
         # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
         # construct one instance per actor). Passing an already-constructed

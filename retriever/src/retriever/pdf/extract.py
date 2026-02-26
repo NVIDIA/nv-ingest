@@ -28,6 +28,11 @@ except Exception:  # pragma: no cover
     np = None  # type: ignore[assignment]
 
 try:
+    import cv2
+except Exception:  # pragma: no cover
+    cv2 = None  # type: ignore[assignment]
+
+try:
     from PIL import Image
 except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
@@ -102,6 +107,37 @@ def _render_page_to_base64(page: Any, *, dpi: int = 200, image_format: str = "pn
         return meta
 
     raise RuntimeError("Failed to render page to an image representation.")
+
+
+def _bitmap_to_rgb_numpy(bitmap: Any) -> Any:
+    """Convert a PdfBitmap to an RGB HWC uint8 numpy array.
+
+    Handles BGRA/BGRX/BGR modes that PDFium may return, using an in-place
+    SIMD-optimized channel swap via OpenCV (mirrors the approach in
+    ``api/.../pdfium.py:convert_bitmap_to_corrected_numpy``).
+    """
+    arr = bitmap.to_numpy().copy()
+    mode = getattr(bitmap, "mode", None)
+    if cv2 is not None:
+        if mode in {"BGRA", "BGRX"}:
+            cv2.cvtColor(arr, cv2.COLOR_BGRA2RGBA, dst=arr)
+        elif mode == "BGR":
+            cv2.cvtColor(arr, cv2.COLOR_BGR2RGB, dst=arr)
+    return arr
+
+
+def _render_page_to_numpy(page: Any, *, dpi: int = 200) -> Dict[str, Any]:
+    """Render a page to a numpy array (HWC uint8 RGB). No PNG/base64 overhead."""
+    scale = max(float(dpi) / 72.0, 0.01)
+    bitmap = page.render(scale=scale)
+    arr = _bitmap_to_rgb_numpy(bitmap)
+    h, w = arr.shape[:2]
+    return {
+        "image_array": arr,
+        "image_b64": None,
+        "encoding": "numpy",
+        "orig_shape_hw": (h, w),
+    }
 
 
 def _error_record(
@@ -268,7 +304,7 @@ def pdf_extraction(
                     )
                     render_info: Optional[Dict[str, Any]] = None
                     if want_any_raster:
-                        render_info = _render_page_to_base64(page, dpi=dpi, image_format=image_format)
+                        render_info = _render_page_to_numpy(page, dpi=dpi)
 
                     page_record: Dict[str, Any] = {
                         "path": pdf_path,
@@ -320,6 +356,141 @@ def pdf_extraction(
         return pd.DataFrame(outputs)
     else:
         raise NotImplementedError("pdf_extraction currently only supports pandas.DataFrame input.")
+
+
+def split_and_extract_pdf(
+    pdf_batch: Any,
+    extract_text: bool = False,
+    extract_images: bool = False,
+    extract_tables: bool = False,
+    extract_charts: bool = False,
+    extract_infographics: bool = False,
+    dpi: int = 200,
+    text_extraction_method: str = "pdfium_hybrid",
+    text_depth: str = "page",
+    start_page: int | None = None,
+    end_page: int | None = None,
+    **kwargs: Any,
+) -> pd.DataFrame:
+    """Fused split + extraction: open each multi-page PDF once, extract per-page."""
+    if not isinstance(pdf_batch, pd.DataFrame):
+        raise NotImplementedError("split_and_extract_pdf currently only supports pandas.DataFrame input.")
+
+    if pdfium is None:  # pragma: no cover
+        outputs: List[Dict[str, Any]] = []
+        for _, row in pdf_batch.iterrows():
+            pdf_path = row.get("path")
+            outputs.append(
+                _error_record(
+                    source_path=str(pdf_path) if pdf_path is not None else None,
+                    stage="import_pypdfium2",
+                    exc=(
+                        _PDFIUM_IMPORT_ERROR
+                        if _PDFIUM_IMPORT_ERROR is not None
+                        else RuntimeError("pypdfium2 unavailable")
+                    ),
+                )
+            )
+        return pd.DataFrame(outputs)
+
+    outputs: List[Dict[str, Any]] = []
+    for _, row in pdf_batch.iterrows():
+        pdf_bytes = row.get("bytes")
+        pdf_path = row.get("path")
+        try:
+            if not isinstance(pdf_bytes, (bytes, bytearray, memoryview)):
+                raise RuntimeError(f"Unsupported bytes payload type: {type(pdf_bytes)!r}")
+
+            try:
+                doc = pdfium.PdfDocument(pdf_bytes)
+            except Exception:
+                doc = pdfium.PdfDocument(BytesIO(bytes(pdf_bytes)))
+
+            n_pages = len(doc)
+            start_idx = 0 if start_page is None else max(int(start_page) - 1, 0)
+            end_idx = (n_pages - 1) if end_page is None else min(int(end_page) - 1, n_pages - 1)
+
+            for page_idx in range(start_idx, end_idx + 1):
+                page = doc.get_page(page_idx)
+                try:
+                    is_scanned = _is_scanned_page(page)
+                    ocr_needed = extract_text and (
+                        (text_extraction_method == "pdfium_hybrid" and is_scanned) or text_extraction_method == "ocr"
+                    )
+
+                    text = ""
+                    if extract_text and not ocr_needed:
+                        text = _extract_page_text(page)
+
+                    want_raster = bool(
+                        extract_images or extract_tables or extract_charts or extract_infographics or ocr_needed
+                    )
+                    page_image = None
+                    if want_raster:
+                        page_image = _render_page_to_numpy(page, dpi=dpi)
+
+                    outputs.append(
+                        {
+                            "path": pdf_path,
+                            "page_number": page_idx + 1,
+                            "text": text if extract_text else "",
+                            "page_image": page_image,
+                            "images": [],
+                            "tables": [],
+                            "charts": [],
+                            "infographics": [],
+                            "metadata": {
+                                "has_text": bool(text.strip()) if extract_text else False,
+                                "needs_ocr_for_text": ocr_needed,
+                                "dpi": dpi,
+                                "source_path": pdf_path,
+                                "error": None,
+                            },
+                        }
+                    )
+                finally:
+                    if hasattr(page, "close"):
+                        page.close()
+            doc.close()
+        except BaseException as e:
+            outputs.append(
+                _error_record(
+                    source_path=str(pdf_path) if pdf_path else None,
+                    stage="split_and_extract",
+                    exc=e,
+                )
+            )
+    return pd.DataFrame(outputs)
+
+
+@dataclass(slots=True)
+class PDFSplitAndExtractActor:
+    """Fused split + extraction actor for Ray Data ActorPoolStrategy."""
+
+    extract_kwargs: Dict[str, Any]
+
+    def __init__(self, **extract_kwargs: Any) -> None:
+        self.extract_kwargs = dict(extract_kwargs)
+
+    def __call__(self, pdf_batch: Any, **override_kwargs: Any) -> Any:
+        try:
+            return split_and_extract_pdf(pdf_batch, **self.extract_kwargs, **override_kwargs)
+        except BaseException as e:
+            source_path = None
+            try:
+                if isinstance(pdf_batch, pd.DataFrame) and "path" in pdf_batch.columns and len(pdf_batch.index) > 0:
+                    source_path = str(pdf_batch.iloc[0]["path"])
+            except Exception:
+                source_path = None
+            return pd.DataFrame(
+                [
+                    _error_record(
+                        source_path=source_path,
+                        stage="actor_call",
+                        exc=e,
+                    )
+                ]
+            )
 
 
 @dataclass(slots=True)
