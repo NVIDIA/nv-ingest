@@ -116,16 +116,6 @@ To enable `nemotron-parse` in the batch pipeline, set all of the following to va
 
 Example: run the batch pipeline on a directory of PDFs with nemotron-parse enabled:
 
-
-To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero (they default to 0, which leaves `nemotron-parse` disabled):
-​
-- `--nemotron-parse-workers` — number of Ray workers to run nemotron-parse
-- `--gpu-nemotron-parse` — GPU fraction to allocate per worker (for example, 0.25 to run four workers on a single GPU)
-- `--nemotron-parse-batch-size` — batch size for each nemotron-parse request
-​
-
-For example, run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on:
-
 ```shell
 python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
   --nemotron-parse-workers 16 \
