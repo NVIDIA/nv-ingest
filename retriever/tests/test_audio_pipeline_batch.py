@@ -141,6 +141,40 @@ def test_inprocess_audio_pipeline_with_mocked_asr(tmp_path: Path):
 
 
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
+def test_inprocess_audio_pipeline_local_asr_mocked(tmp_path: Path):
+    """Inprocess with audio_endpoints=(None, None) uses local ASR; mock ParakeetCTC1B1ASR so no real model."""
+    wav = tmp_path / "small.wav"
+    _make_small_wav(wav, duration_sec=0.5)
+
+    from retriever.ingest_modes.inprocess import InProcessIngestor
+
+    mock_model = MagicMock()
+    mock_model.transcribe.return_value = ["local asr mock transcript"]
+
+    with patch("retriever.audio.asr_actor._get_client") as mock_get_client:
+        with patch("retriever.model.local.ParakeetCTC1B1ASR", return_value=mock_model):
+            ingestor = (
+                InProcessIngestor(documents=[])
+                .files([str(wav)])
+                .extract_audio(
+                    params=AudioChunkParams(split_type="size", split_interval=500_000),
+                    asr_params=ASRParams(audio_endpoints=(None, None)),
+                )
+            )
+            results = ingestor.ingest()
+
+    mock_get_client.assert_not_called()
+    assert results is not None
+    assert isinstance(results, list)
+    assert len(results) >= 1
+    df = results[0]
+    assert isinstance(df, pd.DataFrame)
+    assert "text" in df.columns
+    assert len(df) >= 1
+    assert (df["text"] == "local asr mock transcript").all()
+
+
+@pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_fused_audio_pipeline_with_mocked_asr(tmp_path: Path):
     """Fused: same as batch but FusedIngestor; embed() uses explode + _BatchEmbedActor when _pipeline_type==audio."""
     ray = pytest.importorskip("ray")

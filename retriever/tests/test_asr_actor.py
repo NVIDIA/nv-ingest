@@ -80,7 +80,56 @@ def test_apply_asr_to_df():
         assert out["text"].iloc[0] == "applied transcript"
 
 
-def test_asr_params_requires_grpc_endpoint():
-    """When audio_endpoints[0] is empty, ASRActor.__init__ raises via _get_client (ValueError). Or RuntimeError if nv-ingest-api not installed."""
-    with pytest.raises((ValueError, RuntimeError)):
-        ASRActor(params=ASRParams(audio_endpoints=(None, None)))
+def test_local_asr_does_not_call_get_client():
+    """When audio_endpoints are both null, ASRActor uses local model and does not call _get_client."""
+    with patch("retriever.audio.asr_actor._get_client") as mock_get:
+        with patch("retriever.model.local.ParakeetCTC1B1ASR") as mock_class:
+            mock_model = MagicMock()
+            mock_model.transcribe.return_value = ["mocked local transcript"]
+            mock_class.return_value = mock_model
+
+            params = ASRParams(audio_endpoints=(None, None))
+            actor = ASRActor(params=params)
+
+            mock_get.assert_not_called()
+            assert actor._client is None
+            assert actor._model is mock_model
+
+            batch = pd.DataFrame([
+                {
+                    "path": "/tmp/chunk.wav",
+                    "bytes": b"fake_audio_bytes",
+                    "source_path": "/tmp/source.wav",
+                    "duration": 1.0,
+                    "chunk_index": 0,
+                    "metadata": {},
+                    "page_number": 0,
+                }
+            ])
+            out = actor(batch)
+
+            assert len(out) == 1
+            assert out["text"].iloc[0] == "mocked local transcript"
+            mock_model.transcribe.assert_called_once()
+            # One path passed (temp file or /tmp/chunk.wav)
+            call_args = mock_model.transcribe.call_args[0][0]
+            assert isinstance(call_args, list)
+            assert len(call_args) == 1
+
+
+def test_local_asr_apply_asr_to_df():
+    """apply_asr_to_df with audio_endpoints=(None, None) uses local model when mocked."""
+    with patch("retriever.audio.asr_actor._get_client") as mock_get:
+        with patch("retriever.model.local.ParakeetCTC1B1ASR") as mock_class:
+            mock_model = MagicMock()
+            mock_model.transcribe.return_value = ["apply local text"]
+            mock_class.return_value = mock_model
+
+            batch = pd.DataFrame([
+                {"path": "/p", "bytes": b"x", "source_path": "/s", "duration": 0.5, "chunk_index": 0, "metadata": {}, "page_number": 0}
+            ])
+            out = apply_asr_to_df(batch, asr_params={"audio_endpoints": (None, None)})
+
+            mock_get.assert_not_called()
+            assert len(out) == 1
+            assert out["text"].iloc[0] == "apply local text"
