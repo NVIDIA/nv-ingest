@@ -6,5 +6,5 @@ channels:
   - conda-forge
 dependencies:
   - pip:
-      - pypdfium2>=4.30.0
+      - pypdfium2==4.30.0
       - ray[all]>=2.52.0

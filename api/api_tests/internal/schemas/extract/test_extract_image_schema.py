@@ -31,15 +31,15 @@ def test_valid_yolox_both():
 
 
 def test_invalid_yolox_empty_both():
-    with pytest.raises(ValidationError) as excinfo:
-        ImageConfigSchema(yolox_endpoints=(None, None))
-    assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
+    config = ImageConfigSchema(yolox_endpoints=(None, None))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_cleaning_yolox_endpoints_spaces_and_quotes():
-    with pytest.raises(ValidationError) as excinfo:
-        ImageConfigSchema(yolox_endpoints=("  ", '  "  '))
-    assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
+    config = ImageConfigSchema(yolox_endpoints=("  ", '  "  '))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_custom_protocol_is_normalized():
