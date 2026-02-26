@@ -85,6 +85,8 @@ class LanceDbParams(_ParamsModel):
     embedding_key: str = "embedding"
     include_text: bool = True
     text_column: str = "text"
+    hybrid: bool = False
+    fts_language: str = "English"
 
 
 class BatchTuningParams(_ParamsModel):
