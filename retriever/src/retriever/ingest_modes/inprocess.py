@@ -28,10 +28,10 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
-from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
-from retriever.ocr.ocr import ocr_page_elements
+from retriever.ocr.ocr import nemotron_parse_page_elements, ocr_page_elements
 from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
@@ -1052,6 +1052,13 @@ class InProcessIngestor(Ingestor):
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
         kwargs = resolved.model_dump(mode="python")
+        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
+        nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(batch_tuning.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        use_nemotron_parse_only = (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
@@ -1102,50 +1109,70 @@ class InProcessIngestor(Ingestor):
                 d.update(_stage_remote_kwargs(stage_name))
             return d
 
-        # NOTE: Page element detection is a common prerequisite for downstream
-        # structure stages (tables/charts/infographics). We enable it whenever
-        # any downstream extraction is requested.
-        if any(
-            kwargs.get(k) is True for k in ("extract_text", "extract_tables", "extract_charts", "extract_infographics")
-        ):
-            print("Adding page elements task")
-            pe_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url", ""))
-            pe_model = None if pe_invoke_url else NemotronPageElementsV3()
-            self._tasks.append(
-                (
-                    detect_page_elements_v3,
-                    _detect_kwargs_with_model(
-                        pe_model,
-                        stage_name="page_elements",
-                        allow_remote=True,
-                    ),
-                )
+        if use_nemotron_parse_only:
+            parse_flags: dict[str, Any] = {}
+            if kwargs.get("extract_tables") is True:
+                parse_flags["extract_tables"] = True
+            if kwargs.get("extract_charts") is True:
+                parse_flags["extract_charts"] = True
+            if kwargs.get("extract_infographics") is True:
+                parse_flags["extract_infographics"] = True
+            parse_flags["inference_batch_size"] = int(nemotron_parse_batch_size)
+            parse_flags.update(_stage_remote_kwargs("nemotron_parse"))
+            parse_invoke_url = kwargs.get(
+                "nemotron_parse_invoke_url", kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
             )
-
-        # OCR-based extraction for tables/charts/infographics.
-        ocr_flags = {}
-        if kwargs.get("extract_tables") is True:
-            ocr_flags["extract_tables"] = True
-        if kwargs.get("extract_charts") is True:
-            ocr_flags["extract_charts"] = True
-        if kwargs.get("extract_infographics") is True:
-            ocr_flags["extract_infographics"] = True
-        ocr_flags.update(_stage_remote_kwargs("ocr"))
-
-        if ocr_flags:
-            print("Adding OCR extraction task")
-            ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
-            if ocr_invoke_url:
-                self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
+            if parse_invoke_url:
+                parse_flags["invoke_url"] = parse_invoke_url
+                self._tasks.append((nemotron_parse_page_elements, {"model": None, **parse_flags}))
             else:
-                ocr_model_dir = (
-                    kwargs.get("ocr_model_dir")
-                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
-                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
-                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                self._tasks.append((nemotron_parse_page_elements, {"model": NemotronParseV12(), **parse_flags}))
+        else:
+            # NOTE: Page element detection is a common prerequisite for downstream
+            # structure stages (tables/charts/infographics). We enable it whenever
+            # any downstream extraction is requested.
+            if any(
+                kwargs.get(k) is True
+                for k in ("extract_text", "extract_tables", "extract_charts", "extract_infographics")
+            ):
+                print("Adding page elements task")
+                pe_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url", ""))
+                pe_model = None if pe_invoke_url else NemotronPageElementsV3()
+                self._tasks.append(
+                    (
+                        detect_page_elements_v3,
+                        _detect_kwargs_with_model(
+                            pe_model,
+                            stage_name="page_elements",
+                            allow_remote=True,
+                        ),
+                    )
                 )
-                model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
-                self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
+
+            # OCR-based extraction for tables/charts/infographics.
+            ocr_flags = {}
+            if kwargs.get("extract_tables") is True:
+                ocr_flags["extract_tables"] = True
+            if kwargs.get("extract_charts") is True:
+                ocr_flags["extract_charts"] = True
+            if kwargs.get("extract_infographics") is True:
+                ocr_flags["extract_infographics"] = True
+            ocr_flags.update(_stage_remote_kwargs("ocr"))
+
+            if ocr_flags:
+                print("Adding OCR extraction task")
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+                if ocr_invoke_url:
+                    self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
+                else:
+                    ocr_model_dir = (
+                        kwargs.get("ocr_model_dir")
+                        or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                        or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                        or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                    )
+                    model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                    self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
 
         return self
 

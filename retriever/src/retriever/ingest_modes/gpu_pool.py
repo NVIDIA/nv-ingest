@@ -55,6 +55,18 @@ class OCRModelConfig:
 
 
 @dataclass
+class NemotronParseModelConfig:
+    """Config to recreate a NemotronParseV12 model."""
+
+    task_prompt: str = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
+
+    def create(self) -> Any:
+        from retriever.model.local import NemotronParseV12
+
+        return NemotronParseV12(task_prompt=self.task_prompt)
+
+
+@dataclass
 class EmbeddingModelConfig:
     """Config to recreate a LlamaNemotronEmbed1BV2Embedder."""
 
@@ -115,7 +127,7 @@ class GPUTaskDescriptor:
 def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
     """Extract a picklable model config from live kwargs, or None."""
     from retriever.page_elements import detect_page_elements_v3
-    from retriever.ocr.ocr import ocr_page_elements
+    from retriever.ocr.ocr import nemotron_parse_page_elements, ocr_page_elements
     from .inprocess import embed_text_main_text_embed, explode_content_to_rows
 
     if func is detect_page_elements_v3:
@@ -131,6 +143,13 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
         if model is not None and hasattr(model, "_model_dir"):
             model_dir = str(model._model_dir)
         return OCRModelConfig(model_dir=model_dir)
+
+    if func is nemotron_parse_page_elements:
+        if kwargs.get("invoke_url"):
+            return None  # Remote endpoint, no local model
+        return NemotronParseModelConfig(
+            task_prompt=str(kwargs.get("task_prompt") or NemotronParseModelConfig.task_prompt)
+        )
 
     if func is embed_text_main_text_embed:
         model = kwargs.get("model")

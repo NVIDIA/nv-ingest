@@ -479,6 +479,25 @@ def main(
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
+    nemotron_parse_workers: float = typer.Option(
+        0.0,
+        "--nemotron-parse-workers",
+        min=0.0,
+        help="Actor count for Nemotron Parse stage (enables parse-only mode when " \
+            "> 0.0 with parse GPU/batch-size).",
+    ),
+    gpu_nemotron_parse: float = typer.Option(
+        0.0,
+        "--gpu-nemotron-parse",
+        min=0.0,
+        help="GPUs reserved per Nemotron Parse actor.",
+    ),
+    nemotron_parse_batch_size: float = typer.Option(
+        0.0,
+        "--nemotron-parse-batch-size",
+        min=0.0,
+        help="Ray Data batch size for Nemotron Parse stage (enables parse-only mode when > 0.0 with parse workers/GPU).",
+    ),
     page_elements_invoke_url: Optional[str] = typer.Option(
         None,
         "--page-elements-invoke-url",
@@ -647,6 +666,9 @@ def main(
                             "gpu_page_elements": float(gpu_page_elements),
                             "gpu_ocr": float(gpu_ocr),
                             "gpu_embed": float(gpu_embed),
+                            "nemotron_parse_workers": float(nemotron_parse_workers),
+                            "gpu_nemotron_parse": float(gpu_nemotron_parse),
+                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
                         },
                     )
                 )
@@ -704,6 +726,9 @@ def main(
                             "gpu_page_elements": float(gpu_page_elements),
                             "gpu_ocr": float(gpu_ocr),
                             "gpu_embed": float(gpu_embed),
+                            "nemotron_parse_workers": float(nemotron_parse_workers),
+                            "gpu_nemotron_parse": float(gpu_nemotron_parse),
+                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
                         },
                     )
                 )

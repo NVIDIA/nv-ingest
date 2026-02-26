@@ -11,6 +11,7 @@ from retriever.chart import app as chart_app
 from retriever.utils.compare import app as compare_app
 from retriever.html import __main__ as html_main
 from retriever.utils.image import app as image_app
+from retriever.ingest_modes import pipeline as ingest_pipeline
 from retriever.local import app as local_app
 from retriever.online import __main__ as online_main
 from retriever.pdf import app as pdf_app
@@ -31,6 +32,7 @@ app.add_typer(recall_app, name="recall")
 app.add_typer(txt_main.app, name="txt")
 app.add_typer(html_main.app, name="html")
 app.add_typer(online_main.app, name="online")
+app.add_typer(ingest_pipeline.app, name="ingest")
 
 
 def _version_callback(value: bool) -> None:

@@ -17,7 +17,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import timedelta
 
 from typing import Union
@@ -26,7 +26,7 @@ import ray
 import ray.data as rd
 from retriever.utils.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
-from retriever.ocr.ocr import OCRActor
+from retriever.ocr.ocr import NemotronParseActor, OCRActor
 from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
@@ -398,13 +398,22 @@ class BatchIngestor(Ingestor):
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
         page_elements_batch_size = kwargs.pop("page_elements_batch_size", 24)
         detect_batch_size = kwargs.pop("detect_batch_size", 24)
+        nemotron_parse_workers = float(kwargs.pop("nemotron_parse_workers", 0.0))
+        gpu_nemotron_parse = float(kwargs.pop("gpu_nemotron_parse", 0.0))
+        nemotron_parse_batch_size = float(kwargs.pop("nemotron_parse_batch_size", 0.0))
+        use_nemotron_parse_only = (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
 
-        # Count GPU stages that will be created (page_elements is always on).
+        # Count GPU stages that will be created.
         # +1 reserves headroom for a downstream embed() stage.
         detect_stage_count = (
             1 if any(kwargs.get(k) is True for k in ("extract_tables", "extract_charts", "extract_infographics")) else 0
         )
-        gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
+        if use_nemotron_parse_only:
+            gpu_stage_count = detect_stage_count + 1  # nemotron-parse + embed
+        else:
+            gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
 
         # Per-stage GPU allocation: give OCR (the bottleneck) a full GPU;
         # page-elements (lightweight YOLOX) and embedding share 0.5 each.
@@ -455,19 +464,25 @@ class BatchIngestor(Ingestor):
             detect_workers = int(ocr_endpoints)
 
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
-        total_gpu_cpus = (
-            page_elements_workers * page_elements_cpus_per_actor
-            + detect_workers * detect_stage_count * ocr_cpus_per_actor
-        )
+        if use_nemotron_parse_only:
+            total_gpu_cpus = int(nemotron_parse_workers) * ocr_cpus_per_actor
+        else:
+            total_gpu_cpus = (
+                page_elements_workers * page_elements_cpus_per_actor
+                + detect_workers * detect_stage_count * ocr_cpus_per_actor
+            )
         cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
 
         # region agent log
-        total_gpu_requested = (
-            float(gpu_page_elements) * float(page_elements_workers)
-            + float(gpu_ocr) * float(detect_workers * detect_stage_count)
-            + float(gpu_embed) * 1.0
-        )
+        if use_nemotron_parse_only:
+            total_gpu_requested = float(gpu_nemotron_parse) * float(nemotron_parse_workers) + float(gpu_embed) * 1.0
+        else:
+            total_gpu_requested = (
+                float(gpu_page_elements) * float(page_elements_workers)
+                + float(gpu_ocr) * float(detect_workers * detect_stage_count)
+                + float(gpu_embed) * 1.0
+            )
         _debug_log(
             run_id=debug_run_id,
             hypothesis_id="H1",
@@ -478,9 +493,13 @@ class BatchIngestor(Ingestor):
                 "num_cpus_available": self._num_cpus,
                 "gpu_page_elements": gpu_page_elements,
                 "gpu_ocr": gpu_ocr,
+                "gpu_nemotron_parse": gpu_nemotron_parse,
                 "gpu_embed": gpu_embed,
                 "page_elements_workers": page_elements_workers,
                 "detect_workers": detect_workers,
+                "nemotron_parse_workers": nemotron_parse_workers,
+                "nemotron_parse_batch_size": nemotron_parse_batch_size,
+                "use_nemotron_parse_only": use_nemotron_parse_only,
                 "detect_stage_count": detect_stage_count,
                 "pdf_extract_workers": pdf_extract_workers,
                 "pdf_extract_num_cpus": pdf_extract_num_cpus,
@@ -510,7 +529,7 @@ class BatchIngestor(Ingestor):
         logging.info(
             "Batch extract resources: %d GPUs, %d CPUs | "
             "pdf_extract_workers=%d, page_elements_workers=%d, ocr_workers=%d, "
-            "gpu_page_elements=%.2f, gpu_ocr=%.2f, gpu_embed=%.2f",
+            "gpu_page_elements=%.2f, gpu_ocr=%.2f, gpu_nemotron_parse=%.2f, gpu_embed=%.2f, parse_only=%s",
             self._num_gpus,
             self._num_cpus,
             pdf_extract_workers,
@@ -518,7 +537,9 @@ class BatchIngestor(Ingestor):
             detect_workers,
             gpu_page_elements,
             gpu_ocr,
+            gpu_nemotron_parse,
             gpu_embed,
+            use_nemotron_parse_only,
         )
 
         # Downstream batch stages assume `page_image.image_b64` exists for every page.
@@ -595,55 +616,84 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
-        # Page-element detection with a GPU actor pool.
-        # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can
-        # construct one instance per actor). Passing an already-constructed
-        # callable object is treated as a "regular function" and will fail.
-        self._rd_dataset = self._rd_dataset.map_batches(
-            PageElementDetectionActor,
-            batch_size=page_elements_batch_size,
-            batch_format="pandas",
-            num_cpus=page_elements_cpus_per_actor,
-            num_gpus=gpu_page_elements,
-            compute=rd.ActorPoolStrategy(size=page_elements_workers),
-            fn_constructor_kwargs=dict(detect_kwargs),
-        )
-
-        # OCR-based extraction for tables/charts/infographics (single stage).
-        ocr_flags = {}
-        if kwargs.get("extract_tables") is True:
-            ocr_flags["extract_tables"] = True
-        if kwargs.get("extract_charts") is True:
-            ocr_flags["extract_charts"] = True
-        if kwargs.get("extract_infographics") is True:
-            ocr_flags["extract_infographics"] = True
-        for k in (
-            "api_key",
-            "request_timeout_s",
-            "remote_max_pool_workers",
-            "remote_max_retries",
-            "remote_max_429_retries",
-        ):
-            if k in kwargs:
-                ocr_flags[k] = kwargs[k]
-        ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
-        if ocr_invoke_url:
-            ocr_flags["invoke_url"] = ocr_invoke_url
-        if "ocr_request_timeout_s" in kwargs:
-            ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
-        if "ocr_api_key" in kwargs:
-            ocr_flags["api_key"] = kwargs["ocr_api_key"]
-
-        if ocr_flags:
+        if use_nemotron_parse_only:
+            parse_flags: dict[str, Any] = {}
+            if kwargs.get("extract_tables") is True:
+                parse_flags["extract_tables"] = True
+            if kwargs.get("extract_charts") is True:
+                parse_flags["extract_charts"] = True
+            if kwargs.get("extract_infographics") is True:
+                parse_flags["extract_infographics"] = True
+            for k in (
+                "api_key",
+                "request_timeout_s",
+                "remote_max_pool_workers",
+                "remote_max_retries",
+                "remote_max_429_retries",
+            ):
+                if k in kwargs:
+                    parse_flags[k] = kwargs[k]
+            parse_invoke_url = kwargs.get(
+                "nemotron_parse_invoke_url", kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+            )
+            if parse_invoke_url:
+                parse_flags["invoke_url"] = parse_invoke_url
             self._rd_dataset = self._rd_dataset.map_batches(
-                OCRActor,
-                batch_size=detect_batch_size,
+                NemotronParseActor,
+                batch_size=int(nemotron_parse_batch_size),
                 batch_format="pandas",
                 num_cpus=ocr_cpus_per_actor,
-                num_gpus=gpu_ocr,
-                compute=rd.ActorPoolStrategy(size=detect_workers),
-                fn_constructor_kwargs=ocr_flags,
+                num_gpus=float(gpu_nemotron_parse),
+                compute=rd.ActorPoolStrategy(size=int(nemotron_parse_workers)),
+                fn_constructor_kwargs=parse_flags,
             )
+        else:
+            # Page-element detection with a GPU actor pool.
+            self._rd_dataset = self._rd_dataset.map_batches(
+                PageElementDetectionActor,
+                batch_size=page_elements_batch_size,
+                batch_format="pandas",
+                num_cpus=page_elements_cpus_per_actor,
+                num_gpus=gpu_page_elements,
+                compute=rd.ActorPoolStrategy(size=page_elements_workers),
+                fn_constructor_kwargs=dict(detect_kwargs),
+            )
+
+            # OCR-based extraction for tables/charts/infographics (single stage).
+            ocr_flags = {}
+            if kwargs.get("extract_tables") is True:
+                ocr_flags["extract_tables"] = True
+            if kwargs.get("extract_charts") is True:
+                ocr_flags["extract_charts"] = True
+            if kwargs.get("extract_infographics") is True:
+                ocr_flags["extract_infographics"] = True
+            for k in (
+                "api_key",
+                "request_timeout_s",
+                "remote_max_pool_workers",
+                "remote_max_retries",
+                "remote_max_429_retries",
+            ):
+                if k in kwargs:
+                    ocr_flags[k] = kwargs[k]
+            ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+            if ocr_invoke_url:
+                ocr_flags["invoke_url"] = ocr_invoke_url
+            if "ocr_request_timeout_s" in kwargs:
+                ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+            if "ocr_api_key" in kwargs:
+                ocr_flags["api_key"] = kwargs["ocr_api_key"]
+
+            if ocr_flags:
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    OCRActor,
+                    batch_size=detect_batch_size,
+                    batch_format="pandas",
+                    num_cpus=ocr_cpus_per_actor,
+                    num_gpus=gpu_ocr,
+                    compute=rd.ActorPoolStrategy(size=detect_workers),
+                    fn_constructor_kwargs=ocr_flags,
+                )
 
         return self
 

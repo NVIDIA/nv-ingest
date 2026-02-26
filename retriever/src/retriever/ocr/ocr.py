@@ -645,3 +645,291 @@ class OCRActor:
                 out["ocr_v1"] = [payload for _ in range(n)]
                 return out
             return [{"ocr_v1": _error_payload(stage="actor_call", exc=e)}]
+
+
+# ---------------------------------------------------------------------------
+# Nemotron Parse v1.2
+# ---------------------------------------------------------------------------
+
+
+def _extract_parse_text(response_item: Any) -> str:
+    if response_item is None:
+        return ""
+    if isinstance(response_item, str):
+        return response_item.strip()
+    if isinstance(response_item, dict):
+        for key in ("generated_text", "text", "output_text", "prediction", "output", "data"):
+            value = response_item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, list) and value:
+                first = value[0]
+                if isinstance(first, str) and first.strip():
+                    return first.strip()
+                if isinstance(first, dict):
+                    inner = _extract_parse_text(first)
+                    if inner:
+                        return inner
+    if isinstance(response_item, list):
+        for item in response_item:
+            text = _extract_parse_text(item)
+            if text:
+                return text
+    try:
+        return str(response_item).strip()
+    except Exception:
+        return ""
+
+
+def nemotron_parse_page_elements(
+    batch_df: Any,
+    *,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
+    extract_tables: bool = False,
+    extract_charts: bool = False,
+    extract_infographics: bool = False,
+    task_prompt: str = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>",
+    remote_retry: RemoteRetryParams | None = None,
+    **kwargs: Any,
+) -> Any:
+    """
+    Run Nemotron Parse v1.2 on cropped page elements.
+
+    Emits OCR-compatible content columns (``table``, ``chart``, ``infographic``)
+    so this stage can replace the page-elements + OCR pair in pipeline wiring.
+    """
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
+    if not isinstance(batch_df, pd.DataFrame):
+        raise NotImplementedError("nemotron_parse_page_elements currently only supports pandas.DataFrame input.")
+
+    invoke_url = (invoke_url or kwargs.get("nemotron_parse_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
+
+    wanted_labels: set[str] = set()
+    if extract_tables:
+        wanted_labels.add("table")
+    if extract_charts:
+        wanted_labels.add("chart")
+    if extract_infographics:
+        wanted_labels.add("infographic")
+
+    all_table: List[List[Dict[str, Any]]] = []
+    all_chart: List[List[Dict[str, Any]]] = []
+    all_infographic: List[List[Dict[str, Any]]] = []
+    all_meta: List[Dict[str, Any]] = []
+
+    t0_total = time.perf_counter()
+
+    for row in batch_df.itertuples(index=False):
+        table_items: List[Dict[str, Any]] = []
+        chart_items: List[Dict[str, Any]] = []
+        infographic_items: List[Dict[str, Any]] = []
+        row_error: Any = None
+
+        try:
+            pe = getattr(row, "page_elements_v3", None)
+            dets: List[Dict[str, Any]] = []
+            if isinstance(pe, dict):
+                dets = pe.get("detections") or []
+            if not isinstance(dets, list):
+                dets = []
+
+            page_image = getattr(row, "page_image", None) or {}
+            page_image_b64 = page_image.get("image_b64") if isinstance(page_image, dict) else None
+            if not isinstance(page_image_b64, str) or not page_image_b64:
+                all_table.append(table_items)
+                all_chart.append(chart_items)
+                all_infographic.append(infographic_items)
+                all_meta.append({"timing": None, "error": None})
+                continue
+
+            crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
+            # Parse-only mode may skip page-elements detection entirely. In that
+            # case, parse the full page once and fan out the text to enabled
+            # content channels.
+            if not crops and wanted_labels:
+                try:
+                    raw = base64.b64decode(page_image_b64)
+                    with Image.open(io.BytesIO(raw)) as im0:
+                        full_crop = np.asarray(im0.convert("RGB"), dtype=np.uint8).copy()
+                    crops = [("full_page", [0.0, 0.0, 1.0, 1.0], full_crop)]
+                except Exception:
+                    crops = []
+
+            if use_remote:
+                crop_b64s: List[str] = []
+                crop_meta: List[Tuple[str, List[float]]] = []
+                for label_name, bbox, crop_array in crops:
+                    crop_b64s.append(_np_rgb_to_b64_png(crop_array))
+                    crop_meta.append((label_name, bbox))
+
+                if crop_b64s:
+                    response_items = invoke_image_inference_batches(
+                        invoke_url=invoke_url,
+                        image_b64_list=crop_b64s,
+                        api_key=api_key,
+                        timeout_s=float(request_timeout_s),
+                        max_batch_size=int(kwargs.get("inference_batch_size", 8)),
+                        max_pool_workers=int(retry.remote_max_pool_workers),
+                        max_retries=int(retry.remote_max_retries),
+                        max_429_retries=int(retry.remote_max_429_retries),
+                    )
+                    if len(response_items) != len(crop_meta):
+                        raise RuntimeError(f"Expected {len(crop_meta)} Parse responses, got {len(response_items)}")
+
+                    for i, (label_name, bbox) in enumerate(crop_meta):
+                        text = _extract_parse_text(response_items[i])
+                        entry = {"bbox_xyxy_norm": bbox, "text": text}
+                        if label_name == "table":
+                            table_items.append(entry)
+                        elif label_name == "chart":
+                            chart_items.append(entry)
+                        elif label_name == "infographic":
+                            infographic_items.append(entry)
+                        elif label_name == "full_page":
+                            if extract_tables:
+                                table_items.append(dict(entry))
+                            if extract_charts:
+                                chart_items.append(dict(entry))
+                            if extract_infographics:
+                                infographic_items.append(dict(entry))
+            else:
+                for label_name, bbox, crop_array in crops:
+                    text = str(model.invoke(crop_array, task_prompt=task_prompt) or "").strip()
+                    entry = {"bbox_xyxy_norm": bbox, "text": text}
+                    if label_name == "table":
+                        table_items.append(entry)
+                    elif label_name == "chart":
+                        chart_items.append(entry)
+                    elif label_name == "infographic":
+                        infographic_items.append(entry)
+                    elif label_name == "full_page":
+                        if extract_tables:
+                            table_items.append(dict(entry))
+                        if extract_charts:
+                            chart_items.append(dict(entry))
+                        if extract_infographics:
+                            infographic_items.append(dict(entry))
+
+        except BaseException as e:
+            print(f"Warning: Nemotron Parse failed: {type(e).__name__}: {e}")
+            row_error = {
+                "stage": "nemotron_parse_page_elements",
+                "type": e.__class__.__name__,
+                "message": str(e),
+                "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
+            }
+
+        all_table.append(table_items)
+        all_chart.append(chart_items)
+        all_infographic.append(infographic_items)
+        all_meta.append({"timing": None, "error": row_error})
+
+    elapsed = time.perf_counter() - t0_total
+    for meta in all_meta:
+        meta["timing"] = {"seconds": float(elapsed)}
+
+    out = batch_df.copy()
+    out["table"] = all_table
+    out["chart"] = all_chart
+    out["infographic"] = all_infographic
+    # Aliases retained for experiments that read parse-specific columns.
+    out["table_parse"] = all_table
+    out["chart_parse"] = all_chart
+    out["infographic_parse"] = all_infographic
+    out["nemotron_parse_v1_2"] = all_meta
+    return out
+
+
+class NemotronParseActor:
+    """
+    Ray-friendly callable that initializes Nemotron Parse v1.2 once per actor.
+
+    This actor is a drop-in map-batches stage intended for future pipeline
+    wiring in batch/inprocess ingest modes.
+    """
+
+    __slots__ = (
+        "_model",
+        "_extract_tables",
+        "_extract_charts",
+        "_extract_infographics",
+        "_invoke_url",
+        "_api_key",
+        "_request_timeout_s",
+        "_task_prompt",
+        "_remote_retry",
+    )
+
+    def __init__(
+        self,
+        *,
+        extract_tables: bool = False,
+        extract_charts: bool = False,
+        extract_infographics: bool = False,
+        nemotron_parse_invoke_url: Optional[str] = None,
+        invoke_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        request_timeout_s: float = 120.0,
+        task_prompt: str = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>",
+        remote_max_pool_workers: int = 16,
+        remote_max_retries: int = 10,
+        remote_max_429_retries: int = 5,
+    ) -> None:
+        self._invoke_url = (nemotron_parse_invoke_url or invoke_url or "").strip()
+        self._api_key = api_key
+        self._request_timeout_s = float(request_timeout_s)
+        self._task_prompt = str(task_prompt)
+        self._remote_retry = RemoteRetryParams(
+            remote_max_pool_workers=int(remote_max_pool_workers),
+            remote_max_retries=int(remote_max_retries),
+            remote_max_429_retries=int(remote_max_429_retries),
+        )
+        if self._invoke_url:
+            self._model = None
+        else:
+            from retriever.model.local import NemotronParseV12
+
+            self._model = NemotronParseV12(task_prompt=self._task_prompt)
+        self._extract_tables = bool(extract_tables)
+        self._extract_charts = bool(extract_charts)
+        self._extract_infographics = bool(extract_infographics)
+
+    def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
+        try:
+            return nemotron_parse_page_elements(
+                batch_df,
+                model=self._model,
+                invoke_url=self._invoke_url,
+                api_key=self._api_key,
+                request_timeout_s=self._request_timeout_s,
+                task_prompt=self._task_prompt,
+                extract_tables=self._extract_tables,
+                extract_charts=self._extract_charts,
+                extract_infographics=self._extract_infographics,
+                remote_retry=self._remote_retry,
+                **override_kwargs,
+            )
+        except BaseException as e:
+            if isinstance(batch_df, pd.DataFrame):
+                out = batch_df.copy()
+                payload = _error_payload(stage="nemotron_parse_actor_call", exc=e)
+                n = len(out.index)
+                out["table"] = [[] for _ in range(n)]
+                out["chart"] = [[] for _ in range(n)]
+                out["infographic"] = [[] for _ in range(n)]
+                out["table_parse"] = [[] for _ in range(n)]
+                out["chart_parse"] = [[] for _ in range(n)]
+                out["infographic_parse"] = [[] for _ in range(n)]
+                out["nemotron_parse_v1_2"] = [payload for _ in range(n)]
+                return out
+            return [{"nemotron_parse_v1_2": _error_payload(stage="nemotron_parse_actor_call", exc=e)}]
