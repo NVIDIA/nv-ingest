@@ -34,7 +34,7 @@ dependencies:
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
   - redis-py>=5.2.1
-  - requests>=2.28.2
+  - requests>=2.32.5
   - scikit-learn>=1.6.0
   - scipy>=1.15.1
   - setuptools>=58.2.0
