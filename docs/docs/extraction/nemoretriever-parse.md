@@ -4,11 +4,12 @@ For scanned documents, or documents with complex layouts,
 we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
 Nemotron parse provides higher-accuracy text extraction. 
 
-This documentation describes the following two methods 
+This documentation describes the following three methods 
 to run [NeMo Retriever extraction](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
+- Run the Ray batch pipeline with nemotron-parse (library mode)
 
 !!! note
 
@@ -103,6 +104,27 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
         For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
+
+## Run the Ray batch pipeline with nemotron-parse
+
+When using the nemotron-parse model in the retriever batch pipeline, the **page-elements** and **nemotron-ocr** stages are omitted from the Ray pipeline in favor of the nemotron-parse actor. This applies when you run the pipeline from the command line (for example, `batch_pipeline.py` in library mode).
+
+To enable nemotron-parse in the batch pipeline, set all of the following to values greater than zero (they default to 0, which disables nemotron-parse):
+
+- `--nemotron-parse-workers` — number of Ray workers for nemotron-parse
+- `--gpu-nemotron-parse` — GPU fraction per worker (e.g. `0.25` for 4 workers per GPU)
+- `--nemotron-parse-batch-size` — batch size per nemotron-parse request
+
+Example: run the batch pipeline on a directory of PDFs with nemotron-parse enabled:
+
+```shell
+python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
+  --nemotron-parse-workers 16 \
+  --gpu-nemotron-parse .25 \
+  --nemotron-parse-batch-size 32
+```
+
+Replace `/path/to/pdfs` with your input directory (e.g. `/home/local/jdyer/datasets/jp20`).
 
 
 ## Related Topics
