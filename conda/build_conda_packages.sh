@@ -57,7 +57,7 @@ if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
 
     # Generate the version if not specified
     if [ -z "$RELEASE_VERSION" ]; then
-        NV_INGEST_API_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+        NV_INGEST_API_VERSION=$(get_package_version "$SCRIPT_PATH")
     else
         NV_INGEST_API_VERSION=$RELEASE_VERSION
     fi
@@ -77,7 +77,7 @@ if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
 
     # Generate the version if not specified
     if [ -z "$RELEASE_VERSION" ]; then
-        NV_INGEST_SERVICE_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+        NV_INGEST_SERVICE_VERSION=$(get_package_version "$SCRIPT_PATH")
     else
         NV_INGEST_SERVICE_VERSION=$RELEASE_VERSION
     fi
@@ -97,7 +97,7 @@ if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
 
     # Generate the version if not specified
     if [ -z "$RELEASE_VERSION" ]; then
-        NV_INGEST_CLIENT_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+        NV_INGEST_CLIENT_VERSION=$(get_package_version "$SCRIPT_PATH")
     else
         NV_INGEST_CLIENT_VERSION=$RELEASE_VERSION
     fi
