@@ -9,7 +9,6 @@ Unit tests for multimodal embedding helpers and explode_content_to_rows.
 from __future__ import annotations
 
 import sys
-import types
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -26,22 +25,46 @@ from retriever.text_embed.main_text_embed import (
 )
 
 # ---------------------------------------------------------------------------
-# Stub heavy transitive deps that the __init__.py / batch.py import chain
-# pulls in but that are not installed in lightweight test environments.
+# Stub heavy internal modules so ``from retriever.ingest_modes.inprocess``
+# can be imported in lightweight CI (only pytest, pandas, pydantic, pyyaml).
+#
+# The ``retriever.ingest_modes`` __init__.py eagerly imports batch/fused/online
+# which pull in ray, torch, nemotron_*, nv_ingest_api, etc.  And inprocess.py
+# itself imports model/local (torch, nemotron_*), page_elements, ocr, and
+# pdf.extract — each with their own heavy transitive deps.
+#
+# Rather than chasing every third-party leaf dependency, we pre-populate
+# sys.modules for the heavy *internal* retriever sub-packages with MagicMock.
+# This cuts off the entire transitive tree at the root.
 # ---------------------------------------------------------------------------
-if "ray" not in sys.modules:
-    _ray_stub = types.ModuleType("ray")
-    _ray_stub.remote = lambda *a, **kw: lambda cls: cls  # type: ignore[attr-defined]
-    sys.modules["ray"] = _ray_stub
-    _ray_data_stub = types.ModuleType("ray.data")
-    sys.modules["ray.data"] = _ray_data_stub
-
-if "typer" not in sys.modules or not hasattr(sys.modules["typer"], "Typer"):
-    _typer_stub = types.ModuleType("typer")
-    _typer_stub.Typer = lambda **kw: MagicMock()  # type: ignore[attr-defined]
-    _typer_stub.Option = lambda *a, **kw: None  # type: ignore[attr-defined]
-    _typer_stub.Argument = lambda *a, **kw: None  # type: ignore[attr-defined]
-    sys.modules["typer"] = _typer_stub
+_HEAVY_INTERNAL = [
+    # -- sibling ingest modes (prevents batch.py/fused.py from loading) ------
+    "retriever.ingest_modes.batch",
+    "retriever.ingest_modes.fused",
+    "retriever.ingest_modes.online",
+    # -- model / ML packages (torch, nemotron_*, transformers) ---------------
+    "retriever.model.local",
+    "retriever.model.local.llama_nemotron_embed_1b_v2_embedder",
+    "retriever.model.local.nemotron_page_elements_v3",
+    "retriever.model.local.nemotron_ocr_v1",
+    "retriever.model.local.nemotron_table_structure_v1",
+    "retriever.model.local.nemotron_graphic_elements_v1",
+    # -- detection / OCR (nemotron_page_elements_v3, PIL, requests) ----------
+    "retriever.page_elements",
+    "retriever.page_elements.page_elements",
+    "retriever.ocr",
+    "retriever.ocr.ocr",
+    # -- PDF (pypdfium2, nv_ingest_api via pdf/__init__ → __main__ → stage) --
+    "retriever.pdf",
+    "retriever.pdf.__main__",
+    "retriever.pdf.config",
+    "retriever.pdf.io",
+    "retriever.pdf.stage",
+    "retriever.pdf.extract",
+    "retriever.pdf.split",
+]
+for _mod_name in _HEAVY_INTERNAL:
+    sys.modules.setdefault(_mod_name, MagicMock())
 
 from retriever.ingest_modes.inprocess import explode_content_to_rows  # noqa: E402
 
