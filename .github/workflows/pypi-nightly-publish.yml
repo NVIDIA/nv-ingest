@@ -114,8 +114,7 @@ jobs:
         run: |
           cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
-      - name: Build retriever wheel
-        shell: bash
+      - name: Build nemo-retriever wheel
         run: |
           cd retriever
           python - <<'PY'
