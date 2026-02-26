@@ -6,9 +6,5 @@ channels:
   - conda-forge
 dependencies:
   - pip:
-<<<<<<< Updated upstream
-      - pypdfium2==4.30.0
-=======
       - pypdfium2>=4.30.0,<5.0.0
->>>>>>> Stashed changes
       - ray[all]>=2.52.0
