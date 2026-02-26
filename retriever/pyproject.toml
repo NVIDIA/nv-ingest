@@ -62,7 +62,8 @@ dependencies = [
   "markitdown",
   "timm==1.0.22",
   "accelerate==1.12.0",
-  "albumentations==2.0.8"
+  "albumentations==2.0.8",
+  "open-clip-torch==3.2.0"
 ]
 
 [project.optional-dependencies]
