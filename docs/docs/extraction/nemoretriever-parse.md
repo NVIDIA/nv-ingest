@@ -23,7 +23,6 @@ Currently, the limitations to using `nemotron-parse` with NeMo Retriever Extract
 - Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
 - `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).
 
-
 ## Run the NIM Locally by Using Docker Compose
 
 Use the following procedure to run the NIM locally.
