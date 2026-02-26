@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# GPU-specific overrides for A10G (loaded by harness when --deployment-type helm --sku a10g).
+# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.a10g.yaml.
+
+nimOperator:
+  page_elements:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
+      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
+        value: "2"
+      - name: OMP_NUM_THREADS
+        value: "2"
+      - name: NIM_TRITON_CPU_THREADS_POST_PROCESSOR
+        value: "1"
+      - name: NIM_ENABLE_OTEL
+        value: "true"
+      - name: NIM_OTEL_SERVICE_NAME
+        value: "page-elements"
+      - name: NIM_OTEL_TRACES_EXPORTER
+        value: "otlp"
+      - name: NIM_OTEL_METRICS_EXPORTER
+        value: "console"
+      - name: NIM_OTEL_EXPORTER_OTLP_ENDPOINT
+        value: "http://otel-collector:4318"
+      - name: TRITON_OTEL_URL
+        value: "http://otel-collector:4318/v1/traces"
+      - name: TRITON_OTEL_RATE
+        value: "1"
+
+  graphic_elements:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_RATE_LIMIT
+        value: "3"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
+      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+        value: "2048"
+      - name: OMP_NUM_THREADS
+        value: "1"
+
+  table_structure:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_RATE_LIMIT
+        value: "3"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
+      - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
+        value: "2048"
+      - name: OMP_NUM_THREADS
+        value: "1"
+
+  nemoretriever_ocr_v1:
+    env:
+      - name: OMP_NUM_THREADS
+        value: "8"
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
+
+  llama_3_2_nv_rerankqa_1b_v2:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
