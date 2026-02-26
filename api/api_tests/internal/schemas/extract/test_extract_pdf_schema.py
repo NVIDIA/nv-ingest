@@ -29,14 +29,15 @@ def test_pdfium_valid_yolox_http_only():
 
 
 def test_pdfium_invalid_yolox_both_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        PDFiumConfigSchema(yolox_endpoints=(None, None))
-    assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
+    config = PDFiumConfigSchema(yolox_endpoints=(None, None))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_pdfium_cleaning_yolox_endpoints_spaces_and_quotes():
-    with pytest.raises(ValidationError):
-        PDFiumConfigSchema(yolox_endpoints=("  ", '  "  '))
+    config = PDFiumConfigSchema(yolox_endpoints=("  ", '  "  '))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_pdfium_extra_fields_forbidden():
