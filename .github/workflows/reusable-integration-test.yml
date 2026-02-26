@@ -85,8 +85,7 @@ jobs:
             'milvus-lite==2.4.12' \
             'nvidia-riva-client==2.20.0' \
             'unstructured-client>=0.25.9' \
-            # block pulling in breaking changes in pypdfium2 v5
-            'pypdfium2<5' \
+            'pypdfium2<5' \ # block pulling in breaking changes in pypdfium2 v5
             tritonclient \
             markitdown \
             glom
