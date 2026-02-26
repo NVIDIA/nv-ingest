@@ -31,6 +31,7 @@ def _use_remote(params: ASRParams) -> bool:
     http = (params.audio_endpoints[1] or "").strip()
     return bool(grpc or http)
 
+
 logger = logging.getLogger(__name__)
 
 # Default NGC/NVCF Parakeet gRPC endpoint when using cloud ASR
@@ -72,10 +73,12 @@ def asr_params_from_env(
         auth_token=auth_token,
     )
 
+
 try:
     from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import (
         create_audio_inference_client,
     )
+
     _PARAKEET_AVAILABLE = True
 except ImportError:
     create_audio_inference_client = None  # type: ignore[misc, assignment]

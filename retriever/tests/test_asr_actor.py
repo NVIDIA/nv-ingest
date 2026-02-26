@@ -11,7 +11,6 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 from retriever.audio.asr_actor import ASRActor
 from retriever.audio.asr_actor import apply_asr_to_df
@@ -43,17 +42,19 @@ def test_asr_actor_mock_transcribe():
         params = ASRParams(audio_endpoints=("localhost:50051", None))
         actor = ASRActor(params=params)
         raw = b"\x00\x00\x00\x00"
-        batch = pd.DataFrame([
-            {
-                "path": "/tmp/chunk.wav",
-                "bytes": raw,
-                "source_path": "/tmp/source.wav",
-                "duration": 1.0,
-                "chunk_index": 0,
-                "metadata": {"source_path": "/tmp/source.wav", "chunk_index": 0, "duration": 1.0},
-                "page_number": 0,
-            }
-        ])
+        batch = pd.DataFrame(
+            [
+                {
+                    "path": "/tmp/chunk.wav",
+                    "bytes": raw,
+                    "source_path": "/tmp/source.wav",
+                    "duration": 1.0,
+                    "chunk_index": 0,
+                    "metadata": {"source_path": "/tmp/source.wav", "chunk_index": 0, "duration": 1.0},
+                    "page_number": 0,
+                }
+            ]
+        )
         out = actor(batch)
 
         assert len(out) == 1
@@ -71,9 +72,19 @@ def test_apply_asr_to_df():
         mock_client.infer.return_value = ([], "applied transcript")
         mock_get.return_value = mock_client
 
-        batch = pd.DataFrame([
-            {"path": "/p", "bytes": b"x", "source_path": "/s", "duration": 0.5, "chunk_index": 0, "metadata": {}, "page_number": 0}
-        ])
+        batch = pd.DataFrame(
+            [
+                {
+                    "path": "/p",
+                    "bytes": b"x",
+                    "source_path": "/s",
+                    "duration": 0.5,
+                    "chunk_index": 0,
+                    "metadata": {},
+                    "page_number": 0,
+                }
+            ]
+        )
         out = apply_asr_to_df(batch, asr_params={"audio_endpoints": ("localhost:50051", None)})
         assert isinstance(out, pd.DataFrame)
         assert len(out) == 1
@@ -95,17 +106,19 @@ def test_local_asr_does_not_call_get_client():
             assert actor._client is None
             assert actor._model is mock_model
 
-            batch = pd.DataFrame([
-                {
-                    "path": "/tmp/chunk.wav",
-                    "bytes": b"fake_audio_bytes",
-                    "source_path": "/tmp/source.wav",
-                    "duration": 1.0,
-                    "chunk_index": 0,
-                    "metadata": {},
-                    "page_number": 0,
-                }
-            ])
+            batch = pd.DataFrame(
+                [
+                    {
+                        "path": "/tmp/chunk.wav",
+                        "bytes": b"fake_audio_bytes",
+                        "source_path": "/tmp/source.wav",
+                        "duration": 1.0,
+                        "chunk_index": 0,
+                        "metadata": {},
+                        "page_number": 0,
+                    }
+                ]
+            )
             out = actor(batch)
 
             assert len(out) == 1
@@ -125,9 +138,19 @@ def test_local_asr_apply_asr_to_df():
             mock_model.transcribe.return_value = ["apply local text"]
             mock_class.return_value = mock_model
 
-            batch = pd.DataFrame([
-                {"path": "/p", "bytes": b"x", "source_path": "/s", "duration": 0.5, "chunk_index": 0, "metadata": {}, "page_number": 0}
-            ])
+            batch = pd.DataFrame(
+                [
+                    {
+                        "path": "/p",
+                        "bytes": b"x",
+                        "source_path": "/s",
+                        "duration": 0.5,
+                        "chunk_index": 0,
+                        "metadata": {},
+                        "page_number": 0,
+                    }
+                ]
+            )
             out = apply_asr_to_df(batch, asr_params={"audio_endpoints": (None, None)})
 
             mock_get.assert_not_called()

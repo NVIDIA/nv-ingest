@@ -1613,6 +1613,7 @@ class InProcessIngestor(Ingestor):
 
             def _loader(p: str) -> pd.DataFrame:
                 from retriever.audio.chunk_actor import audio_path_to_chunks_df
+
                 return audio_path_to_chunks_df(p, params=AudioChunkParams(**self._extract_audio_chunk_kwargs))
 
         else:

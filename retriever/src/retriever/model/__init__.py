@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from . import local
+
 _VL_EMBED_MODEL_IDS = frozenset(
     {
         "nvidia/llama-nemotron-embed-vl-1b-v2",

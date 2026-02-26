@@ -27,6 +27,7 @@ from retriever.params import VdbUploadParams
 
 def _make_small_wav(path: Path, duration_sec: float = 0.5, sample_rate: int = 8000) -> None:
     import wave
+
     n_frames = int(sample_rate * duration_sec)
     with wave.open(str(path), "wb") as wav:
         wav.setnchannels(1)

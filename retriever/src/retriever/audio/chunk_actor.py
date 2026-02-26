@@ -102,21 +102,24 @@ def _chunk_one(source_path: str, params: AudioChunkParams, interface: MediaInter
             except Exception as e:
                 logger.warning("Could not read chunk %s: %s", chunk_path, e)
                 continue
-            rows.append({
-                "path": chunk_path,
-                "source_path": source_path,
-                "duration": duration,
-                "chunk_index": idx,
-                "metadata": meta,
-                "page_number": idx,
-                "bytes": chunk_bytes,
-            })
+            rows.append(
+                {
+                    "path": chunk_path,
+                    "source_path": source_path,
+                    "duration": duration,
+                    "chunk_index": idx,
+                    "metadata": meta,
+                    "page_number": idx,
+                    "bytes": chunk_bytes,
+                }
+            )
         return rows
 
 
 def audio_path_to_chunks_df(path: str, params: AudioChunkParams | None = None) -> pd.DataFrame:
     """
-    Synchronous loader: one media file path -> DataFrame of chunk rows (path, source_path, duration, chunk_index, metadata, page_number, bytes).
+    Synchronous loader: one media file path -> DataFrame of chunk rows (path, source_path, duration, chunk_index,
+    metadata, page_number, bytes).
 
     Used by inprocess ingest() when _pipeline_type == "audio".
     """

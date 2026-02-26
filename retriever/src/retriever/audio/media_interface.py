@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import ffmpeg
+
     _FFMPEG_AVAILABLE = True
 except Exception:
     ffmpeg = None  # type: ignore[assignment]
@@ -54,9 +55,7 @@ def _probe(
         args += ["pipe:"]
     else:
         args += [filename]
-    p = subprocess.Popen(
-        args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     communicate_kwargs: dict = {}
     if timeout is not None:
         communicate_kwargs["timeout"] = timeout
@@ -68,9 +67,7 @@ def _probe(
     return json.loads(out.decode("utf-8"))
 
 
-def _get_audio_from_video(
-    input_path: str, output_file: str, cache_path: Optional[str] = None
-) -> Optional[Path]:
+def _get_audio_from_video(input_path: str, output_file: str, cache_path: Optional[str] = None) -> Optional[Path]:
     """Extract audio from a video file. Returns output Path or None on failure."""
     if not _FFMPEG_AVAILABLE or ffmpeg is None:
         raise RuntimeError("ffmpeg is required; install ffmpeg-python and system ffmpeg.")
@@ -123,15 +120,11 @@ class MediaInterface(_LoaderInterface):
         try:
             file_size = path_file.stat().st_size
             if file_handle:
-                probe = _probe(
-                    "pipe:", format=path_file.suffix, file_handle=file_handle
-                )
+                probe = _probe("pipe:", format=path_file.suffix, file_handle=file_handle)
             else:
                 probe = _probe(str(path_file), format=path_file.suffix)
             if probe["streams"][0]["codec_type"] == "video":
-                sample_rate = float(
-                    probe["streams"][0]["avg_frame_rate"].split("/")[0]
-                )
+                sample_rate = float(probe["streams"][0]["avg_frame_rate"].split("/")[0])
                 duration = float(probe["format"]["duration"])
             elif probe["streams"][0]["codec_type"] == "audio":
                 sample_rate = float(probe["streams"][0]["sample_rate"])
@@ -139,9 +132,7 @@ class MediaInterface(_LoaderInterface):
                 duration = (file_size * 8) / float(bitrate)
             else:
                 raise ValueError(f"Unknown codec_type: {probe['streams'][0]}")
-            num_splits = self.find_num_splits(
-                file_size, sample_rate, duration, split_interval, split_type
-            )
+            num_splits = self.find_num_splits(file_size, sample_rate, duration, split_interval, split_type)
         except ffmpeg.Error as e:
             logger.error("FFmpeg error for file %s: %s", path_file, e.stderr.decode())
         except ValueError as e:
@@ -184,9 +175,7 @@ class MediaInterface(_LoaderInterface):
         num_splits = 0
         cache_path = cache_path or output_dir
         try:
-            probe, num_splits, duration = self.probe_media(
-                path_file, split_interval, split_type
-            )
+            probe, num_splits, duration = self.probe_media(path_file, split_interval, split_type)
             if num_splits is None or duration is None or num_splits <= 0:
                 return []
             segment_time = math.ceil(duration / num_splits)
@@ -213,20 +202,13 @@ class MediaInterface(_LoaderInterface):
             )
             self.path_metadata[str(input_path)] = probe
         except ffmpeg.Error as e:
-            logger.error(
-                "FFmpeg error for file %s: %s", original_input_path, e.stderr.decode()
-            )
+            logger.error("FFmpeg error for file %s: %s", original_input_path, e.stderr.decode())
             return []
-        files = [
-            str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}")
-            for i in range(int(num_splits))
-        ]
+        files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
         if video_audio_separate and suffix.lower() in [".mp4", ".mov", ".avi", ".mkv"]:
             for f in files:
                 fp = Path(f)
-                audio_path = self.get_audio_from_video(
-                    f, str(fp.with_suffix(".mp3")), str(cache_path)
-                )
+                audio_path = self.get_audio_from_video(f, str(fp.with_suffix(".mp3")), str(cache_path))
                 if audio_path is not None:
                     files.append(str(audio_path))
         return files
@@ -254,8 +236,4 @@ class MediaInterface(_LoaderInterface):
 
 def is_media_available() -> bool:
     """True if ffmpeg-python is installed and the ffprobe binary is on PATH."""
-    return (
-        _FFMPEG_AVAILABLE
-        and ffmpeg is not None
-        and shutil.which("ffprobe") is not None
-    )
+    return _FFMPEG_AVAILABLE and ffmpeg is not None and shutil.which("ffprobe") is not None
