@@ -6,5 +6,6 @@
 
 from .api import create_ingestor
 from .version import __version__, get_version, get_version_info
+from . import model
 
 __all__ = ["__version__", "create_ingestor", "get_version", "get_version_info"]
