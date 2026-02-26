@@ -73,6 +73,22 @@ html:
   tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
   encoding: utf-8
 
+# Optional config for .extract_audio() API (batch, inprocess, fused, online).
+# ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint; host-local ASR is not supported.
+audio_chunk:
+  split_type: size
+  split_interval: 450
+  audio_only: false
+  video_audio_separate: false
+
+audio_asr:
+  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet. Override via AUDIO_GRPC_ENDPOINT, etc.
+  audio_endpoints: [null, null]
+  audio_infer_protocol: grpc
+  function_id: null
+  auth_token: null
+  segment_audio: false
+
 table:
   # Example config for:
   #   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`

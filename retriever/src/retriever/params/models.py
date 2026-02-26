@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Sequence
+from typing import Literal, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -70,6 +70,25 @@ class TextChunkParams(_ParamsModel):
 
 class HtmlChunkParams(TextChunkParams):
     pass
+
+
+class AudioChunkParams(_ParamsModel):
+    """Params for media chunking (audio/video split). Aligned with nv-ingest-api dataloader."""
+
+    split_type: Literal["size", "time", "frame"] = "size"
+    split_interval: int = 450
+    audio_only: bool = False
+    video_audio_separate: bool = False
+
+
+class ASRParams(_ParamsModel):
+    """Params for ASR (Parakeet/Riva gRPC). Remote/self-deployed only; no host-local."""
+
+    audio_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    audio_infer_protocol: str = "grpc"
+    function_id: Optional[str] = None
+    auth_token: Optional[str] = None
+    segment_audio: bool = False
 
 
 class LanceDbParams(_ParamsModel):

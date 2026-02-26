@@ -31,6 +31,8 @@ from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
+from ..params import ASRParams
+from ..params import AudioChunkParams
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import HtmlChunkParams
@@ -692,6 +694,52 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
             num_gpus=0,
             fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
+        )
+        return self
+
+    def extract_audio(
+        self,
+        params: AudioChunkParams | None = None,
+        asr_params: ASRParams | None = None,
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure audio pipeline: read_binary_files -> MediaChunkActor -> ASRActor (chunk -> transcript).
+
+        Use with .files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_audio().
+        ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint (see ASRParams.audio_endpoints).
+        """
+        from retriever.audio import ASRActor
+        from retriever.audio import MediaChunkActor
+
+        self._pipeline_type = "audio"
+        chunk_resolved = _coerce_params(params, AudioChunkParams, kwargs)
+        asr_resolved = _coerce_params(asr_params, ASRParams, kwargs)
+        self._extract_audio_chunk_kwargs = chunk_resolved.model_dump(mode="python")
+        self._extract_audio_asr_kwargs = asr_resolved.model_dump(mode="python")
+        self._tasks.append(
+            ("extract_audio", {"chunk": self._extract_audio_chunk_kwargs, "asr": self._extract_audio_asr_kwargs})
+        )
+
+        audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
+        asr_batch_size = kwargs.get("asr_batch_size", 8)
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            MediaChunkActor,
+            batch_size=audio_chunk_batch_size,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
+        )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            ASRActor,
+            batch_size=asr_batch_size,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
 

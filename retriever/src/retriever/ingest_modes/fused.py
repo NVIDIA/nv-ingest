@@ -24,8 +24,10 @@ from ..pdf.split import PDFSplitActor
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import PdfSplitParams
+from .batch import _BatchEmbedActor
 from .batch import BatchIngestor
-from .inprocess import embed_text_main_text_embed, explode_content_to_rows
+from .inprocess import embed_text_main_text_embed
+from .inprocess import explode_content_to_rows
 
 
 def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None:
@@ -178,6 +180,7 @@ class FusedIngestor(BatchIngestor):
         Run page-elements + OCR + explode + embed in one GPU actor stage.
 
         `fused` mode intentionally does not support remote NIM invocation.
+        When _pipeline_type == "audio", uses explode + _BatchEmbedActor (no PDF stages).
         """
         resolved = params or EmbedParams(**kwargs)
         if params is not None and kwargs:
@@ -191,6 +194,29 @@ class FusedIngestor(BatchIngestor):
             **resolved.fused_tuning.model_dump(mode="python", exclude_none=True),
         }
         _assert_no_remote_endpoints(dict(kwargs), context="embed")
+
+        if getattr(self, "_pipeline_type", None) == "audio":
+            embed_workers = int(kwargs.get("embed_workers", 1))
+            embed_batch_size = int(kwargs.get("embed_batch_size", 256))
+            embed_cpus_per_actor = float(kwargs.get("embed_cpus_per_actor", 1))
+            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
+            self._rd_dataset = self._rd_dataset.map_batches(
+                explode_content_to_rows,
+                batch_size=embed_batch_size,
+                batch_format="pandas",
+                num_cpus=1,
+                num_gpus=0,
+            )
+            self._rd_dataset = self._rd_dataset.map_batches(
+                _BatchEmbedActor,
+                batch_size=embed_batch_size,
+                batch_format="pandas",
+                num_cpus=embed_cpus_per_actor,
+                num_gpus=getattr(self, "_gpu_embed", 1.0),
+                compute=rd.ActorPoolStrategy(size=embed_workers),
+                fn_constructor_kwargs={"params": resolved},
+            )
+            return self
 
         fused_workers = int(kwargs.pop("fused_workers", kwargs.pop("embed_workers", 1)))
         fused_batch_size = int(kwargs.pop("fused_batch_size", kwargs.pop("embed_batch_size", 64)))
