@@ -14,7 +14,7 @@ dependencies = [
     "nv-ingest-api",
     "nv-ingest-client",
     "milvus-lite==2.4.12",
-    "pypdfium2",
+    "pypdfium2>=4.30.0,<5.0.0",
     "nemotron-page-elements-v3>=0.dev0",
     "nemotron-graphic-elements-v1>=0.dev0",
     "nemotron-table-structure-v1>=0.dev0",
