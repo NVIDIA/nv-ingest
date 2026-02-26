@@ -23,8 +23,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
-from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3  # noqa: F401
-from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3  # noqa: F401
+from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
@@ -207,20 +206,23 @@ def embed_text_main_text_embed(
     if _endpoint is None and model is None:
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
 
-    # Map NIM aliases to the actual model ID expected by the remote endpoint.
-    _NIM_MODEL_ALIASES = {
-        "nemo_retriever_v1": "nvidia/llama-3.2-nv-embedqa-1b-v2",
-    }
-    _resolved_model_name = _NIM_MODEL_ALIASES.get(model_name, model_name) if model_name else model_name
+    # Resolve NIM aliases to the actual HF model ID.
+    from retriever.model import resolve_embed_model
+
+    _resolved_model_name = resolve_embed_model(model_name)
 
     # Build an embedder callable compatible with `create_text_embeddings_for_df`.
     # Only used when running with a local model (no NIM endpoint).
     _embed = None
     if _endpoint is None and model is not None:
 
+        # VL model handles formatting internally via encode_documents();
+        # embedqa needs an explicit "passage: " prefix.
+        _skip_prefix = hasattr(model, "embed_queries")
+
         def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:  # noqa: F811
-            prefixed = [f"passage: {t}" for t in texts]
-            vecs = model.embed(prefixed, batch_size=int(inference_batch_size))
+            batch = texts if _skip_prefix else [f"passage: {t}" for t in texts]
+            vecs = model.embed(batch, batch_size=int(inference_batch_size))
             tolist = getattr(vecs, "tolist", None)
             if callable(tolist):
                 return tolist()
@@ -1235,20 +1237,30 @@ class InProcessIngestor(Ingestor):
         normalize = bool(embed_kwargs.pop("normalize", True))
         max_length = int(embed_kwargs.pop("max_length", 8192))
 
-        # model_name may be a NIM alias (e.g. "nemo_retriever_v1") or a real HF
-        # repo ID (e.g. "nvidia/llama-3.2-nv-embedqa-1b-v2"). Only forward it as
-        # model_id when it looks like an HF repo (contains "/").
         model_name_raw = embed_kwargs.pop("model_name", None)
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
+
+        from retriever.model import is_vl_embed_model, resolve_embed_model
+
+        model_id = resolve_embed_model(model_name_raw)
 
         embed_kwargs.setdefault("input_type", "passage")
-        embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device is not None else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
-        )
+
+        if is_vl_embed_model(model_name_raw):
+            from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+            embed_kwargs["model"] = LlamaNemotronEmbedVL1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                model_id=model_id,
+            )
+        else:
+            embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                normalize=normalize,
+                max_length=max_length,
+                model_id=model_id,
+            )
         self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self
 

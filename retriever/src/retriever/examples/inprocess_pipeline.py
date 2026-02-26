@@ -160,6 +160,11 @@ def main(
         "--segment-audio",
         help="If set, each speech segment becomes its own row (used with --input-type audio).",
     ),
+    embed_model_name: str = typer.Option(
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "--embed-model-name",
+        help="Embedding model name passed to .embed().",
+    ),
 ) -> None:
     _ = input_type
 
@@ -179,7 +184,7 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -197,7 +202,7 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -248,7 +253,7 @@ def main(
                     ocr_invoke_url=ocr_invoke_url,
                 )
             )
-            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -276,7 +281,7 @@ def main(
                     ocr_invoke_url=ocr_invoke_url,
                 )
             )
-            .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -317,10 +322,16 @@ def main(
     unique_basenames = table.to_pandas()["pdf_basename"].unique()
     print(f"Unique basenames: {unique_basenames}")
 
+    # Resolve the HF model ID for recall query embedding so aliases
+    # (e.g. "nemo_retriever_v1") map to the correct model.
+    from retriever.model import resolve_embed_model
+
+    _recall_model = resolve_embed_model(str(embed_model_name))
+
     cfg = RecallConfig(
         lancedb_uri=str(LANCEDB_URI),
         lancedb_table=str(LANCEDB_TABLE),
-        embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model=_recall_model,
         embedding_http_endpoint=embed_invoke_url,
         top_k=10,
         ks=(1, 5, 10),
