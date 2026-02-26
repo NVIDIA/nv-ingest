@@ -74,7 +74,7 @@ html:
   encoding: utf-8
 
 # Optional config for .extract_audio() API (batch, inprocess, fused, online).
-# ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint; host-local ASR is not supported.
+# ASR can be remote (Parakeet/Riva gRPC) or local (HuggingFace nvidia/parakeet-ctc-1.1b).
 audio_chunk:
   split_type: size
   split_interval: 450
@@ -82,7 +82,8 @@ audio_chunk:
   video_audio_separate: false
 
 audio_asr:
-  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet.
+  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet when remote.
+  # When both null, local HF model (nvidia/parakeet-ctc-1.1b) is used; no NIM/gRPC required.
   # For NGC cloud ASR: set auth_token from NGC_API_KEY and function_id from NGC catalog;
   # or use env: AUDIO_GRPC_ENDPOINT (default grpc.nvcf.nvidia.com:443), NGC_API_KEY, AUDIO_FUNCTION_ID.
   audio_endpoints: [null, null]

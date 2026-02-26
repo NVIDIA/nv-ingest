@@ -3,7 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-ASRActor: Ray Data map_batches callable for speech-to-text (Parakeet/Riva gRPC).
+ASRActor: Ray Data map_batches callable for speech-to-text.
+
+Supports remote (Parakeet/Riva gRPC) or local (HuggingFace nvidia/parakeet-ctc-1.1b).
+When audio_endpoints are both null/empty, uses local model; otherwise uses remote client.
 
 Consumes chunk rows (path, bytes, source_path, duration, chunk_index, metadata)
 and produces rows with text (transcript) for downstream embed/VDB.
@@ -13,11 +16,20 @@ from __future__ import annotations
 
 import base64
 import logging
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from retriever.params import ASRParams
+
+
+def _use_remote(params: ASRParams) -> bool:
+    """True if at least one of audio_endpoints is set (use remote gRPC client)."""
+    grpc = (params.audio_endpoints[0] or "").strip()
+    http = (params.audio_endpoints[1] or "").strip()
+    return bool(grpc or http)
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +108,21 @@ class ASRActor:
     """
     Ray Data map_batches callable: chunk rows (path/bytes) -> rows with text (transcript).
 
-    Uses Parakeet (Riva ASR) via gRPC. Output rows have path, text, page_number, metadata
-    for downstream explode_content_to_rows and embed.
+    When audio_endpoints are set, uses Parakeet (Riva ASR) via gRPC. When both are
+    null/empty, uses local HuggingFace/NeMo Parakeet (nvidia/parakeet-ctc-1.1b).
+    Output rows have path, text, page_number, metadata for downstream embed.
     """
 
     def __init__(self, params: ASRParams | None = None) -> None:
         self._params = params or ASRParams()
-        self._client = _get_client(self._params)
+        if _use_remote(self._params):
+            self._client = _get_client(self._params)
+            self._model = None
+        else:
+            self._client = None
+            from retriever.model.local import ParakeetCTC1B1ASR
+
+            self._model = ParakeetCTC1B1ASR()
 
     def __call__(self, batch_df: pd.DataFrame) -> pd.DataFrame:
         if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
@@ -126,6 +146,38 @@ class ASRActor:
             )
         return pd.DataFrame(out_rows)
 
+    def _transcribe_remote(self, raw: bytes, path: Optional[str]) -> Optional[str]:
+        """Use remote gRPC client to transcribe audio bytes."""
+        audio_b64 = base64.b64encode(raw).decode("ascii")
+        try:
+            segments, transcript = self._client.infer(
+                audio_b64,
+                model_name="parakeet",
+            )
+            return transcript if transcript else ""
+        except Exception as e:
+            logger.warning("Parakeet infer failed for path=%s: %s", path, e)
+            return None
+
+    def _transcribe_local(self, raw: bytes, path: Optional[str]) -> Optional[str]:
+        """Use local Parakeet model to transcribe; path or temp file with raw bytes."""
+        if self._model is None:
+            return None
+        path_to_use = path
+        if not path_to_use or not Path(path_to_use).exists():
+            # Raw bytes: write to temp file (format detected by loader/ffmpeg)
+            with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as f:
+                f.write(raw)
+                path_to_use = f.name
+            try:
+                transcripts = self._model.transcribe([path_to_use])
+                return transcripts[0] if transcripts else ""
+            finally:
+                Path(path_to_use).unlink(missing_ok=True)
+        else:
+            transcripts = self._model.transcribe([path_to_use])
+            return transcripts[0] if transcripts else ""
+
     def _transcribe_one(self, row: pd.Series) -> Optional[Dict[str, Any]]:
         raw = row.get("bytes")
         path = row.get("path")
@@ -139,17 +191,13 @@ class ASRActor:
         if raw is None:
             return None
 
-        audio_b64 = base64.b64encode(raw).decode("ascii")
-        try:
-            segments, transcript = self._client.infer(
-                audio_b64,
-                model_name="parakeet",
-            )
-        except Exception as e:
-            logger.warning("Parakeet infer failed for path=%s: %s", path, e)
-            return None
+        if self._client is not None:
+            transcript = self._transcribe_remote(raw, path)
+        else:
+            transcript = self._transcribe_local(raw, path)
 
-        transcript = transcript if transcript else ""
+        if transcript is None:
+            return None
         source_path = row.get("source_path", path)
         duration = row.get("duration")
         chunk_index = row.get("chunk_index", 0)
