@@ -214,6 +214,8 @@ services:
   audio:
     image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-1.4.0}
     shm_size: 2gb
+    ports:
+      - "${AUDIO_GRPC_PORT:-50051}:50051"
     expose:
       - "50051" # grpc
       - "9000"  # http

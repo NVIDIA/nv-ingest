@@ -138,7 +138,11 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
     try:
         db = lancedb.connect(uri)
         table = db.open_table(table_name)
-        df = table.to_pandas()[["source_id", "page_number", "metadata"]]
+        cols = ["source_id", "page_number", "metadata"]
+        all_cols = table.to_pandas().columns.tolist()
+        if "text" in all_cols:
+            cols.append("text")
+        df = table.to_pandas()[cols]
     except Exception:
         return None
 
@@ -167,6 +171,8 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
                 "ocr_chart_total": 0,
                 "ocr_infographic_total": 0,
                 "page_elements_by_label": defaultdict(int),
+                "is_audio": False,
+                "audio_words": 0,
             },
         )
 
@@ -190,11 +196,20 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
                     _to_int(count, default=0),
                 )
 
+        content_meta = meta.get("content_metadata")
+        if isinstance(content_meta, dict) and content_meta.get("type") == "audio":
+            entry["is_audio"] = True
+            text = str(getattr(row, "text", "") or "")
+            entry["audio_words"] = max(entry["audio_words"], len(text.split()))
+
     pe_by_label_totals: dict[str, int] = defaultdict(int)
     page_elements_total = 0
     ocr_table_total = 0
     ocr_chart_total = 0
     ocr_infographic_total = 0
+    audio_files = 0
+    audio_segments = 0
+    audio_words_total = 0
     for page_entry in per_page.values():
         page_elements_total += int(page_entry["page_elements_total"])
         ocr_table_total += int(page_entry["ocr_table_total"])
@@ -202,6 +217,12 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
         ocr_infographic_total += int(page_entry["ocr_infographic_total"])
         for label, count in page_entry["page_elements_by_label"].items():
             pe_by_label_totals[label] += int(count)
+        if page_entry["is_audio"]:
+            audio_segments += 1
+            audio_words_total += page_entry["audio_words"]
+
+    audio_paths = {k[0] for k, e in per_page.items() if e["is_audio"]}
+    audio_files = len(audio_paths)
 
     return {
         "pages_seen": int(len(per_page)),
@@ -210,6 +231,9 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
         "ocr_table_total_detections": int(ocr_table_total),
         "ocr_chart_total_detections": int(ocr_chart_total),
         "ocr_infographic_total_detections": int(ocr_infographic_total),
+        "audio_files": audio_files,
+        "audio_segments": audio_segments,
+        "audio_words_total": audio_words_total,
     }
 
 
@@ -230,6 +254,12 @@ def _print_detection_summary(summary: Optional[dict]) -> None:
     else:
         for label, count in by_label.items():
             print(f"    {label}: {count}")
+
+    audio_files = summary.get("audio_files", 0)
+    if audio_files > 0:
+        print(f"  Audio files transcribed: {audio_files}")
+        print(f"  Audio transcript segments: {summary.get('audio_segments', 0)}")
+        print(f"  Audio transcript words: {summary.get('audio_words_total', 0)}")
 
 
 def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
@@ -339,14 +369,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        help="Directory containing PDFs, .txt, .html, .doc/.pptx, or .mp3/.wav files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
+        help="Input format: 'pdf', 'txt', 'html', 'doc', or 'audio'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice), 'audio' for .mp3/.wav (transcribed via Riva/Parakeet).",  # noqa: E501
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -531,6 +561,16 @@ def main(
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
     ),
+    audio_grpc_endpoint: str = typer.Option(
+        "audio:50051",
+        "--audio-grpc-endpoint",
+        help="Riva/Parakeet gRPC endpoint for audio transcription (used with --input-type audio).",
+    ),
+    segment_audio: bool = typer.Option(
+        False,
+        "--segment-audio",
+        help="If set, each speech segment becomes its own row (used with --input-type audio).",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
@@ -592,6 +632,35 @@ def main(
                 ingestor.files(glob_pattern)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                        }
+                    )
+                )
+            )
+        elif input_type == "audio":
+            import glob as _glob
+
+            audio_exts = ("*.mp3", "*.wav")
+            audio_files = [f for ext in audio_exts for f in _glob.glob(str(input_dir / ext))]
+            if not audio_files:
+                raise typer.BadParameter(f"No audio files (.mp3/.wav) found in {input_dir}")
+            ingestor = create_ingestor(
+                run_mode="batch",
+                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+            )
+            ingestor = (
+                ingestor.files(audio_files)
+                .extract_audio(
+                    grpc_endpoint=audio_grpc_endpoint,
+                    segment_audio=segment_audio,
+                )
+                .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
                 .vdb_upload(
                     VdbUploadParams(
                         lancedb={
@@ -791,11 +860,12 @@ def main(
         if not no_recall_details:
             print("\nPer-query retrieval details:")
         missed_gold: list[tuple[str, str]] = []
-        ext = (
-            ".html"
-            if input_type == "html"
-            else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
-        )
+        ext = {
+            "txt": ".txt",
+            "html": ".html",
+            "doc": ".docx",
+            "audio": ".mp3",
+        }.get(input_type, ".pdf")
         for i, (q, g, hits) in enumerate(
             zip(
                 _df_query["query"].astype(str).tolist(),
