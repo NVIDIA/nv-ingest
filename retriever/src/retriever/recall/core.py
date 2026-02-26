@@ -41,6 +41,7 @@ class RecallConfig:
     # top candidates with full-precision vectors to eliminate SQ quantization error.
     nprobes: int = 0
     refine_factor: int = 10
+    hybrid: bool = False
     # Local HF knobs (only used when endpoints are missing).
     local_hf_device: Optional[str] = None
     local_hf_cache_dir: Optional[str] = None
@@ -138,12 +139,26 @@ def _embed_queries_local_hf(
     device: Optional[str],
     cache_dir: Optional[str],
     batch_size: int,
+    model_name: Optional[str] = None,
 ) -> List[List[float]]:
     # Lazy import: only load torch/HF when needed.
-    from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+    from retriever.model import is_vl_embed_model, resolve_embed_model
 
-    embedder = LlamaNemotronEmbed1BV2Embedder(device=device, hf_cache_dir=cache_dir, normalize=True)
-    vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
+    model_id = resolve_embed_model(model_name)
+
+    if is_vl_embed_model(model_name):
+        from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+        embedder = LlamaNemotronEmbedVL1BV2Embedder(device=device, hf_cache_dir=cache_dir, model_id=model_id)
+        # VL model handles query formatting internally via encode_queries().
+        vecs = embedder.embed_queries(queries, batch_size=int(batch_size))
+    else:
+        from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+        embedder = LlamaNemotronEmbed1BV2Embedder(
+            device=device, hf_cache_dir=cache_dir, normalize=True, model_id=model_id
+        )
+        vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
     # Ensure list-of-list floats.
     return vecs.detach().to("cpu").tolist()
 
@@ -157,6 +172,8 @@ def _search_lancedb(
     vector_column_name: str = "vector",
     nprobes: int = 0,
     refine_factor: int = 10,
+    query_texts: Optional[List[str]] = None,
+    hybrid: bool = False,
 ) -> List[List[Dict[str, Any]]]:
     import lancedb  # type: ignore
 
@@ -180,16 +197,34 @@ def _search_lancedb(
             effective_nprobes = 16  # safe fallback matching default index config
 
     results: List[List[Dict[str, Any]]] = []
-    for v in query_vectors:
+    for i, v in enumerate(query_vectors):
         q = np.asarray(v, dtype="float32")
-        hits = (
-            table.search(q, vector_column_name=vector_column_name)
-            .nprobes(effective_nprobes)
-            .refine_factor(refine_factor)
-            .select(["text", "metadata", "source", "_distance"])
-            .limit(top_k)
-            .to_list()
-        )
+
+        if hybrid and query_texts is not None:
+            from lancedb.rerankers import RRFReranker  # type: ignore
+
+            text = query_texts[i]
+            hits = (
+                table.search(query_type="hybrid")
+                .vector(q)
+                .text(text)
+                .nprobes(effective_nprobes)
+                .refine_factor(refine_factor)
+                .select(["text", "metadata", "source"])
+                .limit(top_k)
+                .rerank(RRFReranker())
+                .to_list()
+            )
+        else:
+            hits = (
+                table.search(q, vector_column_name=vector_column_name)
+                .nprobes(effective_nprobes)
+                .refine_factor(refine_factor)
+                .select(["text", "metadata", "source", "_distance"])
+                .limit(top_k)
+                .to_list()
+            )
+
         results.append(hits)
     return results
 
@@ -275,6 +310,7 @@ def retrieve_and_score(
             device=cfg.local_hf_device,
             cache_dir=cfg.local_hf_cache_dir,
             batch_size=int(cfg.local_hf_batch_size),
+            model_name=cfg.embedding_model,
         )
     raw_hits = _search_lancedb(
         lancedb_uri=cfg.lancedb_uri,
@@ -284,6 +320,8 @@ def retrieve_and_score(
         vector_column_name=vector_column_name,
         nprobes=int(cfg.nprobes),
         refine_factor=int(cfg.refine_factor),
+        query_texts=queries,
+        hybrid=bool(cfg.hybrid),
     )
     retrieved_keys = _hits_to_keys(raw_hits)
     metrics = {f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k)) for k in cfg.ks}

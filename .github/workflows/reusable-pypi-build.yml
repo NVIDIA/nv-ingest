@@ -84,7 +84,7 @@ jobs:
           NV_INGEST_VERSION=${{ steps.set-version.outputs.version }} \
           python -m build
 
-      - name: Build retriever wheel
+      - name: Build nemo-retriever wheel
         run: |
           cd retriever
           python - <<'PY'

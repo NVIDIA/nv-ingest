@@ -7,7 +7,7 @@ managed = true
 package = true
 
 [project]
-name = "retriever"
+name = "nemo-retriever"
 dynamic = ["version"]
 description = "A modern RAG ingestion pipeline from Nvidia"
 readme = "README.md"
@@ -46,7 +46,9 @@ dependencies = [
   "python-multipart>=0.0.9",
   # NOTE: `llama_nemotron_embed_1b_v2` currently expects `HybridCache` from
   # `transformers.cache_utils`, which is not present in transformers>=5.
-  "transformers>=4.49.0,<5.0.0",
+  # Versions 4.54.0-4.55.x have a flash attention bug that produces incorrect
+  # image embeddings in the VL model; exclude that range.
+  "transformers>=4.49.0,<5.0.0,!=4.54.*,!=4.55.*",
   "tokenizers>=0.20.3,<0.22.0",
   "torch~=2.9.1",
   "torchvision>=0.24,<0.25",

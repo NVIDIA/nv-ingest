@@ -14,10 +14,10 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from importlib import import_module
 from pathlib import Path
 from typing import Optional, TextIO
 
-import lancedb
 import ray
 import typer
 from retriever import create_ingestor
@@ -33,6 +33,11 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _lancedb():
+    """Import lancedb lazily to avoid fork warnings during early process setup."""
+    return import_module("lancedb")
 
 
 class _TeeStream:
@@ -104,7 +109,7 @@ def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
     Falls back to table row count if page-level fields are unavailable.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
     except Exception:
         return None
@@ -136,7 +141,7 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
     ingestion by the Ray write stage.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
         df = table.to_pandas()[["source_id", "page_number", "metadata"]]
     except Exception:
@@ -261,7 +266,7 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     # Local path URI in this pipeline.
     Path(uri).mkdir(parents=True, exist_ok=True)
 
-    db = lancedb.connect(uri)
+    db = _lancedb().connect(uri)
     try:
         db.open_table(table_name)
         return
@@ -331,7 +336,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
     key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
     return key, dist
 
 
@@ -489,6 +494,11 @@ def main(
         "--embed-invoke-url",
         help="Optional remote endpoint URL for embedding model inference.",
     ),
+    embed_model_name: str = typer.Option(
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "--embed-model-name",
+        help="Embedding model name passed to .embed().",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -525,6 +535,11 @@ def main(
         path_type=Path,
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
+    ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
     ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
@@ -565,7 +580,7 @@ def main(
             ingestor = (
                 ingestor.files(glob_pattern)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
                 .vdb_upload(
                     VdbUploadParams(
                         lancedb={
@@ -573,6 +588,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -586,7 +602,7 @@ def main(
             ingestor = (
                 ingestor.files(glob_pattern)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(EmbedParams(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url))
+                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
                 .vdb_upload(
                     VdbUploadParams(
                         lancedb={
@@ -594,6 +610,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -635,7 +652,7 @@ def main(
                 )
                 .embed(
                     EmbedParams(
-                        model_name="nemo_retriever_v1",
+                        model_name=str(embed_model_name),
                         embed_invoke_url=embed_invoke_url,
                         batch_tuning={
                             "embed_workers": int(embed_workers),
@@ -651,6 +668,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -691,7 +709,7 @@ def main(
                 )
                 .embed(
                     EmbedParams(
-                        model_name="nemo_retriever_v1",
+                        model_name=str(embed_model_name),
                         embed_invoke_url=embed_invoke_url,
                         batch_tuning={
                             "embed_workers": int(embed_workers),
@@ -707,6 +725,7 @@ def main(
                             "table_name": LANCEDB_TABLE,
                             "overwrite": True,
                             "create_index": True,
+                            "hybrid": hybrid,
                         }
                     )
                 )
@@ -740,7 +759,7 @@ def main(
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
-        db = lancedb.connect(lancedb_uri)
+        db = _lancedb().connect(lancedb_uri)
         table = None
         open_err: Optional[Exception] = None
         for _ in range(3):
@@ -767,12 +786,19 @@ def main(
         unique_basenames = table.to_pandas()["pdf_basename"].unique()
         print(f"Unique basenames: {unique_basenames}")
 
+        # Resolve the HF model ID for recall query embedding so aliases
+        # (e.g. "nemo_retriever_v1") map to the correct model.
+        from retriever.model import resolve_embed_model
+
+        _recall_model = resolve_embed_model(str(embed_model_name))
+
         cfg = RecallConfig(
             lancedb_uri=str(lancedb_uri),
             lancedb_table=str(LANCEDB_TABLE),
-            embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+            embedding_model=_recall_model,
             top_k=10,
             ks=(1, 5, 10),
+            hybrid=hybrid,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
