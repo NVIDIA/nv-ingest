@@ -984,6 +984,16 @@ class BatchIngestor(Ingestor):
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
 
+        if kw.get("hybrid", False):
+            text_column = str(kw.get("text_column", "text"))
+            fts_language = str(kw.get("fts_language", "English"))
+            try:
+                table.create_fts_index(text_column, language=fts_language)
+            except Exception as e:
+                print(
+                    f"Warning: FTS index creation failed on column {text_column!r} (continuing with vector-only): {e}"
+                )
+
         for index_stub in table.list_indices():
             table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
