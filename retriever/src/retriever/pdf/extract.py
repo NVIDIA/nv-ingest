@@ -23,16 +23,6 @@ else:  # pragma: no cover
     _PDFIUM_IMPORT_ERROR = None
 
 try:
-    import numpy as np
-except Exception:  # pragma: no cover
-    np = None  # type: ignore[assignment]
-
-try:
-    import cv2
-except Exception:  # pragma: no cover
-    cv2 = None  # type: ignore[assignment]
-
-try:
     from PIL import Image
 except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
@@ -107,37 +97,6 @@ def _render_page_to_base64(page: Any, *, dpi: int = 200, image_format: str = "pn
         return meta
 
     raise RuntimeError("Failed to render page to an image representation.")
-
-
-def _bitmap_to_rgb_numpy(bitmap: Any) -> Any:
-    """Convert a PdfBitmap to an RGB HWC uint8 numpy array.
-
-    Handles BGRA/BGRX/BGR modes that PDFium may return, using an in-place
-    SIMD-optimized channel swap via OpenCV (mirrors the approach in
-    ``api/.../pdfium.py:convert_bitmap_to_corrected_numpy``).
-    """
-    arr = bitmap.to_numpy().copy()
-    mode = getattr(bitmap, "mode", None)
-    if cv2 is not None:
-        if mode in {"BGRA", "BGRX"}:
-            cv2.cvtColor(arr, cv2.COLOR_BGRA2RGBA, dst=arr)
-        elif mode == "BGR":
-            cv2.cvtColor(arr, cv2.COLOR_BGR2RGB, dst=arr)
-    return arr
-
-
-def _render_page_to_numpy(page: Any, *, dpi: int = 200) -> Dict[str, Any]:
-    """Render a page to a numpy array (HWC uint8 RGB). No PNG/base64 overhead."""
-    scale = max(float(dpi) / 72.0, 0.01)
-    bitmap = page.render(scale=scale)
-    arr = _bitmap_to_rgb_numpy(bitmap)
-    h, w = arr.shape[:2]
-    return {
-        "image_array": arr,
-        "image_b64": None,
-        "encoding": "numpy",
-        "orig_shape_hw": (h, w),
-    }
 
 
 def _error_record(
@@ -304,7 +263,7 @@ def pdf_extraction(
                     )
                     render_info: Optional[Dict[str, Any]] = None
                     if want_any_raster:
-                        render_info = _render_page_to_numpy(page, dpi=dpi)
+                        render_info = _render_page_to_base64(page, dpi=dpi)
 
                     page_record: Dict[str, Any] = {
                         "path": pdf_path,
@@ -427,7 +386,7 @@ def split_and_extract_pdf(
                     )
                     page_image = None
                     if want_raster:
-                        page_image = _render_page_to_numpy(page, dpi=dpi)
+                        page_image = _render_page_to_base64(page, dpi=dpi)
 
                     outputs.append(
                         {

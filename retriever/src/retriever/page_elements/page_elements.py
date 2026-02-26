@@ -99,14 +99,6 @@ def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
     }
 
 
-def _np_to_b64_png(arr: "np.ndarray") -> str:
-    """Encode an HWC uint8 numpy array to a base64-encoded PNG string."""
-    img = Image.fromarray(arr.astype(np.uint8), mode="RGB")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("ascii")
-
-
 def _decode_b64_image_to_chw_tensor(image_b64: str) -> Tuple["torch.Tensor", Tuple[int, int]]:
     if torch is None or Image is None or np is None:  # pragma: no cover
         raise ImportError("page element detection requires torch, pillow, and numpy.")
@@ -508,28 +500,17 @@ def detect_page_elements_v3(
     for _, row in pages_df.iterrows():
         try:
             page_img = row.get("page_image")
-            if isinstance(page_img, dict) and isinstance(page_img.get("image_array"), np.ndarray):
-                arr = page_img["image_array"]
-                h, w = arr.shape[:2]
-                row_shapes.append((h, w))
-                if use_remote:
-                    row_b64.append(_np_to_b64_png(arr))
-                    row_tensors.append(None)
-                else:
-                    row_b64.append(None)
-                    row_tensors.append(arr)
+            b64 = page_img["image_b64"]
+            if not b64:
+                raise ValueError("No usable image_b64 found in row.")
+            row_b64.append(b64)
+            if use_remote:
+                row_tensors.append(None)
+                row_shapes.append(None)
             else:
-                b64 = page_img["image_b64"]
-                if not b64:
-                    raise ValueError("No usable image_b64 found in row.")
-                row_b64.append(b64)
-                if use_remote:
-                    row_tensors.append(None)
-                    row_shapes.append(None)
-                else:
-                    t, orig_shape = _decode_b64_image_to_np_array(b64)
-                    row_tensors.append(t)
-                    row_shapes.append(orig_shape)
+                t, orig_shape = _decode_b64_image_to_np_array(b64)
+                row_tensors.append(t)
+                row_shapes.append(orig_shape)
             row_payloads.append({"detections": []})
         except BaseException as e:
             row_tensors.append(None)
