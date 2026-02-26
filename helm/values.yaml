@@ -110,6 +110,7 @@ tmpDirSize: 50Gi
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port
 ## @param envVars.MESSAGE_CLIENT_TYPE [default: "redis"] Type of message client to use
 ## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"] Name of the Redis queue for ingest tasks
+## @param envVars.REDIS_POOL_SIZE [default: "50"] Maximum Redis connection pool size. Increase for high-concurrency workloads (e.g., 100-200 for large batch jobs)
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests
 ## @param envVars.NV_INGEST_MAX_UTIL [default: "32"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
