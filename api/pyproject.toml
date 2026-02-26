@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -29,6 +29,7 @@ dependencies = [
     "ffmpeg-python==0.2.0",
     "tritonclient",
     "glom",
+    "pypdfium2==4.30.0",
 ]
 
 [project.optional-dependencies]

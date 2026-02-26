@@ -54,8 +54,8 @@ def test_create_lancedb_results_filters_and_transforms():
     assert len(out) == 2
     assert out[0]["vector"] == [0.1, 0.2]
     assert out[0]["text"] == "text content a"
-    assert out[0]["metadata"] == "1"  # page_number converted to string
-    assert out[0]["source"] == "s1"
+    assert out[0]["metadata"] == '{"page_number":1}'
+    assert out[0]["source"] == '{"source_id":"s1"}'
 
 
 def test_create_index_uses_lancedb_and_pa_schema(monkeypatch):
@@ -545,9 +545,9 @@ def test_create_lancedb_results_missing_content_metadata_graceful():
         ]
     ]
     out = lancedb_mod.create_lancedb_results(results)
-    # Should still produce output with empty string for page number
+    # Should still produce output with JSON-serialized empty metadata.
     assert len(out) == 1
-    assert out[0]["metadata"] == ""  # No page_number available
+    assert out[0]["metadata"] == "{}"
     assert out[0]["text"] == "text with missing content_metadata"
 
 

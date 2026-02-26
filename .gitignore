@@ -246,3 +246,10 @@ tools/harness/lancedb/
 history.db
 history.db-shm
 history.db-wal
+
+
+lancedb/
+outputs/
+models/
+
+retriever/run_results/

@@ -1,0 +1,368 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+logger = logging.getLogger(__name__)
+
+import numpy as np
+import pandas as pd
+
+from nv_ingest_api.util.nim import infer_microservice
+
+
+@dataclass(frozen=True)
+class RecallConfig:
+    lancedb_uri: str
+    lancedb_table: str
+    embedding_model: str
+    # Embedding endpoints (optional).
+    #
+    # If neither HTTP nor gRPC endpoint is provided (and embedding_endpoint is empty),
+    # stage7 will fall back to local HuggingFace embeddings via:
+    #   retriever.model.local.llama_nemotron_embed_1b_v2_embedder
+    embedding_http_endpoint: Optional[str] = None
+    embedding_grpc_endpoint: Optional[str] = None
+    # Back-compat single endpoint string (http URL or host:port for gRPC).
+    embedding_endpoint: Optional[str] = None
+    embedding_api_key: str = ""
+    top_k: int = 10
+    ks: Sequence[int] = (1, 3, 5, 10)
+    # ANN search tuning (LanceDB IVF_HNSW_SQ).
+    # nprobes=0 means "search all partitions" (exhaustive); refine_factor re-ranks
+    # top candidates with full-precision vectors to eliminate SQ quantization error.
+    nprobes: int = 0
+    refine_factor: int = 10
+    hybrid: bool = False
+    # Local HF knobs (only used when endpoints are missing).
+    local_hf_device: Optional[str] = None
+    local_hf_cache_dir: Optional[str] = None
+    local_hf_batch_size: int = 64
+
+
+def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize a query CSV into:
+      - query (string)
+      - golden_answer (string key that should match LanceDB `pdf_page`)
+
+    Supported inputs:
+      - query,pdf_page
+      - query,pdf,page (or query,pdf,gt_page)
+    """
+    df = df.copy()
+    if "gt_page" in df.columns and "page" not in df.columns:
+        df = df.rename(columns={"gt_page": "page"})
+
+    if "query" not in df.columns:
+        raise KeyError("Query CSV must contain a 'query' column.")
+
+    if "pdf_page" in df.columns:
+        df["golden_answer"] = df["pdf_page"].astype(str)
+        return df
+
+    required = {"pdf", "page"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise KeyError(
+            "Query CSV must contain either columns ['query','pdf_page'] or ['query','pdf','page'] "
+            f"(missing: {sorted(missing)})"
+        )
+
+    df["pdf"] = df["pdf"].astype(str).str.replace(".pdf", "", regex=False)
+    df["page"] = df["page"].astype(str)
+    df["golden_answer"] = df.apply(lambda x: f"{x.pdf}_{x.page}", axis=1)
+    return df
+
+
+def _resolve_embedding_endpoint(cfg: RecallConfig) -> Tuple[Optional[str], Optional[bool]]:
+    """
+    Resolve which embedding endpoint to use.
+
+    Returns (endpoint, use_grpc) where:
+      - endpoint is either an http(s) URL or a host:port string for gRPC
+      - use_grpc is True for gRPC, False for HTTP, None when no endpoint is configured
+    """
+    http_ep = (cfg.embedding_http_endpoint or "").strip() if isinstance(cfg.embedding_http_endpoint, str) else None
+    grpc_ep = (cfg.embedding_grpc_endpoint or "").strip() if isinstance(cfg.embedding_grpc_endpoint, str) else None
+    single = (cfg.embedding_endpoint or "").strip() if isinstance(cfg.embedding_endpoint, str) else None
+
+    if http_ep:
+        return http_ep, False
+    if grpc_ep:
+        return grpc_ep, True
+    if single:
+        # Infer protocol: if a URL scheme is present, treat as HTTP; otherwise gRPC.
+        return single, (not single.lower().startswith("http"))
+
+    return None, None
+
+
+def _embed_queries_nim(
+    queries: List[str],
+    *,
+    endpoint: str,
+    model: str,
+    api_key: str,
+    grpc: bool,
+) -> List[List[float]]:
+    # `infer_microservice` returns a list of embeddings.
+    embeddings = infer_microservice(
+        queries,
+        model_name=model,
+        embedding_endpoint=endpoint,
+        nvidia_api_key=(api_key or "").strip(),
+        grpc=bool(grpc),
+        input_type="query",
+    )
+    # Some backends return numpy arrays; normalize to list-of-list floats.
+    out: List[List[float]] = []
+    for e in embeddings:
+        if isinstance(e, np.ndarray):
+            out.append(e.astype("float32").tolist())
+        else:
+            out.append(list(e))
+    return out
+
+
+def _embed_queries_local_hf(
+    queries: List[str],
+    *,
+    device: Optional[str],
+    cache_dir: Optional[str],
+    batch_size: int,
+    model_name: Optional[str] = None,
+) -> List[List[float]]:
+    # Lazy import: only load torch/HF when needed.
+    from retriever.model import is_vl_embed_model, resolve_embed_model
+
+    model_id = resolve_embed_model(model_name)
+
+    if is_vl_embed_model(model_name):
+        from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+        embedder = LlamaNemotronEmbedVL1BV2Embedder(device=device, hf_cache_dir=cache_dir, model_id=model_id)
+        # VL model handles query formatting internally via encode_queries().
+        vecs = embedder.embed_queries(queries, batch_size=int(batch_size))
+    else:
+        from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+        embedder = LlamaNemotronEmbed1BV2Embedder(
+            device=device, hf_cache_dir=cache_dir, normalize=True, model_id=model_id
+        )
+        vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
+    # Ensure list-of-list floats.
+    return vecs.detach().to("cpu").tolist()
+
+
+def _search_lancedb(
+    *,
+    lancedb_uri: str,
+    table_name: str,
+    query_vectors: List[List[float]],
+    top_k: int,
+    vector_column_name: str = "vector",
+    nprobes: int = 0,
+    refine_factor: int = 10,
+    query_texts: Optional[List[str]] = None,
+    hybrid: bool = False,
+) -> List[List[Dict[str, Any]]]:
+    import lancedb  # type: ignore
+
+    db = lancedb.connect(lancedb_uri)
+    table = db.open_table(table_name)
+
+    # Determine nprobes: 0 means "search all partitions" for exhaustive ANN search.
+    # Read the actual partition count from the index so we don't hard-code it.
+    effective_nprobes = nprobes
+    if effective_nprobes <= 0:
+        try:
+            indices = table.list_indices()
+            for idx in indices:
+                np_ = getattr(idx, "num_partitions", None)
+                if np_ and int(np_) > 0:
+                    effective_nprobes = int(np_)
+                    break
+        except Exception:
+            pass
+        if effective_nprobes <= 0:
+            effective_nprobes = 16  # safe fallback matching default index config
+
+    results: List[List[Dict[str, Any]]] = []
+    for i, v in enumerate(query_vectors):
+        q = np.asarray(v, dtype="float32")
+
+        if hybrid and query_texts is not None:
+            from lancedb.rerankers import RRFReranker  # type: ignore
+
+            text = query_texts[i]
+            hits = (
+                table.search(query_type="hybrid")
+                .vector(q)
+                .text(text)
+                .nprobes(effective_nprobes)
+                .refine_factor(refine_factor)
+                .select(["text", "metadata", "source"])
+                .limit(top_k)
+                .rerank(RRFReranker())
+                .to_list()
+            )
+        else:
+            hits = (
+                table.search(q, vector_column_name=vector_column_name)
+                .nprobes(effective_nprobes)
+                .refine_factor(refine_factor)
+                .select(["text", "metadata", "source", "_distance"])
+                .limit(top_k)
+                .to_list()
+            )
+
+        results.append(hits)
+    return results
+
+
+def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
+    retrieved_keys: List[List[str]] = []
+    for hits in raw_hits:
+        keys: List[str] = []
+        for h in hits:
+            res = json.loads(h["metadata"])
+            source = json.loads(h["source"])
+            # Prefer explicit `pdf_page` column; fall back to derived form.
+            if res.get("page_number") is not None and source.get("source_id"):
+                filename = Path(source["source_id"]).stem
+                keys.append(filename + "_" + str(res["page_number"]))
+            else:
+                logger.warning(
+                    "Skipping hit with missing page_number or source_id: metadata=%s source=%s",
+                    h.get("metadata", ""),
+                    h.get("source", ""),
+                )
+        retrieved_keys.append([k for k in keys if k])
+    return retrieved_keys
+
+
+def _is_hit(golden_key: str, retrieved: List[str], k: int) -> bool:
+    """Check if a golden key is found in the top-k retrieved keys.
+
+    Handles filenames with underscores via ``rsplit`` and also accepts
+    whole-document keys (page ``-1``).
+    """
+    parts = golden_key.rsplit("_", 1)
+    if len(parts) != 2:
+        return golden_key in retrieved[:k]
+    filename, page = parts
+    specific_page = f"{filename}_{page}"
+    entire_document = f"{filename}_-1"
+    top = retrieved[:k]
+    return specific_page in top or entire_document in top
+
+
+def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
+    hits = sum(_is_hit(g, r, k) for g, r in zip(gold, retrieved))
+    return hits / max(1, len(gold))
+
+
+def retrieve_and_score(
+    query_csv: Path,
+    *,
+    cfg: RecallConfig,
+    limit: Optional[int] = None,
+    vector_column_name: str = "vector",
+) -> Tuple[pd.DataFrame, List[str], List[List[Dict[str, Any]]], List[List[str]], Dict[str, float]]:
+    """
+    Run embeddings + LanceDB retrieval for a query CSV.
+
+    Returns:
+      - normalized query DataFrame
+      - gold keys
+      - raw LanceDB hits
+      - retrieved keys (pdf_page-like)
+      - metrics dict (recall@k)
+    """
+    df_query = _normalize_query_df(pd.read_csv(query_csv))
+    if limit is not None:
+        df_query = df_query.head(int(limit)).copy()
+
+    queries = df_query["query"].astype(str).tolist()
+    gold = df_query["golden_answer"].astype(str).tolist()
+
+    endpoint, use_grpc = _resolve_embedding_endpoint(cfg)
+    if endpoint is not None and use_grpc is not None:
+        vectors = _embed_queries_nim(
+            queries,
+            endpoint=endpoint,
+            model=cfg.embedding_model,
+            api_key=cfg.embedding_api_key,
+            grpc=bool(use_grpc),
+        )
+    else:
+        vectors = _embed_queries_local_hf(
+            queries,
+            device=cfg.local_hf_device,
+            cache_dir=cfg.local_hf_cache_dir,
+            batch_size=int(cfg.local_hf_batch_size),
+            model_name=cfg.embedding_model,
+        )
+    raw_hits = _search_lancedb(
+        lancedb_uri=cfg.lancedb_uri,
+        table_name=cfg.lancedb_table,
+        query_vectors=vectors,
+        top_k=int(cfg.top_k),
+        vector_column_name=vector_column_name,
+        nprobes=int(cfg.nprobes),
+        refine_factor=int(cfg.refine_factor),
+        query_texts=queries,
+        hybrid=bool(cfg.hybrid),
+    )
+    retrieved_keys = _hits_to_keys(raw_hits)
+    metrics = {f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k)) for k in cfg.ks}
+    return df_query, gold, raw_hits, retrieved_keys, metrics
+
+
+def evaluate_recall(
+    query_csv: Path,
+    *,
+    cfg: RecallConfig,
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    df_query, gold, raw_hits, retrieved_keys, metrics = retrieve_and_score(
+        query_csv,
+        cfg=cfg,
+        limit=None,
+        vector_column_name="vector",
+    )
+
+    # Build per-query analysis DataFrame
+    rows = []
+    for i, (q, g, r) in enumerate(zip(df_query["query"].astype(str).tolist(), gold, retrieved_keys)):
+        row = {"query_id": i, "query": q, "golden_answer": g, "top_retrieved": r[: cfg.top_k]}
+        for k in cfg.ks:
+            k = int(k)
+            row[f"hit@{k}"] = _is_hit(g, r, k)
+            row[f"rank@{k}"] = (r[: cfg.top_k].index(g) + 1) if (g in r[: cfg.top_k]) else None
+        rows.append(row)
+    results_df = pd.DataFrame(rows)
+
+    saved: Dict[str, str] = {}
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        out = output_dir / f"recall_results_{ts}.csv"
+        results_df.to_csv(out, index=False)
+        saved["results_csv"] = str(out)
+
+    return {
+        "n_queries": int(len(df_query)),
+        "top_k": int(cfg.top_k),
+        "metrics": metrics,
+        "saved": saved,
+    }

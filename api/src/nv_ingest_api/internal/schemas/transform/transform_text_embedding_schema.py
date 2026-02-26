@@ -18,14 +18,21 @@ class TextEmbeddingSchema(BaseModel):
     api_key: str = Field(default="", repr=False)
     batch_size: int = Field(default=4)
     embedding_model: str = Field(default="nvidia/llama-3.2-nv-embedqa-1b-v2")
-    embedding_nim_endpoint: str = Field(default="http://embedding:8000/v1")
+    # When null/empty, callers may choose to run a local embedding backend instead of a remote endpoint.
+    # Keep the historical default so existing configs continue to work unchanged.
+    embedding_nim_endpoint: Optional[str] = Field(default="http://embedding:8000/v1")
     encoding_format: str = Field(default="float")
     httpx_log_level: LogLevel = Field(default=LogLevel.WARNING)
     input_type: str = Field(default="passage")
     raise_on_failure: bool = Field(default=False)
     truncate: str = Field(default="END")
+    embed_text_elements: bool = Field(default=True)
+    embed_structured_elements: bool = Field(default=True)
+    embed_image_elements: bool = Field(default=True)
+    embed_audio_elements: bool = Field(default=True)
     text_elements_modality: str = Field(default="text")
     image_elements_modality: str = Field(default="text")
+    image_elements_aggregate_page_content: bool = Field(default=False)
     structured_elements_modality: str = Field(default="text")
     audio_elements_modality: str = Field(default="text")
     custom_content_field: Optional[str] = None
@@ -39,6 +46,15 @@ class TextEmbeddingSchema(BaseModel):
     def _coerce_api_key_none(cls, v):
         return "" if v is None else v
 
+    @field_validator("embedding_nim_endpoint", mode="before")
+    @classmethod
+    def _coerce_empty_endpoint_to_none(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     @model_validator(mode="before")
     @classmethod
     def _coerce_none_to_empty(cls, values):
@@ -46,3 +62,22 @@ class TextEmbeddingSchema(BaseModel):
         if isinstance(values, dict) and values.get("api_key") is None:
             values["api_key"] = ""
         return values
+
+    @model_validator(mode="after")
+    def _reject_non_text_modalities(self):
+        """Reject image/text_image modalities — only text modality is supported."""
+        _NON_TEXT = frozenset({"image", "text_image", "image_text"})
+        for field_name in (
+            "text_elements_modality",
+            "image_elements_modality",
+            "structured_elements_modality",
+            "audio_elements_modality",
+        ):
+            value = getattr(self, field_name, "text")
+            if value in _NON_TEXT:
+                raise ValueError(
+                    f"{field_name}={value!r} is not supported. "
+                    f"Only 'text' modality is supported for embedding. "
+                    f"Image and multimodal embedding support has been removed."
+                )
+        return self
