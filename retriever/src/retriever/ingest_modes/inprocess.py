@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import glob
 import json
+import multiprocessing
 import os
 import re
 import time
@@ -526,6 +527,9 @@ def upload_embeddings_to_lancedb_inprocess(
     embedding_key: str = "embedding",
     include_text: bool = True,
     text_column: str = "text",
+    hybrid: bool = False,
+    fts_language: str = "English",
+    **_ignored: Any,
 ) -> Any:
     """
     Pipeline task: upload embeddings from a pandas DataFrame into LanceDB.
@@ -547,6 +551,8 @@ def upload_embeddings_to_lancedb_inprocess(
     - **embedding_key**: key inside payload dict to read embedding list from
     - **include_text**: if True, store `text_column` content alongside the vector
     - **text_column**: column to read text from when `include_text=True`
+    - **hybrid**: if True, additionally build an FTS index on `text`
+    - **fts_language**: language passed to LanceDB FTS index creation
 
     Returns the input DataFrame unchanged (so it can remain in the pipeline).
     """
@@ -683,6 +689,14 @@ def upload_embeddings_to_lancedb_inprocess(
             except Exception as e:
                 # Don't fail ingestion due to index training; users can rebuild later with more data.
                 print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+
+    if hybrid:
+        # Build text index for hybrid retrieval when text is present.
+        try:
+            table.create_fts_index("text", language=str(fts_language))
+        except Exception as e:
+            # Keep ingestion resilient: vector data was already written.
+            print(f"Warning: failed to create LanceDB FTS index (continuing without FTS): {e}")
 
     print(f"Wrote {len(rows)} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
     return df
@@ -1350,7 +1364,10 @@ class InProcessIngestor(Ingestor):
                             if progress is not None:
                                 progress.update(1)
 
-                    with ProcessPoolExecutor(max_workers=max_workers) as cpu_pool:
+                    with ProcessPoolExecutor(
+                        max_workers=max_workers,
+                        mp_context=multiprocessing.get_context("spawn"),
+                    ) as cpu_pool:
                         future_to_idx = {
                             cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i for i, chunk in enumerate(chunks)
                         }
@@ -1422,7 +1439,10 @@ class InProcessIngestor(Ingestor):
 
                 doc_done: dict[str, int] = defaultdict(int)
 
-                with ProcessPoolExecutor(max_workers=max_workers) as pool:
+                with ProcessPoolExecutor(
+                    max_workers=max_workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                ) as pool:
                     future_to_idx = {pool.submit(_process_chunk_cpu, c, cpu_tasks): i for i, c in enumerate(chunks)}
 
                     for future in as_completed(future_to_idx):
