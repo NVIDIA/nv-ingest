@@ -82,7 +82,9 @@ audio_chunk:
   video_audio_separate: false
 
 audio_asr:
-  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet. Override via AUDIO_GRPC_ENDPOINT, etc.
+  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet.
+  # For NGC cloud ASR: set auth_token from NGC_API_KEY and function_id from NGC catalog;
+  # or use env: AUDIO_GRPC_ENDPOINT (default grpc.nvcf.nvidia.com:443), NGC_API_KEY, AUDIO_FUNCTION_ID.
   audio_endpoints: [null, null]
   audio_infer_protocol: grpc
   function_id: null

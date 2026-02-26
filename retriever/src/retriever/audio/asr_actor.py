@@ -21,6 +21,45 @@ from retriever.params import ASRParams
 
 logger = logging.getLogger(__name__)
 
+# Default NGC/NVCF Parakeet gRPC endpoint when using cloud ASR
+DEFAULT_NGC_ASR_GRPC_ENDPOINT = "grpc.nvcf.nvidia.com:443"
+# Default NVCF function ID for Parakeet NIM (same as nv-ingest default_libmode_pipeline_impl)
+DEFAULT_NGC_ASR_FUNCTION_ID = "1598d209-5e27-4d3c-8079-4751568b1081"
+
+
+def asr_params_from_env(
+    *,
+    grpc_endpoint_var: str = "AUDIO_GRPC_ENDPOINT",
+    auth_token_var: str = "NGC_API_KEY",
+    function_id_var: str = "AUDIO_FUNCTION_ID",
+    default_grpc_endpoint: Optional[str] = DEFAULT_NGC_ASR_GRPC_ENDPOINT,
+    default_function_id: Optional[str] = DEFAULT_NGC_ASR_FUNCTION_ID,
+) -> ASRParams:
+    """
+    Build ASRParams from environment variables for cloud/NGC ASR.
+
+    - AUDIO_GRPC_ENDPOINT: gRPC endpoint (default: grpc.nvcf.nvidia.com:443 for NGC).
+    - NGC_API_KEY: Bearer token for NGC/NVCF (required for cloud).
+    - AUDIO_FUNCTION_ID: NVCF function ID for the Parakeet NIM (default: same as nv-ingest libmode).
+
+    Returns ASRParams with auth_token and function_id set from env when present.
+    When NGC_API_KEY is set but AUDIO_FUNCTION_ID is not, uses the nv-ingest default Parakeet NIM function ID.
+    """
+    import os
+
+    grpc_endpoint = (os.environ.get(grpc_endpoint_var) or "").strip() or default_grpc_endpoint
+    auth_token = (os.environ.get(auth_token_var) or "").strip() or None
+    function_id = (os.environ.get(function_id_var) or "").strip() or None
+    if auth_token and function_id is None and default_function_id:
+        function_id = default_function_id
+
+    return ASRParams(
+        audio_endpoints=(grpc_endpoint, None),
+        audio_infer_protocol="grpc",
+        function_id=function_id,
+        auth_token=auth_token,
+    )
+
 try:
     from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import (
         create_audio_inference_client,

@@ -12,6 +12,7 @@ batch, inprocess, fused, and online run modes.
 from __future__ import annotations
 
 from retriever.audio.asr_actor import ASRActor
+from retriever.audio.asr_actor import asr_params_from_env
 from retriever.audio.chunk_actor import MediaChunkActor
 from retriever.audio.media_interface import MediaInterface
 from retriever.params import ASRParams
@@ -20,6 +21,7 @@ from retriever.params import AudioChunkParams
 __all__ = [
     "ASRActor",
     "ASRParams",
+    "asr_params_from_env",
     "AudioChunkParams",
     "MediaChunkActor",
     "MediaInterface",
