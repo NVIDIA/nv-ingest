@@ -479,12 +479,17 @@ def main(
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
+    # fmt: off
     nemotron_parse_workers: float = typer.Option(
         0.0,
         "--nemotron-parse-workers",
         min=0.0,
-        help="Actor count for Nemotron Parse stage (enables parse-only mode when " "> 0.0 with parse GPU/batch-size).",
+        help=(
+            "Actor count for Nemotron Parse stage "
+            "(enables parse-only mode when > 0.0 with parse GPU/batch-size)."
+        ),  # noqa: E501
     ),
+    # fmt: on
     gpu_nemotron_parse: float = typer.Option(
         0.0,
         "--gpu-nemotron-parse",
@@ -495,7 +500,8 @@ def main(
         0.0,
         "--nemotron-parse-batch-size",
         min=0.0,
-        help="Ray Data batch size for Nemotron Parse stage (enables parse-only mode when > 0.0 with parse workers/GPU).",
+        help="Ray Data batch size for Nemotron Parse stage "
+        "(enables parse-only mode when > 0.0 with parse workers/GPU).",
     ),
     page_elements_invoke_url: Optional[str] = typer.Option(
         None,
