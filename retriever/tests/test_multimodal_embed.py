@@ -26,9 +26,16 @@ from retriever.text_embed.main_text_embed import (
 )
 
 # ---------------------------------------------------------------------------
-# Stub `typer` before importing inprocess (typer is a transitive dep via
-# batch.py -> pdf -> __init__.py that may not be installed in test envs).
+# Stub heavy transitive deps that the __init__.py / batch.py import chain
+# pulls in but that are not installed in lightweight test environments.
 # ---------------------------------------------------------------------------
+if "ray" not in sys.modules:
+    _ray_stub = types.ModuleType("ray")
+    _ray_stub.remote = lambda *a, **kw: lambda cls: cls  # type: ignore[attr-defined]
+    sys.modules["ray"] = _ray_stub
+    _ray_data_stub = types.ModuleType("ray.data")
+    sys.modules["ray.data"] = _ray_data_stub
+
 if "typer" not in sys.modules or not hasattr(sys.modules["typer"], "Typer"):
     _typer_stub = types.ModuleType("typer")
     _typer_stub.Typer = lambda **kw: MagicMock()  # type: ignore[attr-defined]
