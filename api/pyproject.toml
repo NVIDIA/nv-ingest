@@ -29,7 +29,7 @@ dependencies = [
     "ffmpeg-python==0.2.0",
     "tritonclient",
     "glom",
-    "pypdfium2>=4.30.0,<5.0.0",
+    "pypdfium2==4.30.0",
 ]
 
 [project.optional-dependencies]
