@@ -105,17 +105,27 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
         For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
-## Run the Ray batch pipeline with nemotron-parse
+## Run the Ray batch pipeline with `nemotron-parse`
 
-When using the nemotron-parse model in the retriever batch pipeline, the **page-elements** and **nemotron-ocr** stages are omitted from the Ray pipeline in favor of the nemotron-parse actor. This applies when you run the pipeline from the command line (for example, `batch_pipeline.py` in library mode).
+When the `nemotron-parse` model is used in the retriever batch pipeline, the `page-elements` and `nemotron-ocr` stages are skipped in the Ray pipeline, as their functionality is handled by the `nemotron-parse` actor. This behavior applies when running the pipeline from the command line (for instance, using `batch_pipeline.py` in library mode).
 
-To enable nemotron-parse in the batch pipeline, set all of the following to values greater than zero (they default to 0, which disables nemotron-parse):
+To enable `nemotron-parse` in the batch pipeline, set all of the following to values greater than zero (they default to 0, which disables `nemotron-parse`):
 
 - `--nemotron-parse-workers` — number of Ray workers for nemotron-parse
 - `--gpu-nemotron-parse` — GPU fraction per worker (e.g. `0.25` for 4 workers per GPU)
 - `--nemotron-parse-batch-size` — batch size per nemotron-parse request
 
 Example: run the batch pipeline on a directory of PDFs with nemotron-parse enabled:
+
+
+To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero (they default to 0, which leaves `nemotron-parse` disabled):
+​
+- `--nemotron-parse-workers` — number of Ray workers to run nemotron-parse
+- `--gpu-nemotron-parse` — GPU fraction to allocate per worker (for example, 0.25 to run four workers on a single GPU)
+- `--nemotron-parse-batch-size` — batch size for each nemotron-parse request
+​
+
+For example, run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on:
 
 ```shell
 python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
@@ -124,8 +134,7 @@ python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
   --nemotron-parse-batch-size 32
 ```
 
-Replace `/path/to/pdfs` with your input directory (e.g. `/home/local/jdyer/datasets/jp20`).
-
+Replace `/path/to/pdfs` with the path to your input directory (for example, `/home/local/jdyer/datasets/jp20`).
 
 ## Related Topics
 
