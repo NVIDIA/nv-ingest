@@ -24,15 +24,15 @@ def test_table_valid_yolox_and_ocr_http_only():
 
 
 def test_table_invalid_yolox_both_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        TableExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=("grpc_ocr", None))
-    assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
+    config = TableExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=("grpc_ocr", None))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_table_invalid_ocr_both_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), ocr_endpoints=("  ", '  "  '))
-    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
+    config = TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), ocr_endpoints=("  ", '  "  '))
+    assert config.ocr_endpoints == (None, None)
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_table_extra_fields_forbidden():
