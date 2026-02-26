@@ -1,6 +1,5 @@
 name: Nv-Ingest Nightly PyPi Wheel Publish
 
-# Trigger for pull requests and pushing to main
 on:
   schedule:
     # Runs every day at 11:30PM (UTC)
@@ -11,16 +10,34 @@ on:
         description: 'Source branch to build wheel from'
         required: true
         default: 'main'
+        type: string
       VERSION:
         description: 'Version string for the release (e.g., 25.4.0)'
         required: true
+        default: ''
+        type: string
       RELEASE_TYPE:
         description: 'Whether the build is a nightly or release'
         required: true
+        default: dev
         type: choice
         options:
           - dev
           - release
+      upload_to:
+        description: 'Where to upload (none/testpypi/pypi)'
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - none
+          - testpypi
+          - pypi
+      skip_existing:
+        description: 'Skip already-uploaded versions'
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   build:
@@ -28,8 +45,25 @@ jobs:
     container:
       image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     steps:
-      - name: Determine source branch and release type to use for run
+      - name: Decide upload target
+        id: target
+        shell: bash
         run: |
+          set -euo pipefail
+          # Default for scheduled runs: testpypi
+          upload_to="testpypi"
+          skip_existing="true"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            upload_to="${{ inputs.upload_to }}"
+            skip_existing="${{ inputs.skip_existing }}"
+          fi
+          echo "upload_to=${upload_to}" >> "$GITHUB_OUTPUT"
+          echo "skip_existing=${skip_existing}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine source branch and release type to use for run
+        shell: bash
+        run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Setting build source to ${{ github.event.inputs.environment }}"
             echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
@@ -61,27 +95,72 @@ jobs:
           ref: ${{ env.ENVIRONMENT }}
 
       - name: Install build dependencies
+        shell: bash
         run: |
           pip install build twine
 
       - name: Build nv-ingest-api wheel
+        shell: bash
         run: |
           cd api && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
       - name: Build nv-ingest-client wheel
+        shell: bash
         run: |
           cd client && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
       - name: Build nv-ingest service wheel
+        shell: bash
         run: |
           cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
-      - name: Publish wheels to Artifactory
-        env:
-          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
-          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      - name: Build nemo-retriever wheel
         run: |
-          twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
-          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/* \
-          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/*
+          cd retriever
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path("src/retriever/_build_info.py").write_text(
+              '"""Build metadata written by CI before packaging."""\n\n'
+              'BUILD_GIT_SHA = "${{ github.sha }}"\n'
+              f'BUILD_DATE = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n',
+              encoding="utf-8",
+          )
+          PY
+          RETRIEVER_RELEASE_TYPE=${{ env.RELEASE_TYPE }} \
+          RETRIEVER_VERSION=${{ env.VERSION }} \
+          RETRIEVER_BUILD_NUMBER=${{ github.run_number }} \
+          RETRIEVER_GIT_SHA=${{ github.sha }} \
+          python -m build
+
+      - name: Publish wheels
+        env:
+          TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upload_to="${{ steps.target.outputs.upload_to }}"
+          repository_url="https://test.pypi.org/legacy/"
+          token="${TEST_PYPI_API_TOKEN:-}"
+          if [[ "${upload_to}" == "pypi" ]]; then
+            repository_url="https://upload.pypi.org/legacy/"
+            token="${PYPI_API_TOKEN:-}"
+          fi
+
+          if [[ "${upload_to}" == "none" ]]; then
+            echo "upload_to=none; skipping package upload."
+            exit 0
+          fi
+
+          skip_existing_flag=""
+          if [[ "${{ steps.target.outputs.skip_existing }}" == "true" ]]; then
+            skip_existing_flag="--skip-existing"
+          fi
+
+          twine upload ${skip_existing_flag} --repository-url "${repository_url}" -u __token__ -p "${token}" api/dist/* \
+          && twine upload ${skip_existing_flag} --repository-url "${repository_url}" -u __token__ -p "${token}" client/dist/* \
+          && twine upload ${skip_existing_flag} --repository-url "${repository_url}" -u __token__ -p "${token}" src/dist/* \
+          && twine upload ${skip_existing_flag} --repository-url "${repository_url}" -u __token__ -p "${token}" retriever/dist/*

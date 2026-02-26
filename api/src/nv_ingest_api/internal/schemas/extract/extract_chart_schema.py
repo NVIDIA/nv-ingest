@@ -24,21 +24,17 @@ class ChartExtractorConfigSchema(LowercaseProtocolMixin):
 
     yolox_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
         A tuple containing the gRPC and HTTP services for the yolox endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
+        If both are empty, the chart extractor falls back to a local HuggingFace model.
 
     ocr_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
         A tuple containing the gRPC and HTTP services for the ocr endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
+        If both are empty, the chart extractor falls back to a local OCR pipeline.
 
     Methods
     -------
     validate_endpoints(values)
-        Validates that at least one of the gRPC or HTTP services is provided for each endpoint.
-
-    Raises
-    ------
-    ValueError
-        If both gRPC and HTTP services are empty for any endpoint.
+        Cleans and normalizes endpoints and infers the infer protocol.
+        If both endpoints are empty for an entry, infer_protocol defaults to "local".
 
     Config
     ------
@@ -93,16 +89,17 @@ class ChartExtractorConfigSchema(LowercaseProtocolMixin):
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 
-            if not grpc_service and not http_service:
-                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
-
             values[endpoint_name] = (grpc_service, http_service)
 
             # Auto-infer protocol from endpoints if not specified
             protocol_name = endpoint_name.replace("_endpoints", "_infer_protocol")
             protocol_value = values.get(protocol_name)
             if not protocol_value:
-                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+                # If both endpoints are empty, default to local.
+                protocol_value = "http" if http_service else "grpc" if grpc_service else "local"
+            elif not grpc_service and not http_service:
+                # If protocol was explicitly set but endpoints are empty, force local.
+                protocol_value = "local"
             values[protocol_name] = protocol_value
 
         return values

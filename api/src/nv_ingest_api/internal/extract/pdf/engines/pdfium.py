@@ -435,6 +435,7 @@ def pdfium_extractor(
     text_extraction_method = extractor_config.get("extract_method", "pdfium")
     extract_images_method = extractor_config.get("extract_images_method", "group")
     extract_images_params = extractor_config.get("extract_images_params", {})
+    page_image_max_dimension = extractor_config.get("page_image_max_dimension", 1024)
 
     # Extract metadata_column
     metadata_column = extractor_config.get("metadata_column", "metadata")
@@ -557,7 +558,7 @@ def pdfium_extractor(
                     page_text = _extract_page_text(page)
                 image, _ = pdfium_pages_to_numpy(
                     [page],
-                    scale_tuple=(16384, 16384),
+                    scale_tuple=(page_image_max_dimension, page_image_max_dimension),
                     trace_info=execution_trace_log,
                 )
                 base64_image = numpy_to_base64(image[0])

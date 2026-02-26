@@ -1,0 +1,49 @@
+# Example config for: `retriever pdf stage page-elements --config <this.yaml>`
+#
+# CLI override rule:
+# - If you pass an option explicitly on the CLI, it wins.
+# - Otherwise the value from this YAML file is used.
+#
+# You can run repeatedly:
+#   retriever pdf stage page-elements --config retriever/pdf_stage_config.yaml
+#
+
+# Directory containing PDFs (scanned recursively for *.pdf)
+input_dir: /home/local/jdyer/datasets/bo767
+
+# PDF extraction method: pdfium | pdfium_hybrid | ocr | nemotron_parse | tika | unstructured_io | adobe | llama
+method: pdfium
+
+# Optional auth token for NIM-backed services
+auth_token: null
+
+endpoints:
+  yolox:
+    # If set to null then HuggingFace models will be used instead of NIMs
+    # grpc: localhost:8001
+    # http: http://localhost:8000/v1/infer
+    grpc: null
+    http: null
+
+  # Only required for method: nemotron_parse
+  nemotron_parse:
+    grpc: null
+    http: null
+    model_name: null
+
+extract:
+  text: true
+  # Text depth: page | document
+  text_depth: page
+  images: false
+  tables: true
+  charts: true
+  infographics: true
+  page_as_image: false
+
+outputs:
+  write_json: true
+  json_output_dir: /home/local/jdyer/datasets/bo767-results-hf-standalone/
+
+# Optionally limit number of PDFs processed
+limit: null
