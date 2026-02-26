@@ -11,7 +11,7 @@ dependencies:
   - s3fs>=2024.10.0
   - httpx>=0.28.1
   - pydantic>=2.10.3
-  - pypdfium2>=4.30.0
+  - pypdfium2==4.30.0
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0

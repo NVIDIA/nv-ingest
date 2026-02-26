@@ -30,15 +30,15 @@ def test_valid_ocr_both():
 
 
 def test_invalid_ocr_both_empty():
-    with pytest.raises(ValidationError) as excinfo:
-        InfographicExtractorConfigSchema(ocr_endpoints=(None, None))
-    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
+    config = InfographicExtractorConfigSchema(ocr_endpoints=(None, None))
+    assert config.ocr_endpoints == (None, None)
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_cleaning_ocr_endpoints_spaces_and_quotes():
-    with pytest.raises(ValidationError) as excinfo:
-        InfographicExtractorConfigSchema(ocr_endpoints=("  ", '  "  '))
-    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
+    config = InfographicExtractorConfigSchema(ocr_endpoints=("  ", '  "  '))
+    assert config.ocr_endpoints == (None, None)
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_extra_fields_forbidden_in_infographic_config():
