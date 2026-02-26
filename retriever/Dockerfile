@@ -11,7 +11,6 @@ ARG BASE_IMG_TAG=jammy-20250619
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
-# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
       bzip2 \
       ca-certificates \
@@ -58,20 +57,17 @@ RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
        done \
     && apt-get clean
 
-# Miniforge + conda env with Python 3.12, CUDA 13 cudart, uv (for OCR: libcudart.so.13)
-RUN wget -q -O /tmp/miniforge.sh \
-      "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" \
-    && bash /tmp/miniforge.sh -b -p /opt/conda \
-    && rm /tmp/miniforge.sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-ENV PATH=/opt/conda/bin:$PATH
+ENV PATH=/root/.local/bin:$PATH
+ENV UV_LINK_MODE=copy
 
-COPY conda/environments/retriever_libcudart.yml /tmp/retriever_libcudart.yml
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    conda env create -f /tmp/retriever_libcudart.yml \
-    && rm /tmp/retriever_libcudart.yml
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv python install 3.12 \
+    && uv venv --python 3.12 /opt/retriever_runtime
 
-# So Nemotron OCR finds libcudart.so.13 at runtime
-ENV LD_LIBRARY_PATH=/opt/conda/envs/retriever_libcudart/lib:${LD_LIBRARY_PATH}
+ENV VIRTUAL_ENV=/opt/retriever_runtime
+ENV PATH=/opt/retriever_runtime/bin:/root/.local/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/retriever_runtime/lib:${LD_LIBRARY_PATH}
 
 ENTRYPOINT ["/bin/bash"]

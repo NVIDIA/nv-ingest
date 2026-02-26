@@ -61,7 +61,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "uvicorn",
     "pip",
-    "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
+    "opencv-python",
     "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",
     "tritonclient",
