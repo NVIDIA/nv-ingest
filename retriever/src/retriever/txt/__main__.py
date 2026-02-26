@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 CLI for .txt extraction: tokenizer-based split, write *.txt_extraction.json.
 
@@ -8,10 +12,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional  # noqa: F401
 
 import typer
 from rich.console import Console
+from retriever.params import TextChunkParams
 
 from . import txt_file_to_chunks_df
 
@@ -73,9 +78,11 @@ def run(
         try:
             df = txt_file_to_chunks_df(
                 str(path),
-                max_tokens=max_tokens,
-                overlap_tokens=overlap,
-                encoding=encoding,
+                params=TextChunkParams(
+                    max_tokens=max_tokens,
+                    overlap_tokens=overlap,
+                    encoding=encoding,
+                ),
             )
         except Exception as e:
             console.print(f"[red]Failed[/red] {path}: {e}")

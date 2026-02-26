@@ -41,4 +41,3 @@ httpx_log_level: "WARNING"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
 
 # Optional: request embedding vector size if the backend supports it
 # dimensions: 1024
-

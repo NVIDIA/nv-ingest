@@ -20,7 +20,7 @@ from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graph
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -46,15 +46,10 @@ def _local_nemotron_ocr_boxes_texts(
       [bounding_boxes, text_predictions, conf_scores]
     """
     model_dir = (
-        os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
+        os.getenv("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+        or os.getenv("NEMOTRON_OCR_MODEL_DIR", "").strip()
         or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
-        or os.getenv("SLIMGEST_NEMOTRON_OCR_MODEL_DIR", "").strip()
     )
-    if not model_dir:
-        raise ValueError(
-            "Local chart OCR requested but no model directory was configured. "
-            "Set $NEMOTRON_OCR_MODEL_DIR (or $NEMOTRON_OCR_V1_MODEL_DIR) to the Nemotron OCR model directory."
-        )
 
     # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
     try:
@@ -68,9 +63,9 @@ def _local_nemotron_ocr_boxes_texts(
     if trace_info is not None:
         trace_info.setdefault("ocr", {})
         trace_info["ocr"]["backend"] = "local_nemotron_ocr_v1"
-        trace_info["ocr"]["model_dir"] = model_dir
+        trace_info["ocr"]["model_dir"] = model_dir or None
 
-    ocr = NemotronOCRV1(model_dir=model_dir)
+    ocr = NemotronOCRV1(model_dir=model_dir) if model_dir else NemotronOCRV1()
 
     results: List[List[Any]] = []
     for b64 in base64_images:
@@ -480,7 +475,7 @@ def extract_chart_data_from_image_internal(
             ocr_model_name = "local"
         else:
             # Get the grpc endpoint to determine the model if needed
-            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
             # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
             ocr_model_name = "scene_text_ensemble"
             ocr_client = _create_ocr_client(ocr_endpoints, ocr_protocol, ocr_model_name, auth_token)

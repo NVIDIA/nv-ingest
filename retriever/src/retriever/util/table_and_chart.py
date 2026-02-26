@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Table/chart/infographic content reconstruction utilities.
 
@@ -11,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import numpy as np
 import pandas as pd
@@ -610,6 +614,10 @@ def reorder_ocr_for_infographic(
 
     confs = [1.0] * len(texts)
     _, reordered_texts, _ = reorder_boxes(
-        np.array(quad_boxes), texts, confs, mode="top_left", dbscan_eps=10,
+        np.array(quad_boxes),
+        texts,
+        confs,
+        mode="top_left",
+        dbscan_eps=10,
     )
     return "\n".join(t for t in reordered_texts if t)

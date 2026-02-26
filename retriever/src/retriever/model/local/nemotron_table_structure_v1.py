@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
@@ -5,6 +9,7 @@ from ..model import BaseModel, RunMode
 
 from nemotron_table_structure_v1.model import define_model as define_model_table_structure
 from nemotron_table_structure_v1.model import resize_pad as resize_pad_table_structure
+
 
 class NemotronTableStructureV1(BaseModel):
     """
@@ -19,9 +24,7 @@ class NemotronTableStructureV1(BaseModel):
     Nemotron Page Elements v3 model.
     """
 
-    def __init__(
-        self
-    ) -> None:
+    def __init__(self) -> None:
         super().__init__()
         # table_structure_model = define_model_table_structure("table_structure_v1")
         self._model = define_model_table_structure(self.model_name)
@@ -97,7 +100,7 @@ class NemotronTableStructureV1(BaseModel):
             "format": "RGB",
             "dimensions": "(1024, 1024)",
             "expected_content": "table",
-            "description": "Table image in RGB format, resized to 1024x1024. Should be cropped from document using page element detection.",
+            "description": "Table image in RGB format, resized to 1024x1024. Should be cropped from document using page element detection.",  # noqa: E501
             "preprocessing_recommendation": "Use Nemotron Page Elements v3 to detect and crop table regions",
         }
 

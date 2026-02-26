@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Unit tests for retriever.txt.split: split_text_by_tokens and txt_file_to_chunks_df.
 """
 
-import tempfile
+import tempfile  # noqa: F401
 from pathlib import Path
 
 import pandas as pd

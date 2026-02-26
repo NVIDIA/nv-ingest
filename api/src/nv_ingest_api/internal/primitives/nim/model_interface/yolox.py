@@ -454,7 +454,8 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
                     "Local YOLOX backend requested but 'retriever' package is not importable. "
-                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or run with infer_protocol='grpc'/'http'."
+                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or "
+                    "run with infer_protocol='grpc'/'http' and backend='local'."  # noqa: E501
                 ) from e
 
             # Choose device (default: cuda if available else cpu).
@@ -570,7 +571,11 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
                 annotation_dicts: List[Dict[str, Any]] = []
                 for i in range(len(tensors)):
-                    preds = per_image_preds[i] if per_image_preds is not None else model.invoke(tensors[i], orig_shapes_hw[i])
+                    preds = (
+                        per_image_preds[i]
+                        if per_image_preds is not None
+                        else model.invoke(tensors[i], orig_shapes_hw[i])
+                    )
                     boxes, labels, scores = model.postprocess(preds)
 
                 ann: Dict[str, List[List[float]]] = {lab: [] for lab in YOLOX_PAGE_V3_CLASS_LABELS}
@@ -600,7 +605,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
                     except Exception:
                         s = 0.0
 
-                    ann[label_name].append([float(box_list[0]), float(box_list[1]), float(box_list[2]), float(box_list[3]), s])
+                    ann[label_name].append(
+                        [float(box_list[0]), float(box_list[1]), float(box_list[2]), float(box_list[3]), s]
+                    )
 
                 annotation_dicts.append(ann)
 

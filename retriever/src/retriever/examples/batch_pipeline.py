@@ -1,7 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Batch ingestion pipeline with optional recall evaluation.
 Run with: uv run python -m retriever.examples.batch_pipeline <input-dir>
 """
+
 import json
 import logging
 import os
@@ -9,19 +14,30 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from importlib import import_module
 from pathlib import Path
 from typing import Optional, TextIO
 
-import lancedb
 import ray
 import typer
 from retriever import create_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
+from retriever.params import TextChunkParams
+from retriever.params import VdbUploadParams
 from retriever.recall.core import RecallConfig, retrieve_and_score
 
 app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _lancedb():
+    """Import lancedb lazily to avoid fork warnings during early process setup."""
+    return import_module("lancedb")
 
 
 class _TeeStream:
@@ -93,7 +109,7 @@ def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
     Falls back to table row count if page-level fields are unavailable.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
     except Exception:
         return None
@@ -125,7 +141,7 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
     ingestion by the Ray write stage.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
         df = table.to_pandas()[["source_id", "page_number", "metadata"]]
     except Exception:
@@ -233,10 +249,7 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
         print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
         return
     if processed_pages is None:
-        print(
-            "Pages/sec: unavailable (could not estimate processed pages). "
-            f"Ingest time: {ingest_elapsed_s:.2f}s"
-        )
+        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
         return
 
     pps = processed_pages / ingest_elapsed_s
@@ -253,7 +266,7 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     # Local path URI in this pipeline.
     Path(uri).mkdir(parents=True, exist_ok=True)
 
-    db = lancedb.connect(uri)
+    db = _lancedb().connect(uri)
     try:
         db.open_table(table_name)
         return
@@ -323,7 +336,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
     key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
     return key, dist
 
 
@@ -331,14 +344,14 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 def main(
     input_dir: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
         exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', or 'doc'. Use 'txt' for .txt files (tokenizer chunking). Use 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",
+        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -481,6 +494,11 @@ def main(
         "--embed-invoke-url",
         help="Optional remote endpoint URL for embedding model inference.",
     ),
+    embed_model_name: str = typer.Option(
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "--embed-model-name",
+        help="Embedding model name passed to .embed().",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -518,10 +536,14 @@ def main(
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
     ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
-        os.environ.setdefault("NEMOTRON_OCR_MODEL_DIR", str(Path.cwd() / "nemotron-ocr-v1"))
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
@@ -536,17 +558,11 @@ def main(
             gpu_page_elements = 0.0
 
         if ocr_invoke_url and float(gpu_ocr) != 0.0:
-            print(
-                "[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from "
-                f"{float(gpu_ocr):.3f} to 0.0"
-            )
+            print("[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from " f"{float(gpu_ocr):.3f} to 0.0")
             gpu_ocr = 0.0
 
         if embed_invoke_url and float(gpu_embed) != 0.0:
-            print(
-                "[WARN] --embed-invoke-url is set; forcing --gpu-embed from "
-                f"{float(gpu_embed):.3f} to 0.0"
-            )
+            print("[WARN] --embed-invoke-url is set; forcing --gpu-embed from " f"{float(gpu_embed):.3f} to 0.0")
             gpu_embed = 0.0
 
         # Resolve Ray: start a head node, connect to given address, or run in-process
@@ -559,102 +575,169 @@ def main(
             glob_pattern = str(input_dir / "*.txt")
             ingestor = create_ingestor(
                 run_mode="batch",
-                ray_address=ray_address,
-                ray_log_to_driver=ray_log_to_driver,
+                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
             )
             ingestor = (
                 ingestor.files(glob_pattern)
-                .extract_txt(max_tokens=512, overlap_tokens=0)
-                .embed(model_name="nemo_retriever_v1", embed_invoke_url=embed_invoke_url)
-                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
+                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
+            )
+        elif input_type == "html":
+            glob_pattern = str(input_dir / "*.html")
+            ingestor = create_ingestor(
+                run_mode="batch",
+                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+            )
+            ingestor = (
+                ingestor.files(glob_pattern)
+                .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
+                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
         elif input_type == "doc":
             # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
             doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
             ingestor = create_ingestor(
                 run_mode="batch",
-                ray_address=ray_address,
-                ray_log_to_driver=ray_log_to_driver,
+                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
             )
             ingestor = (
                 ingestor.files(doc_globs)
                 .extract(
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
-                    debug_run_id=str(runtime_metrics_prefix or "unknown"),
-                    pdf_extract_workers=int(pdf_extract_workers),
-                    pdf_extract_num_cpus=float(pdf_extract_num_cpus),
-                    pdf_split_batch_size=int(pdf_split_batch_size),
-                    pdf_extract_batch_size=int(pdf_extract_batch_size),
-                    page_elements_batch_size=int(page_elements_batch_size),
-                    page_elements_workers=int(page_elements_workers),
-                    detect_workers=int(ocr_workers),
-                    detect_batch_size=int(ocr_batch_size),
-                    page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
-                    ocr_cpus_per_actor=float(ocr_cpus_per_actor),
-                    gpu_page_elements=float(gpu_page_elements),
-                    gpu_ocr=float(gpu_ocr),
-                    gpu_embed=float(gpu_embed),
-                    page_elements_invoke_url=page_elements_invoke_url,
-                    ocr_invoke_url=ocr_invoke_url,
+                    ExtractParams(
+                        extract_text=True,
+                        extract_tables=True,
+                        extract_charts=True,
+                        extract_infographics=False,
+                        page_elements_invoke_url=page_elements_invoke_url,
+                        ocr_invoke_url=ocr_invoke_url,
+                        batch_tuning={
+                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                            "pdf_extract_workers": int(pdf_extract_workers),
+                            "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                            "pdf_split_batch_size": int(pdf_split_batch_size),
+                            "pdf_extract_batch_size": int(pdf_extract_batch_size),
+                            "page_elements_batch_size": int(page_elements_batch_size),
+                            "page_elements_workers": int(page_elements_workers),
+                            "detect_workers": int(ocr_workers),
+                            "detect_batch_size": int(ocr_batch_size),
+                            "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
+                            "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
+                            "gpu_page_elements": float(gpu_page_elements),
+                            "gpu_ocr": float(gpu_ocr),
+                            "gpu_embed": float(gpu_embed),
+                        },
+                    )
                 )
                 .embed(
-                    model_name="nemo_retriever_v1",
-                    embed_workers=int(embed_workers),
-                    embed_batch_size=int(embed_batch_size),
-                    embed_cpus_per_actor=float(embed_cpus_per_actor),
-                    embed_invoke_url=embed_invoke_url,
+                    EmbedParams(
+                        model_name=str(embed_model_name),
+                        embed_invoke_url=embed_invoke_url,
+                        batch_tuning={
+                            "embed_workers": int(embed_workers),
+                            "embed_batch_size": int(embed_batch_size),
+                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                        },
+                    )
                 )
-                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
         else:
             pdf_glob = str(input_dir / "*.pdf")
             ingestor = create_ingestor(
                 run_mode="batch",
-                ray_address=ray_address,
-                ray_log_to_driver=ray_log_to_driver,
+                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
             )
             ingestor = (
                 ingestor.files(pdf_glob)
                 .extract(
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
-                    debug_run_id=str(runtime_metrics_prefix or "unknown"),
-                    pdf_extract_workers=int(pdf_extract_workers),
-                    pdf_extract_num_cpus=float(pdf_extract_num_cpus),
-                    pdf_split_batch_size=int(pdf_split_batch_size),
-                    pdf_extract_batch_size=int(pdf_extract_batch_size),
-                    page_elements_batch_size=int(page_elements_batch_size),
-                    page_elements_workers=int(page_elements_workers),
-                    detect_workers=int(ocr_workers),
-                    detect_batch_size=int(ocr_batch_size),
-                    page_elements_cpus_per_actor=float(page_elements_cpus_per_actor),
-                    ocr_cpus_per_actor=float(ocr_cpus_per_actor),
-                    gpu_page_elements=float(gpu_page_elements),
-                    gpu_ocr=float(gpu_ocr),
-                    gpu_embed=float(gpu_embed),
-                    page_elements_invoke_url=page_elements_invoke_url,
-                    ocr_invoke_url=ocr_invoke_url,
+                    ExtractParams(
+                        extract_text=True,
+                        extract_tables=True,
+                        extract_charts=True,
+                        extract_infographics=False,
+                        page_elements_invoke_url=page_elements_invoke_url,
+                        ocr_invoke_url=ocr_invoke_url,
+                        batch_tuning={
+                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                            "pdf_extract_workers": int(pdf_extract_workers),
+                            "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                            "pdf_split_batch_size": int(pdf_split_batch_size),
+                            "pdf_extract_batch_size": int(pdf_extract_batch_size),
+                            "page_elements_batch_size": int(page_elements_batch_size),
+                            "page_elements_workers": int(page_elements_workers),
+                            "detect_workers": int(ocr_workers),
+                            "detect_batch_size": int(ocr_batch_size),
+                            "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
+                            "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
+                            "gpu_page_elements": float(gpu_page_elements),
+                            "gpu_ocr": float(gpu_ocr),
+                            "gpu_embed": float(gpu_embed),
+                        },
+                    )
                 )
                 .embed(
-                    model_name="nemo_retriever_v1",
-                    embed_workers=int(embed_workers),
-                    embed_batch_size=int(embed_batch_size),
-                    embed_cpus_per_actor=float(embed_cpus_per_actor),
-                    embed_invoke_url=embed_invoke_url,
+                    EmbedParams(
+                        model_name=str(embed_model_name),
+                        embed_invoke_url=embed_invoke_url,
+                        batch_tuning={
+                            "embed_workers": int(embed_workers),
+                            "embed_batch_size": int(embed_batch_size),
+                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                        },
+                    )
                 )
-                .vdb_upload(lancedb_uri=lancedb_uri, table_name=LANCEDB_TABLE, overwrite=True, create_index=True)
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
         ingestor.ingest(
-            runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
-            runtime_metrics_prefix=runtime_metrics_prefix,
+            params=IngestExecuteParams(
+                runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
+                runtime_metrics_prefix=runtime_metrics_prefix,
+            )
         )
         ingest_elapsed_s = time.perf_counter() - ingest_start
         processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
@@ -676,7 +759,7 @@ def main(
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
-        db = lancedb.connect(lancedb_uri)
+        db = _lancedb().connect(lancedb_uri)
         table = None
         open_err: Optional[Exception] = None
         for _ in range(3):
@@ -691,8 +774,7 @@ def main(
                 time.sleep(2)
         if table is None:
             raise RuntimeError(
-                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
-                f"but it was not found."
+                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
             ) from open_err
         try:
             if int(table.count_rows()) == 0:
@@ -704,12 +786,19 @@ def main(
         unique_basenames = table.to_pandas()["pdf_basename"].unique()
         print(f"Unique basenames: {unique_basenames}")
 
+        # Resolve the HF model ID for recall query embedding so aliases
+        # (e.g. "nemo_retriever_v1") map to the correct model.
+        from retriever.model import resolve_embed_model
+
+        _recall_model = resolve_embed_model(str(embed_model_name))
+
         cfg = RecallConfig(
             lancedb_uri=str(lancedb_uri),
             lancedb_table=str(LANCEDB_TABLE),
-            embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+            embedding_model=_recall_model,
             top_k=10,
             ks=(1, 5, 10),
+            hybrid=hybrid,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
@@ -717,7 +806,11 @@ def main(
         if not no_recall_details:
             print("\nPer-query retrieval details:")
         missed_gold: list[tuple[str, str]] = []
-        ext = ".txt" if input_type == "txt" else ".pdf"
+        ext = (
+            ".html"
+            if input_type == "html"
+            else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
+        )
         for i, (q, g, hits) in enumerate(
             zip(
                 _df_query["query"].astype(str).tolist(),

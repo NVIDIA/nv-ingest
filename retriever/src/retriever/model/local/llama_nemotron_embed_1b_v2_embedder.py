@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -78,8 +82,23 @@ class LlamaNemotronEmbed1BV2Embedder:
                         max_length=max(1, int(self.max_length)),
                         return_tensors="pt",
                     ).to(dev)
-                    out = self._model(**batch)
-                    lhs = out.last_hidden_state  # [B, S, D]
+                    out = self._model(**batch, output_hidden_states=True)
+                    # The bidirectional model returns BaseModelOutputWithPast
+                    # (last_hidden_state), but some transformers versions or
+                    # model revisions return CausalLMOutputWithPast (hidden_states).
+                    lhs = getattr(out, "last_hidden_state", None)
+                    if lhs is None:
+                        # CausalLMOutputWithPast: use the last layer's hidden state.
+                        hs = getattr(out, "hidden_states", None)
+                        if hs is not None:
+                            lhs = hs[-1]
+                        else:
+                            raise AttributeError(
+                                f"Model output ({type(out).__name__}) has neither "
+                                "'last_hidden_state' nor 'hidden_states'. "
+                                "Ensure the model is loaded with trust_remote_code=True."
+                            )
+                    # lhs shape: [B, S, D]
                     mask = batch["attention_mask"].unsqueeze(-1)  # [B, S, 1]
                     vec = (lhs * mask).sum(dim=1) / mask.sum(dim=1)  # [B, D]
                     vec = vec.detach().to("cpu")

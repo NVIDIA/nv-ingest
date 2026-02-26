@@ -1,4 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
+
+# flake8: noqa
 
 import csv
 import json
@@ -122,7 +128,7 @@ def _candidate_image_stems(row: QueryRow) -> List[str]:
     """
     Try to resolve dataset IDs to rendered image stems.
 
-    Primary convention from `slimgest.pdf.convert`:
+    Primary convention from `retriever.utils.convert`:
       <pdf_basename>_page<NNNN>.<ext> where NNNN is 1-based.
 
     The bo767 CSV includes `pdf_page` like "<pdf>_<page1based>".
@@ -653,7 +659,7 @@ def _gather_results_zip(
 
         # Include a small readme to guide recipients.
         readme = (
-            "slimgest stage999 gathered results\n"
+            "retriever stage999 gathered results\n"
             "\n"
             "Contents:\n"
             "- bo767_query_gt.csv: original query->pdf_page mapping\n"
@@ -919,7 +925,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
         )
         raise typer.Exit(1)
 
-    app_fastapi = FastAPI(title="Slimgest Stage999 Post-Mortem Analysis")
+    app_fastapi = FastAPI(title="Retriever Stage999 Post-Mortem Analysis")
 
     # Helper to get summary data for a specific index
     def _get_example_data(idx: int) -> Dict[str, Any]:
@@ -984,7 +990,7 @@ def _run_web_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slimgest Stage999 Post-Mortem Analysis</title>
+    <title>Retriever Stage999 Post-Mortem Analysis</title>
     <style>
         * {
             margin: 0;
@@ -1691,7 +1697,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
     summary_cache: Dict[int, Dict[str, Any]] = {}
 
     root = tk.Tk()
-    root.title("slimgest stage999 post-mortem analysis")
+    root.title("retriever stage999 post-mortem analysis")
 
     # Layout: left search+list, right detail panel.
     root.columnconfigure(0, weight=0)

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Page element detection stage (Nemotron Page Elements v3).
 
@@ -12,4 +16,3 @@ __all__ = [
     "detect_page_elements_v3",
     "PageElementDetectionActor",
 ]
-

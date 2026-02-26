@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Local pipeline stage: table extraction wrapper.
 
@@ -14,16 +18,13 @@ from typing import Optional
 import typer
 
 from retriever.table import stage as table_stage
+from retriever.io.stage_files import build_stage_output_path, find_stage_inputs
 
 app = typer.Typer(help="Stage 3: table extractor (wrapper around `retriever.table.stage`).")
 
 
 def _iter_pdf_extraction_infographics_json_files(input_dir: Path) -> list[Path]:
-    # Match both:
-    # - `pdf_extraction.infographics.json` (common when each doc has its own folder)
-    # - `<doc>.pdf_extraction.infographics.json` (common when all outputs live in one folder)
-    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.infographic.json")]
-    return sorted(files)
+    return find_stage_inputs(input_dir, suffix="pdf_extraction.infographic.json")
 
 
 def _run_one(
@@ -132,7 +133,7 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for p in files:
-        out = out_dir / (p.stem + ".table" + p.suffix) if output_dir is not None else None
+        out = build_stage_output_path(p, stage_suffix=".table", output_dir=out_dir) if output_dir is not None else None
         _run_one(
             input_path=p,
             output_path=out,

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import argparse
@@ -17,9 +21,7 @@ from pathlib import Path
 from typing import Any
 
 
-DONE_RE = re.compile(
-    r"\[done\]\s+(?P<files>\d+)\s+files,\s+(?P<pages>\d+)\s+pages\s+in\s+(?P<secs>[0-9.]+)s"
-)
+DONE_RE = re.compile(r"\[done\]\s+(?P<files>\d+)\s+files,\s+(?P<pages>\d+)\s+pages\s+in\s+(?P<secs>[0-9.]+)s")
 RECALL_LINE_RE = re.compile(r"^\s{2}(?P<key>[^:]+):\s*(?P<val>-?\d+(?:\.\d+)?)\s*$", re.MULTILINE)
 
 
@@ -217,23 +219,23 @@ def build_default_variants() -> list[Variant]:
             return
         seen.add(k)
         v = Variant(
-                run_id=f"V{len(variants) + 1:05d}",
-                pdf_workers=int(cfg["pdf_workers"]),
-                pdf_num_cpus=float(cfg["pdf_num_cpus"]),
-                pdf_split_bs=int(cfg["pdf_split_bs"]),
-                pdf_bs=int(cfg["pdf_bs"]),
-                page_elements_bs=int(cfg["page_elements_bs"]),
-                page_elements_workers=int(cfg["page_elements_workers"]),
-                ocr_workers=int(cfg["ocr_workers"]),
-                ocr_bs=int(cfg["ocr_bs"]),
-                embed_workers=int(cfg["embed_workers"]),
-                embed_bs=int(cfg["embed_bs"]),
-                page_elements_cpus_per_actor=float(cfg["page_elements_cpus_per_actor"]),
-                ocr_cpus_per_actor=float(cfg["ocr_cpus_per_actor"]),
-                embed_cpus_per_actor=float(cfg["embed_cpus_per_actor"]),
-                gpu_page_elements=float(cfg["gpu_page_elements"]),
-                gpu_ocr=float(cfg["gpu_ocr"]),
-                gpu_embed=float(cfg["gpu_embed"]),
+            run_id=f"V{len(variants) + 1:05d}",
+            pdf_workers=int(cfg["pdf_workers"]),
+            pdf_num_cpus=float(cfg["pdf_num_cpus"]),
+            pdf_split_bs=int(cfg["pdf_split_bs"]),
+            pdf_bs=int(cfg["pdf_bs"]),
+            page_elements_bs=int(cfg["page_elements_bs"]),
+            page_elements_workers=int(cfg["page_elements_workers"]),
+            ocr_workers=int(cfg["ocr_workers"]),
+            ocr_bs=int(cfg["ocr_bs"]),
+            embed_workers=int(cfg["embed_workers"]),
+            embed_bs=int(cfg["embed_bs"]),
+            page_elements_cpus_per_actor=float(cfg["page_elements_cpus_per_actor"]),
+            ocr_cpus_per_actor=float(cfg["ocr_cpus_per_actor"]),
+            embed_cpus_per_actor=float(cfg["embed_cpus_per_actor"]),
+            gpu_page_elements=float(cfg["gpu_page_elements"]),
+            gpu_ocr=float(cfg["gpu_ocr"]),
+            gpu_embed=float(cfg["gpu_embed"]),
         )
         if _is_valid_variant(v):
             variants.append(v)
@@ -615,9 +617,7 @@ def main() -> int:
         return 2
 
     # Preserve original matrix row numbers for distributed sharding visibility.
-    selected: list[tuple[int, Variant]] = [
-        (idx, variants[idx - 1]) for idx in range(row_start, row_end + 1)
-    ]
+    selected: list[tuple[int, Variant]] = [(idx, variants[idx - 1]) for idx in range(row_start, row_end + 1)]
 
     print(f"Loaded matrix rows: {total_rows}")
     print(f"Running row range: [{row_start}, {row_end}] ({len(selected)} rows)")
@@ -925,7 +925,9 @@ def main() -> int:
             if k.startswith("recall_") and k not in {"recall_recall_1", "recall_recall_5", "recall_recall_10"}
         }
     )
-    common_recall_fields = [k for k in ["recall_recall_1", "recall_recall_5", "recall_recall_10"] if any(k in r for r in rows)]
+    common_recall_fields = [
+        k for k in ["recall_recall_1", "recall_recall_5", "recall_recall_10"] if any(k in r for r in rows)
+    ]
     fieldnames = base_fieldnames + common_recall_fields + recall_fieldnames
     with output_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

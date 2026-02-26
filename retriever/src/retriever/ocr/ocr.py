@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 """
@@ -17,6 +21,7 @@ import traceback
 
 import numpy as np
 import pandas as pd
+from retriever.params import RemoteRetryParams
 from retriever.nim.nim import invoke_image_inference_batches
 
 try:
@@ -193,6 +198,10 @@ def _np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
 
 def _extract_remote_ocr_item(response_item: Any) -> Any:
     if isinstance(response_item, dict):
+        # NIM text_detections format: return full list (not v[0])
+        td = response_item.get("text_detections")
+        if isinstance(td, list) and td:
+            return td
         for k in ("prediction", "predictions", "output", "outputs", "data"):
             v = response_item.get(k)
             if isinstance(v, list) and v:
@@ -244,6 +253,26 @@ def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
                     blocks.append({"text": item.strip(), "sort_y": 0.0, "sort_x": 0.0})
                 continue
             if not isinstance(item, dict):
+                continue
+
+            # NIM text_detections format:
+            # {"text_prediction": {"text": "...", "confidence": ...},
+            #  "bounding_box": {"points": [{"x": ..., "y": ...}, ...]}}
+            tp = item.get("text_prediction")
+            if isinstance(tp, dict):
+                txt0 = str(tp.get("text") or "").strip()
+                if txt0 and txt0 != "nan":
+                    sort_y, sort_x = 0.0, 0.0
+                    bb = item.get("bounding_box")
+                    if isinstance(bb, dict):
+                        pts = bb.get("points")
+                        if isinstance(pts, list) and pts:
+                            try:
+                                sort_x = float(pts[0].get("x", 0.0))
+                                sort_y = float(pts[0].get("y", 0.0))
+                            except Exception:
+                                pass
+                    blocks.append({"text": txt0, "sort_y": sort_y, "sort_x": sort_x})
                 continue
 
             # Nemotron OCR normalized-coord form
@@ -347,8 +376,14 @@ def ocr_page_elements(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron OCR v1 on cropped regions detected by PageElements v3.
 
@@ -441,14 +476,12 @@ def ocr_page_elements(
                         api_key=api_key,
                         timeout_s=float(request_timeout_s),
                         max_batch_size=int(kwargs.get("inference_batch_size", 8)),
-                        max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                        max_retries=int(kwargs.get("remote_max_retries", 10)),
-                        max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                        max_pool_workers=int(retry.remote_max_pool_workers),
+                        max_retries=int(retry.remote_max_retries),
+                        max_429_retries=int(retry.remote_max_429_retries),
                     )
                     if len(response_items) != len(crop_meta):
-                        raise RuntimeError(
-                            f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}"
-                        )
+                        raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")
 
                     for i, (label_name, bbox) in enumerate(crop_meta):
                         preds = _extract_remote_ocr_item(response_items[i])
@@ -493,6 +526,7 @@ def ocr_page_elements(
                         infographic_items.append(entry)
 
         except BaseException as e:
+            print(f"Warning: OCR failed: {type(e).__name__}: {e}")
             row_error = {
                 "stage": "ocr_page_elements",
                 "type": e.__class__.__name__,
@@ -550,6 +584,7 @@ class OCRActor:
         "_invoke_url",
         "_api_key",
         "_request_timeout_s",
+        "_remote_retry",
     )
 
     def __init__(
@@ -562,22 +597,23 @@ class OCRActor:
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
+        remote_max_pool_workers: int = 16,
+        remote_max_retries: int = 10,
+        remote_max_429_retries: int = 5,
     ) -> None:
-        # model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-        # if not model_dir:
-        #     raise RuntimeError(
-        #         "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-        #         "the path of the Nemotron OCR v1 model directory."
-        #     )
         self._invoke_url = (ocr_invoke_url or invoke_url or "").strip()
         self._api_key = api_key
         self._request_timeout_s = float(request_timeout_s)
+        self._remote_retry = RemoteRetryParams(
+            remote_max_pool_workers=int(remote_max_pool_workers),
+            remote_max_retries=int(remote_max_retries),
+            remote_max_429_retries=int(remote_max_429_retries),
+        )
         if self._invoke_url:
             self._model = None
         else:
             from retriever.model.local import NemotronOCRV1
 
-            #self._model = NemotronOCRV1(model_dir=model_dir)
             self._model = NemotronOCRV1()
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)
@@ -594,6 +630,7 @@ class OCRActor:
                 extract_tables=self._extract_tables,
                 extract_charts=self._extract_charts,
                 extract_infographics=self._extract_infographics,
+                remote_retry=self._remote_retry,
                 **override_kwargs,
             )
         except BaseException as e:

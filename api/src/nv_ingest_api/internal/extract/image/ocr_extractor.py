@@ -15,7 +15,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
 from nv_ingest_api.internal.schemas.extract.extract_ocr_schema import OCRExtractorSchema
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
@@ -257,6 +257,11 @@ def _process_page_elements(df_to_process: pd.DataFrame, ocr_results: List[Tuple]
         return df_to_process
 
     for result_idx, df_idx in enumerate(valid_indices):
+        # Preserve the original base64 image before overwriting with OCR text.
+        # This enables text_image modality for multimodal embeddings.
+        original_image = df_to_process.loc[df_idx, "metadata"]["content"]
+        df_to_process.loc[df_idx, "metadata"]["text_metadata"]["source_image"] = original_image
+
         # Unpack result: (bounding_boxes, text_predictions, confidence_scores)
         bboxes, texts, _ = ocr_results[result_idx]
         if not bboxes or not texts:
@@ -356,7 +361,7 @@ def extract_text_data_from_image_internal(
     endpoint_config = extraction_config.endpoint_config
 
     # Get the grpc endpoint to determine the model if needed
-    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]  # noqa: F841
     # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
     ocr_model_name = "scene_text_ensemble"
 

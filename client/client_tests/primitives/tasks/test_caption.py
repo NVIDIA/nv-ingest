@@ -113,6 +113,110 @@ def test_caption_task_to_dict_empty_fields():
     assert task_dict == {"type": "caption", "task_properties": {}}
 
 
+def test_caption_task_temperature_init():
+    """Test initializing CaptionTask with temperature."""
+    task = CaptionTask(temperature=0.7)
+    assert task._temperature == 0.7
+
+
+def test_caption_task_temperature_default():
+    """Test that temperature defaults to None."""
+    task = CaptionTask()
+    assert task._temperature is None
+
+
+def test_caption_task_temperature_to_dict():
+    """Test to_dict includes temperature when set."""
+    task = CaptionTask(temperature=0.5)
+    task_dict = task.to_dict()
+    assert task_dict["task_properties"]["temperature"] == 0.5
+
+
+def test_caption_task_temperature_to_dict_unset():
+    """Test to_dict excludes temperature when not set."""
+    task = CaptionTask()
+    task_dict = task.to_dict()
+    assert "temperature" not in task_dict["task_properties"]
+
+
+def test_caption_task_temperature_str():
+    """Test __str__ includes temperature when set."""
+    task = CaptionTask(temperature=0.3)
+    task_str = str(task)
+    assert "temperature: 0.3" in task_str
+
+
+def test_caption_task_temperature_str_unset():
+    """Test __str__ omits temperature when not set."""
+    task = CaptionTask()
+    task_str = str(task)
+    assert "temperature" not in task_str
+
+
+def test_caption_task_context_text_max_chars_init():
+    """Test initializing CaptionTask with context_text_max_chars."""
+    task = CaptionTask(context_text_max_chars=512)
+    assert task._context_text_max_chars == 512
+
+
+def test_caption_task_context_text_max_chars_default():
+    """Test that context_text_max_chars defaults to None."""
+    task = CaptionTask()
+    assert task._context_text_max_chars is None
+
+
+def test_caption_task_context_text_max_chars_to_dict():
+    """Test to_dict includes context_text_max_chars when set."""
+    task = CaptionTask(context_text_max_chars=256)
+    task_dict = task.to_dict()
+    assert task_dict["task_properties"]["context_text_max_chars"] == 256
+
+
+def test_caption_task_context_text_max_chars_to_dict_unset():
+    """Test to_dict excludes context_text_max_chars when not set."""
+    task = CaptionTask()
+    task_dict = task.to_dict()
+    assert "context_text_max_chars" not in task_dict["task_properties"]
+
+
+def test_caption_task_context_text_max_chars_str():
+    """Test __str__ includes context_text_max_chars when set."""
+    task = CaptionTask(context_text_max_chars=1024)
+    task_str = str(task)
+    assert "context_text_max_chars: 1024" in task_str
+
+
+def test_caption_task_context_text_max_chars_str_unset():
+    """Test __str__ omits context_text_max_chars when not set."""
+    task = CaptionTask()
+    task_str = str(task)
+    assert "context_text_max_chars" not in task_str
+
+
+def test_caption_task_schema_context_text_max_chars():
+    """Test IngestTaskCaptionSchema accepts context_text_max_chars."""
+    schema = IngestTaskCaptionSchema(context_text_max_chars=100)
+    assert schema.context_text_max_chars == 100
+
+
+def test_caption_task_schema_context_text_max_chars_default():
+    """Test IngestTaskCaptionSchema context_text_max_chars defaults to None."""
+    schema = IngestTaskCaptionSchema()
+    assert schema.context_text_max_chars is None
+
+
+def test_caption_task_schema_temperature():
+    """Test IngestTaskCaptionSchema accepts temperature."""
+    schema = IngestTaskCaptionSchema(temperature=0.5)
+    assert schema.temperature == 0.5
+
+
+def test_caption_task_schema_temperature_default():
+    """Test IngestTaskCaptionSchema temperature defaults to None."""
+    schema = IngestTaskCaptionSchema()
+    assert schema.temperature is None
+
+
 # Execute tests
 if __name__ == "__main__":
     test_caption_task_schema_valid_all_fields()
@@ -127,4 +231,12 @@ if __name__ == "__main__":
     test_caption_task_to_dict_all_fields()
     test_caption_task_to_dict_partial_fields()
     test_caption_task_to_dict_empty_fields()
+    test_caption_task_context_text_max_chars_init()
+    test_caption_task_context_text_max_chars_default()
+    test_caption_task_context_text_max_chars_to_dict()
+    test_caption_task_context_text_max_chars_to_dict_unset()
+    test_caption_task_context_text_max_chars_str()
+    test_caption_task_context_text_max_chars_str_unset()
+    test_caption_task_schema_context_text_max_chars()
+    test_caption_task_schema_context_text_max_chars_default()
     print("All tests passed.")

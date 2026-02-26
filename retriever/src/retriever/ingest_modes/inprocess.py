@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 In-process runmode.
 
@@ -9,20 +13,22 @@ from __future__ import annotations
 
 import glob
 import json
+import multiprocessing
 import os
 import re
+import time
 import uuid
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import BytesIO
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
-from nemotron_page_elements_v3.model import define_model
 
 import pandas as pd
-from retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
-from retriever.model.local import NemotronGraphicElementsV1, NemotronOCRV1, NemotronPageElementsV3
+from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
 from retriever.ocr.ocr import ocr_page_elements
@@ -33,13 +39,34 @@ try:
 except Exception:  # pragma: no cover
     tqdm = None  # type: ignore[assignment]
 
-from ..convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
+try:
+    import pypdfium2 as pdfium
+except Exception as e:  # pragma: no cover
+    pdfium = None  # type: ignore[assignment]
+    _PDFIUM_IMPORT_ERROR = e
+
+from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
+from ..params import EmbedParams
+from ..params import ExtractParams
+from ..params import HtmlChunkParams
+from ..params import IngestExecuteParams
+from ..params import TextChunkParams
+from ..params import VdbUploadParams
 from ..pdf.extract import pdf_extraction
 from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
+from ..html import html_file_to_chunks_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
+
+
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return model_cls(**kwargs)
+    if kwargs:
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
 
 
 def _combine_text_with_content(row, text_column, content_columns):
@@ -182,14 +209,23 @@ def embed_text_main_text_embed(
     if _endpoint is None and model is None:
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
 
+    # Resolve NIM aliases to the actual HF model ID.
+    from retriever.model import resolve_embed_model
+
+    _resolved_model_name = resolve_embed_model(model_name)
+
     # Build an embedder callable compatible with `create_text_embeddings_for_df`.
     # Only used when running with a local model (no NIM endpoint).
     _embed = None
     if _endpoint is None and model is not None:
 
-        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
-            prefixed = [f"passage: {t}" for t in texts]
-            vecs = model.embed(prefixed, batch_size=int(inference_batch_size))
+        # VL model handles formatting internally via encode_documents();
+        # embedqa needs an explicit "passage: " prefix.
+        _skip_prefix = hasattr(model, "embed_queries")
+
+        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:  # noqa: F811
+            batch = texts if _skip_prefix else [f"passage: {t}" for t in texts]
+            vecs = model.embed(batch, batch_size=int(inference_batch_size))
             tolist = getattr(vecs, "tolist", None)
             if callable(tolist):
                 return tolist()
@@ -208,7 +244,7 @@ def embed_text_main_text_embed(
         truncate="END",
         dimensions=None,
         embedding_nim_endpoint=_endpoint or "http://localhost:8012/v1",
-        embedding_model=model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model=_resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
     )
 
     # Rows should already be exploded (one row per page text / table / chart)
@@ -227,6 +263,10 @@ def embed_text_main_text_embed(
         )
     except BaseException as e:
         # Fail-soft: preserve batch shape and set an error payload per-row.
+        import traceback as _tb
+
+        print(f"Warning: embedding failed: {type(e).__name__}: {e}")
+        _tb.print_exc()
         err_payload = {"embedding": None, "error": {"stage": "embed", "type": e.__class__.__name__, "message": str(e)}}
         out_df = batch_df.copy()
         if output_column:
@@ -318,6 +358,52 @@ def _safe_stem(name: str) -> str:
     # Keep it filesystem-friendly.
     s = re.sub(r"[^A-Za-z0-9._-]+", "_", s)
     return s[:160] if len(s) > 160 else s
+
+
+def pages_df_from_pdf_bytes(pdf_bytes: Union[bytes, bytearray], source_path: str) -> pd.DataFrame:
+    """
+    Build a per-page DataFrame from raw PDF bytes (same schema as pdf_path_to_pages_df).
+
+    Used by the online ingest mode to run the same pipeline on document bytes
+    received via REST. Columns: bytes, path, page_number.
+    """
+    pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+    out_rows = [{"bytes": b, "path": source_path, "page_number": i + 1} for i, b in enumerate(pages)]
+    return pd.DataFrame(out_rows)
+
+
+def run_pipeline_tasks_on_df(
+    initial_df: pd.DataFrame,
+    per_doc_tasks: Sequence[Tuple[Callable[..., Any], Dict[str, Any]]],
+    post_tasks: Optional[Sequence[Tuple[Callable[..., Any], Dict[str, Any]]]] = None,
+) -> Tuple[Any, List[Dict[str, Any]]]:
+    """
+    Run the inprocess pipeline task chain on a single document DataFrame.
+
+    Returns (final_result, metrics) where metrics is a list of
+    {"stage": str, "duration_sec": float} for each stage. Used by both
+    InProcessIngestor.ingest() and the online Ray Serve deployment.
+    """
+    import time
+
+    metrics: List[Dict[str, Any]] = []
+    current: Any = initial_df
+    for func, kwargs in per_doc_tasks:
+        t0 = time.perf_counter()
+        if func is pdf_extraction:
+            current = func(pdf_binary=current, **kwargs)
+        else:
+            current = func(current, **kwargs)
+        metrics.append({"stage": getattr(func, "__name__", "unknown"), "duration_sec": time.perf_counter() - t0})
+
+    if post_tasks and current is not None:
+        combined = current if isinstance(current, pd.DataFrame) else pd.concat(current, ignore_index=True)
+        for func, kwargs in post_tasks:
+            t0 = time.perf_counter()
+            combined = func(combined, **kwargs)
+            metrics.append({"stage": getattr(func, "__name__", "unknown"), "duration_sec": time.perf_counter() - t0})
+        return combined, metrics
+    return current, metrics
 
 
 def save_dataframe_to_disk_json(df: Any, *, output_directory: str) -> Any:
@@ -441,6 +527,9 @@ def upload_embeddings_to_lancedb_inprocess(
     embedding_key: str = "embedding",
     include_text: bool = True,
     text_column: str = "text",
+    hybrid: bool = False,
+    fts_language: str = "English",
+    **_ignored: Any,
 ) -> Any:
     """
     Pipeline task: upload embeddings from a pandas DataFrame into LanceDB.
@@ -462,6 +551,8 @@ def upload_embeddings_to_lancedb_inprocess(
     - **embedding_key**: key inside payload dict to read embedding list from
     - **include_text**: if True, store `text_column` content alongside the vector
     - **text_column**: column to read text from when `include_text=True`
+    - **hybrid**: if True, additionally build an FTS index on `text`
+    - **fts_language**: language passed to LanceDB FTS index creation
 
     Returns the input DataFrame unchanged (so it can remain in the pipeline).
     """
@@ -486,6 +577,23 @@ def upload_embeddings_to_lancedb_inprocess(
         metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
         if pdf_page:
             metadata_obj["pdf_page"] = pdf_page
+        # Persist per-page detection counters for end-of-run summaries.
+        # Mirrors batch.py so LanceDB-based summary reads also work.
+        pe_num = getattr(r, "page_elements_v3_num_detections", None)
+        if pe_num is not None:
+            try:
+                metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
+            except Exception:
+                pass
+        pe_counts = getattr(r, "page_elements_v3_counts_by_label", None)
+        if isinstance(pe_counts, dict):
+            metadata_obj["page_elements_v3_counts_by_label"] = {
+                str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
+            }
+        for ocr_col in ("table", "chart", "infographic"):
+            entries = getattr(r, ocr_col, None)
+            if isinstance(entries, list):
+                metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
         source_obj: Dict[str, Any] = {"source_id": str(path)}
 
         row_out: Dict[str, Any] = {
@@ -582,15 +690,309 @@ def upload_embeddings_to_lancedb_inprocess(
                 # Don't fail ingestion due to index training; users can rebuild later with more data.
                 print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
 
+    if hybrid:
+        # Build text index for hybrid retrieval when text is present.
+        try:
+            table.create_fts_index("text", language=str(fts_language))
+        except Exception as e:
+            # Keep ingestion resilient: vector data was already written.
+            print(f"Warning: failed to create LanceDB FTS index (continuing without FTS): {e}")
+
     print(f"Wrote {len(rows)} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
     return df
+
+
+def pdf_to_pages_df(path: str) -> pd.DataFrame:
+    """
+    Convert a document at *path* into a DataFrame where each row
+    contains a *single-page* PDF's raw bytes.
+
+    For ``.docx`` / ``.pptx`` files the document is first converted
+    to PDF via LibreOffice, then split into pages.  The original
+    *path* is preserved so downstream metadata tracks the source file.
+
+    Columns:
+    - bytes: single-page PDF bytes
+    - path: original input path
+    - page_number: 1-indexed page number
+    """
+    if pdfium is None:  # pragma: no cover
+        raise ImportError("pypdfium2 is required for inprocess ingestion.") from _PDFIUM_IMPORT_ERROR
+
+    abs_path = os.path.abspath(path)
+    ext = os.path.splitext(abs_path)[1].lower()
+    out_rows: list[dict[str, Any]] = []
+    doc = None
+    try:
+        if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+            # Convert DOCX/PPTX to PDF bytes first.
+            with open(abs_path, "rb") as f:
+                file_bytes = f.read()
+            pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
+            doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
+        else:
+            doc = pdfium.PdfDocument(abs_path)
+
+        for page_idx in range(len(doc)):
+            single = pdfium.PdfDocument.new()
+            try:
+                single.import_pages(doc, pages=[page_idx])
+                buf = BytesIO()
+                single.save(buf)
+                out_rows.append(
+                    {
+                        "bytes": buf.getvalue(),
+                        "path": abs_path,
+                        "page_number": page_idx + 1,
+                    }
+                )
+            finally:
+                try:
+                    single.close()
+                except Exception:
+                    pass
+    except BaseException as e:
+        # Preserve shape expected downstream (pdf_extraction emits error
+        # records per-row, so we return a single row to trigger that).
+        out_rows.append({"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)})
+    finally:
+        try:
+            if doc is not None:
+                doc.close()
+        except Exception:
+            pass
+
+    return pd.DataFrame(out_rows)
+
+
+def _iter_page_chunks(path: str, chunk_size: int = 32) -> Iterator[pd.DataFrame]:
+    """Yield DataFrames of *chunk_size* pages from a document.
+
+    Reuses the same pdfium page-splitting logic as :func:`pdf_to_pages_df`
+    but yields incrementally so that downstream work can begin before the
+    entire document is split.  At most *chunk_size* single-page PDF blobs
+    are in memory per yield.
+
+    Handles DOCX/PPTX conversion (same as ``pdf_to_pages_df``).
+    """
+    if pdfium is None:  # pragma: no cover
+        raise ImportError("pypdfium2 is required for inprocess ingestion.") from _PDFIUM_IMPORT_ERROR
+
+    abs_path = os.path.abspath(path)
+    ext = os.path.splitext(abs_path)[1].lower()
+    doc = None
+    try:
+        if ext in SUPPORTED_EXTENSIONS and ext != ".pdf":
+            with open(abs_path, "rb") as f:
+                pdf_bytes = convert_to_pdf_bytes(f.read(), ext)
+            doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
+        else:
+            doc = pdfium.PdfDocument(abs_path)
+
+        chunk: list[dict] = []
+        for page_idx in range(len(doc)):
+            single = pdfium.PdfDocument.new()
+            try:
+                single.import_pages(doc, pages=[page_idx])
+                buf = BytesIO()
+                single.save(buf)
+                chunk.append({"bytes": buf.getvalue(), "path": abs_path, "page_number": page_idx + 1})
+            finally:
+                try:
+                    single.close()
+                except Exception:
+                    pass
+            if len(chunk) >= chunk_size:
+                yield pd.DataFrame(chunk)
+                chunk = []
+        if chunk:
+            yield pd.DataFrame(chunk)
+    except BaseException as e:
+        yield pd.DataFrame([{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}])
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception:
+                pass
+
+
+def _process_doc_cpu(doc_path: str, cpu_tasks: list) -> pd.DataFrame:
+    """Worker function for ProcessPoolExecutor.
+
+    Runs ``pdf_to_pages_df`` followed by all CPU-bound pipeline tasks on a
+    single document.  All arguments are picklable (strings, module-level
+    functions, and dicts of simple types).
+    """
+    try:
+        current: Any = pdf_to_pages_df(doc_path)
+        for func, kwargs in cpu_tasks:
+            if func is pdf_extraction:
+                current = func(pdf_binary=current, **kwargs)
+            else:
+                current = func(current, **kwargs)
+        return current
+    except Exception as e:
+        # Return a minimal error DataFrame so one failed document does not
+        # halt the pipeline.
+        return pd.DataFrame([{"bytes": b"", "path": doc_path, "page_number": 0, "error": f"{type(e).__name__}: {e}"}])
+
+
+def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
+    """Worker function for ProcessPoolExecutor — page-chunk variant.
+
+    Runs CPU-bound pipeline tasks on a pre-split page-chunk DataFrame.
+    Similar to :func:`_process_doc_cpu` but skips ``pdf_to_pages_df``
+    since the page splitting has already been done by the caller.
+    """
+    try:
+        current: Any = chunk_df
+        for func, kwargs in cpu_tasks:
+            if func is pdf_extraction:
+                current = func(pdf_binary=current, **kwargs)
+            else:
+                current = func(current, **kwargs)
+        return current
+    except Exception as e:
+        return pd.DataFrame([{"bytes": b"", "path": "", "page_number": 0, "error": f"{type(e).__name__}: {e}"}])
+
+
+def _collect_summary_from_df(df: pd.DataFrame) -> dict:
+    """Compute detection summary from a result DataFrame.
+
+    Mirrors the batch pipeline's ``_collect_detection_summary`` but reads
+    directly from the in-memory DataFrame instead of LanceDB.  Rows are
+    deduplicated by ``(path, page_number)`` so exploded content rows don't
+    inflate counts.
+    """
+    per_page: dict[tuple, dict] = {}
+
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+
+        path = str(row_dict.get("path") or row_dict.get("source_id") or "")
+        page_number = -1
+        try:
+            page_number = int(row_dict.get("page_number", -1))
+        except (TypeError, ValueError):
+            pass
+
+        key = (path, page_number)
+
+        meta = row_dict.get("metadata")
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except Exception:
+                meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+
+        entry = per_page.setdefault(
+            key,
+            {
+                "pe": 0,
+                "ocr_table": 0,
+                "ocr_chart": 0,
+                "ocr_infographic": 0,
+                "pe_by_label": defaultdict(int),
+            },
+        )
+
+        # Check metadata first, then fall back to direct DataFrame columns.
+        # The batch pipeline stores these inside the metadata JSON, but the
+        # inprocess pipeline keeps them as top-level DataFrame columns.
+        try:
+            pe = int(
+                meta.get("page_elements_v3_num_detections") or row_dict.get("page_elements_v3_num_detections") or 0
+            )
+        except (TypeError, ValueError):
+            pe = 0
+        entry["pe"] = max(entry["pe"], pe)
+
+        for field, meta_key, col_key in [
+            ("ocr_table", "ocr_table_detections", "table"),
+            ("ocr_chart", "ocr_chart_detections", "chart"),
+            ("ocr_infographic", "ocr_infographic_detections", "infographic"),
+        ]:
+            try:
+                val = int(meta.get(meta_key, 0) or 0)
+            except (TypeError, ValueError):
+                val = 0
+            # Fall back to counting direct list columns (e.g. row["table"]).
+            if val == 0:
+                col_val = row_dict.get(col_key)
+                if isinstance(col_val, list):
+                    val = len(col_val)
+            entry[field] = max(entry[field], val)
+
+        label_counts = meta.get("page_elements_v3_counts_by_label") or row_dict.get("page_elements_v3_counts_by_label")
+        if isinstance(label_counts, dict):
+            for label, count in label_counts.items():
+                try:
+                    c = int(count or 0)
+                except (TypeError, ValueError):
+                    c = 0
+                entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
+
+    pe_by_label_totals: dict[str, int] = defaultdict(int)
+    pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
+    for e in per_page.values():
+        pe_total += e["pe"]
+        ocr_table_total += e["ocr_table"]
+        ocr_chart_total += e["ocr_chart"]
+        ocr_infographic_total += e["ocr_infographic"]
+        for label, count in e["pe_by_label"].items():
+            pe_by_label_totals[label] += count
+
+    return {
+        "pages_seen": len(per_page),
+        "page_elements_v3_total_detections": pe_total,
+        "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
+        "ocr_table_total_detections": ocr_table_total,
+        "ocr_chart_total_detections": ocr_chart_total,
+        "ocr_infographic_total_detections": ocr_infographic_total,
+    }
+
+
+def _print_ingest_summary(results: list, elapsed_s: float) -> None:
+    """Print end-of-ingest summary matching batch pipeline output format."""
+    dfs = [r for r in results if isinstance(r, pd.DataFrame) and not r.empty]
+    if not dfs:
+        print(f"\nIngest time: {elapsed_s:.2f}s (no documents processed)")
+        return
+
+    combined = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
+    summary = _collect_summary_from_df(combined)
+
+    print("\nDetection summary (deduped by source/page_number):")
+    print(f"  Pages seen: {summary['pages_seen']}")
+    print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
+    print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
+    print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
+    print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
+    print("  PageElements v3 counts by label:")
+    by_label = summary.get("page_elements_v3_counts_by_label", {})
+    if not by_label:
+        print("    (none)")
+    else:
+        for label, count in by_label.items():
+            print(f"    {label}: {count}")
+
+    pages = summary["pages_seen"]
+    if elapsed_s > 0 and pages > 0:
+        pps = pages / elapsed_s
+        print(f"Pages processed: {pages}")
+        print(f"Pages/sec: {pps:.2f}")
+    else:
+        print(f"\nIngest time: {elapsed_s:.2f}s")
 
 
 class InProcessIngestor(Ingestor):
     RUN_MODE = "inprocess"
 
-    def __init__(self, documents: Optional[List[str]] = None, **kwargs: Any) -> None:
-        super().__init__(documents=documents, **kwargs)
+    def __init__(self, documents: Optional[List[str]] = None) -> None:
+        super().__init__(documents=documents)
 
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
         # by ensuring both names refer to the same list.
@@ -599,9 +1001,10 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract) or "txt" (extract_txt). Loader dispatch in ingest().
-        self._pipeline_type: Literal["pdf", "txt"] = "pdf"
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), or "html" (extract_html). Loader dispatch in ingest().
+        self._pipeline_type: Literal["pdf", "txt", "html"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
+        self._extract_html_kwargs: Dict[str, Any] = {}
 
     def files(self, documents: Union[str, List[str]]) -> "InProcessIngestor":
         """
@@ -635,7 +1038,7 @@ class InProcessIngestor(Ingestor):
 
         return self
 
-    def extract(self, **kwargs: Any) -> "InProcessIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure extraction for in-process execution (skeleton).
 
@@ -646,9 +1049,9 @@ class InProcessIngestor(Ingestor):
         # NOTE: `kwargs` passed to `.extract()` are intended primarily for PDF extraction
         # (e.g. `extract_text`, `dpi`, etc). Downstream model stages do NOT necessarily
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
-        print(f"Type kwargs: {type(kwargs)}")
-        print(f"kwargs: {kwargs}")
 
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        kwargs = resolved.model_dump(mode="python")
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
@@ -706,11 +1109,13 @@ class InProcessIngestor(Ingestor):
             kwargs.get(k) is True for k in ("extract_text", "extract_tables", "extract_charts", "extract_infographics")
         ):
             print("Adding page elements task")
+            pe_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url", ""))
+            pe_model = None if pe_invoke_url else NemotronPageElementsV3()
             self._tasks.append(
                 (
                     detect_page_elements_v3,
                     _detect_kwargs_with_model(
-                        define_model("page_element_v3"),
+                        pe_model,
                         stage_name="page_elements",
                         allow_remote=True,
                     ),
@@ -729,23 +1134,22 @@ class InProcessIngestor(Ingestor):
 
         if ocr_flags:
             print("Adding OCR extraction task")
-            ocr_model_dir = os.environ.get("NEMOTRON_OCR_MODEL_DIR", "")
-            if not ocr_model_dir:
-                raise RuntimeError(
-                    "NEMOTRON_OCR_MODEL_DIR environment variable must be set to "
-                    "the path of the Nemotron OCR v1 model directory."
+            ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+            if ocr_invoke_url:
+                self._tasks.append((ocr_page_elements, {"model": None, **ocr_flags}))
+            else:
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
                 )
-            self._tasks.append((ocr_page_elements, {"model": NemotronOCRV1(model_dir=ocr_model_dir), **ocr_flags}))
+                model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
 
         return self
 
-    def extract_txt(
-        self,
-        max_tokens: int = 512,
-        overlap_tokens: int = 0,
-        encoding: str = "utf-8",
-        **kwargs: Any,
-    ) -> "InProcessIngestor":
+    def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure txt ingestion: tokenizer-based chunking only (no PDF extraction).
 
@@ -753,20 +1157,28 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_txt().
         """
         self._pipeline_type = "txt"
-        self._extract_txt_kwargs = {
-            "max_tokens": max_tokens,
-            "overlap_tokens": overlap_tokens,
-            "encoding": encoding,
-            **kwargs,
-        }
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._extract_txt_kwargs = resolved.model_dump(mode="python")
         return self
 
-    def embed(self, **kwargs: Any) -> "InProcessIngestor":
+    def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
+        """
+        Configure HTML ingestion: markitdown -> markdown -> tokenizer chunking (no PDF extraction).
+
+        Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_html().
+        """
+        self._pipeline_type = "html"
+        resolved = _coerce_params(params, HtmlChunkParams, kwargs)
+        self._extract_html_kwargs = resolved.model_dump(mode="python")
+        return self
+
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure embedding for in-process execution.
 
         This records an embedding task so call sites can chain `.embed(...)`
-        after `.extract(...)` or `.extract_txt()`.
+        after `.extract(...)`, `.extract_txt()`, or `.extract_html()`.
 
         When ``embedding_endpoint`` (or ``embed_invoke_url``) is provided (e.g.
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
@@ -776,7 +1188,13 @@ class InProcessIngestor(Ingestor):
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
         self._tasks.append((explode_content_to_rows, {}))
 
-        embed_kwargs = dict(kwargs)
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        embed_kwargs = {
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+        }
         if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
             embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
 
@@ -794,20 +1212,30 @@ class InProcessIngestor(Ingestor):
         normalize = bool(embed_kwargs.pop("normalize", True))
         max_length = int(embed_kwargs.pop("max_length", 8192))
 
-        # model_name may be a NIM alias (e.g. "nemo_retriever_v1") or a real HF
-        # repo ID (e.g. "nvidia/llama-3.2-nv-embedqa-1b-v2"). Only forward it as
-        # model_id when it looks like an HF repo (contains "/").
         model_name_raw = embed_kwargs.pop("model_name", None)
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
+
+        from retriever.model import is_vl_embed_model, resolve_embed_model
+
+        model_id = resolve_embed_model(model_name_raw)
 
         embed_kwargs.setdefault("input_type", "passage")
-        embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device is not None else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
-        )
+
+        if is_vl_embed_model(model_name_raw):
+            from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+            embed_kwargs["model"] = LlamaNemotronEmbedVL1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                model_id=model_id,
+            )
+        else:
+            embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                normalize=normalize,
+                max_length=max_length,
+                model_id=model_id,
+            )
         self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self
 
@@ -830,7 +1258,7 @@ class InProcessIngestor(Ingestor):
         self._tasks.append((save_dataframe_to_disk_json, {"output_directory": str(output_directory)}))
         return self
 
-    def vdb_upload(self, purge_results_after_upload: bool = True, **kwargs: Any) -> "InProcessIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Upload the (embedding-enriched) results to a vector DB (LanceDB).
 
@@ -856,27 +1284,277 @@ class InProcessIngestor(Ingestor):
         Notes:
         - `purge_results_after_upload` is accepted for API parity but is not used in inprocess mode.
         """
-        _ = purge_results_after_upload  # parity with interface; inprocess does not purge by default
-        self._tasks.append((upload_embeddings_to_lancedb_inprocess, dict(kwargs)))
+        p = params or VdbUploadParams()
+        if kwargs:
+            lancedb_kwargs = {k: v for k, v in kwargs.items() if k != "purge_results_after_upload"}
+            if lancedb_kwargs:
+                p = p.model_copy(update={"lancedb": p.lancedb.model_copy(update=lancedb_kwargs)})
+            if "purge_results_after_upload" in kwargs:
+                p = p.model_copy(update={"purge_results_after_upload": bool(kwargs["purge_results_after_upload"])})
+        _ = p.purge_results_after_upload  # parity with interface; inprocess does not purge by default
+        self._tasks.append((upload_embeddings_to_lancedb_inprocess, p.lancedb.model_dump(mode="python")))
         return self
 
-    def ingest(
-        self,
-        show_progress: bool = False,
-        return_failures: bool = False,
-        save_to_disk: bool = False,
-        return_traces: bool = False,
-        **_: Any,
-    ) -> list[Any]:
-        # Tasks that run once on combined results (after all docs). All others run per-doc.
-        _post_tasks = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
-        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_tasks]
-        post_tasks = [(f, k) for f, k in self._tasks if f in _post_tasks]
+    # Tasks that run once on combined results (after all docs). All others run per-doc.
+    _POST_TASKS = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
 
-        # Iterate through all configured documents; for each file build a per-page
-        # DataFrame and run the per-doc task chain.
-        results: list[Any] = []
+    def get_pipeline_tasks(
+        self,
+    ) -> Tuple[List[Tuple[Callable[..., Any], Dict[str, Any]]], List[Tuple[Callable[..., Any], Dict[str, Any]]]]:
+        """
+        Return (per_doc_tasks, post_tasks) for use by ingest() or by the online
+        serve deployment to run the same pipeline on a single document.
+        """
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in self._POST_TASKS]
+        post_tasks = [(f, k) for f, k in self._tasks if f in self._POST_TASKS]
+        return per_doc_tasks, post_tasks
+
+    def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> list[Any]:
+        run_params = _coerce_params(params, IngestExecuteParams, kwargs)
+        show_progress = run_params.show_progress
+        _ = (run_params.return_failures, run_params.save_to_disk, run_params.return_traces)
+        parallel = run_params.parallel
+        max_workers = run_params.max_workers
+        gpu_devices = list(run_params.gpu_devices) if run_params.gpu_devices else None
+        page_chunk_size = run_params.page_chunk_size
+
+        _start = time.perf_counter()
+
+        # -- Three-way task classification --------------------------------
+        _post_task_fns = (upload_embeddings_to_lancedb_inprocess, save_dataframe_to_disk_json)
+        _cpu_task_fns = (pdf_extraction,)
+
+        cpu_tasks = [(f, k) for f, k in self._tasks if f in _cpu_task_fns]
+        gpu_tasks = [(f, k) for f, k in self._tasks if f not in _cpu_task_fns and f not in _post_task_fns]
+        post_tasks = [(f, k) for f, k in self._tasks if f in _post_task_fns]
+
         docs = list(self._documents)
+
+        # -- Parallel execution branch ------------------------------------
+        if parallel:
+            if gpu_devices and len(gpu_devices) >= 1 and gpu_tasks:
+                # Pipelined: GPU workers load models while CPU runs,
+                # each completed chunk goes to GPU immediately.
+                from .gpu_pool import GPUWorkerPool, gpu_tasks_to_descriptors
+
+                descriptors = gpu_tasks_to_descriptors(gpu_tasks)
+                errors: list[str] = []
+
+                with GPUWorkerPool(gpu_devices, descriptors) as gpu_pool:
+                    # Split all docs into page chunks (main thread, cheap PDF byte splitting)
+                    chunks: list[pd.DataFrame] = []
+                    chunk_to_doc: list[str] = []
+                    doc_chunk_total: dict[str, int] = defaultdict(int)
+                    for doc in docs:
+                        for chunk_df in _iter_page_chunks(doc, page_chunk_size):
+                            chunk_to_doc.append(doc)
+                            doc_chunk_total[doc] += 1
+                            chunks.append(chunk_df)
+
+                    shard_id = 0
+                    progress = None
+                    if show_progress and tqdm is not None:
+                        progress = tqdm(total=len(docs), desc="Processing files", unit="file")
+
+                    shard_to_doc: dict[int, str] = {}
+                    doc_done: dict[str, int] = defaultdict(int)
+
+                    def _check_file_done(doc_path: str) -> None:
+                        if doc_done[doc_path] >= doc_chunk_total[doc_path]:
+                            if progress is not None:
+                                progress.update(1)
+
+                    with ProcessPoolExecutor(
+                        max_workers=max_workers,
+                        mp_context=multiprocessing.get_context("spawn"),
+                    ) as cpu_pool:
+                        future_to_idx = {
+                            cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i for i, chunk in enumerate(chunks)
+                        }
+
+                        for future in as_completed(future_to_idx):
+                            idx = future_to_idx[future]
+                            doc = chunk_to_doc[idx]
+                            try:
+                                result = future.result()
+                                if isinstance(result, pd.DataFrame) and not result.empty:
+                                    shard_to_doc[shard_id] = doc
+                                    gpu_pool.submit(shard_id, result)
+                                    shard_id += 1
+                                else:
+                                    doc_done[doc] += 1
+                                    _check_file_done(doc)
+                            except Exception as e:
+                                errors.append(f"chunk {idx}: {type(e).__name__}: {e}")
+                                print(f"Warning: failed to process chunk {idx}: {e}")
+                                doc_done[doc] += 1
+                                _check_file_done(doc)
+
+                    if errors:
+                        print(f"Warning: {len(errors)} chunk(s) failed CPU extraction")
+
+                    # All CPU done, collect remaining GPU results
+                    def _on_gpu_done(sid: int) -> None:
+                        d = shard_to_doc.get(sid, "")
+                        if d:
+                            doc_done[d] += 1
+                            _check_file_done(d)
+
+                    combined = gpu_pool.collect_all(on_shard_done=_on_gpu_done)
+
+                    if progress is not None:
+                        progress.close()
+
+                if combined.empty:
+                    results: list = []
+                    if show_progress:
+                        _print_ingest_summary(results, time.perf_counter() - _start)
+                    return results
+
+                for func, kwargs in post_tasks:
+                    combined = func(combined, **kwargs)
+
+                results = [combined]
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+            else:
+                # Single-GPU or no-GPU path: CPU parallel on chunks, then sequential GPU
+                chunks: list[pd.DataFrame] = []
+                chunk_to_doc: list[str] = []
+                doc_chunk_total: dict[str, int] = defaultdict(int)
+                for doc in docs:
+                    for chunk_df in _iter_page_chunks(doc, page_chunk_size):
+                        chunk_to_doc.append(doc)
+                        doc_chunk_total[doc] += 1
+                        chunks.append(chunk_df)
+
+                cpu_results: list[pd.DataFrame] = []
+                errors: list[str] = []
+
+                progress = None
+                if show_progress and tqdm is not None:
+                    progress = tqdm(total=len(docs), desc="Processing files", unit="file")
+
+                doc_done: dict[str, int] = defaultdict(int)
+
+                with ProcessPoolExecutor(
+                    max_workers=max_workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                ) as pool:
+                    future_to_idx = {pool.submit(_process_chunk_cpu, c, cpu_tasks): i for i, c in enumerate(chunks)}
+
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        doc = chunk_to_doc[idx]
+                        try:
+                            result = future.result()
+                            if isinstance(result, pd.DataFrame) and not result.empty:
+                                cpu_results.append(result)
+                        except Exception as e:
+                            errors.append(f"chunk {idx}: {type(e).__name__}: {e}")
+                            print(f"Warning: failed to process chunk {idx}: {e}")
+                        doc_done[doc] += 1
+                        if doc_done[doc] >= doc_chunk_total[doc] and progress is not None:
+                            progress.update(1)
+
+                if progress is not None:
+                    progress.close()
+
+                if errors:
+                    print(f"Warning: {len(errors)} chunk(s) failed CPU extraction")
+
+                if not cpu_results:
+                    results = []
+                    if show_progress:
+                        _print_ingest_summary(results, time.perf_counter() - _start)
+                    return results
+
+                combined = pd.concat(cpu_results, ignore_index=True)
+                for func, kwargs in gpu_tasks:
+                    combined = func(combined, **kwargs)
+
+                for func, kwargs in post_tasks:
+                    combined = func(combined, **kwargs)
+
+                results = [combined]
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+        # -- Sequential execution branch (default) ------------------------
+        use_multi_gpu_seq = gpu_devices and len(gpu_devices) >= 1 and gpu_tasks
+
+        if use_multi_gpu_seq:
+            # Pipelined: GPU workers process earlier chunks while CPU
+            # extracts later chunks of the same (or next) document.
+            cpu_and_extract = [(f, k) for f, k in self._tasks if f in _cpu_task_fns]
+
+            from .gpu_pool import GPUWorkerPool, gpu_tasks_to_descriptors
+
+            descriptors = gpu_tasks_to_descriptors(gpu_tasks)
+
+            with GPUWorkerPool(gpu_devices, descriptors) as gpu_pool:
+                shard_id = 0
+                shard_to_doc: dict[int, str] = {}
+                doc_chunk_total: dict[str, int] = defaultdict(int)
+                doc_done: dict[str, int] = defaultdict(int)
+
+                for doc_path in docs:
+                    for chunk_df in _iter_page_chunks(doc_path, page_chunk_size):
+                        doc_chunk_total[doc_path] += 1
+                        current: Any = chunk_df
+                        for func, kwargs in cpu_and_extract:
+                            if func is pdf_extraction:
+                                current = func(pdf_binary=current, **kwargs)
+                            else:
+                                current = func(current, **kwargs)
+                        if isinstance(current, pd.DataFrame) and not current.empty:
+                            shard_to_doc[shard_id] = doc_path
+                            gpu_pool.submit(shard_id, current)
+                            shard_id += 1
+                        else:
+                            doc_done[doc_path] += 1
+
+                progress = None
+                if show_progress and tqdm is not None:
+                    # Docs whose chunks all failed CPU are already done
+                    already_done = sum(
+                        1 for d in docs if d not in doc_chunk_total or doc_done.get(d, 0) >= doc_chunk_total[d]
+                    )
+                    progress = tqdm(total=len(docs), desc="Processing files", unit="file", initial=already_done)
+
+                def _on_gpu_done(sid: int) -> None:
+                    d = shard_to_doc.get(sid, "")
+                    if d:
+                        doc_done[d] += 1
+                        if doc_done[d] >= doc_chunk_total[d] and progress is not None:
+                            progress.update(1)
+
+                combined = gpu_pool.collect_all(on_shard_done=_on_gpu_done)
+
+                if progress is not None:
+                    progress.close()
+
+            if combined.empty:
+                results = []
+                if show_progress:
+                    _print_ingest_summary(results, time.perf_counter() - _start)
+                return results
+
+            for func, kwargs in post_tasks:
+                combined = func(combined, **kwargs)
+
+            results = [combined]
+            if show_progress:
+                _print_ingest_summary(results, time.perf_counter() - _start)
+            return results
+
+        # Fully sequential: per-document CPU + GPU + post tasks
+        per_doc_tasks = [(f, k) for f, k in self._tasks if f not in _post_task_fns]
+
+        results: list[Any] = []
         doc_iter = docs
         if show_progress and tqdm is not None:
             doc_iter = tqdm(docs, desc="Processing documents", unit="doc")
@@ -896,30 +1574,25 @@ class InProcessIngestor(Ingestor):
                             file_bytes = f.read()
                         pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
                         pages = _split_pdf_to_single_page_bytes(pdf_bytes)
-                        out_rows = [
-                            {"bytes": b, "path": abs_path, "page_number": i + 1}
-                            for i, b in enumerate(pages)
-                        ]
+                        out_rows = [{"bytes": b, "path": abs_path, "page_number": i + 1} for i, b in enumerate(pages)]
                         return pd.DataFrame(out_rows)
                     except BaseException as e:
-                        return pd.DataFrame(
-                            [{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}]
-                        )
+                        return pd.DataFrame([{"bytes": b"", "path": abs_path, "page_number": 0, "error": str(e)}])
                 return pdf_path_to_pages_df(p)
 
-        else:
+        elif self._pipeline_type == "html":
+
             def _loader(p: str) -> pd.DataFrame:
-                return txt_file_to_chunks_df(p, **self._extract_txt_kwargs)
+                return html_file_to_chunks_df(p, params=HtmlChunkParams(**self._extract_html_kwargs))
+
+        else:
+
+            def _loader(p: str) -> pd.DataFrame:
+                return txt_file_to_chunks_df(p, params=TextChunkParams(**self._extract_txt_kwargs))
 
         for doc_path in doc_iter:
             initial_df = _loader(doc_path)
-
-            current: Any = initial_df
-            for func, kwargs in per_doc_tasks:
-                if func is pdf_extraction:
-                    current = func(pdf_binary=current, **kwargs)
-                else:
-                    current = func(current, **kwargs)
+            current, _ = run_pipeline_tasks_on_df(initial_df, per_doc_tasks, None)
             results.append(current)
 
         # Run upload/save once on combined results so overwrite=True keeps full corpus.
@@ -928,5 +1601,6 @@ class InProcessIngestor(Ingestor):
             for func, kwargs in post_tasks:
                 combined = func(combined, **kwargs)
 
-        _ = (show_progress, return_failures, save_to_disk, return_traces)  # reserved for future use
+        if show_progress:
+            _print_ingest_summary(results, time.perf_counter() - _start)
         return results

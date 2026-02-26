@@ -1,4 +1,8 @@
-from typing import Any, Dict, List, Sequence, Tuple, Union, cast
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 
 from torch import nn
 import torch
@@ -130,7 +134,7 @@ class NemotronPageElementsV3(HuggingFaceModel):
         def _one(p: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             b_np, l_np, s_np = postprocess_preds_page_element(p, self._model.thresholds_per_class, self._model.labels)
             b = torch.as_tensor(b_np, dtype=torch.float32)
-            l = torch.as_tensor(l_np, dtype=torch.int64)
+            l = torch.as_tensor(l_np, dtype=torch.int64)  # noqa: E741
             s = torch.as_tensor(s_np, dtype=torch.float32)
             return b, l, s
 

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Local pipeline stage: infographic extraction wrapper.
 
@@ -19,16 +23,13 @@ from typing import Optional
 import typer
 
 from retriever.infographic import stage as infographic_stage
+from retriever.io.stage_files import build_stage_output_path, find_stage_inputs
 
 app = typer.Typer(help="Stage 2: infographic extractor (wrapper around `retriever.infographic.stage`).")
 
 
 def _iter_pdf_extraction_json_files(input_dir: Path) -> list[Path]:
-    # Match both:
-    # - `pdf_extraction.json` (common when each doc has its own folder)
-    # - `<doc>.pdf_extraction.json` (common when all outputs live in one folder)
-    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.json")]
-    return sorted(files)
+    return find_stage_inputs(input_dir, suffix="pdf_extraction.json")
 
 
 @app.command()
@@ -92,8 +93,7 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for p in files:
-        # Mirror `retriever.infographic.stage.run` default output naming, but place into out_dir.
-        out = out_dir / (p.stem + ".infographic" + p.suffix)
+        out = build_stage_output_path(p, stage_suffix=".infographic", output_dir=out_dir)
         infographic_stage.run(input_path=p, output_path=out, config=config)
 
 
@@ -103,4 +103,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

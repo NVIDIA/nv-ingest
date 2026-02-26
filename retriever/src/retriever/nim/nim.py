@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import time
@@ -47,9 +51,7 @@ def _normalize_batch_response(response_json: Any, expected_count: int) -> List[A
         out.append(item)
 
     if len(out) != int(expected_count):
-        raise RuntimeError(
-            f"Remote response count mismatch: expected {expected_count}, got {len(out)}"
-        )
+        raise RuntimeError(f"Remote response count mismatch: expected {expected_count}, got {len(out)}")
     return out
 
 

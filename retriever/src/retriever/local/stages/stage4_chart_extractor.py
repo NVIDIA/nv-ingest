@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Local pipeline stage: chart extraction wrapper.
 
@@ -20,16 +24,13 @@ from typing import Optional
 import typer
 
 from retriever.chart import stage as chart_stage
+from retriever.io.stage_files import build_stage_output_path, find_stage_inputs
 
 app = typer.Typer(help="Stage 4: chart extractor (wrapper around `retriever.chart.stage`).")
 
 
 def _iter_stage3_table_outputs(input_dir: Path) -> list[Path]:
-    # Stage3 defaults to: <input>.stem + ".table" + <input>.suffix
-    # For the typical stage3 input `*.pdf_extraction.infographics.json`, this yields:
-    #   `*.pdf_extraction.infographics.table.json`
-    files = [p for p in input_dir.iterdir() if p.is_file() and p.name.endswith("pdf_extraction.infographic.table.json")]
-    return sorted(files)
+    return find_stage_inputs(input_dir, suffix="pdf_extraction.infographic.table.json")
 
 
 @app.command()
@@ -92,7 +93,7 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for p in files:
-        out = out_dir / (p.stem + ".chart" + p.suffix) if output_dir is not None else None
+        out = build_stage_output_path(p, stage_suffix=".chart", output_dir=out_dir) if output_dir is not None else None
         chart_stage.run(input_path=p, output_path=out, config=config)
 
 

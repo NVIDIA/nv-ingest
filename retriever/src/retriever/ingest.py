@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 System-facing ingestion interface.
 
@@ -13,32 +17,42 @@ Concrete implementations are provided by runmodes:
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-RunMode = Literal["inprocess", "batch", "fused", "online"]
+from retriever.application.modes.factory import create_runmode_ingestor
+from retriever.params import EmbedParams
+from retriever.params import ExtractParams
+from retriever.params import IngestExecuteParams
+from retriever.params import IngestorCreateParams
+from retriever.params import RunMode
+from retriever.params import VdbUploadParams
 
 
-def create_ingestor(*, run_mode: RunMode = "inprocess", **kwargs: Any) -> "Ingestor":
+def _merge_params[T](params: T | None, kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return kwargs  # type: ignore[return-value]
+    if not kwargs:
+        return params
+    if hasattr(params, "model_copy"):
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
+
+
+def create_ingestor(
+    *,
+    run_mode: RunMode = "inprocess",
+    params: IngestorCreateParams | None = None,
+    **kwargs: Any,
+) -> "Ingestor":
     """
     Factory for selecting an ingestion runmode implementation.
     """
-    if run_mode == "inprocess":
-        from .ingest_modes.inprocess import InProcessIngestor
-
-        return InProcessIngestor(**kwargs)
-    if run_mode == "batch":
-        from .ingest_modes.batch import BatchIngestor
-
-        return BatchIngestor(**kwargs)
-    if run_mode == "fused":
-        from .ingest_modes.fused import FusedIngestor
-
-        return FusedIngestor(**kwargs)
-    if run_mode == "online":
-        from .ingest_modes.online import OnlineIngestor
-
-        return OnlineIngestor(**kwargs)
-    raise ValueError(f"Unknown run_mode: {run_mode!r}")
+    merged = _merge_params(params, kwargs)
+    if isinstance(merged, IngestorCreateParams):
+        parsed = merged
+    else:
+        parsed = IngestorCreateParams(**merged)
+    return create_runmode_ingestor(run_mode=run_mode, params=parsed)
 
 
 class Ingestor:
@@ -50,14 +64,13 @@ class Ingestor:
 
     RUN_MODE: str = "interface"
 
-    def __init__(self, documents: Optional[List[str]] = None, **_: Any) -> None:
+    def __init__(self, documents: Optional[List[str]] = None) -> None:
         self._documents: List[str] = list(documents or [])
         self._buffers: List[Tuple[str, BytesIO]] = []
 
     def _not_implemented(self, method_name: str) -> "None":
         raise NotImplementedError(
-            f"{self.__class__.__name__}.{method_name}() is not implemented yet "
-            f"(run_mode={self.RUN_MODE})."
+            f"{self.__class__.__name__}.{method_name}() is not implemented yet " f"(run_mode={self.RUN_MODE})."
         )
 
     def files(self, documents: Union[str, List[str]]) -> "Ingestor":
@@ -68,7 +81,7 @@ class Ingestor:
         """Add in-memory buffers for processing."""
         self._not_implemented("buffers")
 
-    def load(self, **_: Any) -> "Ingestor":
+    def load(self) -> "Ingestor":
         """
         Placeholder for remote fetch/localization.
 
@@ -79,18 +92,16 @@ class Ingestor:
 
     def ingest(
         self,
-        show_progress: bool = False,
-        return_failures: bool = False,
-        save_to_disk: bool = False,
-        return_traces: bool = False,
-        **_: Any,
+        params: IngestExecuteParams | None = None,
+        **kwargs: Any,
     ) -> Union[List[Any], Tuple[Any, ...]]:
         """
         Execute the configured ingestion pipeline (placeholder).
         """
+        _ = _merge_params(params, kwargs)
         self._not_implemented("ingest")
 
-    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False, **_: Any) -> Any:
+    def ingest_async(self, *, return_failures: bool = False, return_traces: bool = False) -> Any:
         """Asynchronously execute ingestion (placeholder)."""
         self._not_implemented("ingest_async")
 
@@ -98,31 +109,33 @@ class Ingestor:
         """Record the default task chain (placeholder)."""
         self._not_implemented("all_tasks")
 
-    def dedup(self, **kwargs: Any) -> "Ingestor":
+    def dedup(self) -> "Ingestor":
         """Record a dedup task configuration."""
         self._not_implemented("dedup")
 
-    def embed(self, **kwargs: Any) -> "Ingestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record an embedding task configuration."""
+        _ = _merge_params(params, kwargs)
         self._not_implemented("embed")
 
-    def extract(self, **kwargs: Any) -> "Ingestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record an extract task configuration."""
+        _ = _merge_params(params, kwargs)
         self._not_implemented("extract")
 
-    def filter(self, **kwargs: Any) -> "Ingestor":
+    def filter(self) -> "Ingestor":
         """Record a filter task configuration."""
         self._not_implemented("filter")
 
-    def split(self, **kwargs: Any) -> "Ingestor":
+    def split(self) -> "Ingestor":
         """Record a split task configuration."""
         self._not_implemented("split")
 
-    def store(self, **kwargs: Any) -> "Ingestor":
+    def store(self) -> "Ingestor":
         """Record a store task configuration."""
         self._not_implemented("store")
 
-    def store_embed(self, **kwargs: Any) -> "Ingestor":
+    def store_embed(self) -> "Ingestor":
         """Record a store-embed task configuration."""
         self._not_implemented("store_embed")
 
@@ -138,8 +151,9 @@ class Ingestor:
         """Record a UDF task configuration."""
         self._not_implemented("udf")
 
-    def vdb_upload(self, purge_results_after_upload: bool = True, **kwargs: Any) -> "Ingestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "Ingestor":
         """Record a vector DB upload configuration (execution TBD)."""
+        _ = _merge_params(params, kwargs)
         self._not_implemented("vdb_upload")
 
     def save_intermediate_results(self, output_dir: str) -> "Ingestor":
@@ -155,7 +169,7 @@ class Ingestor:
         """Record result persistence configuration (execution TBD)."""
         self._not_implemented("save_to_disk")
 
-    def caption(self, **kwargs: Any) -> "Ingestor":
+    def caption(self) -> "Ingestor":
         """Record a caption task configuration."""
         self._not_implemented("caption")
 

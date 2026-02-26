@@ -26,8 +26,13 @@ class TextEmbeddingSchema(BaseModel):
     input_type: str = Field(default="passage")
     raise_on_failure: bool = Field(default=False)
     truncate: str = Field(default="END")
+    embed_text_elements: bool = Field(default=True)
+    embed_structured_elements: bool = Field(default=True)
+    embed_image_elements: bool = Field(default=True)
+    embed_audio_elements: bool = Field(default=True)
     text_elements_modality: str = Field(default="text")
     image_elements_modality: str = Field(default="text")
+    image_elements_aggregate_page_content: bool = Field(default=False)
     structured_elements_modality: str = Field(default="text")
     audio_elements_modality: str = Field(default="text")
     custom_content_field: Optional[str] = None
@@ -57,3 +62,22 @@ class TextEmbeddingSchema(BaseModel):
         if isinstance(values, dict) and values.get("api_key") is None:
             values["api_key"] = ""
         return values
+
+    @model_validator(mode="after")
+    def _reject_non_text_modalities(self):
+        """Reject image/text_image modalities — only text modality is supported."""
+        _NON_TEXT = frozenset({"image", "text_image", "image_text"})
+        for field_name in (
+            "text_elements_modality",
+            "image_elements_modality",
+            "structured_elements_modality",
+            "audio_elements_modality",
+        ):
+            value = getattr(self, field_name, "text")
+            if value in _NON_TEXT:
+                raise ValueError(
+                    f"{field_name}={value!r} is not supported. "
+                    f"Only 'text' modality is supported for embedding. "
+                    f"Image and multimodal embedding support has been removed."
+                )
+        return self

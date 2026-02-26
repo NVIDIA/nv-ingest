@@ -1,7 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Retriever application package."""
 
-__all__ = ["__version__"]
+from .api import create_ingestor
+from .version import __version__, get_version, get_version_info
 
-__version__ = "0.1.0"
-
-from .ingest import create_ingestor
+__all__ = ["__version__", "create_ingestor", "get_version", "get_version_info"]

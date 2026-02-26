@@ -43,12 +43,13 @@ def test_valid_config_with_both_services():
 
 
 def test_invalid_config_empty_endpoints():
-    with pytest.raises(ValidationError) as exc_info:
-        TableExtractorConfigSchema(
-            yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-            ocr_endpoints=(None, None),
-        )
-    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints" in str(exc_info.value)
+    # Empty endpoints are valid and select local inference.
+    config = TableExtractorConfigSchema(
+        yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
+        ocr_endpoints=(None, None),
+    )
+    assert config.ocr_endpoints == (None, None)
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_invalid_extra_fields():

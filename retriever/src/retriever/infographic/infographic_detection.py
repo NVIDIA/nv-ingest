@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 """
@@ -17,6 +21,7 @@ import time
 import traceback
 
 import pandas as pd
+from retriever.params import RemoteRetryParams
 from retriever.nim.nim import invoke_image_inference_batches
 
 try:
@@ -175,7 +180,7 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
             return None
 
     b = _to_tensor(boxes)
-    l = _to_tensor(labels)
+    l = _to_tensor(labels)  # noqa: E741
     s = _to_tensor(scores) if scores is not None else None
     if b is None or l is None:
         return []
@@ -183,7 +188,7 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
     if b.ndim != 2 or int(b.shape[-1]) != 4:
         return []
     if l.ndim == 2 and int(l.shape[-1]) == 1:
-        l = l.squeeze(-1)
+        l = l.squeeze(-1)  # noqa: E741
     if l.ndim != 1:
         return []
 
@@ -262,8 +267,14 @@ def detect_infographic_elements_v1(
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Graphic Elements v1 on an infographic image source.
 
@@ -325,9 +336,9 @@ def detect_infographic_elements_v1(
                 api_key=api_key,
                 timeout_s=float(request_timeout_s),
                 max_batch_size=int(inference_batch_size),
-                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                max_retries=int(kwargs.get("remote_max_retries", 10)),
-                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                max_pool_workers=int(retry.remote_max_pool_workers),
+                max_retries=int(retry.remote_max_retries),
+                max_429_retries=int(retry.remote_max_429_retries),
             )
             elapsed = time.perf_counter() - t0
             if len(response_items) != len(valid):
@@ -339,9 +350,7 @@ def detect_infographic_elements_v1(
         except BaseException as e:
             elapsed = time.perf_counter() - t0
             for row_i in valid:
-                payloads[row_i] = _error_payload(stage="remote_invoke", exc=e) | {
-                    "timing": {"seconds": float(elapsed)}
-                }
+                payloads[row_i] = _error_payload(stage="remote_invoke", exc=e) | {"timing": {"seconds": float(elapsed)}}
 
     for chunk_start in range(0, len(valid), int(inference_batch_size)):
         if use_remote:
@@ -438,8 +447,14 @@ def detect_infographic_elements_v1_from_page_elements_v3(
     output_column: str = "infographic_elements_v1",
     num_detections_column: str = "infographic_elements_v1_num_detections",
     counts_by_label_column: str = "infographic_elements_v1_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Graphic Elements v1 only on cropped infographic/title regions.
 
@@ -564,9 +579,9 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                     api_key=api_key,
                     timeout_s=float(request_timeout_s),
                     max_batch_size=int(inference_batch_size),
-                    max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                    max_retries=int(kwargs.get("remote_max_retries", 10)),
-                    max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
                 )
                 elapsed = time.perf_counter() - t0
                 if len(response_items) != len(crop_b64s):
@@ -632,7 +647,9 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                     elapsed = time.perf_counter() - t0
                     preds_list = preds if isinstance(preds, list) else [preds]
                     if len(preds_list) != len(idxs):
-                        raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
+                        raise RuntimeError(
+                            "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                        )
                     for local_j, crop_i in enumerate(idxs):
                         dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
                         crop_payloads[crop_i] = {
@@ -676,7 +693,12 @@ def detect_infographic_elements_v1_from_page_elements_v3(
             else:
                 region_ref["detections"] = []
                 region_ref["timing"] = None
-                region_ref["error"] = {"stage": "invoke", "type": "TypeError", "message": "Unexpected payload type", "traceback": ""}
+                region_ref["error"] = {
+                    "stage": "invoke",
+                    "type": "TypeError",
+                    "message": "Unexpected payload type",
+                    "traceback": "",
+                }
 
     # Aggregate counts per page.
     for i, page_payload in enumerate(out_payloads):
@@ -759,4 +781,3 @@ class InfographicDetectionActor:
                 out["infographic_elements_v1_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"infographic_elements_v1": _error_payload(stage="actor_call", exc=e)}]
-

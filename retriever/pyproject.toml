@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -7,8 +7,8 @@ managed = true
 package = true
 
 [project]
-name = "retriever"
-version = "0.1.0"
+name = "nemo-retriever"
+dynamic = ["version"]
 description = "A modern RAG ingestion pipeline from Nvidia"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -23,7 +23,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "ray[data]>=2.49.0",
+  "ray[data,serve]>=2.49.0",
   "pypdfium2==4.30.0",
   "pandas>=2.0,<3",
   "tqdm>=4.66.0",
@@ -46,9 +46,10 @@ dependencies = [
   "python-multipart>=0.0.9",
   # NOTE: `llama_nemotron_embed_1b_v2` currently expects `HybridCache` from
   # `transformers.cache_utils`, which is not present in transformers>=5.
-  "transformers>=4.49.0,<5.0.0",
+  # Versions 4.54.0-4.55.x have a flash attention bug that produces incorrect
+  # image embeddings in the VL model; exclude that range.
+  "transformers>=4.49.0,<5.0.0,!=4.54.*,!=4.55.*",
   "tokenizers>=0.20.3,<0.22.0",
-  # TensorRT support (keep Torch/TorchVision versions aligned; mismatch breaks torchvision C++ ops like nms)
   "torch~=2.9.1",
   "torchvision>=0.24,<0.25",
   "einops",
@@ -58,6 +59,7 @@ dependencies = [
   "nemotron-graphic-elements-v1>=0.dev0",
   "nemotron-table-structure-v1>=0.dev0",
   "nemotron-ocr>=0.dev0",
+  "markitdown",
 ]
 
 [project.optional-dependencies]
@@ -68,6 +70,9 @@ dev = [
 
 [project.scripts]
 retriever = "retriever.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "retriever.version.get_build_version"}
 
 [tool.uv.sources]
 nv-ingest = { path = "../src/", editable = true }

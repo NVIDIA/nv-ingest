@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -9,6 +13,7 @@ import traceback
 
 from nemotron_page_elements_v3.utils import postprocess_preds_page_element
 import pandas as pd
+from retriever.params import RemoteRetryParams
 
 try:
     import numpy as np
@@ -124,13 +129,13 @@ def _decode_b64_image_to_np_array(image_b64: str) -> Tuple["np.array", Tuple[int
 
 def _labels_from_model(_model: Any) -> List[str]:
     return [
-            "table",
-            "chart",
-            "title",
-            "infographic",
-            "text",
-            "header_footer",
-        ]
+        "table",
+        "chart",
+        "title",
+        "infographic",
+        "text",
+        "header_footer",
+    ]
 
 
 def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
@@ -157,7 +162,7 @@ def _postprocess_to_per_image_detections(
     """
     Convert model postprocess outputs into a list of per-image detection dicts.
 
-    Expected detection format matches the "stage2 page_elements_v3 json" used by `retriever.image.render`.
+    Expected detection format matches the "stage2 page_elements_v3 json" used by `retriever.utils.image.render`.
     """
     if torch is None:  # pragma: no cover
         raise ImportError("torch is required for page element detection postprocess.")
@@ -303,6 +308,37 @@ def _annotation_dict_to_detections(
     return dets
 
 
+def _bounding_boxes_to_detections(
+    bb_dict: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Convert a bounding_boxes dict (NIM API format) to detection dicts.
+
+    Input format: {"label": [{"x_min": ..., "y_min": ..., "x_max": ..., "y_max": ..., "confidence": ...}, ...]}
+    """
+    dets: List[Dict[str, Any]] = []
+    for api_name, entries in bb_dict.items():
+        retriever_name = _API_TO_RETRIEVER.get(api_name, api_name)
+        try:
+            label_id = _RETRIEVER_LABEL_NAMES.index(retriever_name)
+        except ValueError:
+            label_id = None
+        for entry in entries:
+            dets.append(
+                {
+                    "bbox_xyxy_norm": [
+                        float(entry["x_min"]),
+                        float(entry["y_min"]),
+                        float(entry["x_max"]),
+                        float(entry["y_max"]),
+                    ],
+                    "label": label_id,
+                    "label_name": retriever_name,
+                    "score": float(entry.get("confidence", 0.0)),
+                }
+            )
+    return dets
+
+
 def _apply_page_elements_v3_postprocess(
     dets: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
@@ -356,6 +392,19 @@ def _remote_response_to_detections(
         except Exception:
             pass
 
+    # NIM bounding_boxes format:
+    # {"index": 0, "bounding_boxes": {"title": [{"x_min": ..., "y_min": ..., ...}]}}
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+        bb = cand.get("bounding_boxes")
+        if isinstance(bb, dict):
+            try:
+                dets = _bounding_boxes_to_detections(bb)
+                return _apply_page_elements_v3_postprocess(dets)
+            except Exception:
+                pass
+
     # Fall back to API-style annotation dict:
     # {"table": [[x0,y0,x1,y1,conf], ...], "paragraph": [...]}
     for cand in candidates:
@@ -382,8 +431,14 @@ def detect_page_elements_v3(
     output_column: str = "page_elements_v3",
     num_detections_column: str = "page_elements_v3_num_detections",
     counts_by_label_column: str = "page_elements_v3_counts_by_label",
+    remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
     """
     Run Nemotron Page Elements v3 on a pandas batch.
 
@@ -438,7 +493,7 @@ def detect_page_elements_v3(
 
     label_names = _labels_from_model(model) if model is not None else list(_RETRIEVER_LABEL_NAMES)
     if model is not None and hasattr(model, "thresholds_per_class"):
-        thresholds_per_class = list(getattr(model, "thresholds_per_class"))
+        thresholds_per_class = getattr(model, "thresholds_per_class")
     else:
         thresholds_per_class = [0.0 for _ in label_names]
 
@@ -486,16 +541,15 @@ def detect_page_elements_v3(
                 api_key=api_key,
                 timeout_s=float(request_timeout_s),
                 max_batch_size=int(inference_batch_size),
-                max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
-                max_retries=int(kwargs.get("remote_max_retries", 10)),
-                max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+                max_pool_workers=int(retry.remote_max_pool_workers),
+                max_retries=int(retry.remote_max_retries),
+                max_429_retries=int(retry.remote_max_429_retries),
             )
             elapsed = time.perf_counter() - t0
 
             if len(response_items) != len(valid_indices):
                 raise RuntimeError(
-                    "Remote response count mismatch: "
-                    f"expected {len(valid_indices)}, got {len(response_items)}"
+                    "Remote response count mismatch: " f"expected {len(valid_indices)}, got {len(response_items)}"
                 )
 
             for local_i, row_i in enumerate(valid_indices):
@@ -511,13 +565,14 @@ def detect_page_elements_v3(
                 }
         except BaseException as e:
             elapsed = time.perf_counter() - t0
+            print(f"Warning: page_elements remote inference failed: {type(e).__name__}: {e}")
             for row_i in valid_indices:
                 row_payloads[row_i] = _error_payload(stage="remote_inference", exc=e) | {
                     "timing": {"seconds": float(elapsed)}
                 }
 
     for chunk_start in range(0, len(valid_indices), int(inference_batch_size)):
-        chunk_idx = valid_indices[chunk_start:chunk_start + int(inference_batch_size)]
+        chunk_idx = valid_indices[chunk_start : chunk_start + int(inference_batch_size)]
         if not chunk_idx:
             continue
 
@@ -579,7 +634,7 @@ def detect_page_elements_v3(
             print(f"Error invoking model: {ex}")
             preds_list: List[Any] = []
             for j in range(int(batch.shape[0])):
-                preds_list.append(model(batch[j:j + 1], orig_shapes[j]))
+                preds_list.append(model(batch[j : j + 1], orig_shapes[j]))
             preds = preds_list
         elapsed = time.perf_counter() - t0
 
@@ -609,7 +664,7 @@ def detect_page_elements_v3(
                         continue
                     b_np, l_np, s_np = postprocess_preds_page_element(
                         p,
-                        list(thresholds_per_class),
+                        thresholds_per_class,
                         label_names,
                     )
                     boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))
@@ -692,4 +747,3 @@ class PageElementDetectionActor:
                 out["page_elements_v3_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"page_elements_v3": _error_payload(stage="actor_call", exc=e)}]
-

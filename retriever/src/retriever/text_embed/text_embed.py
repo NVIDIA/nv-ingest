@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 """
@@ -12,7 +16,7 @@ It mirrors the "pure pandas batch fn + Ray-friendly actor" pattern used by:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence  # noqa: F401
 
 import time
 import traceback
@@ -100,7 +104,11 @@ def embed_text_1b_v2(
                 # Keep placeholder but mark as "no text".
                 payloads[i] = {"embedding": None, "error": None}
                 continue
-            texts.append(f"{input_type}: {txt}" if input_type else txt)
+            # VL model handles formatting internally; skip prefix.
+            if input_type and not hasattr(model, "embed_queries"):
+                texts.append(f"{input_type}: {txt}")
+            else:
+                texts.append(txt)
             text_row_idxs.append(i)
         except BaseException as e:
             payloads[i] = _error_payload(stage="extract_text", exc=e)
@@ -156,7 +164,11 @@ def embed_text_1b_v2(
     out = batch_df.copy()
     out[output_column] = payloads
     out[embedding_dim_column] = [
-        int(len((p or {}).get("embedding") or [])) if isinstance(p, dict) and isinstance(p.get("embedding"), list) else 0
+        (
+            int(len((p or {}).get("embedding") or []))
+            if isinstance(p, dict) and isinstance(p.get("embedding"), list)
+            else 0
+        )
         for p in payloads
     ]
     out[has_embedding_column] = [bool(d > 0) for d in out[embedding_dim_column].tolist()]
@@ -173,19 +185,31 @@ class TextEmbedActor:
 
     def __init__(self, **detect_kwargs: Any) -> None:
         self.detect_kwargs = dict(detect_kwargs)
-        from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 
         device = self.detect_kwargs.pop("device", None)
         hf_cache_dir = self.detect_kwargs.pop("hf_cache_dir", None)
         normalize = bool(self.detect_kwargs.pop("normalize", True))
         max_length = self.detect_kwargs.pop("max_length", 4096)
+        model_name = self.detect_kwargs.get("model_name")
 
-        self._model = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device is not None else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-            normalize=normalize,
-            max_length=int(max_length),
-        )
+        from retriever.model import is_vl_embed_model
+
+        if is_vl_embed_model(model_name):
+            from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+            self._model = LlamaNemotronEmbedVL1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+            )
+        else:
+            from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+            self._model = LlamaNemotronEmbed1BV2Embedder(
+                device=str(device) if device is not None else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                normalize=normalize,
+                max_length=int(max_length),
+            )
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:
@@ -204,4 +228,3 @@ class TextEmbedActor:
                 out["text_embeddings_1b_v2_has_embedding"] = [False for _ in range(len(out.index))]
                 return out
             return [{"text_embeddings_1b_v2": _error_payload(stage="actor_call", exc=e)}]
-

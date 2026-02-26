@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Batch runmode.
 
@@ -20,15 +24,30 @@ from typing import Union
 
 import ray
 import ray.data as rd
-from retriever.convert import DocToPdfConversionActor
+from retriever.utils.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
 from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
+from ..params import EmbedParams
+from ..params import ExtractParams
+from ..params import HtmlChunkParams
+from ..params import IngestExecuteParams
+from ..params import PdfSplitParams
+from ..params import TextChunkParams
+from ..params import VdbUploadParams
 
 DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
+
+
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+    if params is None:
+        return model_cls(**kwargs)
+    if kwargs:
+        return params.model_copy(update=kwargs)  # type: ignore[return-value]
+    return params
 
 
 # region agent log
@@ -60,20 +79,21 @@ class _LanceDBWriteActor:
     has been consumed (handled by ``BatchIngestor.ingest()``).
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, params: VdbUploadParams | None = None) -> None:
         import json
         from pathlib import Path
 
         self._json = json
         self._Path = Path
+        lancedb_params = (params or VdbUploadParams()).lancedb
 
-        self._lancedb_uri = str(kwargs.get("lancedb_uri", "lancedb"))
-        self._table_name = str(kwargs.get("table_name", "nv-ingest"))
-        self._overwrite = bool(kwargs.get("overwrite", True))
-        self._embedding_column = str(kwargs.get("embedding_column", "text_embeddings_1b_v2"))
-        self._embedding_key = str(kwargs.get("embedding_key", "embedding"))
-        self._include_text = bool(kwargs.get("include_text", True))
-        self._text_column = str(kwargs.get("text_column", "text"))
+        self._lancedb_uri = lancedb_params.lancedb_uri
+        self._table_name = lancedb_params.table_name
+        self._overwrite = lancedb_params.overwrite
+        self._embedding_column = lancedb_params.embedding_column
+        self._embedding_key = lancedb_params.embedding_key
+        self._include_text = lancedb_params.include_text
+        self._text_column = lancedb_params.text_column
 
         import lancedb  # type: ignore
         import pyarrow as pa  # type: ignore
@@ -87,25 +107,24 @@ class _LanceDBWriteActor:
         self._table = None
         mode = "overwrite" if self._overwrite else "create"
         fields = [
-                pa.field("vector", pa.list_(pa.float32(), 2048)),
-                pa.field("pdf_page", pa.string()),
-                pa.field("filename", pa.string()),
-                pa.field("pdf_basename", pa.string()),
-                pa.field("page_number", pa.int32()),
-                pa.field("source_id", pa.string()),
-                pa.field("path", pa.string()),
-                pa.field("text", pa.string()),
-                pa.field("metadata", pa.string()),
-                pa.field("source", pa.string()),
-            ]
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source_id", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+            pa.field("source", pa.string()),
+        ]
         self._schema = pa.schema(fields)
 
         self._table = self._db.create_table(
-                        self._table_name,
-                        schema=self._schema,
-                        mode=mode,
-                    )
-
+            self._table_name,
+            schema=self._schema,
+            mode=mode,
+        )
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch.
@@ -169,9 +188,7 @@ class _LanceDBWriteActor:
             pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
             if isinstance(pe_counts, dict):
                 metadata_obj["page_elements_v3_counts_by_label"] = {
-                    str(k): int(v)
-                    for k, v in pe_counts.items()
-                    if isinstance(k, str) and v is not None
+                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
                 }
             for ocr_col in ("table", "chart", "infographic"):
                 entries = getattr(row, ocr_col, None)
@@ -220,36 +237,49 @@ class _BatchEmbedActor:
     model creation and delegates to a remote NIM endpoint instead.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        self._kwargs = dict(kwargs)
-        if "embedding_endpoint" not in self._kwargs and kwargs.get("embed_invoke_url"):
-            self._kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+    def __init__(self, params: EmbedParams) -> None:
+        self._params = params
+        self._kwargs = {
+            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
+            **params.runtime.model_dump(mode="python", exclude_none=True),
+        }
+        if "embedding_endpoint" not in self._kwargs and self._kwargs.get("embed_invoke_url"):
+            self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url")
 
         # If a remote NIM endpoint is configured, skip local model creation.
-        endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
+        endpoint = (self._kwargs.get("embedding_endpoint") or self._kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             self._model = None
             return
 
-        from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+        device = self._kwargs.get("device")
+        hf_cache_dir = self._kwargs.get("hf_cache_dir")
+        normalize = bool(self._kwargs.get("normalize", True))
+        max_length = int(self._kwargs.get("max_length", 8192))
+        model_name_raw = self._kwargs.get("model_name")
 
-        device = kwargs.get("device")
-        hf_cache_dir = kwargs.get("hf_cache_dir")
-        normalize = bool(kwargs.get("normalize", True))
-        max_length = int(kwargs.get("max_length", 8192))
-        # model_name may be a NIM alias (e.g. "nemo_retriever_v1") or a real HF
-        # repo ID (e.g. "nvidia/llama-3.2-nv-embedqa-1b-v2"). Only forward it as
-        # model_id when it looks like an HF repo (contains "/").
-        model_name_raw = kwargs.get("model_name")
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
+        from retriever.model import is_vl_embed_model, resolve_embed_model
 
-        self._model = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
-        )
+        model_id = resolve_embed_model(model_name_raw)
+
+        if is_vl_embed_model(model_name_raw):
+            from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+
+            self._model = LlamaNemotronEmbedVL1BV2Embedder(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                model_id=model_id,
+            )
+        else:
+            from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+            self._model = LlamaNemotronEmbed1BV2Embedder(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                normalize=normalize,
+                max_length=max_length,
+                model_id=model_id,
+            )
 
     def __call__(self, batch_df: Any) -> Any:
         from retriever.ingest_modes.inprocess import embed_text_main_text_embed
@@ -265,9 +295,8 @@ class BatchIngestor(Ingestor):
         documents: Optional[List[str]] = None,
         ray_address: Optional[str] = None,
         ray_log_to_driver: bool = True,
-        **kwargs: Any,
     ) -> None:
-        super().__init__(documents=documents, **kwargs)
+        super().__init__(documents=documents)
 
         logging.basicConfig(level=logging.INFO)
 
@@ -291,8 +320,9 @@ class BatchIngestor(Ingestor):
         self._rd_dataset: rd.Dataset = None  # Ray Data dataset created from input documents.
         self._tasks: List[tuple[str, dict[str, Any]]] = []
         self._intermediate_output_dir: Optional[str] = None
-        self._pipeline_type: str = "pdf"  # "pdf" | "txt"
-        self._extract_txt_kwargs: Dict[str, Any] = {}
+        self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
+        self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
+        self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -328,7 +358,7 @@ class BatchIngestor(Ingestor):
 
         return self
 
-    def extract(self, **kwargs: Any) -> "BatchIngestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure extraction for batch processing (builder only).
 
@@ -347,6 +377,13 @@ class BatchIngestor(Ingestor):
         - ``page_elements_cpus_per_actor``: CPUs reserved per page-elements actor (default 1).
         - ``ocr_cpus_per_actor``: CPUs reserved per OCR actor (default 1).
         """
+
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        kwargs = {
+            **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
+            **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
         def _endpoint_count(raw: Any) -> int:
@@ -533,7 +570,12 @@ class BatchIngestor(Ingestor):
 
         # Splitting pdfs is broken into a separate stage to help amortize downstream
         # processing if PDFs have vastly different numbers of pages.
-        pdf_split_actor = PDFSplitActor(**kwargs)
+        pdf_split_actor = PDFSplitActor(
+            split_params=PdfSplitParams(
+                start_page=kwargs.get("start_page"),
+                end_page=kwargs.get("end_page"),
+            )
+        )
         self._rd_dataset = self._rd_dataset.map_batches(
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
@@ -605,13 +647,7 @@ class BatchIngestor(Ingestor):
 
         return self
 
-    def extract_txt(
-        self,
-        max_tokens: int = 512,
-        overlap_tokens: int = 0,
-        encoding: str = "utf-8",
-        **kwargs: Any,
-    ) -> "BatchIngestor":
+    def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure txt-only pipeline: read_binary_files -> TxtSplitActor (bytes -> chunk rows).
 
@@ -621,12 +657,8 @@ class BatchIngestor(Ingestor):
         from retriever.txt.ray_data import TxtSplitActor
 
         self._pipeline_type = "txt"
-        self._extract_txt_kwargs = {
-            "max_tokens": max_tokens,
-            "overlap_tokens": overlap_tokens,
-            "encoding": encoding,
-            **kwargs,
-        }
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._extract_txt_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -635,11 +667,35 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
             num_cpus=1,
             num_gpus=0,
-            fn_constructor_kwargs=dict(self._extract_txt_kwargs),
+            fn_constructor_kwargs={"params": TextChunkParams(**self._extract_txt_kwargs)},
         )
         return self
 
-    def embed(self, **kwargs: Any) -> "BatchIngestor":
+    def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Configure HTML-only pipeline: read_binary_files -> HtmlSplitActor (bytes -> chunk rows).
+
+        Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_html().
+        """
+        from retriever.html.ray_data import HtmlSplitActor
+
+        self._pipeline_type = "html"
+        resolved = _coerce_params(params, HtmlChunkParams, kwargs)
+        self._extract_html_kwargs = resolved.model_dump(mode="python")
+        self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            HtmlSplitActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
+        )
+        return self
+
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
 
@@ -656,6 +712,16 @@ class BatchIngestor(Ingestor):
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
         """
+
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs = {
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
+
         def _endpoint_count(raw: Any) -> int:
             s = str(raw or "").strip()
             if not s:
@@ -713,12 +779,12 @@ class BatchIngestor(Ingestor):
             num_cpus=embed_cpus_per_actor,
             num_gpus=gpu_per_stage,
             compute=rd.ActorPoolStrategy(size=embed_workers),
-            fn_constructor_kwargs=dict(kwargs),
+            fn_constructor_kwargs={"params": resolved},
         )
 
         return self
 
-    def vdb_upload(self, purge_results_after_upload: bool = True, **kwargs: Any) -> "BatchIngestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a streaming LanceDB upload stage to the batch pipeline.
 
@@ -730,9 +796,17 @@ class BatchIngestor(Ingestor):
         Accepts the same kwargs as
         ``inprocess.upload_embeddings_to_lancedb_inprocess``.
         """
-        _ = purge_results_after_upload
-        self._tasks.append(("vdb_upload", dict(kwargs)))
-        self._vdb_upload_kwargs = dict(kwargs)
+        p = params or VdbUploadParams()
+        if kwargs:
+            lancedb_kwargs = {k: v for k, v in kwargs.items() if k != "purge_results_after_upload"}
+            if lancedb_kwargs:
+                p = p.model_copy(update={"lancedb": p.lancedb.model_copy(update=lancedb_kwargs)})
+            if "purge_results_after_upload" in kwargs:
+                p = p.model_copy(update={"purge_results_after_upload": bool(kwargs["purge_results_after_upload"])})
+        _ = p.purge_results_after_upload
+        vdb_kwargs = p.lancedb.model_dump(mode="python")
+        self._tasks.append(("vdb_upload", dict(vdb_kwargs)))
+        self._vdb_upload_kwargs = dict(vdb_kwargs)
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -741,7 +815,7 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
             num_gpus=0,
             compute=rd.ActorPoolStrategy(size=1),
-            fn_constructor_kwargs=dict(kwargs),
+            fn_constructor_kwargs={"params": p},
         )
 
         return self
@@ -783,17 +857,7 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
-    def ingest(
-        self,
-        show_progress: bool = False,
-        return_failures: bool = False,
-        save_to_disk: bool = False,
-        return_traces: bool = False,
-        *,
-        runtime_metrics_dir: Optional[str] = None,
-        runtime_metrics_prefix: Optional[str] = None,
-        **_: Any,
-    ) -> int:
+    def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
 
@@ -802,7 +866,15 @@ class BatchIngestor(Ingestor):
         pipeline finishes, we create the LanceDB vector index (which must happen
         after all writes are complete).
         """
-        _ = (show_progress, return_failures, save_to_disk, return_traces)
+        run_params = _coerce_params(params, IngestExecuteParams, kwargs)
+        _ = (
+            run_params.show_progress,
+            run_params.return_failures,
+            run_params.save_to_disk,
+            run_params.return_traces,
+        )
+        runtime_metrics_dir = run_params.runtime_metrics_dir
+        runtime_metrics_prefix = run_params.runtime_metrics_prefix
         t0 = time.monotonic()
         num_pages = self._rd_dataset.count()
         elapsed = time.monotonic() - t0
@@ -911,6 +983,16 @@ class BatchIngestor(Ingestor):
             table.create_index(vector_column_name="vector")
         except Exception as e:
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
+
+        if kw.get("hybrid", False):
+            text_column = str(kw.get("text_column", "text"))
+            fts_language = str(kw.get("fts_language", "English"))
+            try:
+                table.create_fts_index(text_column, language=fts_language)
+            except Exception as e:
+                print(
+                    f"Warning: FTS index creation failed on column {text_column!r} (continuing with vector-only): {e}"
+                )
 
         for index_stub in table.list_indices():
             table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))

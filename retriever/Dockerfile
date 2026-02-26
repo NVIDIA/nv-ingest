@@ -74,28 +74,4 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
 # So Nemotron OCR finds libcudart.so.13 at runtime
 ENV LD_LIBRARY_PATH=/opt/conda/envs/retriever_libcudart/lib:${LD_LIBRARY_PATH}
 
-# ---------------------------------------------------------------------------
-# Install retriever and siblings (build context = nv-ingest root)
-# ---------------------------------------------------------------------------
-FROM base AS install
-
-WORKDIR /workspace
-
-COPY retriever retriever
-COPY src src
-COPY api api
-COPY client client
-
-# Use conda env's uv; create venv and install retriever in editable mode (path deps: ../src, ../api, ../client)
-SHELL ["/bin/bash", "-c"]
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/uv \
-    source /opt/conda/etc/profile.d/conda.sh \
-    && conda activate retriever_libcudart \
-    && uv venv .retriever \
-    && . .retriever/bin/activate \
-    && uv pip install -e ./retriever
-
-# Default: run in-process pipeline (help if no args)
-ENTRYPOINT ["/workspace/.retriever/bin/python", "-m", "retriever.examples.inprocess_pipeline"]
-CMD ["--help"]
+ENTRYPOINT ["/bin/bash"]

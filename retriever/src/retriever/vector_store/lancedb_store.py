@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple  # noqa: F401
 
 from nv_ingest_client.util.vdb.lancedb import LanceDB
 import pandas as pd
@@ -31,6 +35,9 @@ class LanceDBConfig:
     metric: str = "l2"
     num_partitions: int = 16
     num_sub_vectors: int = 256
+
+    hybrid: bool = False
+    fts_language: str = "English"
 
 
 def _read_text_embeddings_json_df(path: Path) -> pd.DataFrame:
@@ -173,6 +180,30 @@ def _infer_vector_dim(rows: Sequence[Dict[str, Any]]) -> int:
     return 0
 
 
+def create_lancedb_index(table: Any, *, cfg: LanceDBConfig, text_column: str = "text") -> None:
+    """Create vector (IVF_HNSW_SQ) and optionally FTS indices on a LanceDB table."""
+    try:
+        table.create_index(
+            index_type=cfg.index_type,
+            metric=cfg.metric,
+            num_partitions=int(cfg.num_partitions),
+            num_sub_vectors=int(cfg.num_sub_vectors),
+            vector_column_name="vector",
+        )
+    except TypeError:
+        table.create_index(vector_column_name="vector")
+
+    if cfg.hybrid:
+        try:
+            table.create_fts_index(text_column, language=cfg.fts_language)
+        except Exception:
+            logger.warning(
+                "FTS index creation failed on column %r; continuing with vector-only search.",
+                text_column,
+                exc_info=True,
+            )
+
+
 def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig) -> None:
     if not rows:
         logger.warning("No embeddings rows provided; nothing to write to LanceDB.")
@@ -209,17 +240,7 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
     table = db.create_table(cfg.table_name, data=list(rows), schema=schema, mode=mode)
 
     if cfg.create_index:
-        try:
-            table.create_index(
-                index_type=cfg.index_type,
-                metric=cfg.metric,
-                num_partitions=int(cfg.num_partitions),
-                num_sub_vectors=int(cfg.num_sub_vectors),
-                vector_column_name="vector",
-            )
-        except TypeError:
-            # Older/newer LanceDB versions may have different signatures; fall back to minimal call.
-            table.create_index(vector_column_name="vector")
+        create_lancedb_index(table, cfg=cfg)
 
 
 def write_embeddings_to_lancedb(df_with_embeddings: pd.DataFrame, *, cfg: LanceDBConfig) -> None:

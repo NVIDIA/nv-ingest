@@ -1,7 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional  # noqa: F401
 
 import pandas as pd
 
@@ -11,14 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 def extract_infographic_data_ray_data(
-    ds: "ray.data.Dataset",
+    ds: "ray.data.Dataset",  # noqa: F821
     *,
     extractor_config: Any,
     task_config: Optional[Dict[str, Any]] = None,
     batch_size: int = 64,
-) -> "ray.data.Dataset":
+) -> "ray.data.Dataset":  # noqa: F821
     """Ray Data adapter for infographic extraction (mutates metadata in-place)."""
-    import ray.data  # type: ignore
+    import ray.data  # type: ignore  # noqa: F401
 
     def _map_batch(batch: pd.DataFrame) -> pd.DataFrame:
         out, _info = extract_infographic_data_from_primitives_df(

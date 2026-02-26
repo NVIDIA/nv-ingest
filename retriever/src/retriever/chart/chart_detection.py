@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -166,7 +170,7 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
             return None
 
     b = _to_tensor(boxes)
-    l = _to_tensor(labels)
+    l = _to_tensor(labels)  # noqa: E741
     s = _to_tensor(scores) if scores is not None else None
     if b is None or l is None:
         return []
@@ -174,7 +178,7 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
     if b.ndim != 2 or int(b.shape[-1]) != 4:
         return []
     if l.ndim == 2 and int(l.shape[-1]) == 1:
-        l = l.squeeze(-1)
+        l = l.squeeze(-1)  # noqa: E741
     if l.ndim != 1:
         return []
 
@@ -514,7 +518,9 @@ def detect_graphic_elements_v1_from_page_elements_v3(
                 elapsed = time.perf_counter() - t0
                 preds_list = preds if isinstance(preds, list) else [preds]
                 if len(preds_list) != len(idxs):
-                    raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
+                    raise RuntimeError(
+                        "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                    )
                 for local_j, crop_i in enumerate(idxs):
                     dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
                     crop_payloads[crop_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
@@ -554,7 +560,12 @@ def detect_graphic_elements_v1_from_page_elements_v3(
             else:
                 region_ref["detections"] = []
                 region_ref["timing"] = None
-                region_ref["error"] = {"stage": "invoke", "type": "TypeError", "message": "Unexpected payload type", "traceback": ""}
+                region_ref["error"] = {
+                    "stage": "invoke",
+                    "type": "TypeError",
+                    "message": "Unexpected payload type",
+                    "traceback": "",
+                }
 
     # Aggregate counts per page.
     for i, page_payload in enumerate(out_payloads):
@@ -629,4 +640,3 @@ class ChartDetectionActor:
                 out["graphic_elements_v1_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"graphic_elements_v1": _error_payload(stage="actor_call", exc=e)}]
-

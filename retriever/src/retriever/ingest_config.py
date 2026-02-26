@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import sys
@@ -138,4 +142,3 @@ def load_ingest_config_section(
         print(f"--- end ingest config section: {section} ---", file=sys.stderr)
 
     return sub
-
