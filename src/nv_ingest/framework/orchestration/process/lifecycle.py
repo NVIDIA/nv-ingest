@@ -167,13 +167,19 @@ class PipelineLifecycleManager:
         Avoids raising exceptions during interpreter shutdown.
         """
         try:
-            self._terminate_broker()
+            self._terminate_broker(from_atexit=True)
         except Exception:
             # Swallow errors at atexit to avoid noisy shutdowns
             pass
 
-    def _terminate_broker(self) -> None:
-        """Terminate the SimpleMessageBroker process if running."""
+    def _terminate_broker(self, from_atexit: bool = False) -> None:
+        """Terminate the SimpleMessageBroker process if running.
+
+        Parameters
+        ----------
+        from_atexit : bool
+            If True, skip logging to avoid errors when called during interpreter shutdown.
+        """
         proc = self._broker_process
         if not proc:
             return
@@ -185,7 +191,9 @@ class PipelineLifecycleManager:
             pass
 
         pid = getattr(proc, "pid", None)
-        logger.info(f"Stopping SimpleMessageBroker (pid={pid})")
+        # Avoid logging during atexit as logging streams may be closed
+        if not from_atexit:
+            logger.info(f"Stopping SimpleMessageBroker (pid={pid})")
         try:
             # First, try graceful terminate
             proc.terminate()

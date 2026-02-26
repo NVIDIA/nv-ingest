@@ -41,7 +41,7 @@ requirements:
     - opentelemetry-sdk>=1.27.0
     - protobuf>=5.29.3
     - pydantic>=2.0.0
-    - pypdfium2>=4.30.0
+    - pypdfium2>=4.30.0,<5.0.0
     - pytest>=8.0.2
     - pytest-mock>=3.14.0
     - python>=3.12.11

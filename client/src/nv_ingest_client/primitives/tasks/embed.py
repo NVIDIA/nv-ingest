@@ -32,8 +32,13 @@ class EmbedTask(Task):
         text: Optional[bool] = None,
         tables: Optional[bool] = None,
         filter_errors: bool = False,
+        embed_text_elements: Optional[bool] = None,
+        embed_structured_elements: Optional[bool] = None,
+        embed_image_elements: Optional[bool] = None,
+        embed_audio_elements: Optional[bool] = None,
         text_elements_modality: Optional[str] = None,
         image_elements_modality: Optional[str] = None,
+        image_elements_aggregate_page_content: Optional[bool] = None,
         structured_elements_modality: Optional[str] = None,
         audio_elements_modality: Optional[str] = None,
         custom_content_field: Optional[str] = None,
@@ -75,8 +80,13 @@ class EmbedTask(Task):
             model_name=model_name,
             api_key=api_key,
             filter_errors=filter_errors,
+            embed_text_elements=embed_text_elements,
+            embed_structured_elements=embed_structured_elements,
+            embed_image_elements=embed_image_elements,
+            embed_audio_elements=embed_audio_elements,
             text_elements_modality=text_elements_modality,
             image_elements_modality=image_elements_modality,
+            image_elements_aggregate_page_content=image_elements_aggregate_page_content,
             structured_elements_modality=structured_elements_modality,
             audio_elements_modality=audio_elements_modality,
             custom_content_field=custom_content_field,
@@ -88,8 +98,13 @@ class EmbedTask(Task):
         self._model_name = validated_data.model_name
         self._api_key = validated_data.api_key
         self._filter_errors = validated_data.filter_errors
+        self._embed_text_elements = validated_data.embed_text_elements
+        self._embed_structured_elements = validated_data.embed_structured_elements
+        self._embed_image_elements = validated_data.embed_image_elements
+        self._embed_audio_elements = validated_data.embed_audio_elements
         self._text_elements_modality = validated_data.text_elements_modality
         self._image_elements_modality = validated_data.image_elements_modality
+        self._image_elements_aggregate_page_content = validated_data.image_elements_aggregate_page_content
         self._structured_elements_modality = validated_data.structured_elements_modality
         self._audio_elements_modality = validated_data.audio_elements_modality
         self._custom_content_field = validated_data.custom_content_field
@@ -115,10 +130,20 @@ class EmbedTask(Task):
         if self._api_key:
             info += "  api_key: [redacted]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
+        if self._embed_text_elements is not None:
+            info += f"  embed_text_elements: {self._embed_text_elements}\n"
+        if self._embed_structured_elements is not None:
+            info += f"  embed_structured_elements: {self._embed_structured_elements}\n"
+        if self._embed_image_elements is not None:
+            info += f"  embed_image_elements: {self._embed_image_elements}\n"
+        if self._embed_audio_elements is not None:
+            info += f"  embed_audio_elements: {self._embed_audio_elements}\n"
         if self._text_elements_modality:
             info += f"  text_elements_modality: {self._text_elements_modality}\n"
         if self._image_elements_modality:
             info += f"  image_elements_modality: {self._image_elements_modality}\n"
+        if self._image_elements_aggregate_page_content:
+            info += f"  image_elements_aggregate_page_content: {self._image_elements_aggregate_page_content}\n"
         if self._structured_elements_modality:
             info += f"  structured_elements_modality: {self._structured_elements_modality}\n"
         if self._audio_elements_modality:
@@ -152,11 +177,26 @@ class EmbedTask(Task):
         if self._api_key:
             task_properties["api_key"] = self._api_key
 
+        if self._embed_text_elements is not None:
+            task_properties["embed_text_elements"] = self._embed_text_elements
+
+        if self._embed_structured_elements is not None:
+            task_properties["embed_structured_elements"] = self._embed_structured_elements
+
+        if self._embed_image_elements is not None:
+            task_properties["embed_image_elements"] = self._embed_image_elements
+
+        if self._embed_audio_elements is not None:
+            task_properties["embed_audio_elements"] = self._embed_audio_elements
+
         if self._text_elements_modality:
             task_properties["text_elements_modality"] = self._text_elements_modality
 
         if self._image_elements_modality:
             task_properties["image_elements_modality"] = self._image_elements_modality
+
+        if self._image_elements_aggregate_page_content:
+            task_properties["image_elements_aggregate_page_content"] = self._image_elements_aggregate_page_content
 
         if self._structured_elements_modality:
             task_properties["structured_elements_modality"] = self._structured_elements_modality

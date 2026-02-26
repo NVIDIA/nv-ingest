@@ -5,6 +5,7 @@
 import os
 import logging
 import warnings
+import threading
 from math import log
 from typing import Any
 from typing import Dict
@@ -27,6 +28,9 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 logger = logging.getLogger(__name__)
 
 YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v3"
+
+# Note: local-vs-remote selection is driven by `infer_protocol` ("local" vs "grpc"/"http")
+# at the `create_inference_client(...)` layer, not by environment variables.
 
 # yolox-page-elements-v2 and v3 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
@@ -392,11 +396,23 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, version: str = YOLOX_PAGE_DEFAULT_VERSION, endpoints: Optional[Tuple[str, str]] = None):
+    # ---- Local Nemotron singleton (lazy) ----
+    _local_nemotron_lock = threading.Lock()
+    _local_nemotron_instance = None
+    _local_nemotron_device = None
+
+    def __init__(
+        self,
+        version: str = YOLOX_PAGE_DEFAULT_VERSION,
+        endpoints: Optional[Tuple[str, str]] = None,
+        *,
+        backend: Optional[str] = None,
+    ):
         """
         Initialize the yolox-page-elements model interface.
         """
         self.version = version
+        self.backend = (backend or "nim").strip().lower()
 
         super().__init__(
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
@@ -405,6 +421,200 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             min_score=YOLOX_PAGE_MIN_SCORE,
             class_labels=YOLOX_PAGE_V3_CLASS_LABELS if self.version.endswith("-v3") else YOLOX_PAGE_V2_CLASS_LABELS,
             endpoints=endpoints,
+        )
+
+    @classmethod
+    def _get_local_nemotron_page_elements_v3(cls, *, device: Optional[str] = None):
+        """
+        Lazily create and return a process-wide singleton NemotronPageElementsV3 model.
+
+        Notes
+        -----
+        - Imports are deferred so the API can run without retriever/torch installed unless local backend is used.
+        - Device selection is best-effort; tensors are moved to the chosen device before invocation.
+        """
+        if cls._local_nemotron_instance is not None:
+            return cls._local_nemotron_instance, cls._local_nemotron_device
+
+        with cls._local_nemotron_lock:
+            if cls._local_nemotron_instance is not None:
+                return cls._local_nemotron_instance, cls._local_nemotron_device
+
+            try:
+                import torch  # local-only dependency
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Local YOLOX backend requested but 'torch' is not available. "
+                    "Install the retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
+                ) from e
+
+            try:
+                # Import path used by retriever stages.
+                from retriever.model.local.nemotron_page_elements_v3 import NemotronPageElementsV3  # type: ignore
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Local YOLOX backend requested but 'retriever' package is not importable. "
+                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or "
+                    "run with infer_protocol='grpc'/'http' and backend='local'."  # noqa: E501
+                ) from e
+
+            # Choose device (default: cuda if available else cpu).
+            dev_str = (device or "").strip()
+            if dev_str:
+                dev = torch.device(dev_str)
+            else:
+                dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            model = NemotronPageElementsV3()
+            # Best-effort: move underlying module to device if present.
+            try:
+                if hasattr(model, "_model") and model._model is not None:
+                    model._model = model._model.to(dev)  # type: ignore[attr-defined]
+            except Exception:
+                # Some wrappers manage device internally; we'll always move tensors below.
+                pass
+
+            cls._local_nemotron_instance = model
+            cls._local_nemotron_device = dev
+            logger.info(f"Initialized local NemotronPageElementsV3 singleton on device={dev}.")
+
+            return cls._local_nemotron_instance, cls._local_nemotron_device
+
+    def infer(self, data: Dict[str, Any], **kwargs) -> List[Dict[str, Any]]:
+        """
+        Unified inference entrypoint.
+
+        - backend="nim": this interface is meant to be invoked via NimClient (existing behavior).
+        - backend="local": runs a local singleton NemotronPageElementsV3 and returns yolox-style annotations.
+        """
+        if self.backend == "local":
+            return self._infer_local_nemotron_page_elements_v3(data, **kwargs)
+
+        raise RuntimeError(
+            "YoloxPageElementsModelInterface.infer() is only supported for backend='local'. "
+            "For backend='nim', construct a NimClient and call NimClient.infer()."
+        )
+
+    def _infer_local_nemotron_page_elements_v3(self, data: Dict[str, Any], **kwargs) -> List[Dict[str, Any]]:
+        """
+        Local inference using Nemotron Page Elements v3.
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Same structure as NimClient inference results for yolox-page-elements:
+            per image: {label: [[x1,y1,x2,y2,score], ...], ...} with coordinates in original pixel space.
+        """
+        # Validate + record original shapes.
+        data = self.prepare_data_for_inference(data)
+        images = data.get("images", [])
+        if not images:
+            return []
+
+        # Nemotron label id mapping used by retriever local stages.
+        # Nemotron emits "text" where nv-ingest yolox expects "paragraph".
+        id_to_label = {
+            0: "table",
+            1: "chart",
+            2: "title",
+            3: "infographic",
+            4: "paragraph",  # nemotron: "text"
+            5: "header_footer",
+        }
+        alias_label = {"text": "paragraph"}
+
+        model, dev = self._get_local_nemotron_page_elements_v3(device=kwargs.get("device"))
+
+        try:
+            import torch  # local-only dependency
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError("Local YOLOX backend requested but 'torch' is not available.") from e
+
+        # Convert numpy HWC -> torch CHW uint8 on device; preprocess (resize/pad).
+        tensors: List["torch.Tensor"] = []
+        orig_shapes_hw: List[Tuple[int, int]] = []
+        for img in images:
+            if not isinstance(img, np.ndarray):
+                raise ValueError("All elements in data['images'] must be numpy.ndarray objects for local inference.")
+            if img.ndim != 3 or img.shape[2] not in (3, 4):
+                raise ValueError(f"Expected HWC RGB/RGBA image; got shape={getattr(img, 'shape', None)}")
+
+            # Ensure RGB uint8.
+            if img.shape[2] == 4:
+                img = img[:, :, :3]
+            if img.dtype != np.uint8:
+                img = (img * 255).astype(np.uint8) if np.issubdtype(img.dtype, np.floating) else img.astype(np.uint8)
+
+            h, w = int(img.shape[0]), int(img.shape[1])
+            orig_shapes_hw.append((h, w))
+
+            t = torch.from_numpy(img).permute(2, 0, 1).contiguous()
+            t = t.to(device=dev, dtype=torch.uint8, non_blocking=(getattr(dev, "type", "") == "cuda"))
+            tensors.append(model.preprocess(t))
+
+        # Best-effort batching (mirrors retriever local stage behavior).
+        per_image_preds: Optional[List[Any]] = None
+        with torch.inference_mode():
+            with torch.autocast(device_type="cuda"):
+                try:
+                    batch_tensor = torch.stack(tensors, dim=0)
+                    m = model.model  # may raise if remote-only
+                    try:
+                        raw = m(batch_tensor, list(orig_shapes_hw))
+                    except Exception:
+                        raw = m(batch_tensor, orig_shapes_hw[0])
+                    raw0 = raw[0] if isinstance(raw, (tuple, list)) and len(raw) > 0 else raw
+                    if isinstance(raw0, list) and len(raw0) == int(batch_tensor.shape[0]):
+                        per_image_preds = raw0
+                except Exception:
+                    per_image_preds = None
+
+                annotation_dicts: List[Dict[str, Any]] = []
+                for i in range(len(tensors)):
+                    preds = (
+                        per_image_preds[i]
+                        if per_image_preds is not None
+                        else model.invoke(tensors[i], orig_shapes_hw[i])
+                    )
+                    boxes, labels, scores = model.postprocess(preds)
+
+                ann: Dict[str, List[List[float]]] = {lab: [] for lab in YOLOX_PAGE_V3_CLASS_LABELS}
+                for box, lab, score in zip(boxes, labels, scores):
+                    # coerce label -> string
+                    if isinstance(lab, str):
+                        label_name = alias_label.get(lab, lab)
+                    else:
+                        try:
+                            lab_i = int(lab.item()) if hasattr(lab, "item") else int(lab)
+                        except Exception:
+                            continue
+                        label_name = id_to_label.get(lab_i, f"unknown_{lab_i}")
+
+                    if label_name not in ann:
+                        # Ignore unknown labels rather than polluting downstream keys.
+                        continue
+
+                    # box is xyxy normalized
+                    if hasattr(box, "detach"):
+                        box_list = box.detach().cpu().tolist()
+                    else:
+                        box_list = box.tolist() if hasattr(box, "tolist") else list(box)
+
+                    try:
+                        s = float(score.item()) if hasattr(score, "item") else float(score)
+                    except Exception:
+                        s = 0.0
+
+                    ann[label_name].append(
+                        [float(box_list[0]), float(box_list[1]), float(box_list[2]), float(box_list[3]), s]
+                    )
+
+                annotation_dicts.append(ann)
+
+        # Reuse the existing nv-ingest postprocessing + coord transform.
+        return self.postprocess_annotations(
+            annotation_dicts,
+            original_image_shapes=data.get("original_image_shapes", []),
         )
 
     def name(
@@ -424,7 +634,16 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, final_score=None, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
-        running_v3 = annotation_dicts and set(YOLOX_PAGE_V3_CLASS_LABELS) <= annotation_dicts[0].keys()
+        # Decide v2 vs v3 post-processing.
+        #
+        # IMPORTANT: Do not infer v3 purely from output keys.
+        # It's common for model outputs (especially gRPC JSON) to omit classes that had no detections
+        # on a given page, which would incorrectly skip v3 post-processing for v3 models.
+        running_v3 = str(getattr(self, "version", "")).endswith("-v3")
+        if (not running_v3) and annotation_dicts:
+            # Back-compat / best-effort auto-detect if version string isn't v3.
+            # Treat presence of any v3-only classes as v3.
+            running_v3 = any(k in annotation_dicts[0] for k in ("paragraph", "header_footer"))
 
         if not final_score:
             if running_v3:
@@ -485,10 +704,21 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, endpoints: Optional[Tuple[str, str]] = None):
+    # ---- Local Nemotron singleton (lazy) ----
+    _local_nemotron_lock = threading.Lock()
+    _local_nemotron_instance = None
+    _local_nemotron_device = None
+
+    def __init__(
+        self,
+        endpoints: Optional[Tuple[str, str]] = None,
+        *,
+        backend: Optional[str] = None,
+    ):
         """
         Initialize the yolox-graphic-elements model interface.
         """
+        self.backend = (backend or "nim").strip().lower()
         super().__init__(
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
@@ -497,6 +727,255 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
             endpoints=endpoints,
         )
+        # Ensure a stable model_name even when endpoints are absent (common for local backend).
+        if not hasattr(self, "model_name") or not getattr(self, "model_name", None):
+            self.model_name = "yolox-graphic-elements"
+
+    @classmethod
+    def _get_local_nemotron_graphic_elements_v1(cls, *, device: Optional[str] = None):
+        """
+        Lazily create and return a process-wide singleton Nemotron Graphic Elements v1 model.
+
+        Note
+        ----
+        This intentionally avoids importing the monorepo `retriever` package so local
+        chart extraction can work in environments where only `nv_ingest_api` + the
+        Nemotron HF packages are installed.
+        """
+        if cls._local_nemotron_instance is not None:
+            return cls._local_nemotron_instance, cls._local_nemotron_device
+
+        with cls._local_nemotron_lock:
+            if cls._local_nemotron_instance is not None:
+                return cls._local_nemotron_instance, cls._local_nemotron_device
+
+            try:
+                import torch  # local-only dependency
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Local YOLOX (graphic-elements) backend requested but 'torch' is not available. "
+                    "Install the retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
+                ) from e
+
+            try:
+                from nemotron_graphic_elements_v1.model import (  # type: ignore
+                    define_model as define_model_graphic_elements,
+                )
+                from nemotron_graphic_elements_v1.model import (  # type: ignore
+                    resize_pad as resize_pad_graphic_elements,
+                )
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Local YOLOX (graphic-elements) backend requested but the "
+                    "`nemotron-graphic-elements-v1` package is not importable. "
+                    "Install it (and its deps) or run with infer_protocol='grpc'/'http'."
+                ) from e
+
+            dev_str = (device or "").strip()
+            if dev_str:
+                dev = torch.device(dev_str)
+            else:
+                dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            # Create minimal wrapper matching the methods we use in local inference.
+            # Use the same model id string used by the retriever shim.
+            model_id = "Nemotron Graphic Elements v1"
+            hf_model = define_model_graphic_elements(model_id)
+            input_shape = (1024, 1024)
+
+            # Best-effort: move underlying module to device if present.
+            try:
+                if hf_model is not None and hasattr(hf_model, "to"):
+                    hf_model = hf_model.to(dev)
+            except Exception:
+                pass
+
+            class _LocalNemotronGraphicElements:
+                def __init__(self, m, shape):
+                    self._model = m
+                    self._shape = shape
+
+                @property
+                def input_shape(self):
+                    return self._shape
+
+                def preprocess(self, tensor):
+                    return resize_pad_graphic_elements(tensor, self.input_shape)
+
+                def invoke(self, input_data, orig_shape):
+                    if self._model is None:
+                        raise RuntimeError("Local Nemotron Graphic Elements v1 model was not initialized.")
+                    return self._model(input_data, orig_shape)[0]
+
+            model = _LocalNemotronGraphicElements(hf_model, input_shape)
+
+            cls._local_nemotron_instance = model
+            cls._local_nemotron_device = dev
+            logger.info(f"Initialized local NemotronGraphicElementsV1 singleton on device={dev}.")
+
+            return cls._local_nemotron_instance, cls._local_nemotron_device
+
+    def infer(self, data: Dict[str, Any], **kwargs) -> List[Dict[str, Any]]:
+        """
+        Unified inference entrypoint.
+
+        - backend="nim": this interface is meant to be invoked via NimClient (existing behavior).
+        - backend="local": runs a local NemotronGraphicElementsV1 and returns yolox-style annotations.
+        """
+        if self.backend == "local":
+            return self._infer_local_nemotron_graphic_elements_v1(data, **kwargs)
+
+        raise RuntimeError(
+            "YoloxGraphicElementsModelInterface.infer() is only supported for backend='local'. "
+            "For backend='nim', construct a NimClient and call NimClient.infer()."
+        )
+
+    def _infer_local_nemotron_graphic_elements_v1(self, data: Dict[str, Any], **kwargs) -> List[Dict[str, Any]]:
+        """
+        Local inference using Nemotron Graphic Elements v1.
+
+        Returns:
+          per image: {label: [[x1,y1,x2,y2], ...], ...} with coordinates in original pixel space.
+        """
+        data = self.prepare_data_for_inference(data)
+        images = data.get("images", [])
+        if not images:
+            return []
+
+        model, dev = self._get_local_nemotron_graphic_elements_v1(device=kwargs.get("device"))
+
+        try:
+            import torch  # local-only dependency
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError("Local YOLOX backend requested but 'torch' is not available.") from e
+
+        def _to_list(v: Any) -> Any:
+            try:
+                if isinstance(v, torch.Tensor):
+                    return v.detach().cpu().tolist()
+                if isinstance(v, np.ndarray):
+                    return v.tolist()
+            except Exception:
+                pass
+            return v
+
+        def _extract_boxes_labels_scores(preds: Any) -> Tuple[Any, Any, Any]:
+            # Common shapes emitted by HF detectors: dict with keys.
+            if isinstance(preds, dict):
+                # IMPORTANT: do not use `or` directly on torch.Tensors (truthiness is ambiguous).
+                def _first_present(d: Dict[str, Any], keys: List[str]) -> Any:
+                    for k in keys:
+                        if k in d and d.get(k) is not None:
+                            return d.get(k)
+                    return None
+
+                boxes = _first_present(preds, ["boxes", "bboxes", "pred_boxes"])
+                labels = _first_present(preds, ["labels", "classes", "pred_classes"])
+                scores = _first_present(preds, ["scores", "confidences", "pred_scores"])
+                return boxes, labels, scores
+            # Sometimes wrapped as list/tuple with dict payload.
+            if isinstance(preds, (list, tuple)) and preds:
+                p0 = preds[0]
+                if isinstance(p0, dict):
+                    return _extract_boxes_labels_scores(p0)
+            return None, None, None
+
+        # Convert images to torch tensors and run per-image (best-effort batching handled by underlying model).
+        annotation_dicts: List[Dict[str, Any]] = []
+        orig_shapes = data.get("original_image_shapes", [])
+        for img, shape in zip(images, orig_shapes):
+            if not isinstance(img, np.ndarray):
+                raise ValueError("All elements in data['images'] must be numpy.ndarray objects for local inference.")
+            if img.ndim != 3 or img.shape[2] not in (3, 4):
+                raise ValueError(f"Expected HWC RGB/RGBA image; got shape={getattr(img, 'shape', None)}")
+
+            # Ensure RGB uint8.
+            if img.shape[2] == 4:
+                img = img[:, :, :3]
+            if img.dtype != np.uint8:
+                img = (img * 255).astype(np.uint8) if np.issubdtype(img.dtype, np.floating) else img.astype(np.uint8)
+
+            h, w = int(img.shape[0]), int(img.shape[1])
+            t = torch.from_numpy(img).permute(2, 0, 1).contiguous()
+            t = t.to(device=dev, dtype=torch.uint8, non_blocking=(getattr(dev, "type", "") == "cuda"))
+            x = model.preprocess(t)
+
+            with torch.inference_mode():
+                with torch.autocast(device_type="cuda"):
+                    preds = model.invoke(x, (h, w))
+
+            boxes, labels, scores = _extract_boxes_labels_scores(preds)
+            boxes_l = _to_list(boxes) if boxes is not None else []
+            labels_l = _to_list(labels) if labels is not None else []
+            scores_l = _to_list(scores) if scores is not None else []
+
+            # Normalize shapes.
+            if not isinstance(boxes_l, list):
+                boxes_l = []
+            if not isinstance(labels_l, list):
+                labels_l = []
+            if not isinstance(scores_l, list):
+                scores_l = []
+
+            n = min(len(boxes_l), len(labels_l), len(scores_l)) if scores_l else min(len(boxes_l), len(labels_l))
+            if not scores_l:
+                scores_l = [1.0 for _ in range(n)]
+
+            # If labels are tensors nested, try flatten.
+            if labels_l and isinstance(labels_l[0], list):
+                labels_l = [x[0] if isinstance(x, list) and x else x for x in labels_l]
+            if scores_l and isinstance(scores_l[0], list):
+                scores_l = [x[0] if isinstance(x, list) and x else x for x in scores_l]
+
+            # Determine if boxes are pixel coords (values > 1) vs normalized.
+            mx = 0.0
+            try:
+                mx = float(max(max(b[:4]) for b in boxes_l[:n])) if n else 0.0
+            except Exception:
+                mx = 0.0
+            is_normalized = mx <= 1.5
+
+            ann: Dict[str, List[List[float]]] = {lab: [] for lab in YOLOX_GRAPHIC_CLASS_LABELS}
+
+            for b, lab, sc in zip(boxes_l[:n], labels_l[:n], scores_l[:n]):
+                if not (isinstance(b, list) and len(b) >= 4):
+                    continue
+                x1, y1, x2, y2 = [float(v) for v in b[:4]]
+                if not is_normalized:
+                    # Convert pixels -> normalized.
+                    if w > 0 and h > 0:
+                        x1, x2 = x1 / float(w), x2 / float(w)
+                        y1, y2 = y1 / float(h), y2 / float(h)
+                # Clamp.
+                x1 = max(0.0, min(1.0, x1))
+                y1 = max(0.0, min(1.0, y1))
+                x2 = max(0.0, min(1.0, x2))
+                y2 = max(0.0, min(1.0, y2))
+
+                label_name: Optional[str] = None
+                if isinstance(lab, str):
+                    label_name = lab
+                else:
+                    try:
+                        li = int(lab.item()) if hasattr(lab, "item") else int(lab)
+                        if 0 <= li < len(YOLOX_GRAPHIC_CLASS_LABELS):
+                            label_name = YOLOX_GRAPHIC_CLASS_LABELS[li]
+                    except Exception:
+                        label_name = None
+
+                if label_name not in ann:
+                    continue
+                try:
+                    score = float(sc.item()) if hasattr(sc, "item") else float(sc)
+                except Exception:
+                    score = 0.0
+
+                ann[label_name].append([x1, y1, x2, y2, score])
+
+            annotation_dicts.append(ann)
+
+        # Reuse existing nv-ingest postprocessing + coord transform to pixel-space box dict.
+        return self.postprocess_annotations(annotation_dicts, original_image_shapes=orig_shapes)
 
     def name(
         self,
@@ -1641,23 +2120,49 @@ def postprocess_included_texts(boxes, confs, labels, classes):
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
+    # If a gRPC endpoint isn't provided (common when using HTTP-only NIM endpoints),
+    # skip Triton repository introspection entirely.
+    if not yolox_grpc_endpoint:
+        return default_model_name
+
+    # Guard against accidentally passing an HTTP URL into the gRPC Triton client.
+    if isinstance(yolox_grpc_endpoint, str) and (
+        yolox_grpc_endpoint.startswith("http://") or yolox_grpc_endpoint.startswith("https://")
+    ):
+        return default_model_name
+
     try:
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
-        model_names = [x["name"] for x in model_index.get("models", [])]
-        if "pipeline" in model_names:
-            yolox_model_name = "pipeline"
-        elif "yolox_ensemble" in model_names:
-            yolox_model_name = "yolox_ensemble"
-        else:
-            yolox_model_name = default_model_name
-    except Exception:
-        logger.warning(
-            f"Failed to get yolox-page-elements version after 30 seconds. Falling back to '{default_model_name}'."
-        )
-        yolox_model_name = default_model_name
+        model_names = [x.get("name") for x in model_index.get("models", []) if isinstance(x, dict)]
 
-    return yolox_model_name
+        # Prefer explicit known orchestrations first.
+        for preferred in (
+            "pipeline",  # BLS pipeline
+            "yolox_ensemble",
+            "yolox",
+            "yolox-page-elements",
+            "page-elements",
+            "nemoretriever-page-elements-v3",
+            "nemoretriever-page-elements-v2",
+        ):
+            if preferred in model_names:
+                return preferred
+
+        # Otherwise pick a best-effort match for newer model names.
+        candidates = [m for m in model_names if isinstance(m, str) and ("yolox" in m or "page-elements" in m)]
+        if candidates:
+            return sorted(candidates)[0]
+
+        return default_model_name
+    except Exception as e:
+        logger.warning(
+            "Failed to inspect YOLOX model repository at '%s' (%s). Falling back to '%s'.",
+            yolox_grpc_endpoint,
+            type(e).__name__,
+            default_model_name,
+        )
+        return default_model_name
 
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
