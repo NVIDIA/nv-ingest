@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import glob
 import json
+import multiprocessing
 import os
 import re
 import time
@@ -1338,7 +1339,10 @@ class InProcessIngestor(Ingestor):
                             if progress is not None:
                                 progress.update(1)
 
-                    with ProcessPoolExecutor(max_workers=max_workers) as cpu_pool:
+                    with ProcessPoolExecutor(
+                        max_workers=max_workers,
+                        mp_context=multiprocessing.get_context("spawn"),
+                    ) as cpu_pool:
                         future_to_idx = {
                             cpu_pool.submit(_process_chunk_cpu, chunk, cpu_tasks): i for i, chunk in enumerate(chunks)
                         }
@@ -1410,7 +1414,10 @@ class InProcessIngestor(Ingestor):
 
                 doc_done: dict[str, int] = defaultdict(int)
 
-                with ProcessPoolExecutor(max_workers=max_workers) as pool:
+                with ProcessPoolExecutor(
+                    max_workers=max_workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                ) as pool:
                     future_to_idx = {pool.submit(_process_chunk_cpu, c, cpu_tasks): i for i, c in enumerate(chunks)}
 
                     for future in as_completed(future_to_idx):

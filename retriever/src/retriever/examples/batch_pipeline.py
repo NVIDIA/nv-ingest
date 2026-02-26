@@ -14,10 +14,10 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from importlib import import_module
 from pathlib import Path
 from typing import Optional, TextIO
 
-import lancedb
 import ray
 import typer
 from retriever import create_ingestor
@@ -33,6 +33,11 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _lancedb():
+    """Import lancedb lazily to avoid fork warnings during early process setup."""
+    return import_module("lancedb")
 
 
 class _TeeStream:
@@ -104,7 +109,7 @@ def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
     Falls back to table row count if page-level fields are unavailable.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
     except Exception:
         return None
@@ -136,7 +141,7 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
     ingestion by the Ray write stage.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
         df = table.to_pandas()[["source_id", "page_number", "metadata"]]
     except Exception:
@@ -261,7 +266,7 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     # Local path URI in this pipeline.
     Path(uri).mkdir(parents=True, exist_ok=True)
 
-    db = lancedb.connect(uri)
+    db = _lancedb().connect(uri)
     try:
         db.open_table(table_name)
         return
@@ -740,7 +745,7 @@ def main(
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
-        db = lancedb.connect(lancedb_uri)
+        db = _lancedb().connect(lancedb_uri)
         table = None
         open_err: Optional[Exception] = None
         for _ in range(3):
