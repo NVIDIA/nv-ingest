@@ -81,13 +81,18 @@ class TestMultimodalCallableRunner:
         embedder = MagicMock()
         embedder.embed_images.return_value = [[0.1, 0.2], [0.3, 0.4]]
 
-        df = pd.DataFrame({
-            "text": ["page one", "page two"],
-            "_image_b64": ["img1_b64", "img2_b64"],
-        })
+        df = pd.DataFrame(
+            {
+                "text": ["page one", "page two"],
+                "_image_b64": ["img1_b64", "img2_b64"],
+            }
+        )
 
         result = _multimodal_callable_runner(
-            df, embedder=embedder, batch_size=64, embed_modality="image",
+            df,
+            embedder=embedder,
+            batch_size=64,
+            embed_modality="image",
         )
 
         embedder.embed_images.assert_called_once()
@@ -102,13 +107,18 @@ class TestMultimodalCallableRunner:
         embedder.embed_text_image.return_value = [[1.0, 2.0]]
         embedder.embed.return_value = [[3.0, 4.0]]
 
-        df = pd.DataFrame({
-            "text": ["with image", "text only"],
-            "_image_b64": ["imgB64", ""],
-        })
+        df = pd.DataFrame(
+            {
+                "text": ["with image", "text only"],
+                "_image_b64": ["imgB64", ""],
+            }
+        )
 
         result = _multimodal_callable_runner(
-            df, embedder=embedder, batch_size=64, embed_modality="text_image",
+            df,
+            embedder=embedder,
+            batch_size=64,
+            embed_modality="text_image",
         )
 
         embedder.embed_text_image.assert_called_once()
@@ -126,10 +136,12 @@ class TestMultimodalCallableRunner:
 class TestExplodeContentToRows:
     def test_text_mode_tags_modality(self):
         """Default text mode tags every row with _embed_modality='text' and no _image_b64."""
-        df = pd.DataFrame({
-            "text": ["Hello world"],
-            "table": [[{"text": "cell data"}]],
-        })
+        df = pd.DataFrame(
+            {
+                "text": ["Hello world"],
+                "table": [[{"text": "cell data"}]],
+            }
+        )
 
         result = explode_content_to_rows(df)
 
@@ -142,11 +154,13 @@ class TestExplodeContentToRows:
         """text_image mode copies page image to _image_b64, crops for structured content."""
         mock_crop.return_value = ("cropped_b64", None)
 
-        df = pd.DataFrame({
-            "text": ["some page text"],
-            "page_image": [{"image_b64": "full_page_b64"}],
-            "table": [[{"text": "table cell", "bbox_xyxy_norm": [0.1, 0.2, 0.9, 0.8]}]],
-        })
+        df = pd.DataFrame(
+            {
+                "text": ["some page text"],
+                "page_image": [{"image_b64": "full_page_b64"}],
+                "table": [[{"text": "table cell", "bbox_xyxy_norm": [0.1, 0.2, 0.9, 0.8]}]],
+            }
+        )
 
         result = explode_content_to_rows(df, modality="text_image")
 
@@ -163,5 +177,6 @@ class TestExplodeContentToRows:
         assert modalities[1] == "text_image"
 
         mock_crop.assert_called_once_with(
-            "full_page_b64", bbox_xyxy_norm=[0.1, 0.2, 0.9, 0.8],
+            "full_page_b64",
+            bbox_xyxy_norm=[0.1, 0.2, 0.9, 0.8],
         )

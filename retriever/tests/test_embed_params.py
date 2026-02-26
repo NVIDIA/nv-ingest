@@ -23,12 +23,15 @@ def test_normalize_modality_image_text_to_text_image():
     assert params.structured_elements_modality == "text_image"
 
 
-@pytest.mark.parametrize("value,expected", [
-    ("text", "text"),
-    ("image", "image"),
-    ("text_image", "text_image"),
-    (None, None),
-])
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("text", "text"),
+        ("image", "image"),
+        ("text_image", "text_image"),
+        (None, None),
+    ],
+)
 def test_normalize_modality_passthrough(value, expected):
     """Values other than 'image_text' pass through unchanged."""
     kwargs = {}
