@@ -4,9 +4,14 @@
 
 """
 Unit tests for retriever.audio: ASRActor (with mocked Parakeet client).
+
+Avoids importing retriever.model (and thus torch) by not eagerly loading
+the model package; local-ASR tests inject a fake retriever.model.local
+into sys.modules so the real module is never loaded.
 """
 
 import base64
+import sys
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -93,12 +98,15 @@ def test_apply_asr_to_df():
 
 def test_local_asr_does_not_call_get_client():
     """When audio_endpoints are both null, ASRActor uses local model and does not call _get_client."""
-    with patch("retriever.audio.asr_actor._get_client") as mock_get:
-        with patch("retriever.model.local.ParakeetCTC1B1ASR") as mock_class:
-            mock_model = MagicMock()
-            mock_model.transcribe.return_value = ["mocked local transcript"]
-            mock_class.return_value = mock_model
-
+    mock_model = MagicMock()
+    mock_model.transcribe.return_value = ["mocked local transcript"]
+    mock_class = MagicMock(return_value=mock_model)
+    mock_local = MagicMock()
+    mock_local.ParakeetCTC1B1ASR = mock_class
+    prev_local = sys.modules.get("retriever.model.local")
+    sys.modules["retriever.model.local"] = mock_local
+    try:
+        with patch("retriever.audio.asr_actor._get_client") as mock_get:
             params = ASRParams(audio_endpoints=(None, None))
             actor = ASRActor(params=params)
 
@@ -128,16 +136,24 @@ def test_local_asr_does_not_call_get_client():
             call_args = mock_model.transcribe.call_args[0][0]
             assert isinstance(call_args, list)
             assert len(call_args) == 1
+    finally:
+        if prev_local is None:
+            sys.modules.pop("retriever.model.local", None)
+        else:
+            sys.modules["retriever.model.local"] = prev_local
 
 
 def test_local_asr_apply_asr_to_df():
     """apply_asr_to_df with audio_endpoints=(None, None) uses local model when mocked."""
-    with patch("retriever.audio.asr_actor._get_client") as mock_get:
-        with patch("retriever.model.local.ParakeetCTC1B1ASR") as mock_class:
-            mock_model = MagicMock()
-            mock_model.transcribe.return_value = ["apply local text"]
-            mock_class.return_value = mock_model
-
+    mock_model = MagicMock()
+    mock_model.transcribe.return_value = ["apply local text"]
+    mock_class = MagicMock(return_value=mock_model)
+    mock_local = MagicMock()
+    mock_local.ParakeetCTC1B1ASR = mock_class
+    prev_local = sys.modules.get("retriever.model.local")
+    sys.modules["retriever.model.local"] = mock_local
+    try:
+        with patch("retriever.audio.asr_actor._get_client") as mock_get:
             batch = pd.DataFrame(
                 [
                     {
@@ -156,3 +172,8 @@ def test_local_asr_apply_asr_to_df():
             mock_get.assert_not_called()
             assert len(out) == 1
             assert out["text"].iloc[0] == "apply local text"
+    finally:
+        if prev_local is None:
+            sys.modules.pop("retriever.model.local", None)
+        else:
+            sys.modules["retriever.model.local"] = prev_local
