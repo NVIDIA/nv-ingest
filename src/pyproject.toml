@@ -68,6 +68,7 @@ dependencies = [
     "nvidia-riva-client==2.20.0",
     "unstructured-client>=0.25.9",
     "markitdown",
+    "python-multipart",
 ]
 
 [project.urls]
