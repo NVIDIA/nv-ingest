@@ -248,4 +248,4 @@ lancedb/
 outputs/
 models/
 
-retriever/run_results/
+nemo_retriever/run_results/

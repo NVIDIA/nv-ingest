@@ -38,4 +38,4 @@ jobs:
             ./dist/api/dist/* \
             ./dist/client/dist/* \
             ./dist/src/dist/* \
-            ./dist/retriever/dist/*
+            ./dist/nemo_retriever/dist/*
