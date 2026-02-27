@@ -110,9 +110,9 @@ When the `nemotron-parse` model is used in the retriever batch pipeline, the `pa
 
 To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero:
 ​
-- `--nemotron-parse-workers` — number of Ray workers to run nemotron-parse
-- `--gpu-nemotron-parse` — GPU fraction to allocate per worker (for example, 0.25 to run four workers on a single GPU)
-- `--nemotron-parse-batch-size` — batch size for each nemotron-parse request
+- `--nemotron-parse-workers` — The number of Ray workers to run `nemotron-parse`.
+- `--gpu-nemotron-parse` — The GPU fraction to allocate for each worker (for example, 0.25 to run four workers on a single GPU).
+- `--nemotron-parse-batch-size` — The batch size for each `nemotron-parse` request.
 
 
 For example, run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on:
