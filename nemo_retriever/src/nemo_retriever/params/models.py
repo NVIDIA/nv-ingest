@@ -127,6 +127,9 @@ class BatchTuningParams(_ParamsModel):
     gpu_page_elements: Optional[float] = None
     gpu_ocr: Optional[float] = None
     gpu_embed: Optional[float] = None
+    nemotron_parse_workers: float = 0.0
+    gpu_nemotron_parse: float = 0.0
+    nemotron_parse_batch_size: float = 0.0
 
 
 class FusedTuningParams(_ParamsModel):

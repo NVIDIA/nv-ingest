@@ -60,6 +60,10 @@ dependencies = [
   "nemotron-table-structure-v1>=0.dev0",
   "nemotron-ocr>=0.dev0",
   "markitdown",
+  "timm==1.0.22",
+  "accelerate==1.12.0",
+  "albumentations==2.0.8",
+  "open-clip-torch==3.2.0",
   # Local ASR (Parakeet): read chunk files and resample to 16 kHz mono
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
