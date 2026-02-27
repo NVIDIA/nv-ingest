@@ -28,7 +28,6 @@ def _make_small_wav(path: Path, duration_sec: float = 0.3, sample_rate: int = 80
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_audio_benchmark_run_mock_asr(tmp_path: Path):
     """Run benchmark with --mock-asr and small row count; assert it completes."""
-    ray = pytest.importorskip("ray")
     wav = tmp_path / "tiny.wav"
     _make_small_wav(wav, duration_sec=0.3)
 

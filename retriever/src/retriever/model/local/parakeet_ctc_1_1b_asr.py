@@ -95,9 +95,7 @@ def _load_model_and_processor(model_id: str, hf_cache_dir: Optional[str] = None)
     if hf_cache_dir:
         kwargs["cache_dir"] = hf_cache_dir
     processor = AutoProcessor.from_pretrained(model_id, **kwargs)
-    model = AutoModelForCTC.from_pretrained(
-        model_id, torch_dtype="auto", device_map=device, **kwargs
-    )
+    model = AutoModelForCTC.from_pretrained(model_id, torch_dtype="auto", device_map=device, **kwargs)
     return model, processor
 
 
@@ -124,9 +122,7 @@ class ParakeetCTC1B1ASR:
     def _ensure_loaded(self) -> None:
         if self._model is not None and self._processor is not None:
             return
-        self._model, self._processor = _load_model_and_processor(
-            self._model_id, self._hf_cache_dir
-        )
+        self._model, self._processor = _load_model_and_processor(self._model_id, self._hf_cache_dir)
         logger.info(
             "ParakeetCTC1B1ASR: loaded %s via Transformers (AutoModelForCTC + AutoProcessor)",
             self._model_id,
@@ -168,9 +164,7 @@ class ParakeetCTC1B1ASR:
             with torch.no_grad():
                 outputs = self._model.generate(**inputs)
             # batch_decode with skip_special_tokens to drop pad tokens
-            decoded = self._processor.batch_decode(
-                outputs, skip_special_tokens=True
-            )
+            decoded = self._processor.batch_decode(outputs, skip_special_tokens=True)
             text = decoded[0] if decoded else ""
             # Fallback: strip any remaining <pad> and normalize spaces
             return _strip_pad_from_transcript(text.strip())

@@ -91,7 +91,10 @@ def discover(
         help="Comma-separated glob pattern(s) for discovery.",
     ),
 ) -> None:
-    """List files that would be processed and where sidecars would be written (no ASR). Use to verify mount and paths."""
+    """
+    List files that would be processed and where sidecars would be written (no ASR).
+    Use to verify mount and paths.
+    """
     patterns = [g.strip() for g in glob.split(",") if g.strip()] or ["*.mp3", "*.wav"]
     paths_set: set[Path] = set()
     for pat in patterns:
@@ -203,9 +206,7 @@ def extract(
     sys.stderr.flush()
 
     if not is_media_available():
-        raise typer.BadParameter(
-            "Audio stage requires ffmpeg. Install system ffmpeg and ensure it is on PATH."
-        )
+        raise typer.BadParameter("Audio stage requires ffmpeg. Install system ffmpeg and ensure it is on PATH.")
 
     if split_type not in ("size", "time", "frame"):
         raise typer.BadParameter("--split-type must be one of: size, time, frame")
@@ -263,14 +264,16 @@ def extract(
         if write_json:
             records = []
             for _, row in df.iterrows():
-                records.append({
-                    "path": str(row.get("path")),
-                    "source_path": str(row.get("source_path", p)),
-                    "duration": _to_jsonable(row.get("duration")),
-                    "chunk_index": int(row.get("chunk_index", 0)),
-                    "text": str(row.get("text", "")),
-                    "metadata": _to_jsonable(row.get("metadata")),
-                })
+                records.append(
+                    {
+                        "path": str(row.get("path")),
+                        "source_path": str(row.get("source_path", p)),
+                        "duration": _to_jsonable(row.get("duration")),
+                        "chunk_index": int(row.get("chunk_index", 0)),
+                        "text": str(row.get("text", "")),
+                        "metadata": _to_jsonable(row.get("metadata")),
+                    }
+                )
             out_path = _audio_extraction_json_path(p, output_dir)
             payload: Dict[str, Any] = {
                 "schema_version": 1,
