@@ -56,26 +56,19 @@ printf '%-32s: %s\n' NUMBAPRO_NVVM $NUMBAPRO_NVVM
 
 printf '%-32s: %s\n' NUMBAPRO_LIBDEVICE $NUMBAPRO_LIBDEVICE
 
-printf '%-32s: %s\n' CONDA_PREFIX $CONDA_PREFIX
+printf '%-32s: %s\n' VIRTUAL_ENV $VIRTUAL_ENV
 
 printf '%-32s: %s\n' PYTHON_PATH $PYTHON_PATH
 
 echo
 
 
-# Print conda packages if conda exists
-if type "conda" &> /dev/null; then
-echo '***conda packages***'
-which conda && conda list
-echo
 # Print pip packages if pip exists
-elif type "pip" &> /dev/null; then
-echo "conda not found"
+if type "pip" &> /dev/null; then
 echo "***pip packages***"
 which pip && pip list
 echo
 else
-echo "conda not found"
 echo "pip not found"
 fi
 }
