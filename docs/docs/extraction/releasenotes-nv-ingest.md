@@ -1,4 +1,4 @@
-# Release Notes for NeMo Retriever Extraction
+# Release Notes for NeMo Retriever Library
 
 This documentation contains the release notes for [NeMo Retriever Library](overview.md).
 

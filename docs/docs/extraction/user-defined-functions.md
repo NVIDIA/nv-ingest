@@ -1,4 +1,4 @@
-# Add User-Defined Functions to NeMo Retriever Extraction
+# Add User-Defined Functions to NeMo Retriever Library
 
 User-Defined Functions (UDFs) allow you to inject custom processing logic into the [NeMo Retriever Library](overview.md) pipeline at specific stages. 
 This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
@@ -942,5 +942,5 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 ## Related Topics
 
 - [NeMo Retriever UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md)
-- [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)
+- [User-Defined Stages for NeMo Retriever Library](user-defined-stages.md)
 - [NimClient Usage](nimclient.md)

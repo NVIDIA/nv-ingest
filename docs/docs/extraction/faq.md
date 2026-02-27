@@ -1,4 +1,4 @@
-# Frequently Asked Questions for NeMo Retriever Extraction
+# Frequently Asked Questions for NeMo Retriever Library
 
 This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever Library](overview.md).
 

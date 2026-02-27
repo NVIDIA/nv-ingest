@@ -1,4 +1,4 @@
-# What is NeMo Retriever Extraction?
+# What is NeMo Retriever Library?
 
 NeMo Retriever Library is a scalable, performance-oriented document content and metadata extraction microservice. 
 NeMo Retriever Library uses specialized NVIDIA NIM microservices 
@@ -18,7 +18,7 @@ and optionally manage storing into a vector database [Milvus](https://milvus.io/
 
 
 
-## What NeMo Retriever Extraction Is ✔️
+## What NeMo Retriever Library Is ✔️
 
 The following diagram shows the NeMo Retriever Library pipeline.
 
@@ -53,7 +53,7 @@ NeMo Retriever Library supports the following file types:
 - `wav`
 
 
-## What NeMo Retriever Extraction Isn't ✖️
+## What NeMo Retriever Library Isn't ✖️
 
 NeMo Retriever Library does not do the following:
 

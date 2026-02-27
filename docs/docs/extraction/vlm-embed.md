@@ -1,4 +1,4 @@
-# Use Multimodal Embedding with NeMo Retriever Extraction
+# Use Multimodal Embedding with NeMo Retriever Library
 
 This documentation describes how to use [NeMo Retriever Library](overview.md) 
 with the multimodal embedding model [Llama 3.2 NeMo Retriever Multimodal Embedding 1B](https://build.nvidia.com/nvidia/llama-3_2-nemoretriever-1b-vlm-embed-v1).

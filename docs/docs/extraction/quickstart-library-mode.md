@@ -1,4 +1,4 @@
-# Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
+# Deploy Without Containers (Library Mode) for NeMo Retriever Library
 
 [NeMo Retriever Library](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
@@ -29,7 +29,7 @@ To get started using library mode, you need the following:
 
 Use the following procedure to prepare your environment.
 
-1. Run the following code to create your NV Ingest Python environment.
+1. Run the following code to create your Python environment.
 
     ```
        uv venv --python 3.12 nvingest && \
@@ -39,7 +39,7 @@ Use the following procedure to prepare your environment.
 
     !!! tip
 
-        To confirm that you have activated your virtual environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
+        To confirm that you have activated your virtual environment, run `which python` and confirm that you see your virtual environment path in the result. You can do this before any python command that you run.
 
 2. Set or create a .env file that contains your NVIDIA Build API key and other environment variables.
 
@@ -258,7 +258,7 @@ Please keep in mind that this response is purely humorous and interpretative, as
 
 ## Logging Configuration
 
-Nemo Retriever extraction uses [Ray](https://docs.ray.io/en/latest/index.html) for logging. 
+The NeMo Retriever Library uses [Ray](https://docs.ray.io/en/latest/index.html) for logging. 
 For details, refer to [Configure Ray Logging](ray-logging.md).
 
 By default, library mode runs in quiet mode to minimize startup noise. 
@@ -441,7 +441,7 @@ if __name__ == "__main__":
 
 ## The `run_pipeline` Function Reference
 
-The `run_pipeline` function is the main entry point to start the Nemo Retriever Extraction pipeline. 
+The `run_pipeline` function is the main entry point to start the NeMo Retriever Library pipeline. 
 It can run in-process or as a subprocess.
 
 The `run_pipeline` function accepts the following parameters.

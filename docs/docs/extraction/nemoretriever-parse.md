@@ -17,7 +17,7 @@ to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 ## Limitations
 
-Currently, the limitations to using `nemotron-parse` with NeMo Retriever Extraction are the following:
+Currently, the limitations to using `nemotron-parse` with the NeMo Retriever Library are the following:
 
 - Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot NeMo Retriever Library](troubleshoot.md).
 - `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).

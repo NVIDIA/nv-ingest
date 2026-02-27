@@ -1,4 +1,4 @@
-# Add User-defined Stages to Your NeMo Retriever Extraction Pipeline
+# Add User-defined Stages to Your NeMo Retriever Library Pipeline
 
 This documentation demonstrates how to add user-defined stages to your [NeMo Retriever Library](overview.md) pipeline.
 You can directly import a function, or use a string module path, and include robust signature validation. 
@@ -292,5 +292,5 @@ The  following example adds user-defined stages to your NeMo Retriever Library p
 
 ## Related Topics
 
-- [User-Defined Functions for NeMo Retriever Extraction](user-defined-functions.md)
+- [User-Defined Functions for NeMo Retriever Library](user-defined-functions.md)
 - [NimClient Usage](nimclient.md)

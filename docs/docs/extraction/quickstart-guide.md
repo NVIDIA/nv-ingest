@@ -1,4 +1,4 @@
-# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
+# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Library
 
 This guide helps you get started using [NeMo Retriever Library](overview.md) in self-hosted mode.
 
@@ -94,7 +94,7 @@ uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 
 !!! note
 
-Interaction from the host requires the appropriate port to be exposed from the `nemo-retriever` container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the NeMo Retriever service from within its container.
+Interaction from the host requires the appropriate port to be exposed from the `nemo-retriever` container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the NeMo Retriever Library from within its container.
 
 To work inside the container, run the following code.
 
@@ -419,7 +419,7 @@ For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the overri
 
 Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
 
-To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
+To use VLM captioning for infographics, start the NeMo Retriever Library with both the `retrieval` and `vlm` profiles by running the following code.
 ```shell
 docker compose \
   -f docker-compose.yaml \

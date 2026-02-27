@@ -1,4 +1,4 @@
-# Telemetry with NeMo Retriever Extraction
+# Telemetry with NeMo Retriever Library
 
 You can view telemetry data for [NeMo Retriever Library](overview.md).
 

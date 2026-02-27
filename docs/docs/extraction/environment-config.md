@@ -1,4 +1,4 @@
-# Environment Variables for NeMo Retriever Extraction
+# Environment Variables for NeMo Retriever Library
 
 The following are the environment variables that you can use to configure [NeMo Retriever Library](overview.md).
 You can specify these in your .env file or directly in your environment.

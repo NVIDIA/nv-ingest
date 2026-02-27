@@ -131,5 +131,5 @@ Instead of running NeMo Retriever Library locally, you can use NVCF to perform i
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
 - [Use the NeMo Retriever Python API](python-api-reference.md)

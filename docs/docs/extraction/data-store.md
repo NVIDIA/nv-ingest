@@ -1,4 +1,4 @@
-# Data Upload for NeMo Retriever Extraction
+# Data Upload for NeMo Retriever Library
 
 Use this documentation to learn how [NeMo Retriever Library](overview.md) handles and uploads data.
 

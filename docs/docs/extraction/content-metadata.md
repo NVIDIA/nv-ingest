@@ -1,4 +1,4 @@
-# Metadata Reference for NeMo Retriever Extraction
+# Metadata Reference for NeMo Retriever Library
 
 This documentation contains the reference for the metadata used in [NeMo Retriever Library](overview.md). 
 The definitions used in this documentation are the following:

@@ -1,4 +1,4 @@
-# Resource Scaling Modes for NeMo Retriever Extraction
+# Resource Scaling Modes for NeMo Retriever Library
 
 This guide covers how resource scaling modes work across stages in [NeMo Retriever Library](overview.md), and how to configure it with docker-compose.
 
