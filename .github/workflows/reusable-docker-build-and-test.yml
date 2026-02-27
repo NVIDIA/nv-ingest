@@ -215,10 +215,11 @@ jobs:
           fi
 
           if [ "${{ inputs.test-selection }}" = "full" ]; then
-            CMD="python -m pytest -rs -m \"$MARKERS\" $COV_ARGS $TEST_PATHS"
+            CMD="python -m pip install --disable-pip-version-check 'pymilvus[milvus_lite]' && python -m pytest -rs -m \"$MARKERS\" $COV_ARGS $TEST_PATHS"
           else
             N="${{ inputs.random-count }}"
             CMD="set -euo pipefail; \
+              python -m pip install --disable-pip-version-check 'pymilvus[milvus_lite]'; \
               python -m pytest --collect-only -q $TEST_PATHS | grep '::' | shuf -n \"$N\" > /tmp/selected-tests.txt; \
               python -m pytest -rs -m \"$MARKERS\" $COV_ARGS \$(cat /tmp/selected-tests.txt)"
           fi

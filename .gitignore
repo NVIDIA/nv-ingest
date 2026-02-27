@@ -181,14 +181,12 @@ tags
 # End of https://www.gitignore.io/api/vim,c++,cmake,python,synology
 
 ./build
-.conda-bld
 .Dockerfile
 .tmp
 *.dirlock
 *.engine
 *.lock
 /build*/
-/conda-build/
 dask-worker-space
 data/*
 docs/source/_lib
@@ -220,8 +218,6 @@ processed_docs
 # Ignore devcontainer volumes
 .volumes
 
-# Ignore conda build output
-conda/output_conda_channel
 
 # Ignore generate docs site
 docs/site

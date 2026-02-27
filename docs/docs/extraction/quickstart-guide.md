@@ -82,33 +82,9 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
-    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nemo-retriever:...  "/opt/conda/envs/nemo_…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:7670...  nemo-retriever-ms-runtime-1
-    14ef31ed7f49  milvusdb/milvus:v2.5.3-gpu                       "/tini -- bash -c 's…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
-    dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  7 minutes ago   Up 7 minutes            0.0.0.0:4317...  nemo-retriever-otel-collector-1
-    5bd0b48eb71b  nvcr.io/nim/nvidia/nemoretriever-graphic-ele...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8003...  nemo-retriever-graphic-elements-1
-    daf878669036  nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1    "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8009...  nemo-retriever-ocr-1
-    216bdf11c566  nvcr.io/nim/nvidia/nemoretriever-page-elements-v3:1.7.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8000...  nemo-retriever-page-elements-1
-    aee9580b0b9a  nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.0  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8012...  nemo-retriever-embedding-1
-    178a92bf6f7f  nvcr.io/nim/nvidia/nemoretriever-table-struc...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8006...  nemo-retriever-table-structure-1
-    7ddbf7690036  openzipkin/zipkin                                "start-zipkin"          7 minutes ago   Up 7 minutes (healthy)  9410/tcp...      nemo-retriever-zipkin-1
-    b73bbe0c202d  minio/minio:RELEASE.2023-03-20T20-16-18Z         "/usr/bin/docker-ent…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9000...  minio
-    97fa798dbe4f  prom/prometheus:latest                           "/bin/prometheus --w…"  7 minutes ago   Up 7 minutes            0.0.0.0:9090...  nemo-retriever-prometheus-1
-    f17cb556b086  grafana/grafana                                  "/run.sh"               7 minutes ago   Up 7 minutes            0.0.0.0:3000...  grafana-service
-    3403c5a0e7be  redis/redis-stack                                "/entrypoint.sh"        7 minutes ago   Up 7 minutes            0.0.0.0:6379...  nemo-retriever-redis-1
-    ```
-
-
-## Step 2: Install Python Dependencies
-
-You can interact with the NeMo Retriever service from the host, or by using `docker exec` to run commands in the NeMo Retriever container.
-
-To interact from the host, you'll need a Python environment that has the client dependencies installed. For example, you can use a Conda environment.
-
-```
-# conda not required but makes it easy to create a fresh Python environment
-conda create --name nemo-retriever-dev python=3.12.11
-conda activate nemo-retriever-dev
-pip install nemo-retriever==26.1.2
+uv venv --python 3.12 nv-ingest-dev
+source nv-ingest-dev/bin/activate
+uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 ```
 
 !!! tip
@@ -438,6 +414,18 @@ The default [docker-compose.yaml](https://github.com/NVIDIA/NeMo-Retriever/blob/
 | `docker-compose.l40s.yaml` | NVIDIA L40S |
 
 For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the override that best matches your GPU memory (for example, `docker-compose.l40s.yaml` or `docker-compose.a10g.yaml`).
+
+### Example: Using the VLM Profile for Infographic Captioning
+
+Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
+
+To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  --profile retrieval \
+  --profile vlm up
+```
 
 ### Example with A100 40GB
 

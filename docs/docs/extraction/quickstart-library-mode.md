@@ -21,7 +21,7 @@ To get started using library mode, you need the following:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended) or MacOS
 - Python 3.12
-- We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
+- We strongly advise using an isolated Python virtual env with [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 
 
@@ -29,7 +29,7 @@ To get started using library mode, you need the following:
 
 Use the following procedure to prepare your environment.
 
-1. Run the following code to create your NV Ingest Conda environment.
+1. Run the following code to create your NV Ingest Python environment.
 
     ```
        uv venv --python 3.12 nvingest && \
@@ -39,7 +39,7 @@ Use the following procedure to prepare your environment.
 
     !!! tip
 
-        To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
+        To confirm that you have activated your virtual environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
 2. Set or create a .env file that contains your NVIDIA Build API key and other environment variables.
 
