@@ -1,7 +1,7 @@
 # Ray Balancing Strategy
 
 This document describes the default Ray Data balancing strategy used by
-`retriever/src/retriever/ray_balance_dag.py`, why each test family exists, and
+`nemo_retriever/src/nemo_retriever/ray_balance_dag.py`, why each test family exists, and
 what to try next.
 
 ## Goal
@@ -129,21 +129,21 @@ To ensure recall is actually executed:
 Generate matrix CSV only:
 
 ```bash
-python retriever/src/retriever/ray_balance_dag.py \
+python nemo_retriever/src/nemo_retriever/ray_balance_dag.py \
   --input-dir /path/to/pdfs \
-  --write-default-matrix-csv retriever/ray_balance_variants.csv \
+  --write-default-matrix-csv nemo_retriever/ray_balance_variants.csv \
   --exit-after-writing-matrix
 ```
 
 Run a shard:
 
 ```bash
-python retriever/src/retriever/ray_balance_dag.py \
+python nemo_retriever/src/nemo_retriever/ray_balance_dag.py \
   --input-dir /path/to/pdfs \
-  --matrix-csv retriever/ray_balance_variants.csv \
+  --matrix-csv nemo_retriever/ray_balance_variants.csv \
   --row-start 1 \
   --row-end 200 \
-  --output-csv retriever/ray_balance_results_001_200.csv
+  --output-csv nemo_retriever/ray_balance_results_001_200.csv
 ```
 
 ## Recommended Next Experiments

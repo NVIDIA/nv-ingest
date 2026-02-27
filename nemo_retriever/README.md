@@ -18,10 +18,10 @@ From the repo root:
 cd /path/to/nv-ingest
 uv venv .retriever
 source .retriever/bin/activate
-uv pip install -e ./retriever
+uv pip install -e ./nemo_retriever
 ```
 
-This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
+This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
 
 ### OCR and CUDA 13 runtime (conda)
 
@@ -49,7 +49,7 @@ your system CUDA Toolkit is missing or older than 13. Use the provided conda env
    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
    ```
 
-4. Follow the **Installation** steps above unchanged: `uv venv .retriever`, `source .retriever/bin/activate`, `uv pip install -e ./retriever`. The conda env supplies the `uv` binary and the CUDA 13 runtime (the dynamic linker finds `libcudart.so.13` in the conda env's `lib`).
+4. Follow the **Installation** steps above unchanged: `uv venv .retriever`, `source .retriever/bin/activate`, `uv pip install -e ./nemo_retriever`. The conda env supplies the `uv` binary and the CUDA 13 runtime (the dynamic linker finds `libcudart.so.13` in the conda env's `lib`).
 
 If your system already has a suitable CUDA 13 (or you are not using OCR), you can use the UV-only path above without the conda env.
 
@@ -61,8 +61,8 @@ From the nv-ingest root, install with UV then run the batch pipeline with a dire
 cd /path/to/nv-ingest
 uv venv .retriever
 source .retriever/bin/activate
-uv pip install -e ./retriever
-uv run python retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs
+uv pip install -e ./nemo_retriever
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs
 ```
 
 Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. Recall is skipped if the query CSV file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, use the conda-based workflow under **OCR and CUDA 13 runtime (conda)** above.
@@ -81,7 +81,7 @@ Start a head node (dashboard is enabled by default on port 8265):
 ray start --head
 ```
 
-Open the dashboard at **http://127.0.0.1:8265**. Run your pipeline in the same machine; pass `--ray-address auto` to attach to this cluster (e.g. `uv run python retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs --ray-address auto` or the batch pipeline CLI with `--ray-address auto`).
+Open the dashboard at **http://127.0.0.1:8265**. Run your pipeline in the same machine; pass `--ray-address auto` to attach to this cluster (e.g. `uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs --ray-address auto` or the batch pipeline CLI with `--ray-address auto`).
 
 **Single-GPU cluster (multi-GPU nodes)**
 

@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import typer
 
-# If this file is executed directly (not via installed package), ensure `retriever/src`
+# If this file is executed directly (not via installed package), ensure `nemo_retriever/src`
 # is on sys.path so `import nemo_retriever...` works from a monorepo checkout.
 _THIS_FILE = Path(__file__).resolve()
-_RETRIEVER_SRC = _THIS_FILE.parents[1]  # .../retriever/src
-if (_RETRIEVER_SRC / "retriever").is_dir() and str(_RETRIEVER_SRC) not in sys.path:
+_RETRIEVER_SRC = _THIS_FILE.parents[1]  # .../nemo_retriever/src
+if (_RETRIEVER_SRC / "nemo_retriever").is_dir() and str(_RETRIEVER_SRC) not in sys.path:
     sys.path.insert(0, str(_RETRIEVER_SRC))
 
 from nemo_retriever.chart.config import load_chart_extractor_schema_from_dict

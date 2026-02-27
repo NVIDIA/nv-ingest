@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 #
-# Build from nv-ingest root: docker build -f retriever/Dockerfile -t retriever .
+# Build from nv-ingest root: docker build -f nemo_retriever/Dockerfile -t retriever .
 # Run: docker run retriever  (help) or docker run -v /host/docs:/data retriever /data
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
