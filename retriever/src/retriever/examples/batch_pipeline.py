@@ -14,10 +14,10 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from importlib import import_module
 from pathlib import Path
 from typing import Optional, TextIO
 
-import lancedb
 import pandas as pd
 import ray
 import typer
@@ -34,6 +34,11 @@ app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
+
+
+def _lancedb():
+    """Import lancedb lazily to avoid fork warnings during early process setup."""
+    return import_module("lancedb")
 
 
 class _TeeStream:
@@ -105,7 +110,7 @@ def _load_metadata_columns(uri: str, table_name: str) -> Optional[pd.DataFrame]:
     Returns a DataFrame with [source_id, page_number, metadata] or None on failure.
     """
     try:
-        db = lancedb.connect(uri)
+        db = _lancedb().connect(uri)
         table = db.open_table(table_name)
     except Exception:
         return None
@@ -271,7 +276,7 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     # Local path URI in this pipeline.
     Path(uri).mkdir(parents=True, exist_ok=True)
 
-    db = lancedb.connect(uri)
+    db = _lancedb().connect(uri)
     try:
         db.open_table(table_name)
         return
@@ -504,6 +509,22 @@ def main(
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),
+    embed_modality: str = typer.Option(
+        "text",
+        "--embed-modality",
+        help="Default embedding modality for all element types: "
+        "'text', 'image', or 'text_image' ('image_text' is also accepted).",
+    ),
+    text_elements_modality: Optional[str] = typer.Option(
+        None,
+        "--text-elements-modality",
+        help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
+    ),
+    structured_elements_modality: Optional[str] = typer.Option(
+        None,
+        "--structured-elements-modality",
+        help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -585,7 +606,15 @@ def main(
             ingestor = (
                 ingestor.files(glob_pattern)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+                .embed(
+                    EmbedParams(
+                        model_name=str(embed_model_name),
+                        embed_invoke_url=embed_invoke_url,
+                        embed_modality=embed_modality,
+                        text_elements_modality=text_elements_modality,
+                        structured_elements_modality=structured_elements_modality,
+                    )
+                )
                 .vdb_upload(
                     VdbUploadParams(
                         lancedb={
@@ -607,7 +636,15 @@ def main(
             ingestor = (
                 ingestor.files(glob_pattern)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+                .embed(
+                    EmbedParams(
+                        model_name=str(embed_model_name),
+                        embed_invoke_url=embed_invoke_url,
+                        embed_modality=embed_modality,
+                        text_elements_modality=text_elements_modality,
+                        structured_elements_modality=structured_elements_modality,
+                    )
+                )
                 .vdb_upload(
                     VdbUploadParams(
                         lancedb={
@@ -659,6 +696,9 @@ def main(
                     EmbedParams(
                         model_name=str(embed_model_name),
                         embed_invoke_url=embed_invoke_url,
+                        embed_modality=embed_modality,
+                        text_elements_modality=text_elements_modality,
+                        structured_elements_modality=structured_elements_modality,
                         batch_tuning={
                             "embed_workers": int(embed_workers),
                             "embed_batch_size": int(embed_batch_size),
@@ -716,6 +756,9 @@ def main(
                     EmbedParams(
                         model_name=str(embed_model_name),
                         embed_invoke_url=embed_invoke_url,
+                        embed_modality=embed_modality,
+                        text_elements_modality=text_elements_modality,
+                        structured_elements_modality=structured_elements_modality,
                         batch_tuning={
                             "embed_workers": int(embed_workers),
                             "embed_batch_size": int(embed_batch_size),
@@ -765,7 +808,7 @@ def main(
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
-        db = lancedb.connect(lancedb_uri)
+        db = _lancedb().connect(lancedb_uri)
         table = None
         open_err: Optional[Exception] = None
         for _ in range(3):
@@ -802,6 +845,7 @@ def main(
             lancedb_uri=str(lancedb_uri),
             lancedb_table=str(LANCEDB_TABLE),
             embedding_model=_recall_model,
+            embedding_http_endpoint=embed_invoke_url,
             top_k=10,
             ks=(1, 5, 10),
             hybrid=hybrid,

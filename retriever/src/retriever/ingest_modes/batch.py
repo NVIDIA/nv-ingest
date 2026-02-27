@@ -753,16 +753,26 @@ class BatchIngestor(Ingestor):
             embed_workers = int(endpoint_count)
 
         # Remaining kwargs are forwarded to the actor constructor.
+        embed_modality = resolved.embed_modality
+        text_elements_modality = resolved.text_elements_modality or embed_modality
+        structured_elements_modality = resolved.structured_elements_modality or embed_modality
         self._tasks.append(("embed", dict(kwargs)))
 
         # Explode content rows before embedding so each table/chart/infographic
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
+        from functools import partial
         from retriever.ingest_modes.inprocess import explode_content_to_rows
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        _explode_fn = partial(
             explode_content_to_rows,
+            modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+        )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _explode_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,

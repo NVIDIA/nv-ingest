@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RunMode = Literal["inprocess", "batch", "fused", "online"]
 
@@ -152,11 +152,17 @@ class ExtractParams(_ParamsModel):
     batch_tuning: BatchTuningParams = Field(default_factory=BatchTuningParams)
 
 
+IMAGE_MODALITIES: frozenset[str] = frozenset({"image", "text_image", "image_text"})
+
+
 class EmbedParams(_ParamsModel):
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
     input_type: str = "passage"
+    embed_modality: str = "text"  # "text", "image", or "text_image" — default for all element types
+    text_elements_modality: Optional[str] = None  # per-type override for page-text rows
+    structured_elements_modality: Optional[str] = None  # per-type override for table/chart/infographic rows
     text_column: str = "text"
     inference_batch_size: int = 32
     output_column: str = "text_embeddings_1b_v2"
@@ -168,6 +174,13 @@ class EmbedParams(_ParamsModel):
     runtime: ModelRuntimeParams = Field(default_factory=ModelRuntimeParams)
     batch_tuning: BatchTuningParams = Field(default_factory=BatchTuningParams)
     fused_tuning: FusedTuningParams = Field(default_factory=FusedTuningParams)
+
+    @field_validator("embed_modality", "text_elements_modality", "structured_elements_modality", mode="before")
+    @classmethod
+    def _normalize_modality(cls, v: str | None) -> str | None:
+        if v == "image_text":
+            return "text_image"
+        return v
 
 
 class VdbUploadParams(_ParamsModel):

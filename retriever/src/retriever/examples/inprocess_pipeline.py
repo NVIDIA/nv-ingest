@@ -155,6 +155,22 @@ def main(
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),
+    embed_modality: str = typer.Option(
+        "text",
+        "--embed-modality",
+        help="Default embedding modality for all element types: "
+        "'text', 'image', or 'text_image' ('image_text' is also accepted).",
+    ),
+    text_elements_modality: Optional[str] = typer.Option(
+        None,
+        "--text-elements-modality",
+        help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
+    ),
+    structured_elements_modality: Optional[str] = typer.Option(
+        None,
+        "--structured-elements-modality",
+        help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
+    ),
 ) -> None:
     _ = input_type
 
@@ -174,7 +190,15 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+            .embed(
+                EmbedParams(
+                    model_name=str(embed_model_name),
+                    embed_invoke_url=embed_invoke_url,
+                    embed_modality=embed_modality,
+                    text_elements_modality=text_elements_modality,
+                    structured_elements_modality=structured_elements_modality,
+                )
+            )
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -192,7 +216,15 @@ def main(
         ingestor = (
             ingestor.files(glob_pattern)
             .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+            .embed(
+                EmbedParams(
+                    model_name=str(embed_model_name),
+                    embed_invoke_url=embed_invoke_url,
+                    embed_modality=embed_modality,
+                    text_elements_modality=text_elements_modality,
+                    structured_elements_modality=structured_elements_modality,
+                )
+            )
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -221,7 +253,15 @@ def main(
                     ocr_invoke_url=ocr_invoke_url,
                 )
             )
-            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+            .embed(
+                EmbedParams(
+                    model_name=str(embed_model_name),
+                    embed_invoke_url=embed_invoke_url,
+                    embed_modality=embed_modality,
+                    text_elements_modality=text_elements_modality,
+                    structured_elements_modality=structured_elements_modality,
+                )
+            )
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
@@ -249,7 +289,15 @@ def main(
                     ocr_invoke_url=ocr_invoke_url,
                 )
             )
-            .embed(EmbedParams(model_name=str(embed_model_name), embed_invoke_url=embed_invoke_url))
+            .embed(
+                EmbedParams(
+                    model_name=str(embed_model_name),
+                    embed_invoke_url=embed_invoke_url,
+                    embed_modality=embed_modality,
+                    text_elements_modality=text_elements_modality,
+                    structured_elements_modality=structured_elements_modality,
+                )
+            )
             .vdb_upload(
                 VdbUploadParams(
                     lancedb={
