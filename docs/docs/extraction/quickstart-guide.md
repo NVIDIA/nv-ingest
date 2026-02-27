@@ -423,7 +423,7 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for image captioning of unstructured images and infographics. This profile enables the `caption` method in the Python API to generate text descriptions of visual content. For more information, refer to [Use Multimodal Embedding](vlm-embed.md) and [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
 
 
 ## Docker Compose override files
@@ -437,6 +437,18 @@ The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/
 | `docker-compose.l40s.yaml` | NVIDIA L40S |
 
 For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the override that best matches your GPU memory (for example, `docker-compose.l40s.yaml` or `docker-compose.a10g.yaml`).
+
+### Example: Using the VLM Profile for Infographic Captioning
+
+Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
+
+To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  --profile retrieval \
+  --profile vlm up
+```
 
 ### Example with A100 40GB
 
