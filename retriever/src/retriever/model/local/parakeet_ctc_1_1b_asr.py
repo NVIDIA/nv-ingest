@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Local ASR using nvidia/parakeet-ctc-1.1b.
+Local ASR using nvidia/parakeet-ctc-1.1b via Hugging Face Transformers.
 
-Tries Transformers (released/pip) first; on failure falls back to NeMo.
-Model expects 16 kHz mono input.
+Uses AutoModelForCTC + AutoProcessor with batch_decode(skip_special_tokens=True)
+to avoid <pad> tokens in output; falls back to post-processing to strip any remaining.
+Requires transformers>=5. Model expects 16 kHz mono input.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from __future__ import annotations
 import logging
 import tempfile
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 import numpy as np
 
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 MODEL_ID = "nvidia/parakeet-ctc-1.1b"
 SAMPLING_RATE = 16000
+
+
+def _strip_pad_from_transcript(text: str) -> str:
+    """Remove <pad> tokens and normalize spaces (fallback when decode doesn't skip them)."""
+    if not text:
+        return ""
+    t = text.replace("<pad>", "").strip()
+    return " ".join(t.split()) if t else ""
 
 
 def _load_audio_16k(path: str) -> Optional[np.ndarray]:
@@ -76,38 +85,28 @@ def _load_audio_16k(path: str) -> Optional[np.ndarray]:
     return data
 
 
-def _load_with_transformers() -> tuple[Optional[object], Optional[str]]:
-    """Try loading with Transformers. Returns (pipe_or_model, None) or (None, error_msg)."""
-    try:
-        from transformers import pipeline
+def _load_model_and_processor(model_id: str, hf_cache_dir: Optional[str] = None):
+    """Load Parakeet ASR via AutoModelForCTC + AutoProcessor (explicit decode control)."""
+    import torch
+    from transformers import AutoModelForCTC, AutoProcessor
 
-        pipe = pipeline(
-            "automatic-speech-recognition",
-            model=MODEL_ID,
-            device_map="auto",
-        )
-        return pipe, None
-    except Exception as e:
-        return None, str(e)
-
-
-def _load_with_nemo() -> tuple[Optional[object], Optional[str]]:
-    """Try loading with NeMo. Returns (model, None) or (None, error_msg)."""
-    try:
-        import nemo.collections.asr as nemo_asr
-
-        model = nemo_asr.models.EncDecCTCModelBPE.from_pretrained(model_name=MODEL_ID)
-        return model, None
-    except Exception as e:
-        return None, str(e)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    kwargs = {}
+    if hf_cache_dir:
+        kwargs["cache_dir"] = hf_cache_dir
+    processor = AutoProcessor.from_pretrained(model_id, **kwargs)
+    model = AutoModelForCTC.from_pretrained(
+        model_id, torch_dtype="auto", device_map=device, **kwargs
+    )
+    return model, processor
 
 
 class ParakeetCTC1B1ASR:
     """
-    Local ASR using nvidia/parakeet-ctc-1.1b.
+    Local ASR using nvidia/parakeet-ctc-1.1b via Hugging Face Transformers.
 
-    Tries Transformers first; if the installed Transformers version does not
-    support this model, falls back to NeMo (requires nemo_toolkit[all]).
+    Uses AutoModelForCTC + AutoProcessor with batch_decode(skip_special_tokens=True)
+    and post-processes to remove any remaining <pad> tokens. Requires transformers>=5.
     """
 
     def __init__(
@@ -119,35 +118,19 @@ class ParakeetCTC1B1ASR:
         self._device = device
         self._hf_cache_dir = hf_cache_dir
         self._model_id = model_id or MODEL_ID
-        self._backend: Literal["transformers", "nemo"] | None = None
-        self._pipe = None
-        self._nemo_model = None
+        self._model = None
+        self._processor = None
 
     def _ensure_loaded(self) -> None:
-        if self._backend is not None:
+        if self._model is not None and self._processor is not None:
             return
-        pipe_or_model, err = _load_with_transformers()
-        if pipe_or_model is not None:
-            self._pipe = pipe_or_model
-            self._backend = "transformers"
-            logger.info("ParakeetCTC1B1ASR: using Transformers backend")
-            return
-        logger.info("Transformers backend failed (%s); trying NeMo.", err)
-        nemo_model, nemo_err = _load_with_nemo()
-        if nemo_model is not None:
-            self._nemo_model = nemo_model
-            self._backend = "nemo"
-            logger.info("ParakeetCTC1B1ASR: using NeMo backend")
-            return
-        raise RuntimeError(
-            f"Failed to load {MODEL_ID}: Transformers failed ({err}); NeMo failed ({nemo_err}). "
-            "For NeMo fallback install: pip install nemo_toolkit[all]"
+        self._model, self._processor = _load_model_and_processor(
+            self._model_id, self._hf_cache_dir
         )
-
-    @property
-    def backend(self) -> Literal["transformers", "nemo"] | None:
-        """Backend in use after first transcribe or _ensure_loaded."""
-        return self._backend
+        logger.info(
+            "ParakeetCTC1B1ASR: loaded %s via Transformers (AutoModelForCTC + AutoProcessor)",
+            self._model_id,
+        )
 
     def transcribe(self, paths: List[str]) -> List[str]:
         """
@@ -155,6 +138,7 @@ class ParakeetCTC1B1ASR:
 
         Each path is loaded and resampled to 16 kHz mono as required by the model.
         Returns one string per path; empty string on load/transcribe failure.
+        <pad> tokens are removed via skip_special_tokens and/or post-processing.
         """
         self._ensure_loaded()
         results: List[str] = []
@@ -163,48 +147,33 @@ class ParakeetCTC1B1ASR:
             if audio is None:
                 results.append("")
                 continue
-            if self._backend == "transformers":
-                out = self._transcribe_transformers(audio)
-            else:
-                out = self._transcribe_nemo(path, audio)
-            results.append(out or "")
+            results.append(self._transcribe_audio(audio) or "")
         return results
 
-    def _transcribe_transformers(self, audio: np.ndarray) -> str:
-        if self._pipe is None:
+    def _transcribe_audio(self, audio: np.ndarray) -> str:
+        if self._model is None or self._processor is None:
             return ""
         try:
-            # pipeline accepts file path or dict with array/sampling_rate
-            result = self._pipe(
-                {"array": audio, "sampling_rate": SAMPLING_RATE},
+            import torch
+
+            # Single sample: wrap in list for processor
+            speech = [audio]
+            inputs = self._processor(
+                speech,
+                sampling_rate=self._processor.feature_extractor.sampling_rate,
+                return_tensors="pt",
+                padding=True,
             )
-            if isinstance(result, dict) and "text" in result:
-                return str(result["text"]).strip()
-            if isinstance(result, str):
-                return result.strip()
-            return ""
+            inputs = inputs.to(self._model.device, dtype=self._model.dtype)
+            with torch.no_grad():
+                outputs = self._model.generate(**inputs)
+            # batch_decode with skip_special_tokens to drop pad tokens
+            decoded = self._processor.batch_decode(
+                outputs, skip_special_tokens=True
+            )
+            text = decoded[0] if decoded else ""
+            # Fallback: strip any remaining <pad> and normalize spaces
+            return _strip_pad_from_transcript(text.strip())
         except Exception as e:
-            logger.warning("Transformers ASR failed: %s", e)
-            return ""
-
-    def _transcribe_nemo(self, path: str, audio: np.ndarray) -> str:
-        if self._nemo_model is None:
-            return ""
-        try:
-            # NeMo transcribe accepts list of file paths; model expects 16k.
-            # We have audio in memory; write to temp wav then transcribe
-            import soundfile as sf
-
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                wav_path = f.name
-            try:
-                sf.write(wav_path, audio, SAMPLING_RATE)
-                transcript_list = self._nemo_model.transcribe([wav_path])
-                if transcript_list and len(transcript_list) > 0:
-                    return str(transcript_list[0]).strip()
-                return ""
-            finally:
-                Path(wav_path).unlink(missing_ok=True)
-        except Exception as e:
-            logger.warning("NeMo ASR failed for %s: %s", path, e)
+            logger.warning("ASR (transformers) failed: %s", e)
             return ""

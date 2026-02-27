@@ -22,6 +22,20 @@ from retriever.audio.asr_actor import apply_asr_to_df
 from retriever.params import ASRParams
 
 
+def test_strip_pad_from_transcript():
+    """Transformers backend post-process removes <pad> and normalizes spaces."""
+    from retriever.model.local.parakeet_ctc_1_1b_asr import _strip_pad_from_transcript
+
+    assert _strip_pad_from_transcript("") == ""
+    assert _strip_pad_from_transcript("  ") == ""
+    assert _strip_pad_from_transcript("<pad>") == ""
+    assert _strip_pad_from_transcript("<pad> hello <pad> world") == "hello world"
+    assert _strip_pad_from_transcript("  a  <pad>  b  ") == "a b"
+    out = _strip_pad_from_transcript("  <pad> foo <pad> bar <pad>  ")
+    assert out == "foo bar"
+    assert "<pad>" not in out
+
+
 def test_asr_actor_empty_batch():
     with patch("retriever.audio.asr_actor._get_client") as mock_get:
         mock_client = MagicMock()

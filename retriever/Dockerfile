@@ -85,6 +85,9 @@ FROM base AS install
 
 WORKDIR /workspace
 
+# Unbuffered stdout/stderr so CLI output appears when run without a TTY (e.g. docker run without -it)
+ENV PYTHONUNBUFFERED=1
+
 COPY retriever retriever
 COPY src src
 COPY api api

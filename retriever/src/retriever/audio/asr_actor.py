@@ -57,17 +57,26 @@ def asr_params_from_env(
 
     Returns ASRParams with auth_token and function_id set from env when present.
     When NGC_API_KEY is set but AUDIO_FUNCTION_ID is not, uses the nv-ingest default Parakeet NIM function ID.
+    Local ASR always uses the transformers backend (nvidia/parakeet-ctc-1.1b).
     """
     import os
 
-    grpc_endpoint = (os.environ.get(grpc_endpoint_var) or "").strip() or default_grpc_endpoint
     auth_token = (os.environ.get(auth_token_var) or "").strip() or None
     function_id = (os.environ.get(function_id_var) or "").strip() or None
     if auth_token and function_id is None and default_function_id:
         function_id = default_function_id
 
+    # Only use remote (NGC) endpoint when credentials are set; otherwise use local Parakeet.
+    grpc_from_env = (os.environ.get(grpc_endpoint_var) or "").strip()
+    if grpc_from_env:
+        grpc_endpoint = grpc_from_env
+    elif auth_token or function_id:
+        grpc_endpoint = default_grpc_endpoint or ""
+    else:
+        grpc_endpoint = ""  # Local ASR (nvidia/parakeet-ctc-1.1b via Transformers)
+
     return ASRParams(
-        audio_endpoints=(grpc_endpoint, None),
+        audio_endpoints=(grpc_endpoint or None, None),
         audio_infer_protocol="grpc",
         function_id=function_id,
         auth_token=auth_token,

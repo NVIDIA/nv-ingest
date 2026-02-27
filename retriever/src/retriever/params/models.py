@@ -82,7 +82,7 @@ class AudioChunkParams(_ParamsModel):
 
 
 class ASRParams(_ParamsModel):
-    """Params for ASR (Parakeet/Riva gRPC). Remote/self-deployed only; no host-local."""
+    """Params for ASR (Parakeet/Riva gRPC or local transformers backend)."""
 
     audio_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     audio_infer_protocol: str = "grpc"

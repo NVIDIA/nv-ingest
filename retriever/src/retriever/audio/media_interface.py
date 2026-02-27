@@ -204,7 +204,8 @@ class MediaInterface(_LoaderInterface):
         except ffmpeg.Error as e:
             logger.error("FFmpeg error for file %s: %s", original_input_path, e.stderr.decode())
             return []
-        files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
+        # Use actual chunk files produced by ffmpeg (may differ from num_splits)
+        files = sorted(str(p) for p in output_dir.glob(f"{file_name}_chunk_*{suffix}") if p.is_file())
         if video_audio_separate and suffix.lower() in [".mp4", ".mov", ".avi", ".mkv"]:
             for f in files:
                 fp = Path(f)

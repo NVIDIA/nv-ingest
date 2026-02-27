@@ -18,9 +18,12 @@ from retriever.audio.media_interface import MediaInterface
 from retriever.params import ASRParams
 from retriever.params import AudioChunkParams
 
+from .cli import app
+
 __all__ = [
     "ASRActor",
     "ASRParams",
+    "app",
     "asr_params_from_env",
     "AudioChunkParams",
     "MediaChunkActor",
