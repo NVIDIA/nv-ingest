@@ -17,7 +17,7 @@ limitations under the License.
 
 # NV-Ingest Devcontainer
 
-The nv-ingest devcontainer is provided as a quick-to-set-up development and exploration environment for use with [Visual Studio Code](https://code.visualstudio.com) (Code). The devcontainer is a lightweight container which mounts-in a Conda environment with cached packages, alleviating long Conda download times on subsequent launches. It provides a simple framework for adding developer-centric [scripts](#development-scripts), and incorporates some helpful Code plugins.
+The nv-ingest devcontainer is provided as a quick-to-set-up development and exploration environment for use with [Visual Studio Code](https://code.visualstudio.com) (Code). The devcontainer is a lightweight container with a pre-created `uv` Python environment and package cache for fast launches. It provides a simple framework for adding developer-centric [scripts](#development-scripts), and incorporates some helpful Code plugins.
 
 > [!Note]
 > NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever extraction.
