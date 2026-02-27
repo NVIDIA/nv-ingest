@@ -6,7 +6,11 @@
 
 from __future__ import annotations
 
+from .retriever import retriever as _retriever_cls
+
 __all__ = ["__version__", "create_ingestor", "get_version", "get_version_info", "ingestor", "retriever"]
+
+retriever = _retriever_cls()
 
 
 def __getattr__(name: str):
@@ -22,10 +26,6 @@ def __getattr__(name: str):
             "get_version": get_version,
             "get_version_info": get_version_info,
         }[name]
-    if name == "retriever":
-        from .retriever import retriever
-
-        return retriever
     if name == "ingestor":
         from .ingestor import ingestor
 
