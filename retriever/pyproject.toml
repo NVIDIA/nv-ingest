@@ -44,12 +44,12 @@ dependencies = [
   "numpy>=1.26.0",
   "debugpy>=1.8.0",
   "python-multipart>=0.0.9",
-  # NOTE: `llama_nemotron_embed_1b_v2` currently expects `HybridCache` from
-  # `transformers.cache_utils`, which is not present in transformers>=5.
-  # Versions 4.54.0-4.55.x have a flash attention bug that produces incorrect
-  # image embeddings in the VL model; exclude that range.
-  "transformers>=4.49.0,<5.0.0,!=4.54.*,!=4.55.*",
-  "tokenizers>=0.20.3,<0.22.0",
+  # transformers>=5 enables loading nvidia/parakeet-ctc-1.1b via pipeline (see
+  # parakeet-ctc-1.1b README). If using llama_nemotron_embed_1b_v2, verify
+  # compatibility with transformers 5 (it previously relied on HybridCache).
+  "transformers>=5.0.0",
+  "tokenizers>=0.20.3",
+  "accelerate>=1.1.0",
   "torch~=2.9.1",
   "torchvision>=0.24,<0.25",
   "einops",
@@ -60,6 +60,9 @@ dependencies = [
   "nemotron-table-structure-v1>=0.dev0",
   "nemotron-ocr>=0.dev0",
   "markitdown",
+  # Local ASR (Parakeet): read chunk files and resample to 16 kHz mono
+  "soundfile>=0.12.0",
+  "scipy>=1.11.0",
 ]
 
 [project.optional-dependencies]
