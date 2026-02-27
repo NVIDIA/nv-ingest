@@ -86,12 +86,12 @@ jobs:
 
       - name: Build nemo-retriever wheel
         run: |
-          cd retriever
+          cd nemo_retriever
           python - <<'PY'
           from datetime import datetime, timezone
           from pathlib import Path
 
-          Path("src/retriever/_build_info.py").write_text(
+          Path("src/nemo_retriever/_build_info.py").write_text(
               '"""Build metadata written by CI before packaging."""\n\n'
               'BUILD_GIT_SHA = "${{ github.sha }}"\n'
               f'BUILD_DATE = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n',
@@ -115,6 +115,6 @@ jobs:
             client/dist/*.tar.gz
             src/dist/*.whl
             src/dist/*.tar.gz
-            retriever/dist/*.whl
-            retriever/dist/*.tar.gz
+            nemo_retriever/dist/*.whl
+            nemo_retriever/dist/*.tar.gz
           retention-days: 7

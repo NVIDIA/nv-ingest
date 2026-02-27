@@ -40,4 +40,4 @@ dist/
 **/*.pyc
 *.egg-info/
 **/*.egg-info/
-retriever/.venv/
+nemo_retriever/.venv/

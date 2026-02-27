@@ -1,0 +1,53 @@
+# Example config for chart extraction.
+#
+# Intended usage (once the chart stage CLI is wired up similarly to table stage):
+#   - `retriever chart stage run --config <this.yaml> --input <primitives.parquet>`
+#   - `retriever local stage4 run --config <this.yaml> --input <primitives.parquet>`
+#
+# This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema`
+# via `nemo_retriever.chart.config.load_chart_extractor_schema_from_dict`.
+#
+# IMPORTANT:
+# If `endpoint_config.yolox_endpoints` is null/empty, chart extraction will fall back to the local
+# HuggingFace model (`nemo_retriever.model.local.nemotron_graphic_elements_v1`).
+# If `endpoint_config.ocr_endpoints` is null/empty, chart extraction falls back to local Nemotron OCR
+# (`nemo_retriever.model.local.nemotron_ocr_v1`) with default HuggingFace model loading.
+#
+
+# Optional worker settings
+max_queue_size: 1
+n_workers: 2
+raise_on_failure: false
+
+# Endpoint configuration for chart extraction (YOLOX graphic-elements + OCR).
+endpoint_config:
+  # Optional auth token for secured services (NIM / hosted endpoints)
+  auth_token: null
+
+  # Tuple/list in the form: [grpc, http]
+  #
+  # Chart extraction uses the YOLOX *graphic-elements* model (not page-elements).
+  #
+  # For the provided `docker-compose.yaml`, the host-mapped ports are:
+  #   - graphic-elements HTTP: 8003 (container 8000)
+  #   - graphic-elements gRPC: 8004 (container 8001)
+  #
+  # If you're running from inside the docker compose network instead, these often look like:
+  #   - "graphic-elements:8001" and "http://graphic-elements:8000/v1/infer"
+  # yolox_endpoints: ["localhost:8004", "http://localhost:8003/v1/infer"]
+  yolox_endpoints: null
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # yolox_infer_protocol: grpc
+
+  # OCR model endpoints (same pattern: [grpc, http]).
+  # For the provided `docker-compose.yaml`, the host-mapped ports are:
+  #   - ocr HTTP: 8019 (container 8000)
+  #   - ocr gRPC: 8010 (container 8001)
+  # ocr_endpoints: ["localhost:8010", "http://localhost:8019/v1/infer"]
+  ocr_endpoints: null
+  # Optional; if omitted it is inferred from which endpoint is present.
+  # ocr_infer_protocol: grpc
+
+  # Optional performance knobs
+  nim_batch_size: 2
+  workers_per_progress_engine: 5

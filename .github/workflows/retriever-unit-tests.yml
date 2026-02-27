@@ -22,9 +22,9 @@ jobs:
       - name: Install unit test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest pandas pydantic pyyaml
+          python -m pip install pytest pandas pydantic pyyaml typer
 
       - name: Run retriever unit tests
         env:
-          PYTHONPATH: retriever/src
-        run: python -m pytest retriever/tests -q
+          PYTHONPATH: nemo_retriever/src
+        run: python -m pytest nemo_retriever/tests -q
