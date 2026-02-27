@@ -23,17 +23,22 @@ __all__ = [
 def __getattr__(name: str):
     if name == "NemotronPageElementsV3":
         from .nemotron_page_elements_v3 import NemotronPageElementsV3
+
         return NemotronPageElementsV3
     if name == "NemotronOCRV1":
         from .nemotron_ocr_v1 import NemotronOCRV1
+
         return NemotronOCRV1
     if name == "NemotronTableStructureV1":
         from .nemotron_table_structure_v1 import NemotronTableStructureV1
+
         return NemotronTableStructureV1
     if name == "NemotronGraphicElementsV1":
         from .nemotron_graphic_elements_v1 import NemotronGraphicElementsV1
+
         return NemotronGraphicElementsV1
     if name == "ParakeetCTC1B1ASR":
         from .parakeet_ctc_1_1b_asr import ParakeetCTC1B1ASR
+
         return ParakeetCTC1B1ASR
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
