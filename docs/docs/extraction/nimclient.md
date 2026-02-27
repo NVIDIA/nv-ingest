@@ -1,11 +1,11 @@
-# NimClient Usage Guide for NeMo Retriever Extraction
+# NimClient Usage Guide for NeMo Retriever Library
 
 The `NimClient` class provides a unified interface for connecting to and interacting with NVIDIA NIM Microservices. 
-This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever extraction](overview.md) pipelines and User Defined Functions (UDFs).
+This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever Library](overview.md) pipelines and User Defined Functions (UDFs).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 The NimClient architecture consists of two main components:
 
@@ -587,5 +587,5 @@ print(f"Formatted input: {formatted}")
 
 ## Related Topics
 
-- [User-Defined Functions for NeMo Retriever Extraction](user-defined-functions.md)
-- [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)
+- [User-Defined Functions for NeMo Retriever Library](user-defined-functions.md)
+- [User-Defined Stages for NeMo Retriever Library](user-defined-stages.md)

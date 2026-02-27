@@ -1,11 +1,11 @@
 # Environment Variables for NeMo Retriever Extraction
 
-The following are the environment variables that you can use to configure [NeMo Retriever extraction](overview.md).
+The following are the environment variables that you can use to configure [NeMo Retriever Library](overview.md).
 You can specify these in your .env file or directly in your environment.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## General Environment Variables
@@ -25,6 +25,16 @@ You can specify these in your .env file or directly in your environment.
 | `REDIS_POOL_SIZE`                | - `50` (default) <br/> - `100` <br/> - `200` <br/>     | Maximum Redis connection pool size. Increase for high-concurrency workloads processing many documents in parallel. Default of 50 works well for most deployments. |
 | `IMAGE_STORAGE_URI`              | `s3://nv-ingest/artifacts/store/images` <br/>          | Default fsspec-compatible URI for the `store` task. Supports `s3://`, `file://`, `gs://`, etc. See [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images). |
 | `IMAGE_STORAGE_PUBLIC_BASE_URL`  | `https://assets.example.com/images` <br/>              | Optional HTTP(S) base URL for serving stored images. |
+
+
+## Vector Database (Retrieval) Environment Variables
+
+These variables apply when using the test harness or when configuring the vector database backend.
+
+| Name                             | Example                        | Description                                                           |
+|----------------------------------|--------------------------------|-----------------------------------------------------------------------|
+| `VDB_BACKEND`                    | `lancedb` (default) <br/> `milvus` <br/> | Vector database backend. Use `lancedb` for embedded, in-process storage (default), or `milvus` for client-server. |
+| `HYBRID`                         | `true` <br/> `false` (default) <br/> | LanceDB only: enable hybrid retrieval (BM25 FTS + vector, RRF). |
 
 
 ## Library Mode Environment Variables

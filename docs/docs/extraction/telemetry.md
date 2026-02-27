@@ -1,10 +1,10 @@
 # Telemetry with NeMo Retriever Extraction
 
-You can view telemetry data for [NeMo Retriever extraction](overview.md).
+You can view telemetry data for [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## OpenTelemetry

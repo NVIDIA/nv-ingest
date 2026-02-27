@@ -1,6 +1,6 @@
-# Extract Speech with NeMo Retriever Extraction
+# Extract Speech with NeMo Retriever Library
 
-This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
+This documentation describes two methods to run [NeMo Retriever Library](overview.md) 
 with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
 to extract speech from audio files.
 
@@ -9,7 +9,7 @@ to extract speech from audio files.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 Currently, you can extract speech from the following file types:
 
@@ -20,7 +20,7 @@ Currently, you can extract speech from the following file types:
 
 ## Overview
 
-[NeMo Retriever extraction](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
+[NeMo Retriever Library](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
 Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
 NeMo Retriever leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
 to transcribe speech to text, which is then embedded by using the NeMo Retriever embedding NIM. 
@@ -62,17 +62,17 @@ Use the following procedure to run the NIM locally.
     NGC_API_KEY=<your-ngc-key>
     ```
 
-3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command. The `--profile audio` flag ensures that speech-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
+3. Start the retriever services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command. The `--profile audio` flag ensures that speech-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
     ```shell
     docker compose --profile retrieval --profile audio up
     ```
 
-4. After the services are running, you can interact with nv-ingest by using Python.
+4. After the services are running, you can interact with the pipeline by using Python.
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells nv-ingest to extract information from WAV audio files.
+    - The `extract` method tells the pipeline to extract information from WAV audio files.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -102,7 +102,7 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells nv-ingest to extract information from WAV audio files.
+    - The `extract` method tells the pipeline to extract information from WAV audio files.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -132,4 +132,4 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
+- [Use the Python API](nv-ingest-python-api.md)

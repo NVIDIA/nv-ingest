@@ -1,28 +1,28 @@
-# Frequently Asked Questions for NeMo Retriever Extraction
+# Frequently Asked Questions for NeMo Retriever Library
 
-This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever extraction](overview.md).
+This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 
-## What if I already have a retrieval pipeline? Can I just use NeMo Retriever extraction? 
+## What if I already have a retrieval pipeline? Can I just use NeMo Retriever Library? 
 
-You can use the nv-ingest-cli or Python APIs to perform extraction only, and then consume the results.
+You can use the CLI or Python APIs to perform extraction only, and then consume the results.
 Using the Python API, `results` is a list object with one entry.
 For code examples, see the Jupyter notebooks [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) 
 and [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb).
 
 
 
-## Where does NeMo Retriever extraction (nv-ingest) ingest to?
+## Where does NeMo Retriever Library ingest to?
 
-NeMo Retriever extraction supports extracting text representations of various forms of content, 
-and ingesting to the [Milvus vector database](https://milvus.io/). 
-NeMo Retriever extraction does not store data on disk except through Milvus and its underlying Minio object store. 
-You can ingest to other data stores; however, you must configure other data stores yourself. 
+NeMo Retriever Library supports extracting text representations of various forms of content,
+and ingesting to a vector database. **[LanceDB](https://lancedb.com/) is the default**; [Milvus](https://milvus.io/) is also fully supported.
+NeMo Retriever Library does not store data on disk except through the vector database (LanceDB uses local Lance files; Milvus uses its server and MinIO).
+You can ingest to other data stores; however, you must configure other data stores yourself.
 For more information, refer to [Data Upload](data-store.md).
 
 

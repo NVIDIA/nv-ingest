@@ -1,6 +1,6 @@
-# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
+# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Library
 
-This guide helps you get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
+This guide helps you get started using [NeMo Retriever Library](overview.md) in self-hosted mode.
 
 
 ## Step 1: Start Containers
@@ -48,9 +48,13 @@ e. Make sure that NVIDIA is set as your default container runtime before you run
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-f. Start core services. This example uses the retrieval profile.  For more information about other profiles, see [Profile Information](#profile-information).
+f. Start core services. By default, the pipeline uses **LanceDB** as the vector database (embedded, in-process); no extra Docker profile is required. If you want to use **Milvus** instead, start with the retrieval profile. This example uses the retrieval profile to run Milvus. For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval up`
+
+    !!! tip "LanceDB (default)"
+
+        To use the default LanceDB backend, you can run `docker compose up` without `--profile retrieval`. LanceDB runs in-process and does not require Milvus, etcd, or MinIO. For details, see [Data Upload](data-store.md).
 
     !!! tip
 
@@ -117,7 +121,7 @@ uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 
 !!! note
 
-Interaction from the host requires the appropriate port to be exposed from the `nv-ingest` container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the NV-Ingest service from within its container.
+Interaction from the host requires the appropriate port to be exposed from the runtime container, as defined in the `docker-compose.yaml` file. If you prefer, you can disable this port and interact directly with the service from within its container.
 
 To work inside the container, run the following code.
 
@@ -129,13 +133,13 @@ This command opens a shell in the `/workspace` directory, where the `DATASET_ROO
 ```bash
 (nv_ingest_runtime) root@your-computer-name:/workspace#
 ```
-From this prompt, you can run the `nv-ingest` CLI and Python examples.
+From this prompt, you can run the CLI and Python examples.
 
-Because many service URIs default to localhost, running inside the `nv-ingest` container also requires that you specify URIs manually so that services can communicate across containers on the internal Docker network. See the example following for how to set the `milvus_uri`.
+Because many service URIs default to localhost, running inside the runtime container also requires that you specify URIs manually so that services can communicate across containers on the internal Docker network. When using Milvus, see the example following for how to set the `milvus_uri`. With the default LanceDB backend, no extra URI configuration is needed.
 
 ## Step 3: Ingest Documents
 
-You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
+You can submit jobs programmatically in Python or using the [CLI](nv-ingest_cli.md).
 
 The following examples demonstrate how to extract text, charts, tables, and images:
 
@@ -409,7 +413,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 !!! tip
 
-    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [Enterprise RAG Blueprint on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [Enterprise RAG Blueprint on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with the retriever pipeline.
 
 
 
@@ -420,7 +424,7 @@ You can specify multiple `--profile` options.
 
 | Profile               | Type     | Description                                                       | 
 |-----------------------|----------|-------------------------------------------------------------------| 
-| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
+| `retrieval`           | Core     | Enables the embedding NIM and (optional) GPU-accelerated Milvus. Omit this profile to use the default LanceDB backend.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
 | `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for image captioning of unstructured images and infographics. This profile enables the `caption` method in the Python API to generate text descriptions of visual content. For more information, refer to [Use Multimodal Embedding](vlm-embed.md) and [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
@@ -442,7 +446,7 @@ For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the overri
 
 Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
 
-To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
+To use VLM captioning for infographics, start NeMo Retriever Library with both the `retrieval` and `vlm` profiles by running the following code.
 ```shell
 docker compose \
   -f docker-compose.yaml \
@@ -482,7 +486,7 @@ docker compose \
 
 ## Specify MIG slices for NIM models
 
-When you deploy NV-Ingest with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NV-Ingest NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md%E2%80%8B).​
+When you deploy the pipeline with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/nv-ingest/main/helm/README.md%E2%80%8B).​
 
 To target a specific MIG profile—for example, a 3g.20gb slice on an A100, which is a hardware-partitioned virtual GPU instance that gives your workload a fixed mid-sized share of the A100’s compute plus 20 GB of dedicated GPU memory and behaves like a smaller independent GPU—for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
 

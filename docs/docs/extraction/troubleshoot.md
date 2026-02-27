@@ -1,15 +1,15 @@
 # Troubleshoot NeMo Retriever Extraction
 
-Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
+Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## Can't process long, non-language text strings
 
-NeMo Retriever extraction is designed to process language and language-length strings. 
+NeMo Retriever Library is designed to process language and language-length strings. 
 If you submit a document that contains extremely long, or non-language text strings, 
 such as a DNA sequence, errors or unexpected results occur.
 
@@ -48,7 +48,7 @@ ulimit -u 10,000
 ## Out-of-Memory (OOM) Error when Processing Large Datasets
 
 When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
-This happens because, by default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+This happens because, by default, NeMo Retriever Library stores the results from every document in system memory (RAM). 
 If the total size of the results exceeds the available memory, the process fails.
 
 To resolve this issue, use the `save_to_disk` method. 

@@ -1,6 +1,6 @@
-# Use Multimodal Embedding with NeMo Retriever Extraction
+# Use Multimodal Embedding with NeMo Retriever Library
 
-This documentation describes how to use [NeMo Retriever extraction](overview.md) 
+This documentation describes how to use [NeMo Retriever Library](overview.md) 
 with the multimodal embedding model [Llama 3.2 NeMo Retriever Multimodal Embedding 1B](https://build.nvidia.com/nvidia/llama-3_2-nemoretriever-1b-vlm-embed-v1).
 
 The `Llama 3.2 NeMo Retriever Multimodal Embedding 1B` model is optimized for multimodal question-answering retrieval. 
@@ -10,14 +10,14 @@ The model supports images that contain text, tables, charts, and infographics.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## Configure and Run the Multimodal NIM
 
 Use the following procedure to configure and run the multimodal embedding NIM locally.
 
-1. Set the embedding model in your .env file. This tells NeMo Retriever extraction to use the Llama 3.2 Multimodal model instead of the default text-only embedding model.
+1. Set the embedding model in your .env file. This tells NeMo Retriever Library to use the Llama 3.2 Multimodal model instead of the default text-only embedding model.
 
     ```
     EMBEDDING_IMAGE=nvcr.io/nvidia/nemo-microservices/llama-3.2-nemoretriever-1b-vlm-embed-v1
@@ -25,7 +25,7 @@ Use the following procedure to configure and run the multimodal embedding NIM lo
     EMBEDDING_NIM_MODEL_NAME=nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1
     ```
 
-2. Start the NeMo Retriever extraction services. The multimodal embedding service is included by default.
+2. Start the NeMo Retriever Library services. The multimodal embedding service is included by default.
 
     ```
     docker compose --profile retrieval up
@@ -90,7 +90,7 @@ results = ingestor.ingest()
 ## Example with Embedding Entire PDF Pages as Images
 
 For documents where the entire page layout is important (such as infographics, complex diagrams, or forms), 
-you can configure NeMo Retriever extraction to treat every page as a single image.
+you can configure NeMo Retriever Library to treat every page as a single image.
 The following example extracts and embeds each page as an image.
 
 !!! note
@@ -122,5 +122,5 @@ results = ingestor.ingest()
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
+- [Use the Python API](nv-ingest-python-api.md)
 - [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images)

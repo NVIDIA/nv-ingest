@@ -1,10 +1,10 @@
 # Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
 
-[NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
+[NeMo Retriever Library](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 In addition, you can use library mode, which is intended for the following cases:
 
@@ -34,8 +34,10 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
+         uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
     ```
+
+    By default, the pipeline uses **LanceDB** as the vector database (no extra package required). To use **Milvus** (e.g. milvus-lite) instead, also install `milvus-lite==2.4.12` and pass `milvus_uri="milvus.db"` in `vdb_upload`. For details, see [Data Upload](data-store.md).
 
     !!! tip
 
@@ -96,9 +98,9 @@ def main():
         message_client_hostname="localhost",
     )
 
-    # gpu_cagra accelerated indexing is not available in milvus-lite
-    # Provide a filename for milvus_uri to use milvus-lite
-    milvus_uri = "milvus.db"
+    # Optional: use Milvus (e.g. milvus-lite) by providing milvus_uri and installing milvus-lite.
+    # By default, LanceDB is used and no milvus_uri is needed.
+    # milvus_uri = "milvus.db"
     collection_name = "test"
     sparse = False
 
@@ -119,7 +121,7 @@ def main():
         .embed()
         .vdb_upload(
             collection_name=collection_name,
-            milvus_uri=milvus_uri,
+            # milvus_uri=milvus_uri,  # Uncomment to use Milvus instead of LanceDB
             sparse=sparse,
             # for llama-3.2 embedder, use 1024 for e5-v5
             dense_dim=2048,
@@ -185,16 +187,17 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ## Step 3: Query Ingested Content
 
-To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
+To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code. With the default LanceDB backend, use the LanceDB retrieval API (see [Data Upload](data-store.md)). The example below shows retrieval when using Milvus (e.g. milvus-lite).
 
 ```python
 import os
 from openai import OpenAI
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
+# Only needed when using Milvus (e.g. milvus-lite) instead of LanceDB
 milvus_uri = "milvus.db"
 collection_name = "test"
-sparse=False
+sparse = False
 
 queries = ["Which animal is responsible for the typos?"]
 
