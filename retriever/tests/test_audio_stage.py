@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Tests for the audio extraction-only stage (retriever audio stage extract).
+Tests for the audio extraction-only stage (retriever audio extract).
 """
 
 from pathlib import Path
@@ -55,7 +55,7 @@ def test_audio_stage_extract_one_mocked_asr(tmp_path: Path):
 
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_audio_stage_extract_cli_writes_sidecar(tmp_path: Path):
-    """Run stage extract CLI; assert sidecar JSON exists and has expected shape."""
+    """Run audio extract CLI; assert sidecar JSON exists and has expected shape."""
     wav = tmp_path / "sample.wav"
     _make_small_wav(wav, duration_sec=0.3)
     mock_client = MagicMock()

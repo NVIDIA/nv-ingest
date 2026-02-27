@@ -3,23 +3,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Audio CLI: Typer app for `retriever audio` subcommands.
+Audio extraction CLI (chunk + ASR, write *.audio_extraction.json sidecars).
 
-Kept in a separate module so that `retriever.audio.__init__` does not import
-`__main__`. Importing __main__ from the package causes runpy to see the module
-already in sys.modules when running `python -m retriever.audio`, leading to a
-RuntimeWarning and unreliable CLI behavior (e.g. no output in Docker).
+This module intentionally contains **no configuration logic**. It simply re-exports the
+`retriever.audio.stage` Typer application so any arguments provided to:
+
+  `retriever audio ...`
+
+are handled exactly the same as the stage commands (e.g. `extract`, `discover`).
 """
 
 from __future__ import annotations
 
-import typer
-
-from . import stage
-
-app = typer.Typer(help="Audio extraction (chunk + ASR).")
-app.add_typer(stage.app, name="stage")
+from retriever.audio.stage import app as app
 
 
 def main() -> None:
     app()
+
+
+if __name__ == "__main__":
+    main()

@@ -5,7 +5,8 @@
 """
 Audio extraction stage: chunk + ASR only, write *.audio_extraction.json sidecars.
 
-Provides an extraction-only CLI analogous to `retriever pdf stage page-elements`.
+Invoked as `retriever audio extract` / `retriever audio discover` (or
+`python -m retriever.audio extract` / `discover`). Analogous to `retriever pdf stage page-elements`.
 """
 
 from __future__ import annotations
