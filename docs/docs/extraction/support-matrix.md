@@ -1,10 +1,10 @@
-# Support Matrix for NeMo Retriever Extraction
+# Support Matrix for NeMo Retriever Library
 
-Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
+Before you begin using [NeMo Retriever Library](overview.md), ensure that you have the hardware for your use case.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## Core and Advanced Pipeline Features
@@ -17,7 +17,7 @@ The core pipeline features include the following:
 - nemoretriever-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
 - nemoretriever-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
 - nemoretriever-ocr-v1 — Image OCR model to detect and extract text from images.
-- retrieval — Enables embedding and indexing into Milvus.
+- retrieval — Enables embedding and indexing into LanceDB (default) or Milvus.
 
 Advanced features require additional GPU support and disk space. 
 This includes the following:
@@ -36,7 +36,7 @@ This includes the following:
 
 ## Hardware Requirements
 
-NeMo Retriever extraction supports the following GPU hardware.
+NeMo Retriever Library supports the following GPU hardware.
 
 - [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
@@ -47,7 +47,7 @@ NeMo Retriever extraction supports the following GPU hardware.
 - [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
 
 
-The following are the hardware requirements to run NeMo Retriever extraction.
+The following are the hardware requirements to run NeMo Retriever Library.
 
 |Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB     | A10G          | L40S   |
 |----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|---------------|---------------|--------|

@@ -1,6 +1,6 @@
-# Add User-defined Stages to Your NeMo Retriever Extraction Pipeline
+# Add User-defined Stages to Your NeMo Retriever Library Pipeline
 
-This documentation demonstrates how to add user-defined stages to your [NeMo Retriever extraction](overview.md) pipeline.
+This documentation demonstrates how to add user-defined stages to your [NeMo Retriever Library](overview.md) pipeline.
 You can directly import a function, or use a string module path, and include robust signature validation. 
 By following these steps, 
 your Lambda stages are robust, signature-validated, plug-and-play for your RayPipeline, 
@@ -8,7 +8,7 @@ and operate on a well-defined DataFrame payload and metadata structure.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 To add user-defined stages to your pipeline, you need the following:
@@ -21,7 +21,7 @@ To add user-defined stages to your pipeline, you need the following:
 
 - **A DataFrame payload** — The `control_message.payload` field must be a [pandas.DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html). For more information, refer to [Create a DataFrame Payload](#create-a-dataframe-payload).
 
-- **Valid metadata** — The `metadata` field must conform to the [nv-ingest metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
+- **Valid metadata** — The `metadata` field must conform to the [content metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
 
 
 
@@ -160,7 +160,7 @@ When the pipeline runs it does the following:
 ## Update and Validate Metadata
 
 The `metadata` column in each row is a dictionary (JSON object), 
-and must conform to the [nv-ingest metadata schema](content-metadata.md). 
+and must conform to the [content metadata schema](content-metadata.md). 
 
 After you change any metadata, you can validate it by using the `validate_metadata` function 
 as demonstrated in the following code example.
@@ -228,7 +228,7 @@ Use the following best practices to avoid validation failures.
 
 ## Minimal Complete Example
 
-The  following example adds user-defined stages to your NeMo Retriever extraction pipeline. 
+The  following example adds user-defined stages to your NeMo Retriever Library pipeline. 
 
 1. The following code creates a function for a user-defined stage.
 
@@ -292,5 +292,5 @@ The  following example adds user-defined stages to your NeMo Retriever extractio
 
 ## Related Topics
 
-- [User-Defined Functions for NeMo Retriever Extraction](user-defined-functions.md)
+- [User-Defined Functions for NeMo Retriever Library](user-defined-functions.md)
 - [NimClient Usage](nimclient.md)

@@ -1,8 +1,8 @@
 # Configure Ray Logging
 
-[NeMo Retriever extraction](overview.md) uses [Ray](https://docs.ray.io/en/latest/index.html) for logging. 
+[NeMo Retriever Library](overview.md) uses [Ray](https://docs.ray.io/en/latest/index.html) for logging. 
 You can use environment variables for fine-grained control over [Ray's logging behavior](https://docs.ray.io/en/latest/ray-observability/user-guides/configure-logging.html). 
-In addition, NeMo Retriever extraction provides preset configurations that you can use to quickly update Ray logging behavior.
+In addition, NeMo Retriever Library provides preset configurations that you can use to quickly update Ray logging behavior.
 
 
 !!! important
@@ -13,7 +13,7 @@ In addition, NeMo Retriever extraction provides preset configurations that you c
 
 ## Quick Start - Use Preset Configurations
 
-To get started quickly, use one of the NeMo Retriever extraction package-level preset variables. 
+To get started quickly, use one of the NeMo Retriever Library package-level preset variables. 
 Run the code below that corresponds to your use case; production, development, or debugging. 
 The log levels are explained following.
 
@@ -96,7 +96,7 @@ If you specify an invalid value, the variable reverts to the default value with 
 
 | Variable                          | Type                             | Description | Valid Values | Default | 
 |-----------------------------------|----------------------------------|-------------|--------------|---------| 
-| `INGEST_RAY_LOG_LEVEL`            | NeMo Retriever extraction preset | Set multiple Ray logging variables to optimize for specific use cases. | `PRODUCTION`, `DEVELOPMENT`, `DEBUG` | `DEVELOPMENT` | 
+| `INGEST_RAY_LOG_LEVEL`            | NeMo Retriever Library preset | Set multiple Ray logging variables to optimize for specific use cases. | `PRODUCTION`, `DEVELOPMENT`, `DEBUG` | `DEVELOPMENT` | 
 | `RAY_DEDUP_LOGS`                  | Log flow control                 | Specify whether to log multiple instances of repeated events or to combine into a single entry. 1 to combine repeated messages (for example, `[repeated 5x]`). | `0`, `1` | `1` | 
 | `RAY_DISABLE_IMPORT_WARNING`      | Ray internal logging             | `1` to suppresses `Ray X.Y.Z started` message and other warnings during initialization. | `0`, `1` | `0` | 
 | `RAY_LOG_TO_DRIVER`               | Log flow control                 | `true`to log worker messages in the main process. `false` to log worker messages in worker log files. | `true`, `false` | `true` | 

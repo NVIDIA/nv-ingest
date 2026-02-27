@@ -1,13 +1,13 @@
-# Resource Scaling Modes for NeMo Retriever Extraction
+# Resource Scaling Modes for NeMo Retriever Library
 
-This guide covers how resource scaling modes work across stages in [NeMo Retriever extraction](overview.md), and how to configure it with docker-compose.
+This guide covers how resource scaling modes work across stages in [NeMo Retriever Library](overview.md), and how to configure it with docker-compose.
 
 - **Static scaling**: Each pipeline stage runs a fixed number of replicas based on heuristics (memory-aware). Good for consistent latency; higher steady-state memory usage.
 - **Dynamic scaling**: Only the source stage is fixed; other stages scale up/down based on observed resource pressure. Better memory efficiency; may briefly pause to spin replicas back up after idle periods.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 

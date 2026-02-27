@@ -1,10 +1,10 @@
-# Notebooks for NeMo Retriever Extraction
+# Notebooks for NeMo Retriever Library
 
-To get started using [NeMo Retriever extraction](overview.md), you can try one of the ready-made notebooks that are available.
+To get started using [NeMo Retriever Library](overview.md), you can try one of the ready-made notebooks that are available.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## Dataset Downloads for Benchmarking

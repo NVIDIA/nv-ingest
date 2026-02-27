@@ -1,11 +1,11 @@
-# Environment Variables for NeMo Retriever Extraction
+# Environment Variables for NeMo Retriever Library
 
-The following are the environment variables that you can use to configure [NeMo Retriever extraction](overview.md).
+The following are the environment variables that you can use to configure [NeMo Retriever Library](overview.md).
 You can specify these in your .env file or directly in your environment.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 ## General Environment Variables
@@ -27,9 +27,19 @@ You can specify these in your .env file or directly in your environment.
 | `IMAGE_STORAGE_PUBLIC_BASE_URL`  | `https://assets.example.com/images` <br/>              | Optional HTTP(S) base URL for serving stored images. |
 
 
+## Vector Database (Retrieval) Environment Variables
+
+These variables apply when using the test harness or when configuring the vector database backend.
+
+| Name                             | Example                        | Description                                                           |
+|----------------------------------|--------------------------------|-----------------------------------------------------------------------|
+| `VDB_BACKEND`                    | `lancedb` (default) <br/> `milvus` <br/> | Vector database backend. Use `lancedb` for embedded, in-process storage (default), or `milvus` for client-server. |
+| `HYBRID`                         | `true` <br/> `false` (default) <br/> | LanceDB only: enable hybrid retrieval (BM25 FTS + vector, RRF). |
+
+
 ## Library Mode Environment Variables
 
-These environment variables apply specifically when running NV-Ingest in library mode.
+These environment variables apply specifically when running the library in library mode.
 
 | Name                              | Example                                                 | Description |
 |-----------------------------------|---------------------------------------------------------|-------------|

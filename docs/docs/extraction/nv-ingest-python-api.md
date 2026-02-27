@@ -1,10 +1,10 @@
-# Use the NeMo Retriever Extraction Python API
+# Use the NeMo Retriever Library Python API
 
-The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+The [NeMo Retriever Library](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 !!! tip
 
@@ -13,7 +13,7 @@ The [NeMo Retriever extraction](overview.md) Python API provides a simple and fl
 
 ## Summary of Key Methods
 
-The main class in the nv-ingest API is `Ingestor`. 
+The main class in the Python API is `Ingestor`. 
 The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
 
 ### Ingestor Methods
@@ -31,7 +31,7 @@ The following table describes methods of the `Ingestor` class.
 | `save_to_disk` | Save ingestion results to disk instead of memory. |
 | `store`        | Persist extracted images/structured renderings to an fsspec-compatible backend. |
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+| `vdb_upload`   | Push extraction results to the vector database (LanceDB by default, or Milvus). For more information, refer to [Data Upload](data-store.md). |
 
 
 ### Extract Method Options
@@ -117,7 +117,7 @@ The behavior of the upload depends on the following values of `return_failures`:
 - **True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
 
 
-The following example uploads data to Milvus and returns any failures.
+The following example uploads data to the vector database (LanceDB by default; use `milvus_uri` for Milvus) and returns any failures.
 
 ```python
 ingestor = (
@@ -221,7 +221,7 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Extract Office Documents (DOCX and PPTX)
 
-NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+NeMo Retriever Library offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
 
 - Native extraction
 - Render as PDF
@@ -257,7 +257,7 @@ ingestor = ingestor.extract(
 
 ### PDF Extraction Strategies
 
-NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
+NeMo Retriever Library offers specialized strategies for PDF processing to handle various document qualities.
 You can select the strategy by using the following `extract_method` parameter values. 
 For the full list of `extract_method` options, refer to [Extract Method Options](#extract-method-options).
 
@@ -280,7 +280,7 @@ results = ingestor.ingest()
 
 ## Work with Large Datasets: Save to Disk
 
-By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
+By default, NeMo Retriever Library stores the results from every document in system memory (RAM). 
 When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
 The `save_to_disk` method configures the extraction pipeline to write the output for each document to a separate JSONL file on disk.
 
@@ -310,8 +310,8 @@ print("Ingestion results saved in ./my_ingest_results")
 
 ### Managing Disk Space with Automatic Cleanup
 
-When you use `save_to_disk`, NeMo Retriever extraction creates intermediate files. 
-For workflows where these files are temporary, NeMo Retriever extraction provides two automatic cleanup mechanisms.
+When you use `save_to_disk`, NeMo Retriever Library creates intermediate files. 
+For workflows where these files are temporary, NeMo Retriever Library provides two automatic cleanup mechanisms.
 
 - **Directory Cleanup with Context Manager** — While not required for general use, the Ingestor can be used as a context manager (`with` statement). This enables the automatic cleanup of the entire output directory when `save_to_disk(cleanup=True)` is set (which is the default).
 
@@ -372,7 +372,7 @@ You can use this to generate descriptions of unstructured images, infographics, 
 
 !!! note
 
-    To use the `caption` option, enable the `vlm` profile when you start the NeMo Retriever extraction services. The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. For more information, refer to [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information).
+    To use the `caption` option, enable the `vlm` profile when you start the NeMo Retriever Library services. The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. For more information, refer to [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information).
 
 ### Basic Usage
 
@@ -451,7 +451,7 @@ ingestor = (
 
 ## Extract Embeddings
 
-The `embed` method in NV-Ingest generates text embeddings for document content.
+The `embed` method in the library generates text embeddings for document content.
 
 ```python
 ingestor = ingestor.embed()
@@ -507,13 +507,13 @@ The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for stor
 
 !!! tip
 
-    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the nv-ingest runtime so the container picks up the new value.
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the runtime so the container picks up the new value.
 
 When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
 
 ### Docker Volume Mounts for Local Storage
 
-When running nv-ingest via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+When running the pipeline via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
 
 By default, the `docker-compose.yaml` mounts a single volume:
 
@@ -596,5 +596,5 @@ results = ingestor.ingest()
 - [Split Documents](chunking.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
 - [Advanced Visual Parsing](nemoretriever-parse.md)
-- [Use NeMo Retriever Extraction with Riva for Audio Processing](audio.md)
+- [Use NeMo Retriever Library with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)

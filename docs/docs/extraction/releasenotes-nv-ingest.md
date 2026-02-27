@@ -1,16 +1,16 @@
-# Release Notes for NeMo Retriever Extraction
+# Release Notes for NeMo Retriever Library
 
-This documentation contains the release notes for [NeMo Retriever extraction](overview.md).
+This documentation contains the release notes for [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 
 ## Release 26.01 (26.1.2)
 
-The NeMo Retriever extraction 26.01 release adds new hardware and software support, and other improvements.
+The NeMo Retriever Library 26.01 release adds new hardware and software support, and other improvements.
 
 To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.2/helm/README.md).
 
@@ -28,7 +28,7 @@ This release contains the following key changes:
 - Support is now deprecated for [paddleocr](https://build.nvidia.com/baidu/paddleocr/modelcard).
 - The `meta-llama/Llama-3.2-1B` tokenizer is now pre-downloaded so that you can run token-based splitting without making a network request. For details, refer to [Split Documents](chunking.md).
 - For scanned PDFs, added specialized extraction strategies. For details, refer to [PDF Extraction Strategies](nv-ingest-python-api.md#pdf-extraction-strategies).
-- Added support for [LanceDB](https://lancedb.com/). For details, refer to [Upload to a Custom Data Store](data-store.md).
+- [LanceDB](https://lancedb.com/) is now the default vector database backend; Milvus remains fully supported. For details, refer to [Data Upload](data-store.md).
 - The V2 API is now available and is the default processing pipeline. The response format remains backwards-compatible. You can enable the v2 API by using `message_client_kwargs={"api_version": "v2"}`.For details, refer to [API Reference](api-docs).
 - Large PDFs are now automatically split into chunks and processed in parallel, delivering faster ingestion for long documents. For details, refer to [PDF Pre-Splitting](v2-api-guide.md).
 - Issues maintaining extraction quality while processing very large files are now resolved with the V2 API. For details, refer to [V2 API Guide](v2-api-guide.md).
@@ -58,7 +58,7 @@ The following are the known issues that are fixed in this version:
 
 ## All Known Issues
 
-The following are the known issues for NeMo Retriever extraction:
+The following are the known issues for NeMo Retriever Library:
 
 - Advanced visual parsing is not supported on RTX Pro 6000, B200, or H200 NVL. For details, refer to [Advanced Visual Parsing](advanced-visual-parsing.md) and [Support Matrix](support-matrix.md).
 - The Page Elements NIM (`nemoretriever-page-elements-v3:1.7.0`) may intermittently fail during inference under high-concurrency workloads. This happens when Triton’s dynamic batching combines requests that exceed the model’s maximum batch size, a situation more commonly seen in multi-GPU setups or large ingestion runs. In these cases, extraction fails for the impacted documents. A correction is planned for `nemoretriever-page-elements-v3:1.7.1`.

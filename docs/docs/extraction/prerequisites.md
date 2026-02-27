@@ -1,10 +1,10 @@
-# Prerequisites for NeMo Retriever Extraction
+# Prerequisites for NeMo Retriever Library
 
-Before you begin using [NeMo Retriever extraction](overview.md), ensure the following software and hardware prerequisites are met.
+Before you begin using [NeMo Retriever Library](overview.md), ensure the following software and hardware prerequisites are met.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 

@@ -1,11 +1,11 @@
-# Add User-Defined Functions to NeMo Retriever Extraction
+# Add User-Defined Functions to NeMo Retriever Library
 
-User-Defined Functions (UDFs) allow you to inject custom processing logic into the [NeMo Retriever extraction](overview.md) pipeline at specific stages. 
+User-Defined Functions (UDFs) allow you to inject custom processing logic into the [NeMo Retriever Library](overview.md) pipeline at specific stages. 
 This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Library is also known as NVIDIA Ingest.
 
 
 
@@ -121,7 +121,7 @@ results = ingestor.files("/path/to/document.pdf") \
 
 ### Understanding IngestControlMessage (ICM)
 
-The `IngestControlMessage` is the primary data structure that flows through the NV-Ingest pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
+The `IngestControlMessage` is the primary data structure that flows through the pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
 
 #### Key ICM Methods
 
@@ -379,7 +379,7 @@ def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ### UDF Function Specification Formats
 
-NV-Ingest supports four different formats for specifying UDF functions:
+The library supports four different formats for specifying UDF functions:
 
 ### 1. Inline Function String
 Define your function directly as a string:
@@ -456,7 +456,7 @@ ingestor.udf(udf_function="my_package.processors.text_utils:enhance_metadata")
 
 ## Integrating with NVIDIA NIMs
 
-NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NV-Ingest pipeline.
+NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the pipeline.
 
 ### Quick NIM Integration
 
@@ -521,7 +521,7 @@ export NGC_API_KEY="your-ngc-api-key"
 
 ### Available NIM Interfaces
 
-NV-Ingest provides several pre-built model interfaces:
+The library provides several pre-built model interfaces:
 
 - **VLMModelInterface**: Vision-Language Models for image analysis and captioning
 - **EmbeddingModelInterface**: Text embedding generation
@@ -542,7 +542,7 @@ See the comprehensive [**NimClient Usage Guide**](nimclient_usage.md).
 
 ### Error Handling
 
-The NV-Ingest system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
+The system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
 
 1. Annotate the job with appropriate error information
 2. Mark the job as failed
@@ -553,7 +553,7 @@ You do not need to implement extensive error handling within your UDF - focus on
 
 ### Performance Considerations
 
-UDFs execute within the NV-Ingest pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
+UDFs execute within the pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
 
 #### Pipeline Impact
 
@@ -942,5 +942,5 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 ## Related Topics
 
 - [NV-Ingest UDF Examples](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.2/examples/udfs/README.md)
-- [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)
+- [User-Defined Stages for NeMo Retriever Library](user-defined-stages.md)
 - [NimClient Usage](nimclient.md)
