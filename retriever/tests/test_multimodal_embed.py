@@ -17,7 +17,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Pure helpers from main_text_embed (no transitive-import issues)
 # ---------------------------------------------------------------------------
-from retriever.text_embed.main_text_embed import (
+from nemo_retriever.text_embed.main_text_embed import (
     _format_image_input_string,
     _format_text_image_pair_input_string,
     _image_from_row,
@@ -25,48 +25,48 @@ from retriever.text_embed.main_text_embed import (
 )
 
 # ---------------------------------------------------------------------------
-# Stub heavy internal modules so ``from retriever.ingest_modes.inprocess``
+# Stub heavy internal modules so ``from nemo_retriever.ingest_modes.inprocess``
 # can be imported in lightweight CI (only pytest, pandas, pydantic, pyyaml).
 #
-# The ``retriever.ingest_modes`` __init__.py eagerly imports batch/fused/online
+# The ``nemo_retriever.ingest_modes`` __init__.py eagerly imports batch/fused/online
 # which pull in ray, torch, nemotron_*, nv_ingest_api, etc.  And inprocess.py
 # itself imports model/local (torch, nemotron_*), page_elements, ocr, and
 # pdf.extract — each with their own heavy transitive deps.
 #
 # Rather than chasing every third-party leaf dependency, we pre-populate
-# sys.modules for the heavy *internal* retriever sub-packages with MagicMock.
+# sys.modules for the heavy *internal* nemo_retriever sub-packages with MagicMock.
 # This cuts off the entire transitive tree at the root.
 # ---------------------------------------------------------------------------
 _HEAVY_INTERNAL = [
     # -- sibling ingest modes (prevents batch.py/fused.py from loading) ------
-    "retriever.ingest_modes.batch",
-    "retriever.ingest_modes.fused",
-    "retriever.ingest_modes.online",
+    "nemo_retriever.ingest_modes.batch",
+    "nemo_retriever.ingest_modes.fused",
+    "nemo_retriever.ingest_modes.online",
     # -- model / ML packages (torch, nemotron_*, transformers) ---------------
-    "retriever.model.local",
-    "retriever.model.local.llama_nemotron_embed_1b_v2_embedder",
-    "retriever.model.local.nemotron_page_elements_v3",
-    "retriever.model.local.nemotron_ocr_v1",
-    "retriever.model.local.nemotron_table_structure_v1",
-    "retriever.model.local.nemotron_graphic_elements_v1",
+    "nemo_retriever.model.local",
+    "nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder",
+    "nemo_retriever.model.local.nemotron_page_elements_v3",
+    "nemo_retriever.model.local.nemotron_ocr_v1",
+    "nemo_retriever.model.local.nemotron_table_structure_v1",
+    "nemo_retriever.model.local.nemotron_graphic_elements_v1",
     # -- detection / OCR (nemotron_page_elements_v3, PIL, requests) ----------
-    "retriever.page_elements",
-    "retriever.page_elements.page_elements",
-    "retriever.ocr",
-    "retriever.ocr.ocr",
+    "nemo_retriever.page_elements",
+    "nemo_retriever.page_elements.page_elements",
+    "nemo_retriever.ocr",
+    "nemo_retriever.ocr.ocr",
     # -- PDF (pypdfium2, nv_ingest_api via pdf/__init__ → __main__ → stage) --
-    "retriever.pdf",
-    "retriever.pdf.__main__",
-    "retriever.pdf.config",
-    "retriever.pdf.io",
-    "retriever.pdf.stage",
-    "retriever.pdf.extract",
-    "retriever.pdf.split",
+    "nemo_retriever.pdf",
+    "nemo_retriever.pdf.__main__",
+    "nemo_retriever.pdf.config",
+    "nemo_retriever.pdf.io",
+    "nemo_retriever.pdf.stage",
+    "nemo_retriever.pdf.extract",
+    "nemo_retriever.pdf.split",
 ]
 for _mod_name in _HEAVY_INTERNAL:
     sys.modules.setdefault(_mod_name, MagicMock())
 
-from retriever.ingest_modes.inprocess import explode_content_to_rows  # noqa: E402
+from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows  # noqa: E402
 
 
 # ===================================================================
@@ -179,7 +179,7 @@ class TestExplodeContentToRows:
         assert list(result["_embed_modality"]) == ["text", "text"]
         assert "_image_b64" not in result.columns
 
-    @patch("retriever.ingest_modes.inprocess._crop_b64_image_by_norm_bbox")
+    @patch("nemo_retriever.ingest_modes.inprocess._crop_b64_image_by_norm_bbox")
     def test_text_image_carries_image(self, mock_crop):
         """text_image mode copies page image to _image_b64, crops for structured content."""
         mock_crop.return_value = ("cropped_b64", None)

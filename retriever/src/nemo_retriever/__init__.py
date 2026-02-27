@@ -1,12 +1,25 @@
-"""Compatibility package exposing retriever modules under nemo_retriever."""
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Retriever application package."""
 
 from __future__ import annotations
 
-import retriever as _retriever
-from retriever import *  # noqa: F401,F403
+__all__ = ["__version__", "create_ingestor", "get_version", "get_version_info"]
 
-__all__ = getattr(_retriever, "__all__", [])
 
-# Reuse the original package path so `nemo_retriever.<submodule>` resolves
-# without duplicating the full package tree.
-__path__ = _retriever.__path__
+def __getattr__(name: str):
+    if name == "create_ingestor":
+        from .api import create_ingestor
+
+        return create_ingestor
+    if name in {"__version__", "get_version", "get_version_info"}:
+        from .version import __version__, get_version, get_version_info
+
+        return {
+            "__version__": __version__,
+            "get_version": get_version,
+            "get_version_info": get_version_info,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

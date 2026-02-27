@@ -3,8 +3,8 @@ import types
 
 import pytest
 
-from retriever.application.modes.factory import create_runmode_ingestor
-from retriever.params import IngestorCreateParams
+from nemo_retriever.application.modes.factory import create_runmode_ingestor
+from nemo_retriever.params import IngestorCreateParams
 
 
 def _register_dummy_mode_module(
@@ -25,7 +25,7 @@ def _register_dummy_mode_module(
 
 
 def test_create_runmode_ingestor_inprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    dummy_class = _register_dummy_mode_module(monkeypatch, "retriever.ingest_modes.inprocess", "InProcessIngestor")
+    dummy_class = _register_dummy_mode_module(monkeypatch, "nemo_retriever.ingest_modes.inprocess", "InProcessIngestor")
     params = IngestorCreateParams(documents=["a.pdf"])
 
     ingestor = create_runmode_ingestor(run_mode="inprocess", params=params)
@@ -35,8 +35,8 @@ def test_create_runmode_ingestor_inprocess(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_create_runmode_ingestor_batch_and_fused(monkeypatch: pytest.MonkeyPatch) -> None:
-    batch_class = _register_dummy_mode_module(monkeypatch, "retriever.ingest_modes.batch", "BatchIngestor")
-    fused_class = _register_dummy_mode_module(monkeypatch, "retriever.ingest_modes.fused", "FusedIngestor")
+    batch_class = _register_dummy_mode_module(monkeypatch, "nemo_retriever.ingest_modes.batch", "BatchIngestor")
+    fused_class = _register_dummy_mode_module(monkeypatch, "nemo_retriever.ingest_modes.fused", "FusedIngestor")
     params = IngestorCreateParams(documents=["doc.pdf"], ray_address="ray://cluster", ray_log_to_driver=False)
 
     batch = create_runmode_ingestor(run_mode="batch", params=params)
@@ -50,7 +50,7 @@ def test_create_runmode_ingestor_batch_and_fused(monkeypatch: pytest.MonkeyPatch
 
 
 def test_create_runmode_ingestor_online(monkeypatch: pytest.MonkeyPatch) -> None:
-    dummy_class = _register_dummy_mode_module(monkeypatch, "retriever.ingest_modes.online", "OnlineIngestor")
+    dummy_class = _register_dummy_mode_module(monkeypatch, "nemo_retriever.ingest_modes.online", "OnlineIngestor")
     params = IngestorCreateParams(documents=["doc.pdf"], base_url="http://example:7670")
 
     ingestor = create_runmode_ingestor(run_mode="online", params=params)

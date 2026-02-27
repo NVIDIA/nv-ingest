@@ -1,0 +1,240 @@
+# nv-ingest retriever consolidated configuration
+#
+# This single file replaces the older per-stage YAML configs:
+#   - pdf_stage_config.yaml
+#   - table_stage_config.yaml
+#   - chart_stage_config.yaml
+#   - infographic_stage_config.yaml
+#   - embedding_stage_config.yaml
+#
+# Where this file is discovered (precedence):
+# - Explicit: pass `--config /path/to/ingest-config.yaml`
+# - Local:    `./ingest-config.yaml` (current working directory)
+# - Home:     `$HOME/.ingest-config.yaml`
+#
+# NOTE:
+# - CLI flags still override YAML values when the command supports it.
+# - Sections below are consumed by their respective stages.
+
+pdf:
+  # Example config for: `retriever pdf stage page-elements --config <this.yaml>`
+  #
+  # Directory containing PDFs (scanned recursively for *.pdf)
+  input_dir: /home/local/jdyer/datasets/jp20
+
+  # PDF extraction method: pdfium | pdfium_hybrid | ocr | nemotron_parse | tika | unstructured_io | adobe | llama
+  method: pdfium
+
+  # Optional auth token for NIM-backed services
+  auth_token: null
+
+  endpoints:
+    yolox:
+      # If set to null then HuggingFace models will be used instead of NIMs
+      # grpc: localhost:8001
+      # http: http://localhost:8000/v1/infer
+      grpc: null
+      http: null
+
+    # Only required for method: nemotron_parse
+    nemotron_parse:
+      grpc: null
+      http: null
+      model_name: null
+
+  extract:
+    text: true
+    # Text depth: page | document
+    text_depth: page
+    images: false
+    tables: true
+    charts: true
+    infographics: true
+    page_as_image: false
+
+  outputs:
+    write_json: true
+    json_output_dir: /home/local/jdyer/datasets/jp20-results-hf-standalone/
+
+  # Optionally limit number of PDFs processed
+  limit: null
+
+# Optional config for `retriever txt run` and .extract_txt() API
+txt:
+  max_tokens: 512
+  overlap_tokens: 0
+  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  encoding: utf-8
+
+# Optional config for `retriever html run` and .extract_html() API
+html:
+  max_tokens: 512
+  overlap_tokens: 0
+  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  encoding: utf-8
+
+table:
+  # Example config for:
+  #   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `retriever local stage3 run --config <this.yaml> --input <primitives.parquet>`
+  #
+  # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema`
+  # via `nemo_retriever.table.config.load_table_extractor_schema_from_dict`.
+  #
+  # IMPORTANT:
+  # `endpoint_config.yolox_endpoints` and `endpoint_config.ocr_endpoints` must each provide at least one
+  # endpoint (gRPC or HTTP). Both cannot be null/empty for either entry.
+
+  # Optional worker settings
+  max_queue_size: 1
+  n_workers: 2
+  raise_on_failure: false
+
+  # Endpoint configuration for table extraction (YOLOX table-structure + OCR).
+  endpoint_config:
+    # Optional auth token for secured services (NIM)
+    auth_token: null
+
+    # Tuple/list in the form: [grpc, http]
+    # YOLOX table-structure model endpoints
+    # yolox_endpoints: ["localhost:8007", "http://localhost:8006/v1/infer"]
+    yolox_endpoints: null
+    # Optional; if omitted it is inferred from which endpoint is present.
+    # yolox_infer_protocol: grpc
+
+    # OCR model endpoints
+    # ocr_endpoints: ["localhost:8010", "http://localhost:8019/v1/infer"]
+    ocr_endpoints: null
+    # Optional; if omitted it is inferred from which endpoint is present.
+    # ocr_infer_protocol: grpc
+
+    # Optional performance knobs
+    nim_batch_size: 2
+    workers_per_progress_engine: 5
+
+chart:
+  # Example config for:
+  #   - `retriever chart stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `retriever local stage4 run --config <this.yaml> --input <primitives.parquet>`
+  #
+  # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema`
+  # via `nemo_retriever.chart.config.load_chart_extractor_schema_from_dict`.
+  #
+  # IMPORTANT:
+  # If `endpoint_config.yolox_endpoints` is null/empty, chart extraction will fall back to the local
+  # HuggingFace model (`nemo_retriever.model.local.nemotron_graphic_elements_v1`).
+  # If `endpoint_config.ocr_endpoints` is null/empty, chart extraction falls back to local Nemotron OCR
+  # (`nemo_retriever.model.local.nemotron_ocr_v1`) with default HuggingFace model loading.
+
+  # Optional worker settings
+  max_queue_size: 1
+  n_workers: 2
+  raise_on_failure: false
+
+  # Endpoint configuration for chart extraction (YOLOX graphic-elements + OCR).
+  endpoint_config:
+    # Optional auth token for secured services (NIM / hosted endpoints)
+    auth_token: null
+
+    # Tuple/list in the form: [grpc, http]
+    #
+    # Chart extraction uses the YOLOX *graphic-elements* model (not page-elements).
+    #
+    # For the provided `docker-compose.yaml`, the host-mapped ports are:
+    #   - graphic-elements HTTP: 8003 (container 8000)
+    #   - graphic-elements gRPC: 8004 (container 8001)
+    #
+    # If you're running from inside the docker compose network instead, these often look like:
+    #   - "graphic-elements:8001" and "http://graphic-elements:8000/v1/infer"
+    # yolox_endpoints: ["localhost:8004", "http://localhost:8003/v1/infer"]
+    yolox_endpoints: null
+    # Optional; if omitted it is inferred from which endpoint is present.
+    # yolox_infer_protocol: grpc
+
+    # OCR model endpoints (same pattern: [grpc, http]).
+    # For the provided `docker-compose.yaml`, the host-mapped ports are:
+    #   - ocr HTTP: 8019 (container 8000)
+    #   - ocr gRPC: 8010 (container 8001)
+    # ocr_endpoints: ["localhost:8010", "http://localhost:8019/v1/infer"]
+    ocr_endpoints: null
+    # Optional; if omitted it is inferred from which endpoint is present.
+    # ocr_infer_protocol: grpc
+
+    # Optional performance knobs
+    nim_batch_size: 2
+    workers_per_progress_engine: 5
+
+infographic:
+  # Example config for:
+  #   - `retriever infographic stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `retriever local stage2 run --config <this.yaml> --input <primitives.parquet>`
+  #
+  # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema`
+  # via `nemo_retriever.infographic.config.load_infographic_extractor_schema_from_dict`.
+  #
+  # IMPORTANT:
+  # `endpoint_config.ocr_endpoints` must provide at least one endpoint (gRPC or HTTP). Both cannot be null/empty.
+
+  # Optional worker settings
+  max_queue_size: 1
+  n_workers: 2
+  raise_on_failure: false
+
+  # Endpoint configuration for OCR used to enrich infographic primitives.
+  endpoint_config:
+    # Tuple/list in the form: [grpc, http]
+    # - gRPC example: "ocr:8001"
+    # - HTTP example: "http://ocr:8000/v1/infer"
+    # ocr_endpoints: ["localhost:8001", "http://localhost:8019/v1/infer"]
+    ocr_endpoints: null
+
+    # Optional; if omitted it is inferred from which endpoint is present.
+    # ocr_infer_protocol: grpc
+
+    # Optional auth token for secured services (NIM)
+    auth_token: null
+
+    # Optional performance knobs
+    nim_batch_size: 2
+    workers_per_progress_engine: 5
+
+embedding:
+  # Text embedding stage config (nemo_retriever.text_embed)
+  #
+  # This YAML is passed to:
+  #   nemo_retriever.text_embed.config.load_text_embedding_schema_from_dict(...)
+  # which validates against nv-ingest-api's `TextEmbeddingSchema`.
+  #
+  # Minimal required fields are optional (schema provides defaults), but you
+  # typically set api_key / endpoint / model to point at your embedding service.
+
+  # Auth (optional; can also be provided via task_config overrides)
+  api_key: ""  # e.g. $NGC_API_KEY or $NVIDIA_API_KEY
+
+  # Embedding service settings
+  # If set to null/empty, `retriever local stage5` will fall back to local HF embeddings
+  # via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
+  embedding_nim_endpoint: null
+  # embedding_nim_endpoint: "http://localhost:8012/v1"
+  embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+
+  # Request formatting
+  encoding_format: "float"   # usually "float"
+  input_type: "passage"      # "passage" (docs) or "query" (queries)
+  truncate: "END"            # how the service truncates long inputs
+
+  # Batch sizing (NIM-side batching is handled internally; this is stage batching)
+  batch_size: 4
+
+  # Modalities for multi-modal models (leave as "text" for text-only models)
+  text_elements_modality: "text"
+  image_elements_modality: "text"
+  structured_elements_modality: "text"
+  audio_elements_modality: "text"
+
+  # Behavior
+  raise_on_failure: false
+  httpx_log_level: "WARNING"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+  # Optional: request embedding vector size if the backend supports it
+  # dimensions: 1024

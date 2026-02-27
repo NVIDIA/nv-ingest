@@ -1,7 +1,7 @@
-# Text embedding stage config (retriever.text_embed)
+# Text embedding stage config (nemo_retriever.text_embed)
 #
 # This YAML is passed to:
-#   retriever.text_embed.config.load_text_embedding_schema_from_dict(...)
+#   nemo_retriever.text_embed.config.load_text_embedding_schema_from_dict(...)
 # which validates against nv-ingest-api's `TextEmbeddingSchema`.
 #
 # Minimal required fields are optional (schema provides defaults), but you
@@ -12,7 +12,7 @@ api_key: ""  # e.g. $NGC_API_KEY or $NVIDIA_API_KEY
 
 # Embedding service settings
 # If set to null/empty, `retriever local stage5` will fall back to local HF embeddings
-# via `retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
+# via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
 embedding_nim_endpoint: null
 # embedding_nim_endpoint: "http://localhost:8012/v1"
 embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"

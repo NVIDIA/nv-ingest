@@ -8,7 +8,7 @@ Unit tests for EmbedParams._normalize_modality and IMAGE_MODALITIES constant.
 
 import pytest
 
-from retriever.params.models import EmbedParams, IMAGE_MODALITIES
+from nemo_retriever.params.models import EmbedParams, IMAGE_MODALITIES
 
 
 def test_normalize_modality_image_text_to_text_image():

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for retriever.txt.split: split_text_by_tokens and txt_file_to_chunks_df.
+Unit tests for nemo_retriever.txt.split: split_text_by_tokens and txt_file_to_chunks_df.
 """
 
 import tempfile  # noqa: F401
@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from retriever.txt.split import split_text_by_tokens, txt_file_to_chunks_df
+from nemo_retriever.txt.split import split_text_by_tokens, txt_file_to_chunks_df
 
 
 class _MockTokenizer:

@@ -3,7 +3,7 @@
 #   - `retriever local stage2 run --config <this.yaml> --input <primitives.parquet>`
 #
 # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema`
-# via `retriever.infographic.config.load_infographic_extractor_schema_from_dict`.
+# via `nemo_retriever.infographic.config.load_infographic_extractor_schema_from_dict`.
 #
 # IMPORTANT:
 # `endpoint_config.ocr_endpoints` must provide at least one endpoint (gRPC or HTTP). Both cannot be null/empty.

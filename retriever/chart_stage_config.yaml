@@ -5,13 +5,13 @@
 #   - `retriever local stage4 run --config <this.yaml> --input <primitives.parquet>`
 #
 # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema`
-# via `retriever.chart.config.load_chart_extractor_schema_from_dict`.
+# via `nemo_retriever.chart.config.load_chart_extractor_schema_from_dict`.
 #
 # IMPORTANT:
 # If `endpoint_config.yolox_endpoints` is null/empty, chart extraction will fall back to the local
-# HuggingFace model (`retriever.model.local.nemotron_graphic_elements_v1`).
+# HuggingFace model (`nemo_retriever.model.local.nemotron_graphic_elements_v1`).
 # If `endpoint_config.ocr_endpoints` is null/empty, chart extraction falls back to local Nemotron OCR
-# (`retriever.model.local.nemotron_ocr_v1`) with default HuggingFace model loading.
+# (`nemo_retriever.model.local.nemotron_ocr_v1`) with default HuggingFace model loading.
 #
 
 # Optional worker settings

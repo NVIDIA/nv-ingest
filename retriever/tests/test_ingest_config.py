@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from retriever.ingest_config import (
+from nemo_retriever.ingest_config import (
     load_ingest_config_file,
     load_ingest_config_section,
     resolve_ingest_config_path,

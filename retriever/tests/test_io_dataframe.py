@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from retriever.io.dataframe import read_dataframe, validate_primitives_dataframe, write_dataframe
+from nemo_retriever.io.dataframe import read_dataframe, validate_primitives_dataframe, write_dataframe
 
 
 def test_validate_primitives_dataframe_requires_metadata_column() -> None:

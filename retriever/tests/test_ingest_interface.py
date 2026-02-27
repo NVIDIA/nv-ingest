@@ -1,6 +1,6 @@
 import pytest
 
-from retriever.ingest import IngestorCreateParams, _merge_params, create_ingestor
+from nemo_retriever.ingest import IngestorCreateParams, _merge_params, create_ingestor
 
 
 def test_merge_params_none_returns_kwargs() -> None:
@@ -24,7 +24,7 @@ def test_create_ingestor_parses_kwargs_and_uses_factory(monkeypatch: pytest.Monk
         captured["params"] = params
         return "sentinel-ingestor"
 
-    monkeypatch.setattr("retriever.ingest.create_runmode_ingestor", fake_factory)
+    monkeypatch.setattr("nemo_retriever.ingest.create_runmode_ingestor", fake_factory)
 
     ingestor = create_ingestor(run_mode="inprocess", documents=["doc.pdf"], base_url="http://example:7670")
     assert ingestor == "sentinel-ingestor"

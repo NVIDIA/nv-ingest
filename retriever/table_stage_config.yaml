@@ -3,7 +3,7 @@
 #   - `retriever local stage3 run --config <this.yaml> --input <primitives.parquet>`
 #
 # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema`
-# via `retriever.table.config.load_table_extractor_schema_from_dict`.
+# via `nemo_retriever.table.config.load_table_extractor_schema_from_dict`.
 #
 # IMPORTANT:
 # `endpoint_config.yolox_endpoints` and `endpoint_config.ocr_endpoints` must each provide at least one
