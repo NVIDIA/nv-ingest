@@ -26,5 +26,5 @@ jobs:
 
       - name: Run retriever unit tests
         env:
-          PYTHONPATH: retriever/src
-        run: python -m pytest retriever/tests -q
+          PYTHONPATH: nemo_retriever/src
+        run: python -m pytest nemo_retriever/tests -q
