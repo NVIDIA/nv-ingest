@@ -104,7 +104,7 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
 ## Step 2: Install Python Dependencies
 
-You can interact with the NV-Ingest service from the host, or by using `docker exec` to run commands in the NV-Ingest container.
+You can interact with the service from the host, or by using `docker exec` to run commands in the runtime container.
 
 To interact from the host, you'll need a Python environment that has the client dependencies installed.
 

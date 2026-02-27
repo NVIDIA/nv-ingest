@@ -1,4 +1,4 @@
-# Data Upload for NeMo Retriever Extraction
+# Data Upload for NeMo Retriever Library
 
 Use this documentation to learn how [NeMo Retriever Library](overview.md) handles and uploads data.
 
@@ -23,7 +23,7 @@ It does not store the embeddings for images.
     To persist extracted images, tables, and chart renderings to disk or object storage, use the `store` task in addition to `vdb_upload`. The `store` task supports any fsspec-compatible backend (local filesystem, S3, GCS, etc.). For details, refer to [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images).
 
 NeMo Retriever Library supports uploading data by using the [Ingestor.vdb_upload API](nv-ingest-python-api.md).
-Currently, data upload is not supported through the [NV Ingest CLI](nv-ingest_cli.md).
+Currently, data upload is not supported through the [CLI](nv-ingest_cli.md).
 
 
 
@@ -124,19 +124,19 @@ Enable hybrid search by setting `hybrid=True` when creating the LanceDB operator
 You can continue using Milvus with no code changes — set `vdb_backend: milvus` in the harness config or use the existing Milvus API calls (`vdb_upload(milvus_uri=...)`, `nvingest_retrieval(...)`).
 
 The `vdb_upload` method uses GPU Cagra accelerated bulk indexing support to load chunks into Milvus.
-To enable hybrid retrieval with Milvus, nv-ingest supports both dense (llama-embedder embeddings) and sparse (BM42) embeddings.
+To enable hybrid retrieval with Milvus, the library supports both dense (llama-embedder embeddings) and sparse (BM42) embeddings.
 
 Bulk indexing is high throughput, but has a built-in overhead of around one minute.
-If the number of ingested documents is 10 or fewer, nv-ingest uses faster streaming inserts instead.
+If the number of ingested documents is 10 or fewer, the library uses faster streaming inserts instead.
 You can control this by setting `stream=True`.
 
-If you set `recreate=True`, nv-ingest drops and recreates the collection given as *collection_name*.
+If you set `recreate=True`, the pipeline drops and recreates the collection given as *collection_name*.
 The Milvus service persists data to disk by using a Docker volume defined in docker-compose.yaml.
-You can delete all collections by deleting that volume, and then restarting the nv-ingest service.
+You can delete all collections by deleting that volume, and then restarting the Milvus service.
 
 !!! warning
 
-    When you use the `vdb_upload` task with Milvus, you must expose the ports for the Milvus and MinIO containers to the nv-ingest client. This ensures that the nv-ingest client can connect to both services and perform the `vdb_upload` action.
+    When you use the `vdb_upload` task with Milvus, you must expose the ports for the Milvus and MinIO containers to the client. This ensures that the client can connect to both services and perform the `vdb_upload` action.
 
 !!! tip
 
@@ -179,7 +179,7 @@ For more information, refer to [Build a Custom Vector Database Operator](https:/
 
 ## Related Topics
 
-- [Use the NeMo Retriever Extraction Python API](nv-ingest-python-api.md)
+- [Use the NeMo Retriever Library Python API](nv-ingest-python-api.md)
 - [Store Extracted Images](nv-ingest-python-api.md#store-extracted-images)
 - [Environment Variables](environment-config.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)

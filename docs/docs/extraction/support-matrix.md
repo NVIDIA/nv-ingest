@@ -1,4 +1,4 @@
-# Support Matrix for NeMo Retriever Extraction
+# Support Matrix for NeMo Retriever Library
 
 Before you begin using [NeMo Retriever Library](overview.md), ensure that you have the hardware for your use case.
 

@@ -451,7 +451,7 @@ ingestor = (
 
 ## Extract Embeddings
 
-The `embed` method in NV-Ingest generates text embeddings for document content.
+The `embed` method in the library generates text embeddings for document content.
 
 ```python
 ingestor = ingestor.embed()

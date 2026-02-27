@@ -1,4 +1,4 @@
-# Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
+# Deploy Without Containers (Library Mode) for NeMo Retriever Library
 
 [NeMo Retriever Library](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 

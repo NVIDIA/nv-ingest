@@ -94,7 +94,7 @@ Use the following procedure to run the NIM locally.
 
 ## Use NVCF Endpoints for Cloud-Based Inference
 
-Instead of running NV-Ingest locally, you can use NVCF to perform inference by using remote endpoints.
+Instead of running the pipeline locally, you can use NVCF to perform inference by using remote endpoints.
 
 1. NVCF requires an authentication token and a function ID for access. Ensure you have these credentials ready before making API calls.
 

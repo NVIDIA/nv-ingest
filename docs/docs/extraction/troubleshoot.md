@@ -1,4 +1,4 @@
-# Troubleshoot NeMo Retriever Extraction
+# Troubleshoot NeMo Retriever Library
 
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever Library](overview.md).
 
