@@ -1,10 +1,10 @@
 # Telemetry with NeMo Retriever Extraction
 
-You can view telemetry data for [NeMo Retriever extraction](overview.md).
+You can view telemetry data for [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 ## OpenTelemetry

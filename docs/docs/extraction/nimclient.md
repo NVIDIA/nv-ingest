@@ -1,11 +1,11 @@
 # NimClient Usage Guide for NeMo Retriever Extraction
 
 The `NimClient` class provides a unified interface for connecting to and interacting with NVIDIA NIM Microservices. 
-This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever extraction](overview.md) pipelines and User Defined Functions (UDFs).
+This documentation demonstrates how to create custom NIM integrations for use in [NeMo Retriever Library](overview.md) pipelines and User Defined Functions (UDFs).
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 The NimClient architecture consists of two main components:
 

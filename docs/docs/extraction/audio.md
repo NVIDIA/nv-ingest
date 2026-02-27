@@ -1,6 +1,6 @@
-# Extract Speech with NeMo Retriever Library Extraction
+# Extract Speech with NeMo Retriever Library
 
-This documentation describes two methods to run [NeMo Retriever Library extraction](overview.md) 
+This documentation describes two methods to run [NeMo Retriever Library](overview.md) 
 with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
 to extract speech from audio files.
 
@@ -9,7 +9,7 @@ to extract speech from audio files.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 Currently, you can extract speech from the following file types:
 
@@ -132,4 +132,4 @@ Instead of running NeMo Retriever Library locally, you can use NVCF to perform i
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the NeMo Retriever Python API](nv-ingest-python-api.md)
+- [Use the NeMo Retriever Python API](python-api-reference.md)

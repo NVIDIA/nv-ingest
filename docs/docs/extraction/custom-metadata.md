@@ -6,7 +6,7 @@ and use it for filtering results during retrieval operations.
 For example, you can add author metadata to your documents, and filter by author when you retrieve results. 
 To create filters, you use [Milvus Filtering Expressions](https://milvus.io/docs/boolean.md).
 
-Use this documentation to use custom metadata to filter search results when you work with [NeMo Retriever extraction](overview.md).
+Use this documentation to use custom metadata to filter search results when you work with [NeMo Retriever Library](overview.md).
 
 
 ## Limitations
@@ -56,7 +56,7 @@ meta_df.to_csv(file_path)
 ### Example: Add Custom Metadata During Ingestion
 
 The following example adds custom metadata during ingestion. 
-For more information about the `Ingestor` class, see [Use the NeMo Retriever Python API](nv-ingest-python-api.md).
+For more information about the `Ingestor` class, see [Use the NeMo Retriever Python API](python-api-reference.md).
 For more information about the `vdb_upload` method, see [Upload Data](data-store.md).
 
 ```python

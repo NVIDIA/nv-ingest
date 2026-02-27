@@ -5,21 +5,21 @@ we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemot
 Nemotron parse provides higher-accuracy text extraction. 
 
 This documentation describes the following two methods 
-to run [NeMo Retriever extraction](overview.md) with nemotron-parse.
+to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 ## Limitations
 
 Currently, the limitations to using `nemotron-parse` with NeMo Retriever Extraction are the following:
 
-- Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+- Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot NeMo Retriever Library](troubleshoot.md).
 - `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).
 
 
@@ -108,5 +108,5 @@ Instead of running NeMo Retriever locally, you can use NVCF to perform inference
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the NeMo Retriever Python API](nv-ingest-python-api.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
+- [Use the NeMo Retriever Python API](python-api-reference.md)

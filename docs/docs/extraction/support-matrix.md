@@ -1,10 +1,10 @@
 # Support Matrix for NeMo Retriever Extraction
 
-Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
+Before you begin using [NeMo Retriever Library](overview.md), ensure that you have the hardware for your use case.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 ## Core and Advanced Pipeline Features
@@ -28,7 +28,7 @@ This includes the following:
     
     !!! note
     
-        While nemotron-nano-12b-v2-vl is the default VLM, you can configure and use other vision language models for image captioning based on your specific use case requirements. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+        While nemotron-nano-12b-v2-vl is the default VLM, you can configure and use other vision language models for image captioning based on your specific use case requirements. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
 
 - Reranker — Use [llama-3.2-nv-rerankqa-1b-v2](https://build.nvidia.com/nvidia/llama-3.2-nv-rerankqa-1b-v2) for improved retrieval accuracy.
 
@@ -36,7 +36,7 @@ This includes the following:
 
 ## Hardware Requirements
 
-NeMo Retriever extraction supports the following GPU hardware.
+NeMo Retriever Library supports the following GPU hardware.
 
 - [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
@@ -47,7 +47,7 @@ NeMo Retriever extraction supports the following GPU hardware.
 - [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
 
 
-The following are the hardware requirements to run NeMo Retriever extraction.
+The following are the hardware requirements to run NeMo Retriever Library.
 
 |Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB     | A10G          | L40S   |
 |----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|---------------|---------------|--------|

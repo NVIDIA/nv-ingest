@@ -1,6 +1,6 @@
 # Add User-defined Stages to Your NeMo Retriever Extraction Pipeline
 
-This documentation demonstrates how to add user-defined stages to your [NeMo Retriever extraction](overview.md) pipeline.
+This documentation demonstrates how to add user-defined stages to your [NeMo Retriever Library](overview.md) pipeline.
 You can directly import a function, or use a string module path, and include robust signature validation. 
 By following these steps, 
 your Lambda stages are robust, signature-validated, plug-and-play for your RayPipeline, 
@@ -8,7 +8,7 @@ and operate on a well-defined DataFrame payload and metadata structure.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 To add user-defined stages to your pipeline, you need the following:
@@ -228,7 +228,7 @@ Use the following best practices to avoid validation failures.
 
 ## Minimal Complete Example
 
-The  following example adds user-defined stages to your NeMo Retriever extraction pipeline. 
+The  following example adds user-defined stages to your NeMo Retriever Library pipeline. 
 
 1. The following code creates a function for a user-defined stage.
 

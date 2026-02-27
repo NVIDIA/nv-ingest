@@ -1,10 +1,10 @@
 # Prerequisites for NeMo Retriever Extraction
 
-Before you begin using [NeMo Retriever extraction](overview.md), ensure the following software and hardware prerequisites are met.
+Before you begin using [NeMo Retriever Library](overview.md), ensure the following software and hardware prerequisites are met.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 

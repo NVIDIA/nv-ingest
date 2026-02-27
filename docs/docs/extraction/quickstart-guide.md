@@ -1,6 +1,6 @@
 # Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
 
-This guide helps you get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
+This guide helps you get started using [NeMo Retriever Library](overview.md) in self-hosted mode.
 
 
 ## Step 1: Start Containers
@@ -136,7 +136,7 @@ Because many service URIs default to localhost, running inside the `nemo-retriev
 
 ## Step 3: Ingest Documents
 
-You can submit jobs programmatically in Python or using the [NeMo Retriever CLI](nv-ingest_cli.md).
+You can submit jobs programmatically in Python or using the [NeMo Retriever CLI](cli-reference.md).
 
 The following examples demonstrate how to extract text, charts, tables, and images:
 
@@ -424,7 +424,7 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images). | 
 
 
 ## Docker Compose override files

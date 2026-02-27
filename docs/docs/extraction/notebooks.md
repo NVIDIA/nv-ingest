@@ -1,10 +1,10 @@
 # Notebooks for NeMo Retriever Extraction
 
-To get started using [NeMo Retriever extraction](overview.md), you can try one of the ready-made notebooks that are available.
+To get started using [NeMo Retriever Library](overview.md), you can try one of the ready-made notebooks that are available.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 
 ## Dataset Downloads for Benchmarking

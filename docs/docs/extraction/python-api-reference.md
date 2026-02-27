@@ -1,10 +1,10 @@
-# Use the NeMo Retriever Extraction Python API
+# Python API Reference
 
-The [NeMo Retriever extraction](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
+The [NeMo Retriever Library](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 !!! tip
 
@@ -13,8 +13,8 @@ The [NeMo Retriever extraction](overview.md) Python API provides a simple and fl
 
 ## Summary of Key Methods
 
-The main class in the NeMo Retriever Python API is `Ingestor`. 
-The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
+The main class in the NeMo Retriever Library Python API is `Ingestor`.
+The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking.
 
 ### Ingestor Methods
 
@@ -83,7 +83,7 @@ ingestor = (
 
 ## Track Job Progress
 
-For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+For large document batches, you can enable a progress bar by setting `show_progress` to true.
 Use the following code.
 
 ```python
@@ -97,7 +97,7 @@ print(len(results), "successful documents")
 
 ## Capture Job Failures
 
-You can capture job failures by setting `return_failures` to true. 
+You can capture job failures by setting `return_failures` to true.
 Use the following code.
 
 ```python
@@ -110,7 +110,7 @@ if failures:
     print("Failures:", failures[:1])
 ```
 
-When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
+When you use the `vdb_upload` method, uploads are performed after ingestion completes.
 The behavior of the upload depends on the following values of `return_failures`:
 
 - **False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
@@ -176,7 +176,7 @@ for doc in result:
 
 ### Extract Specific Elements from PDFs
 
-By default, the `extract` method extracts all supported content types. 
+By default, the `extract` method extracts all supported content types.
 You can customize the extraction behavior by using the following code.
 
 ```python
@@ -221,7 +221,7 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Extract Office Documents (DOCX and PPTX)
 
-NeMo Retriever extraction offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+The NeMo Retriever Library offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
 
 - Native extraction
 - Render as PDF
@@ -257,8 +257,8 @@ ingestor = ingestor.extract(
 
 ### PDF Extraction Strategies
 
-NeMo Retriever extraction offers specialized strategies for PDF processing to handle various document qualities.
-You can select the strategy by using the following `extract_method` parameter values. 
+The NeMo Retriever Library offers specialized strategies for PDF processing to handle various document qualities.
+You can select the strategy by using the following `extract_method` parameter values.
 For the full list of `extract_method` options, refer to [Extract Method Options](#extract-method-options).
 
 - **ocr** – Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt.
@@ -280,18 +280,18 @@ results = ingestor.ingest()
 
 ## Work with Large Datasets: Save to Disk
 
-By default, NeMo Retriever extraction stores the results from every document in system memory (RAM). 
-When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+By default, the NeMo Retriever Library stores the results from every document in system memory (RAM).
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error.
 The `save_to_disk` method configures the extraction pipeline to write the output for each document to a separate JSONL file on disk.
 
 
 ### Basic Usage: Save to a Directory
 
 To save results to disk, simply chain the `save_to_disk` method to your ingestion task.
-By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects, 
+By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects,
 which are memory-efficient proxies that read from the result files on disk.
 
-In the following example, the results are saved to a directory named `my_ingest_results`. 
+In the following example, the results are saved to a directory named `my_ingest_results`.
 You are responsible for managing the created files.
 
 ```python
@@ -310,8 +310,8 @@ print("Ingestion results saved in ./my_ingest_results")
 
 ### Managing Disk Space with Automatic Cleanup
 
-When you use `save_to_disk`, NeMo Retriever extraction creates intermediate files. 
-For workflows where these files are temporary, NeMo Retriever extraction provides two automatic cleanup mechanisms.
+When you use `save_to_disk`, the NeMo Retriever Library creates intermediate files.
+For workflows where these files are temporary, the NeMo Retriever Library provides two automatic cleanup mechanisms.
 
 - **Directory Cleanup with Context Manager** — While not required for general use, the Ingestor can be used as a context manager (`with` statement). This enables the automatic cleanup of the entire output directory when `save_to_disk(cleanup=True)` is set (which is the default).
 
@@ -322,12 +322,12 @@ You can also configure the output directory by using the `NV_INGEST_CLIENT_SAVE_
 
 #### Example (Fully Automatic Cleanup)
 
-Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed. 
+Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed.
 The entire process is temporary, and no files are left on disk.
-The following example includes automatic file purge. 
+The following example includes automatic file purge.
 
 ```python
-# After the 'with' block finishes, 
+# After the 'with' block finishes,
 # the temporary directory and all its contents are automatically deleted.
 
 with (
@@ -345,11 +345,11 @@ with (
 
 #### Example (Preserve Results on Disk)
 
-In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features. 
-The following example disables automatic file purge. 
+In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features.
+The following example disables automatic file purge.
 
 ```python
-# After the 'with' block finishes, 
+# After the 'with' block finishes,
 # the './permanent_results' directory and all jsonl files are preserved for inspection or other uses.
 
 with (
@@ -367,12 +367,12 @@ with (
 
 ## Extract Captions from Images
 
-The `caption` method generates image captions by using a VLM. 
+The `caption` method generates image captions by using a VLM.
 You can use this to generate descriptions of unstructured images, infographics, and other visual content extracted from documents.
 
 !!! note
 
-    To use the `caption` option, enable the `vlm` profile when you start the NeMo Retriever extraction services. The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. For more information, refer to [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information).
+    To use the `caption` option, enable the `vlm` profile when you start the NeMo Retriever Library services. The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`. For more information, refer to [Profile Information in the Quickstart Guide](quickstart-guide.md#profile-information).
 
 ### Basic Usage
 
@@ -451,7 +451,7 @@ ingestor = (
 
 ## Extract Embeddings
 
-The `embed` method in NeMo Retriever generates text embeddings for document content.
+The `embed` method in the NeMo Retriever Library generates text embeddings for document content.
 
 ```python
 ingestor = ingestor.embed()
@@ -507,13 +507,13 @@ The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for stor
 
 !!! tip
 
-    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nemo-retriever/...`). If you change that variable—for example to a host-mounted `file://` path—restart the NeMo Retriever runtime so the container picks up the new value.
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nemo-retriever/...`). If you change that variable—for example to a host-mounted `file://` path—restart the NeMo Retriever Library runtime so the container picks up the new value.
 
 When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
 
 ### Docker Volume Mounts for Local Storage
 
-When running NeMo Retriever via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+When running the NeMo Retriever Library via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
 
 By default, the `docker-compose.yaml` mounts a single volume:
 
@@ -594,7 +594,7 @@ results = ingestor.ingest()
 ## Related Topics
 
 - [Split Documents](chunking.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
 - [Advanced Visual Parsing](nemoretriever-parse.md)
-- [Use NeMo Retriever Extraction with Riva for Audio Processing](audio.md)
+- [Use the NeMo Retriever Library with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)

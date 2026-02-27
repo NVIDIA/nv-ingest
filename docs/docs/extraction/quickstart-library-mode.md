@@ -1,10 +1,10 @@
 # Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
 
-[NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
+[NeMo Retriever Library](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
 !!! note
 
-    NeMo Retriever extraction is part of the NeMo Retriever Library.
+    This library is the NeMo Retriever Library.
 
 In addition, you can use library mode, which is intended for the following cases:
 

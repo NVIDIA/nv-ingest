@@ -12,7 +12,7 @@ There are two ways that NV Ingest chunks text:
 
 !!! warning
 
-    NeMo Retriever extraction is designed to process language and language-length strings. If you submit a document that contains extremely long, or non-language text strings, such as a DNA sequence, errors or unexpected results occur.
+    NeMo Retriever Library is designed to process language and language-length strings. If you submit a document that contains extremely long, or non-language text strings, such as a DNA sequence, errors or unexpected results occur.
 
 
 
@@ -106,6 +106,6 @@ If you are building the container yourself and want to pre-download this model, 
 
 ## Related Topics
 
-- [Use the Python API](nv-ingest-python-api.md)
+- [Use the Python API](python-api-reference.md)
 - [NeMo Retriever Extraction V2 API Guide](v2-api-guide.md)
 - [Environment Variables](environment-variables.md)

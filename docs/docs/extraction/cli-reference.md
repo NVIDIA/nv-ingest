@@ -1,6 +1,6 @@
-# Use the NeMo Retriever Command Line Interface
+# CLI Reference
 
-After you install the Python dependencies, you can use the [NeMo Retriever](overview.md) command line interface (CLI). 
+After you install the Python dependencies, you can use the [NeMo Retriever Library](overview.md) command line interface (CLI).
 To use the CLI, use the `nemo-retriever` command.
 
 To check the version of the CLI that you have installed, run the following command.
@@ -82,7 +82,7 @@ nemo-retriever \
 
 ### Example: PDF File With Custom Split Page Count
 
-To submit a PDF file with a custom split page count, use the `--pdf_split_page_count` option. 
+To submit a PDF file with a custom split page count, use the `--pdf_split_page_count` option.
 This allows you to control how many pages are included in each PDF chunk during processing.
 
 !!! note
@@ -119,7 +119,7 @@ nemo-retriever \
 
 !!! tip
 
-  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
 
 Alternatively, you can use an environment variable to set the API version:
 
@@ -138,7 +138,7 @@ nemo-retriever \
 
 ### Example: Process a Dataset
 
-To submit a dataset for processing, run the following code. 
+To submit a dataset for processing, run the following code.
 To create a dataset, refer to [Command Line Dataset Creation with Enumeration and Sampling](#command-line-dataset-creation-with-enumeration-and-sampling).
 
 ```shell
@@ -166,7 +166,7 @@ nemo-retriever \
 
 ## Command Line Dataset Creation with Enumeration and Sampling
 
-The `gen_dataset.py` script samples files from a specified source directory according to defined proportions and a total size target. 
+The `gen_dataset.py` script samples files from a specified source directory according to defined proportions and a total size target.
 It offers options for caching the file list, outputting a sampled file list, and validating the output.
 
 ```shell
