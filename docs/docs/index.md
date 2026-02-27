@@ -30,7 +30,7 @@ NVIDIA NeMo Retriever comes with enterprise-ready features, including the follow
 
 ## Applications
 
-The following are some applications that use NVIDIA Nemo Retriever:
+The following are some applications that use NVIDIA NeMo Retriever:
 
 - [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
 - [Build an Enterprise RAG pipeline](https://build.nvidia.com/nvidia/build-an-enterprise-rag-pipeline/blueprintcard) (NVIDIA AI Blueprint)

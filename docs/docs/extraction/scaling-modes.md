@@ -7,7 +7,7 @@ This guide covers how resource scaling modes work across stages in [NeMo Retriev
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 
 
@@ -18,7 +18,7 @@ This guide covers how resource scaling modes work across stages in [NeMo Retriev
 
 ## Configure (docker-compose)
 
-Edit `services > nv-ingest-ms-runtime > environment` in `docker-compose.yaml`.
+Edit `services > nemo-retriever-ms-runtime > environment` in `docker-compose.yaml`.
 
 ### Select mode
 
@@ -35,7 +35,7 @@ Example (Static):
 
 ```yaml
 services:
-  nv-ingest-ms-runtime:
+  nemo-retriever-ms-runtime:
     environment:
       - INGEST_DISABLE_DYNAMIC_SCALING=true
       - INGEST_STATIC_MEMORY_THRESHOLD=0.85
@@ -45,7 +45,7 @@ Example (Dynamic):
 
 ```yaml
 services:
-  nv-ingest-ms-runtime:
+  nemo-retriever-ms-runtime:
     environment:
       - INGEST_DISABLE_DYNAMIC_SCALING=false
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
@@ -91,7 +91,7 @@ services:
 
 Open `docker-compose.yaml` and locate:
 
-- `services > nv-ingest-ms-runtime > environment`:
+- `services > nemo-retriever-ms-runtime > environment`:
   - `INGEST_DISABLE_DYNAMIC_SCALING`
   - `INGEST_DYNAMIC_MEMORY_THRESHOLD`
   - `INGEST_STATIC_MEMORY_THRESHOLD`

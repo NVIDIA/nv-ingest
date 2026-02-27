@@ -4,20 +4,20 @@ This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retri
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 
 
 ## What if I already have a retrieval pipeline? Can I just use NeMo Retriever extraction? 
 
-You can use the nv-ingest-cli or Python APIs to perform extraction only, and then consume the results.
+You can use the nemo-retriever CLI or Python APIs to perform extraction only, and then consume the results.
 Using the Python API, `results` is a list object with one entry.
-For code examples, see the Jupyter notebooks [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) 
-and [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb).
+For code examples, see the Jupyter notebooks [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/llama_index_multimodal_rag.ipynb) 
+and [Multimodal RAG with LangChain](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/langchain_multimodal_rag.ipynb).
 
 
 
-## Where does NeMo Retriever extraction (nv-ingest) ingest to?
+## Where does NeMo Retriever extraction ingest to?
 
 NeMo Retriever extraction supports extracting text representations of various forms of content, 
 and ingesting to the [Milvus vector database](https://milvus.io/). 
@@ -61,7 +61,7 @@ For production environments, you should use the provided Helm charts. For [libra
 
 For advanced scenarios, you might want to use library mode with self-hosted NIM instances. 
 You can set custom endpoints for each NIM. 
-For examples of `*_ENDPOINT` variables, refer to [nv-ingest/docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+For examples of `*_ENDPOINT` variables, refer to [NeMo-Retriever/docker-compose.yaml](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docker-compose.yaml).
 
 
 

@@ -4,7 +4,7 @@ Before you begin using [NeMo Retriever extraction](overview.md), ensure the foll
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 
 

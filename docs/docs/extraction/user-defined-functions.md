@@ -5,7 +5,7 @@ This guide covers how to write, validate, and submit UDFs using both the CLI and
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 
 
@@ -16,7 +16,7 @@ This guide covers how to write, validate, and submit UDFs using both the CLI and
 Create a Python function that accepts an `IngestControlMessage` and returns a modified `IngestControlMessage`:
 
 ```python
-from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
 
 def my_custom_processor(control_message: IngestControlMessage) -> IngestControlMessage:
     """Add custom metadata to all documents."""
@@ -41,7 +41,7 @@ The CLI supports all UDF function specification formats. Here are examples of ea
 #### Inline Function String
 ```bash
 # Submit inline UDF function
-nv-ingest-cli \
+nemo-retriever \
     --doc /path/to/document.pdf \
     --output-directory ./output \
     --task 'udf:{"udf_function": "def my_processor(control_message): print(\"Processing...\"); return control_message", "udf_function_name": "my_processor", "target_stage": "text_embedder", "run_before": true}'
@@ -50,7 +50,7 @@ nv-ingest-cli \
 #### Module Path with Colon (Recommended)
 ```bash
 # Submit UDF from importable module (preserves all imports and context)
-nv-ingest-cli \
+nemo-retriever \
     --doc /path/to/document.pdf \
     --output-directory ./output \
     --task 'udf:{"udf_function": "my_package.processors:enhance_metadata", "target_stage": "text_embedder", "run_after": true}'
@@ -59,7 +59,7 @@ nv-ingest-cli \
 #### File Path
 ```bash
 # Submit UDF from file path
-nv-ingest-cli \
+nemo-retriever \
     --doc /path/to/document.pdf \
     --output-directory ./output \
     --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "target_stage": "text_embedder", "run_before": true}'
@@ -68,7 +68,7 @@ nv-ingest-cli \
 #### Legacy Import Path (Limited)
 ```bash
 # Submit UDF using legacy dot notation (function only, no imports)
-nv-ingest-cli \
+nemo-retriever \
     --doc /path/to/document.pdf \
     --output-directory ./output \
     --task 'udf:{"udf_function": "my_package.processors.basic_processor", "target_stage": "text_embedder", "run_after": true}'
@@ -77,7 +77,7 @@ nv-ingest-cli \
 ### 3. Submit via Python Client
 
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 # Create an Ingestor instance with default client
 ingestor = Ingestor()
@@ -121,7 +121,7 @@ results = ingestor.files("/path/to/document.pdf") \
 
 ### Understanding IngestControlMessage (ICM)
 
-The `IngestControlMessage` is the primary data structure that flows through the NV-Ingest pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
+The `IngestControlMessage` is the primary data structure that flows through the NeMo Retriever pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
 
 #### Key ICM Methods
 
@@ -311,9 +311,9 @@ UDFs can be executed at different stages of the pipeline by specifying the `targ
 
 ```bash
 # CLI examples for different target stages
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:validate_input", "target_stage": "pdf_extractor", "run_before": true}'
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:extract_custom", "target_stage": "text_embedder", "run_after": true}'
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:enhance_output", "target_stage": "embedding_storage", "run_before": true}'
+nemo-retriever --doc file.pdf --task 'udf:{"udf_function": "processor.py:validate_input", "target_stage": "pdf_extractor", "run_before": true}'
+nemo-retriever --doc file.pdf --task 'udf:{"udf_function": "processor.py:extract_custom", "target_stage": "text_embedder", "run_after": true}'
+nemo-retriever --doc file.pdf --task 'udf:{"udf_function": "processor.py:enhance_output", "target_stage": "embedding_storage", "run_before": true}'
 ```
 
 ```python
@@ -379,7 +379,7 @@ def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ### UDF Function Specification Formats
 
-NV-Ingest supports four different formats for specifying UDF functions:
+NeMo Retriever supports four different formats for specifying UDF functions:
 
 ### 1. Inline Function String
 Define your function directly as a string:
@@ -456,14 +456,14 @@ ingestor.udf(udf_function="my_package.processors.text_utils:enhance_metadata")
 
 ## Integrating with NVIDIA NIMs
 
-NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NV-Ingest pipeline.
+NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NeMo Retriever pipeline.
 
 ### Quick NIM Integration
 
 ```python
-from nv_ingest_api.internal.primitives.control_message import IngestControlMessage
-from nv_ingest_api.util.nim import create_inference_client
-from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
+from nemo_retriever.internal.primitives.control_message import IngestControlMessage
+from nemo_retriever.util.nim import create_inference_client
+from nemo_retriever.internal.primitives.nim.model_interface.vlm import VLMModelInterface
 import os
 
 def document_analysis_with_nim(control_message: IngestControlMessage) -> IngestControlMessage:
@@ -521,7 +521,7 @@ export NGC_API_KEY="your-ngc-api-key"
 
 ### Available NIM Interfaces
 
-NV-Ingest provides several pre-built model interfaces:
+NeMo Retriever provides several pre-built model interfaces:
 
 - **VLMModelInterface**: Vision-Language Models for image analysis and captioning
 - **EmbeddingModelInterface**: Text embedding generation
@@ -542,7 +542,7 @@ See the comprehensive [**NimClient Usage Guide**](nimclient_usage.md).
 
 ### Error Handling
 
-The NV-Ingest system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
+The NeMo Retriever system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
 
 1. Annotate the job with appropriate error information
 2. Mark the job as failed
@@ -553,7 +553,7 @@ You do not need to implement extensive error handling within your UDF - focus on
 
 ### Performance Considerations
 
-UDFs execute within the NV-Ingest pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
+UDFs execute within the NeMo Retriever pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
 
 #### Pipeline Impact
 
@@ -873,7 +873,7 @@ Test your UDF functions in isolation before deploying them to the pipeline:
 
 ```python
 import pandas as pd
-from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
 
 def test_my_udf():
     # Create test data
@@ -941,6 +941,6 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ## Related Topics
 
-- [NV-Ingest UDF Examples](https://github.com/NVIDIA/nv-ingest/blob/release/26.1.2/examples/udfs/README.md)
+- [NeMo Retriever UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md)
 - [User-Defined Stages for NeMo Retriever Extraction](user-defined-stages.md)
 - [NimClient Usage](nimclient.md)

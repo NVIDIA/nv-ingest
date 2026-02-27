@@ -4,7 +4,7 @@
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 In addition, you can use library mode, which is intended for the following cases:
 
@@ -34,7 +34,7 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
+         uv pip install nemo-retriever==26.1.2 milvus-lite==2.4.12
     ```
 
     !!! tip
@@ -65,7 +65,7 @@ You can submit jobs programmatically by using Python.
 
 !!! tip
 
-    For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+    For more Python examples, refer to [NeMo Retriever: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 If you have a very high number of CPUs, and see the process hang without progress, 
@@ -81,10 +81,10 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 ```python
 import time
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_client.client import Ingestor, NvIngestClient
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+from nemo_retriever.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nemo_retriever.client import Ingestor, NemoRetrieverClient
+from nemo_retriever.util.message_brokers.simple_message_broker import SimpleClient
+from nemo_retriever.util.process_json_files import ingest_json_results_to_blob
 
 def main():
     # Start the pipeline subprocess for library mode
@@ -190,7 +190,7 @@ To query for relevant snippets of the ingested content, and use them with an LLM
 ```python
 import os
 from openai import OpenAI
-from nv_ingest_client.util.milvus import nvingest_retrieval
+from nemo_retriever.util.milvus import query
 
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -198,7 +198,7 @@ sparse=False
 
 queries = ["Which animal is responsible for the typos?"]
 
-retrieved_docs = nvingest_retrieval(
+retrieved_docs = query(
     queries,
     collection_name,
     milvus_uri=milvus_uri,
@@ -307,8 +307,8 @@ It listens for ingestion requests on port `7671` from an external client.
 import logging
 import os
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+from nemo_retriever.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nemo_retriever.util.logging.configuration import configure_logging as configure_local_logging
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -353,11 +353,11 @@ import logging
 import os
 import time
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest_client.client import Ingestor
-from nv_ingest_client.client import NvIngestClient
+from nemo_retriever.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nemo_retriever.util.logging.configuration import configure_logging as configure_local_logging
+from nemo_retriever.util.message_brokers.simple_message_broker import SimpleClient
+from nemo_retriever.client import Ingestor
+from nemo_retriever.client import NemoRetrieverClient
 
 # Configure the logger
 logger = logging.getLogger(__name__)

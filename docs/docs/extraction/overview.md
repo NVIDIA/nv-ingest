@@ -6,7 +6,7 @@ to find, contextualize, and extract text, tables, charts and infographics that y
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
@@ -14,13 +14,13 @@ and optionally manage storing into a vector database [Milvus](https://milvus.io/
 
 !!! note
 
-    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever extraction 24.12.1 release](https://github.com/NVIDIA/NeMo-Retriever/tree/24.12.1).
 
 
 
 ## What NeMo Retriever Extraction Is ✔️
 
-The following diagram shows the Nemo Retriever extraction pipeline.
+The following diagram shows the NeMo Retriever extraction pipeline.
 
 ![Overview diagram](images/overview-extraction.png)
 

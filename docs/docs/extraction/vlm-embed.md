@@ -10,7 +10,7 @@ The model supports images that contain text, tables, charts, and infographics.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 
 ## Configure and Run the Multimodal NIM
@@ -122,5 +122,5 @@ results = ingestor.ingest()
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the NV-Ingest Python API](nv-ingest-python-api.md)
+- [Use the NeMo Retriever Python API](nv-ingest-python-api.md)
 - [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images)

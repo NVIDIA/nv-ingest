@@ -4,16 +4,16 @@ The [NeMo Retriever extraction](overview.md) Python API provides a simple and fl
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever extraction is part of the NeMo Retriever Library.
 
 !!! tip
 
-    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Summary of Key Methods
 
-The main class in the nv-ingest API is `Ingestor`. 
+The main class in the NeMo Retriever Python API is `Ingestor`. 
 The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
 
 ### Ingestor Methods
@@ -65,7 +65,7 @@ The caption task can call a vision-language model (VLM) with the following optio
 
 Example:
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -149,7 +149,7 @@ The `extract` method enables different types of data to be extracted.
 Use the following code to extract a single PDF file.
 
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 # Initialize Ingestor with a local PDF file
 ingestor = Ingestor().files("path/to/document.pdf")
@@ -433,7 +433,7 @@ The caption task can call a VLM with optional prompt and system prompt overrides
 
 Example:
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -451,7 +451,7 @@ ingestor = (
 
 ## Extract Embeddings
 
-The `embed` method in NV-Ingest generates text embeddings for document content.
+The `embed` method in NeMo Retriever generates text embeddings for document content.
 
 ```python
 ingestor = ingestor.embed()
@@ -503,17 +503,17 @@ The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for stor
 | Amazon S3 | `s3://` | `s3://my-bucket/extracted-images` |
 | Google Cloud Storage | `gs://` | `gs://my-bucket/images` |
 | Azure Blob Storage | `abfs://` | `abfs://container@account.dfs.core.windows.net/images` |
-| MinIO (S3-compatible) | `s3://` | `s3://nv-ingest/artifacts/store/images` (default) |
+| MinIO (S3-compatible) | `s3://` | `s3://nemo-retriever/artifacts/store/images` (default) |
 
 !!! tip
 
-    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the nv-ingest runtime so the container picks up the new value.
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nemo-retriever/...`). If you change that variable—for example to a host-mounted `file://` path—restart the NeMo Retriever runtime so the container picks up the new value.
 
 When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
 
 ### Docker Volume Mounts for Local Storage
 
-When running nv-ingest via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+When running NeMo Retriever via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
 
 By default, the `docker-compose.yaml` mounts a single volume:
 
@@ -545,18 +545,18 @@ ingestor = ingestor.store(
 
 ```bash
 # Set DATASET_ROOT before starting services
-export DATASET_ROOT=/raid/my-project/nv-ingest-data
+export DATASET_ROOT=/raid/my-project/nemo-retriever-data
 docker compose up -d
 ```
 
 ```python
-# Now /workspace/data maps to /raid/my-project/nv-ingest-data
+# Now /workspace/data maps to /raid/my-project/nemo-retriever-data
 ingestor = ingestor.store(
     structured=True,
     images=True,
     storage_uri="file:///workspace/data/extracted-images"
 )
-# Files save to /raid/my-project/nv-ingest-data/extracted-images on host
+# Files save to /raid/my-project/nemo-retriever-data/extracted-images on host
 ```
 
 For more information on environment variables, refer to [Environment Variables](environment-config.md).
@@ -568,7 +568,7 @@ For more information on environment variables, refer to [Environment Variables](
 Use the following code to extract mp3 audio content.
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nemo_retriever.client import Ingestor
 
 ingestor = Ingestor().files("audio_file.mp3")
 
