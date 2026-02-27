@@ -1,6 +1,9 @@
 name: Build NV-Ingest Documentation
 
-# Trigger for pull requests and pushing to main
+# Publishes to https://nvidia.github.io/nv-ingest/
+# REQUIRED: In repo Settings → Pages → Build and deployment → Source, select "GitHub Actions"
+# (not "Deploy from a branch"), or this workflow will not update the live site.
+
 on:
   # Runs on pushes targeting the default branch
   push:
@@ -52,13 +55,24 @@ jobs:
       - name: Copy generated docs site from the container
         run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
 
+      - name: Verify generated site
+        run: |
+          if [ ! -f ./generated-site/index.html ]; then
+            echo "::error::Generated site missing index.html. Build may have failed inside the container."
+            ls -la ./generated-site/ || true
+            exit 1
+          fi
+          echo "Generated site contains $(find ./generated-site -type f | wc -l) files"
+
       - name: Stop and remove the container
-        run: docker rm $CONTAINER_ID
+        if: always()
+        run: docker rm -f $CONTAINER_ID 2>/dev/null || true
 
       - name: Upload Site Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./generated-site
+          name: github-pages
 
   deploy:
     needs:

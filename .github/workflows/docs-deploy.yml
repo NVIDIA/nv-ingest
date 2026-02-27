@@ -1,9 +1,8 @@
 name: Documentation Deploy
 
+# NOTE: Docs are built and deployed by build-docs.yml on push to main.
+# This workflow is kept for manual runs only; remove push trigger to avoid duplicate deployments.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -50,6 +49,15 @@ jobs:
       - name: Copy generated docs from container
         run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
 
+      - name: Verify generated site
+        run: |
+          if [ ! -f ./generated-site/index.html ]; then
+            echo "::error::Generated site missing index.html. Build may have failed inside the container."
+            ls -la ./generated-site/ || true
+            exit 1
+          fi
+          echo "Generated site contains $(find ./generated-site -type f | wc -l) files"
+
       - name: Clean up container
         run: docker rm $CONTAINER_ID
 
@@ -57,6 +65,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./generated-site
+          name: github-pages
 
   deploy:
     name: Deploy to GitHub Pages
