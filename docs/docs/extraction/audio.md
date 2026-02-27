@@ -20,7 +20,7 @@ Currently, you can extract speech from the following file types:
 
 ## Overview
 
-[NeMo Retriever Library extraction](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
+[NeMo Retriever Library](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
 Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
 NeMo Retriever Library leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
 to transcribe speech to text, which is then embedded by using the NeMo Retriever Library embedding NIM. 
