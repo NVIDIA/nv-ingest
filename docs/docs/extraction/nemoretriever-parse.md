@@ -115,7 +115,7 @@ To enable `nemotron-parse` in the batch pipeline, set each of the following opti
 - `--nemotron-parse-batch-size` — The batch size for each `nemotron-parse` request.
 
 
-For example, run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on:
+For example, to run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on, use the following code:
 
 ```shell
 python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
