@@ -6,7 +6,7 @@
 Ingestion runmodes.
 
 Each runmode provides a concrete `Ingestor` implementation with the same public
-method surface defined by `nemo_retriever.ingest.Ingestor`.
+method surface defined by `nemo_retriever.ingestor.Ingestor`.
 """
 
 from __future__ import annotations

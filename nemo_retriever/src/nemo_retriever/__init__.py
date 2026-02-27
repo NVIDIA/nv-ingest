@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-__all__ = ["__version__", "create_ingestor", "get_version", "get_version_info", "retriever"]
+__all__ = ["__version__", "create_ingestor", "get_version", "get_version_info", "ingestor", "retriever"]
 
 
 def __getattr__(name: str):
@@ -26,4 +26,8 @@ def __getattr__(name: str):
         from .retriever import retriever
 
         return retriever
+    if name == "ingestor":
+        from .ingestor import ingestor
+
+        return ingestor
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -55,7 +55,7 @@ def create_ingestor(
     return create_runmode_ingestor(run_mode=run_mode, params=parsed)
 
 
-class Ingestor:
+class ingestor:
     """
     Interface base class. All methods intentionally raise NotImplementedError.
 
@@ -73,15 +73,15 @@ class Ingestor:
             f"{self.__class__.__name__}.{method_name}() is not implemented yet " f"(run_mode={self.RUN_MODE})."
         )
 
-    def files(self, documents: Union[str, List[str]]) -> "Ingestor":
+    def files(self, documents: Union[str, List[str]]) -> "ingestor":
         """Add document paths/URIs for processing."""
         self._not_implemented("files")
 
-    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "Ingestor":
+    def buffers(self, buffers: Union[Tuple[str, BytesIO], List[Tuple[str, BytesIO]]]) -> "ingestor":
         """Add in-memory buffers for processing."""
         self._not_implemented("buffers")
 
-    def load(self) -> "Ingestor":
+    def load(self) -> "ingestor":
         """
         Placeholder for remote fetch/localization.
 
@@ -105,37 +105,37 @@ class Ingestor:
         """Asynchronously execute ingestion (placeholder)."""
         self._not_implemented("ingest_async")
 
-    def all_tasks(self) -> "Ingestor":
+    def all_tasks(self) -> "ingestor":
         """Record the default task chain (placeholder)."""
         self._not_implemented("all_tasks")
 
-    def dedup(self) -> "Ingestor":
+    def dedup(self) -> "ingestor":
         """Record a dedup task configuration."""
         self._not_implemented("dedup")
 
-    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "Ingestor":
+    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "ingestor":
         """Record an embedding task configuration."""
         _ = _merge_params(params, kwargs)
         self._not_implemented("embed")
 
-    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "Ingestor":
+    def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "ingestor":
         """Record an extract task configuration."""
         _ = _merge_params(params, kwargs)
         self._not_implemented("extract")
 
-    def filter(self) -> "Ingestor":
+    def filter(self) -> "ingestor":
         """Record a filter task configuration."""
         self._not_implemented("filter")
 
-    def split(self) -> "Ingestor":
+    def split(self) -> "ingestor":
         """Record a split task configuration."""
         self._not_implemented("split")
 
-    def store(self) -> "Ingestor":
+    def store(self) -> "ingestor":
         """Record a store task configuration."""
         self._not_implemented("store")
 
-    def store_embed(self) -> "Ingestor":
+    def store_embed(self) -> "ingestor":
         """Record a store-embed task configuration."""
         self._not_implemented("store_embed")
 
@@ -147,16 +147,16 @@ class Ingestor:
         target_stage: Optional[str] = None,
         run_before: bool = False,
         run_after: bool = False,
-    ) -> "Ingestor":
+    ) -> "ingestor":
         """Record a UDF task configuration."""
         self._not_implemented("udf")
 
-    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "Ingestor":
+    def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "ingestor":
         """Record a vector DB upload configuration (execution TBD)."""
         _ = _merge_params(params, kwargs)
         self._not_implemented("vdb_upload")
 
-    def save_intermediate_results(self, output_dir: str) -> "Ingestor":
+    def save_intermediate_results(self, output_dir: str) -> "ingestor":
         """Record intermediate results persistence configuration."""
         self._not_implemented("save_intermediate_results")
 
@@ -165,15 +165,15 @@ class Ingestor:
         output_directory: Optional[str] = None,
         cleanup: bool = True,
         compression: Optional[str] = "gzip",
-    ) -> "Ingestor":
+    ) -> "ingestor":
         """Record result persistence configuration (execution TBD)."""
         self._not_implemented("save_to_disk")
 
-    def caption(self) -> "Ingestor":
+    def caption(self) -> "ingestor":
         """Record a caption task configuration."""
         self._not_implemented("caption")
 
-    def pdf_split_config(self, pages_per_chunk: int = 32) -> "Ingestor":
+    def pdf_split_config(self, pages_per_chunk: int = 32) -> "ingestor":
         """Record PDF split configuration (execution TBD)."""
         self._not_implemented("pdf_split_config")
 
@@ -200,3 +200,7 @@ class Ingestor:
         Once Ray execution is wired, this should reflect actual job/task state.
         """
         self._not_implemented("get_status")
+
+
+# Backward compatibility alias.
+Ingestor = ingestor

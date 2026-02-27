@@ -46,7 +46,7 @@ except Exception as e:  # pragma: no cover
     _PDFIUM_IMPORT_ERROR = e
 
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
-from ..ingest import Ingestor
+from ..ingestor import Ingestor
 from ..params import EmbedParams
 from ..params.models import IMAGE_MODALITIES
 from ..params import ExtractParams

@@ -98,6 +98,7 @@ class retriever:
         self,
         *,
         lancedb_uri: str,
+        lancedb_table: str,
         query_vectors: list[list[float]],
         query_texts: list[str],
     ) -> list[list[dict[str, Any]]]:
@@ -105,7 +106,7 @@ class retriever:
         import numpy as np
 
         db = lancedb.connect(lancedb_uri)
-        table = db.open_table(self.lancedb_table)
+        table = db.open_table(lancedb_table)
 
         effective_nprobes = int(self.nprobes)
         if effective_nprobes <= 0:
@@ -155,12 +156,14 @@ class retriever:
         *,
         embedder: Optional[str] = None,
         lancedb_uri: Optional[str] = None,
+        lancedb_table: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         """Run retrieval for a single query string."""
         return self.queries(
             [query],
             embedder=embedder,
             lancedb_uri=lancedb_uri,
+            lancedb_table=lancedb_table,
         )[0]
 
     def queries(
@@ -169,6 +172,7 @@ class retriever:
         *,
         embedder: Optional[str] = None,
         lancedb_uri: Optional[str] = None,
+        lancedb_table: Optional[str] = None,
     ) -> list[list[dict[str, Any]]]:
         """Run retrieval for multiple query strings."""
         query_texts = [str(q) for q in queries]
@@ -177,6 +181,7 @@ class retriever:
 
         resolved_embedder = str(embedder or self.embedder)
         resolved_lancedb_uri = str(lancedb_uri or self.lancedb_uri)
+        resolved_lancedb_table = str(lancedb_table or self.lancedb_table)
 
         endpoint = self._resolve_embedding_endpoint()
         if endpoint is not None:
@@ -193,6 +198,11 @@ class retriever:
 
         return self._search_lancedb(
             lancedb_uri=resolved_lancedb_uri,
+            lancedb_table=resolved_lancedb_table,
             query_vectors=vectors,
             query_texts=query_texts,
         )
+
+
+# Backward compatibility alias.
+Retriever = retriever

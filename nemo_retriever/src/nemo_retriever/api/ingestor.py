@@ -4,6 +4,6 @@
 
 from __future__ import annotations
 
-from ..ingest import Ingestor, RunMode, create_ingestor
+from ..ingestor import Ingestor, RunMode, create_ingestor
 
 __all__ = ["Ingestor", "RunMode", "create_ingestor"]

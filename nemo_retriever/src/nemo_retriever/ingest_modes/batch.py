@@ -30,7 +30,7 @@ from nemo_retriever.ocr.ocr import OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 
-from ..ingest import Ingestor
+from ..ingestor import Ingestor
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import HtmlChunkParams

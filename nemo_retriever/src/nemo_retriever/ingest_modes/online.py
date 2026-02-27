@@ -18,7 +18,7 @@ import os
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ..ingest import Ingestor
+from ..ingestor import Ingestor
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import IngestExecuteParams

@@ -1,7 +1,7 @@
 from nemo_retriever import ingestor, retriever
 
-ingestor = ingestor.Ingestor()
-retriever = retriever.Retriever()
+ingestor = ingestor()
+retriever = retriever()
 
 ingestor.files("data/*.pdf")
 ingestor.extract(method="pdfium")
