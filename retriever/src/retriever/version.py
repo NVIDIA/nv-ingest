@@ -21,7 +21,7 @@ except ImportError:
     _PACKAGE_BUILD_DATE = "unknown"
     _PACKAGE_BUILD_GIT_SHA = "unknown"
 
-_PKG_NAME = "retriever"
+_PKG_NAME = "nemo-retriever"
 _UNKNOWN = "unknown"
 
 

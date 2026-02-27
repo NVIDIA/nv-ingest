@@ -4,6 +4,6 @@
 
 from __future__ import annotations
 
-from retriever.adapters.cli.main import app, main
+from .adapters.cli.main import app, main
 
 __all__ = ["app", "main"]

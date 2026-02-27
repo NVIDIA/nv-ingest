@@ -69,10 +69,10 @@ dev = [
 ]
 
 [project.scripts]
-retriever = "retriever.__main__:main"
+retriever = "nemo_retriever.__main__:main"
 
 [tool.setuptools.dynamic]
-version = {attr = "retriever.version.get_build_version"}
+version = {attr = "nemo_retriever.version.get_build_version"}
 
 [tool.uv.sources]
 nv-ingest = { path = "../src/", editable = true }

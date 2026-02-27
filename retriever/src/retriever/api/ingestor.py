@@ -4,6 +4,6 @@
 
 from __future__ import annotations
 
-from retriever.ingest import Ingestor, RunMode, create_ingestor
+from ..ingest import Ingestor, RunMode, create_ingestor
 
 __all__ = ["Ingestor", "RunMode", "create_ingestor"]
