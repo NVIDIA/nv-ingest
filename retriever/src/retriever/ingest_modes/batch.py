@@ -31,6 +31,8 @@ from retriever.pdf.extract import PDFExtractionActor
 from retriever.pdf.split import PDFSplitActor
 
 from ..ingest import Ingestor
+from ..params import ASRParams
+from ..params import AudioChunkParams
 from ..params import EmbedParams
 from ..params import ExtractParams
 from ..params import HtmlChunkParams
@@ -695,6 +697,52 @@ class BatchIngestor(Ingestor):
         )
         return self
 
+    def extract_audio(
+        self,
+        params: AudioChunkParams | None = None,
+        asr_params: ASRParams | None = None,
+        **kwargs: Any,
+    ) -> "BatchIngestor":
+        """
+        Configure audio pipeline: read_binary_files -> MediaChunkActor -> ASRActor (chunk -> transcript).
+
+        Use with .files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_audio().
+        ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint (see ASRParams.audio_endpoints).
+        """
+        from retriever.audio import ASRActor
+        from retriever.audio import MediaChunkActor
+
+        self._pipeline_type = "audio"
+        chunk_resolved = _coerce_params(params, AudioChunkParams, kwargs)
+        asr_resolved = _coerce_params(asr_params, ASRParams, kwargs)
+        self._extract_audio_chunk_kwargs = chunk_resolved.model_dump(mode="python")
+        self._extract_audio_asr_kwargs = asr_resolved.model_dump(mode="python")
+        self._tasks.append(
+            ("extract_audio", {"chunk": self._extract_audio_chunk_kwargs, "asr": self._extract_audio_asr_kwargs})
+        )
+
+        audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
+        asr_batch_size = kwargs.get("asr_batch_size", 8)
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            MediaChunkActor,
+            batch_size=audio_chunk_batch_size,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
+        )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            ASRActor,
+            batch_size=asr_batch_size,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+            fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
+        )
+        return self
+
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
@@ -746,16 +794,26 @@ class BatchIngestor(Ingestor):
             embed_workers = int(endpoint_count)
 
         # Remaining kwargs are forwarded to the actor constructor.
+        embed_modality = resolved.embed_modality
+        text_elements_modality = resolved.text_elements_modality or embed_modality
+        structured_elements_modality = resolved.structured_elements_modality or embed_modality
         self._tasks.append(("embed", dict(kwargs)))
 
         # Explode content rows before embedding so each table/chart/infographic
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
+        from functools import partial
         from retriever.ingest_modes.inprocess import explode_content_to_rows
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        _explode_fn = partial(
             explode_content_to_rows,
+            modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+        )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _explode_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,

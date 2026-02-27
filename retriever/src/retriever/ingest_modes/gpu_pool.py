@@ -56,7 +56,7 @@ class OCRModelConfig:
 
 @dataclass
 class EmbeddingModelConfig:
-    """Config to recreate a LlamaNemotronEmbed1BV2Embedder."""
+    """Config to recreate an embedding model (VL or non-VL)."""
 
     device: Optional[str] = None
     hf_cache_dir: Optional[str] = None
@@ -65,6 +65,19 @@ class EmbeddingModelConfig:
     model_id: Optional[str] = None
 
     def create(self) -> Any:
+        from retriever.model import is_vl_embed_model
+
+        if is_vl_embed_model(self.model_id):
+            from retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+                LlamaNemotronEmbedVL1BV2Embedder,
+            )
+
+            return LlamaNemotronEmbedVL1BV2Embedder(
+                device=self.device,
+                hf_cache_dir=self.hf_cache_dir,
+                model_id=self.model_id,
+            )
+
         from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
             LlamaNemotronEmbed1BV2Embedder,
         )

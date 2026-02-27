@@ -73,6 +73,25 @@ html:
   tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
   encoding: utf-8
 
+# Optional config for .extract_audio() API (batch, inprocess, fused, online).
+# ASR can be remote (Parakeet/Riva gRPC) or local (HuggingFace nvidia/parakeet-ctc-1.1b).
+audio_chunk:
+  split_type: size
+  split_interval: 450
+  audio_only: false
+  video_audio_separate: false
+
+audio_asr:
+  # [grpc_endpoint, http_endpoint]; only gRPC is used for Parakeet when remote.
+  # When both null, local HF model (nvidia/parakeet-ctc-1.1b) is used; no NIM/gRPC required.
+  # For NGC cloud ASR: set auth_token from NGC_API_KEY and function_id from NGC catalog;
+  # or use env: AUDIO_GRPC_ENDPOINT (default grpc.nvcf.nvidia.com:443), NGC_API_KEY, AUDIO_FUNCTION_ID.
+  audio_endpoints: [null, null]
+  audio_infer_protocol: grpc
+  function_id: null
+  auth_token: null
+  segment_audio: false
+
 table:
   # Example config for:
   #   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`

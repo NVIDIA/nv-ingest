@@ -24,6 +24,22 @@ from ..params import ExtractParams
 from ..params import IngestExecuteParams
 from ..params import VdbUploadParams
 
+# Extension -> MIME for online ingest (server may dispatch to audio pipeline by MIME or header).
+_EXTENSION_MIME = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+}
+
+
+def _mime_for_path(path: str) -> str:
+    ext = os.path.splitext(path)[1].lower()
+    return _EXTENSION_MIME.get(ext, "application/pdf")
+
 
 class OnlineIngestor(Ingestor):
     """
@@ -94,6 +110,13 @@ class OnlineIngestor(Ingestor):
         _ = params or ExtractParams(**kwargs)
         return self
 
+    def extract_audio(self, params: Any = None, asr_params: Any = None, **kwargs: Any) -> "OnlineIngestor":
+        """Record audio config. API compatibility. Server must accept audio MIME and run audio pipeline."""
+        _ = params
+        _ = asr_params
+        _ = kwargs
+        return self
+
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record embed config (server uses its own config). API compatibility."""
         _ = params or EmbedParams(**kwargs)
@@ -128,12 +151,16 @@ class OnlineIngestor(Ingestor):
                 results.append({"ok": False, "error": str(e), "source_path": path})
                 continue
 
+            mime = _mime_for_path(path)
+            headers = {"X-Source-Path": path}
+            if not mime.startswith("application/"):
+                headers["X-Document-Type"] = "audio" if "audio" in mime or "video" in mime else "binary"
             try:
                 with httpx.Client(timeout=300.0) as client:
                     resp = client.post(
                         ingest_url,
-                        files={"file": (os.path.basename(path), body, "application/pdf")},
-                        headers={"X-Source-Path": path},
+                        files={"file": (os.path.basename(path), body, mime)},
+                        headers=headers,
                     )
             except Exception as e:
                 results.append({"ok": False, "error": str(e), "source_path": path})
@@ -151,12 +178,16 @@ class OnlineIngestor(Ingestor):
         for name, buf in self._buffers:
             buf.seek(0)
             body = buf.read()
+            mime = _mime_for_path(name)
+            headers = {"X-Source-Path": name}
+            if not mime.startswith("application/"):
+                headers["X-Document-Type"] = "audio" if "audio" in mime or "video" in mime else "binary"
             try:
                 with httpx.Client(timeout=300.0) as client:
                     resp = client.post(
                         ingest_url,
-                        files={"file": (name, body, "application/pdf")},
-                        headers={"X-Source-Path": name},
+                        files={"file": (name, body, mime)},
+                        headers=headers,
                     )
             except Exception as e:
                 results.append({"ok": False, "error": str(e), "source_path": name})
