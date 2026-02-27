@@ -69,6 +69,15 @@ Pass the directory that contains your PDFs as the first argument (`input-dir`). 
 
 For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
 
+### Audio pipeline
+
+Audio ingestion uses `.files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest()` in batch, inprocess, or fused mode. **ASR** (speech-to-text) can be:
+
+- **Local**: When `audio_endpoints` are not set (e.g. `[null, null]` in `ingest-config.yaml` under `audio_asr`), the pipeline uses the local HuggingFace model **nvidia/parakeet-ctc-1.1b** (Transformers first, with NeMo fallback if needed). No NIM or gRPC endpoint required.
+- **Remote**: When `audio_endpoints` is set (e.g. Parakeet NIM or self-deployed Riva gRPC), the pipeline uses the remote client. Set `AUDIO_GRPC_ENDPOINT`, `NGC_API_KEY`, and optionally `AUDIO_FUNCTION_ID` for NGC cloud ASR.
+
+See `ingest-config.yaml` (`audio_chunk`, `audio_asr`) and the audio scripts under `retriever/scripts/` for examples.
+
 ### Starting a Ray cluster
 
 This project uses Ray Data. You can start a Ray cluster yourself to use the dashboard and control GPU usage.

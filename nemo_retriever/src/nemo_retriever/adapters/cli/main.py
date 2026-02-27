@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import typer
 
+from retriever.audio import app as audio_app
 from nemo_retriever.utils.benchmark import app as benchmark_app
 from nemo_retriever.chart import app as chart_app
 from nemo_retriever.utils.compare import app as compare_app
@@ -20,6 +21,7 @@ from nemo_retriever.vector_store import app as vector_store_app
 from nemo_retriever.version import get_version_info
 
 app = typer.Typer(help="Retriever")
+app.add_typer(audio_app, name="audio")
 app.add_typer(image_app, name="image")
 app.add_typer(pdf_app, name="pdf")
 app.add_typer(local_app, name="local")

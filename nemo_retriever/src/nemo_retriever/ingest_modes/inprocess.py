@@ -47,6 +47,8 @@ except Exception as e:  # pragma: no cover
 
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingestor import Ingestor
+from ..params import ASRParams
+from ..params import AudioChunkParams
 from ..params import EmbedParams
 from ..params.models import IMAGE_MODALITIES
 from ..params import ExtractParams
@@ -1309,6 +1311,28 @@ class InProcessIngestor(Ingestor):
         self._extract_html_kwargs = resolved.model_dump(mode="python")
         return self
 
+    def extract_audio(
+        self,
+        params: AudioChunkParams | None = None,
+        asr_params: ASRParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """
+        Configure audio ingestion: media chunking (sync) -> ASR (Parakeet gRPC) -> same embed/vdb.
+
+        Use with .files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_audio(). ASR requires a remote Parakeet/Riva endpoint.
+        """
+        from retriever.audio.asr_actor import apply_asr_to_df
+
+        self._pipeline_type = "audio"
+        chunk_resolved = _coerce_params(params, AudioChunkParams, kwargs)
+        asr_resolved = _coerce_params(asr_params, ASRParams, kwargs)
+        self._extract_audio_chunk_kwargs = chunk_resolved.model_dump(mode="python")
+        self._extract_audio_asr_kwargs = asr_resolved.model_dump(mode="python")
+        self._tasks.append((apply_asr_to_df, {"asr_params": self._extract_audio_asr_kwargs}))
+        return self
+
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure embedding for in-process execution.
@@ -1738,6 +1762,13 @@ class InProcessIngestor(Ingestor):
 
             def _loader(p: str) -> pd.DataFrame:
                 return html_file_to_chunks_df(p, params=HtmlChunkParams(**self._extract_html_kwargs))
+
+        elif self._pipeline_type == "audio":
+
+            def _loader(p: str) -> pd.DataFrame:
+                from retriever.audio.chunk_actor import audio_path_to_chunks_df
+
+                return audio_path_to_chunks_df(p, params=AudioChunkParams(**self._extract_audio_chunk_kwargs))
 
         else:
 
