@@ -46,15 +46,11 @@ If you want chunks smaller than `page`, use token-based splitting as described i
 
 The `split` task uses a tokenizer to count the number of tokens in the document, 
 and splits the document based on the desired maximum chunk size and chunk overlap. 
-We recommend that you use the `meta-llama/Llama-3.2-1B` tokenizer, 
-because it's the same tokenizer as the llama-3.2 embedding model that we use for embedding.
-However, you can use any tokenizer from any HuggingFace model that includes a tokenizer file.
+
+We recommend the default tokenizer for token-based splitting. For more information, refer to [Llama tokenizer (default)](#llama-tokenizer-default).
+You can also use any tokenizer from any HuggingFace model that includes a tokenizer file.
 
 Use the `split` method to chunk large documents as shown in the following code.
-
-!!! note
-
-    The default tokenizer (`meta-llama/Llama-3.2-1B`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token": "hf_***` to authenticate.
 
 ```python
 ingestor = ingestor.split(
@@ -76,6 +72,23 @@ ingestor = ingestor.split(
 )
 ```
 
+### Llama tokenizer (default) {#llama-tokenizer-default}
+
+The default tokenizer for token-based splitting is **`meta-llama/Llama-3.2-1B`**. It matches the tokenizer used by the Llama 3.2 embedding model, which helps keep chunk boundaries aligned with the embedding model.
+
+!!! note
+
+    This tokenizer is gated on Hugging Face and requires an access token. For more information, refer to [User access tokens](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token` in your `split` params (for example, `"hf_***"`) to authenticate.
+
+By default, the NV Ingest container includes this tokenizer pre-downloaded at build time, so it does not need to be fetched at runtime. If you build the container yourself and want to pre-download it, do the following:
+
+- Review the [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B).
+- [Request access](https://huggingface.co/meta-llama/Llama-3.2-1B).
+- Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`.
+- Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
+
+For details on how to set environment variables, refer to [Environment Variables](environment-config.md).
+
 ### Split Parameters
 
 The following table contains the `split` parameters.
@@ -88,19 +101,6 @@ The following table contains the `split` parameters.
 | `params` | A sub-dictionary that can contain `split_source_types` and `hf_access_token` | `{}` |
 | `hf_access_token` | Your Hugging Face access token. | — |
 | `split_source_types` | The source types to split on (only splits on text by default). | — |
-
-
-
-### Pre-download the Tokenizer
-
-By default, the NV Ingest container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded 
-so that it doesn't have to download a tokenizer at runtime.
-If you are building the container yourself and want to pre-download this model, do the following:
-
-- Review the [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B).
-- [Request access](https://huggingface.co/meta-llama/Llama-3.2-1B).
-- Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`
-- Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
 
 
 

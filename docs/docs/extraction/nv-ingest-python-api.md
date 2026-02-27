@@ -566,6 +566,7 @@ For more information on environment variables, refer to [Environment Variables](
 ## Extract Audio
 
 Use the following code to extract mp3 audio content.
+The example uses the default tokenizer for token-based splitting; see [Llama tokenizer (default)](chunking.md#llama-tokenizer-default).
 
 ```python
 from nv_ingest_client.client import Ingestor
