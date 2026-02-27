@@ -178,8 +178,7 @@ ingestor = (
     .vdb_upload(
         collection_name="test",
         sparse=False,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048,
+        dense_dim=2048,  # Use 1024 for default llama-3.2 embedder; see [Data Store](data-store.md)
         # milvus_uri="http://milvus:19530"  # When running from within a container, the URI to the Milvus service is specified using the internal Docker network.
     )
 )
