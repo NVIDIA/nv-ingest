@@ -27,7 +27,7 @@ import ray.data as rd
 from retriever.utils.convert import DocToPdfConversionActor
 from retriever.page_elements import PageElementDetectionActor
 from retriever.ocr.ocr import OCRActor
-from retriever.pdf.extract import PDFSplitAndExtractActor
+from retriever.pdf.extract import split_and_extract_pdf
 
 from ..ingest import Ingestor
 from ..params import EmbedParams
@@ -594,13 +594,13 @@ class BatchIngestor(Ingestor):
         fused_kwargs["start_page"] = kwargs.get("start_page")
         fused_kwargs["end_page"] = kwargs.get("end_page")
         self._rd_dataset = self._rd_dataset.map_batches(
-            PDFSplitAndExtractActor,
+            split_and_extract_pdf,
             batch_size=pdf_split_batch_size,
             batch_format="pandas",
             num_cpus=pdf_extract_num_cpus,
             num_gpus=0,
-            compute=rd.ActorPoolStrategy(size=pdf_extract_workers),
-            fn_constructor_kwargs=fused_kwargs,
+            compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
+            fn_kwargs=fused_kwargs,
         )
         # Page-element detection with a GPU actor pool.
         # For ActorPoolStrategy, Ray Data expects a *callable class* (so it can

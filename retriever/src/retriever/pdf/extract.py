@@ -423,36 +423,6 @@ def split_and_extract_pdf(
 
 
 @dataclass(slots=True)
-class PDFSplitAndExtractActor:
-    """Fused split + extraction actor for Ray Data ActorPoolStrategy."""
-
-    extract_kwargs: Dict[str, Any]
-
-    def __init__(self, **extract_kwargs: Any) -> None:
-        self.extract_kwargs = dict(extract_kwargs)
-
-    def __call__(self, pdf_batch: Any, **override_kwargs: Any) -> Any:
-        try:
-            return split_and_extract_pdf(pdf_batch, **self.extract_kwargs, **override_kwargs)
-        except BaseException as e:
-            source_path = None
-            try:
-                if isinstance(pdf_batch, pd.DataFrame) and "path" in pdf_batch.columns and len(pdf_batch.index) > 0:
-                    source_path = str(pdf_batch.iloc[0]["path"])
-            except Exception:
-                source_path = None
-            return pd.DataFrame(
-                [
-                    _error_record(
-                        source_path=source_path,
-                        stage="actor_call",
-                        exc=e,
-                    )
-                ]
-            )
-
-
-@dataclass(slots=True)
 class PDFExtractionActor:
     """
     Skeleton PDF extraction callable.
