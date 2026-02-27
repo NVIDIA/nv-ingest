@@ -132,4 +132,4 @@ Instead of running NeMo Retriever Library locally, you can use NVCF to perform i
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot NeMo Retriever Library](troubleshoot.md)
-- [Use the NeMo Retriever Python API](python-api-reference.md)
+- [Use the NeMo Retriever Library Python API](python-api-reference.md)
