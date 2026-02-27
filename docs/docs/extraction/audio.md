@@ -89,7 +89,7 @@ Use the following procedure to run the NIM locally.
 
     !!! tip
 
-        For more Python examples, refer to [NeMo Retriever: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+        For more Python examples, refer to [NeMo Retriever Library: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Use NVCF Endpoints for Cloud-Based Inference
