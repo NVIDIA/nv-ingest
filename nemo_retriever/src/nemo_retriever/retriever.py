@@ -10,7 +10,7 @@ from typing import Any, Optional, Sequence
 
 
 @dataclass
-class retriever:
+class Retriever:
     """Simple query helper over LanceDB with configurable embedders."""
 
     lancedb_uri: str = "lancedb"
@@ -205,4 +205,4 @@ class retriever:
 
 
 # Backward compatibility alias.
-Retriever = retriever
+retriever = Retriever
