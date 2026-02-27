@@ -24,6 +24,11 @@ from nemo_retriever.params import ASRParams
 
 def test_strip_pad_from_transcript():
     """Transformers backend post-process removes <pad> and normalizes spaces."""
+    # Some tests monkeypatch nemo_retriever.model.local with a mock module object.
+    # Ensure we import the real package submodule for this test.
+    local_mod = sys.modules.get("nemo_retriever.model.local")
+    if local_mod is not None and not hasattr(local_mod, "__path__"):
+        sys.modules.pop("nemo_retriever.model.local", None)
     from nemo_retriever.model.local.parakeet_ctc_1_1b_asr import _strip_pad_from_transcript
 
     assert _strip_pad_from_transcript("") == ""
