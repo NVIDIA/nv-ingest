@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for retriever.audio: MediaChunkActor and audio_path_to_chunks_df.
+Unit tests for nemo_retriever.audio: MediaChunkActor and audio_path_to_chunks_df.
 """
 
 import wave
@@ -12,11 +12,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from retriever.audio.chunk_actor import CHUNK_COLUMNS
-from retriever.audio.chunk_actor import MediaChunkActor
-from retriever.audio.chunk_actor import audio_path_to_chunks_df
-from retriever.audio.media_interface import is_media_available
-from retriever.params import AudioChunkParams
+from nemo_retriever.audio.chunk_actor import CHUNK_COLUMNS
+from nemo_retriever.audio.chunk_actor import MediaChunkActor
+from nemo_retriever.audio.chunk_actor import audio_path_to_chunks_df
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.params import AudioChunkParams
 
 
 def _make_small_wav(path: Path, duration_sec: float = 0.5, sample_rate: int = 8000) -> None:
@@ -31,7 +31,7 @@ def _make_small_wav(path: Path, duration_sec: float = 0.5, sample_rate: int = 80
 
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_media_chunk_actor_empty_batch():
-    from retriever.audio import MediaChunkActor
+    from nemo_retriever.audio import MediaChunkActor
 
     params = AudioChunkParams(split_type="size", split_interval=1000)
     actor = MediaChunkActor(params=params)
@@ -44,7 +44,7 @@ def test_media_chunk_actor_empty_batch():
 
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_media_chunk_actor_single_small_file(tmp_path: Path):
-    from retriever.audio import MediaChunkActor
+    from nemo_retriever.audio import MediaChunkActor
 
     wav = tmp_path / "tiny.wav"
     _make_small_wav(wav, duration_sec=0.3)

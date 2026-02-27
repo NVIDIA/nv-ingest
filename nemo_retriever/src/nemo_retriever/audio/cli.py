@@ -6,7 +6,7 @@
 Audio extraction CLI (chunk + ASR, write *.audio_extraction.json sidecars).
 
 This module intentionally contains **no configuration logic**. It simply re-exports the
-`retriever.audio.stage` Typer application so any arguments provided to:
+`nemo_retriever.audio.stage` Typer application so any arguments provided to:
 
   `retriever audio ...`
 
@@ -15,7 +15,7 @@ are handled exactly the same as the stage commands (e.g. `extract`, `discover`).
 
 from __future__ import annotations
 
-from retriever.audio.stage import app as app
+from nemo_retriever.audio.stage import app as app
 
 
 def main() -> None:

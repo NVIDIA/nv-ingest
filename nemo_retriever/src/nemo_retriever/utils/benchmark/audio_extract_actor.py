@@ -17,11 +17,11 @@ import pandas as pd
 import ray.data as rd
 import typer
 
-from retriever.audio.asr_actor import ASRActor
-from retriever.audio.asr_actor import asr_params_from_env
-from retriever.audio.chunk_actor import MediaChunkActor
-from retriever.audio.media_interface import is_media_available
-from retriever.params import AudioChunkParams
+from nemo_retriever.audio.asr_actor import ASRActor
+from nemo_retriever.audio.asr_actor import asr_params_from_env
+from nemo_retriever.audio.chunk_actor import MediaChunkActor
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.params import AudioChunkParams
 
 from .common import (
     benchmark_sweep,

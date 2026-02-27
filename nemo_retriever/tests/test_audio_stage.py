@@ -12,12 +12,12 @@ from unittest.mock import patch
 
 import pytest
 
-from retriever.audio.media_interface import is_media_available
-from retriever.audio.stage import _audio_extraction_json_path
-from retriever.audio.stage import _run_extract_one
-from retriever.audio.stage import extract
-from retriever.params import ASRParams
-from retriever.params import AudioChunkParams
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.audio.stage import _audio_extraction_json_path
+from nemo_retriever.audio.stage import _run_extract_one
+from nemo_retriever.audio.stage import extract
+from nemo_retriever.params import ASRParams
+from nemo_retriever.params import AudioChunkParams
 
 
 def _make_small_wav(path: Path, duration_sec: float = 0.5, sample_rate: int = 8000) -> None:
@@ -42,7 +42,7 @@ def test_audio_stage_extract_one_mocked_asr(tmp_path: Path):
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "mock transcript for stage test")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         df = _run_extract_one(str(wav), chunk_params, asr_params)
 
     assert not df.empty
@@ -61,7 +61,7 @@ def test_audio_stage_extract_cli_writes_sidecar(tmp_path: Path):
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "cli mock transcript")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         extract(
             input_dir=tmp_path,
             glob="*.wav",

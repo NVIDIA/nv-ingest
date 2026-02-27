@@ -18,9 +18,9 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from retriever.audio.media_interface import MediaInterface
-from retriever.audio.media_interface import is_media_available
-from retriever.params import AudioChunkParams
+from nemo_retriever.audio.media_interface import MediaInterface
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.params import AudioChunkParams
 
 logger = logging.getLogger(__name__)
 

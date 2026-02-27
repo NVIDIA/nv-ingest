@@ -6,7 +6,7 @@
 Audio extraction stage: chunk + ASR only, write *.audio_extraction.json sidecars.
 
 Invoked as `retriever audio extract` / `retriever audio discover` (or
-`python -m retriever.audio extract` / `discover`). Analogous to `retriever pdf stage page-elements`.
+`python -m nemo_retriever.audio extract` / `discover`). Analogous to `retriever pdf stage page-elements`.
 """
 
 from __future__ import annotations
@@ -20,12 +20,12 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import typer
 
-from retriever.audio.asr_actor import apply_asr_to_df
-from retriever.audio.asr_actor import asr_params_from_env
-from retriever.audio.chunk_actor import audio_path_to_chunks_df
-from retriever.audio.media_interface import is_media_available
-from retriever.params import ASRParams
-from retriever.params import AudioChunkParams
+from nemo_retriever.audio.asr_actor import apply_asr_to_df
+from nemo_retriever.audio.asr_actor import asr_params_from_env
+from nemo_retriever.audio.chunk_actor import audio_path_to_chunks_df
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.params import ASRParams
+from nemo_retriever.params import AudioChunkParams
 
 logger = logging.getLogger(__name__)
 

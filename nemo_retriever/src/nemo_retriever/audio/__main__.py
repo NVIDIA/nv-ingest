@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Entrypoint for `python -m retriever.audio`. Do not import this from the package __init__."""
+"""Entrypoint for `python -m nemo_retriever.audio`. Do not import this from the package __init__."""
 
 from __future__ import annotations
 

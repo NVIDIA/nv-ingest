@@ -16,13 +16,13 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from retriever.audio.chunk_actor import _chunk_one
-from retriever.audio.media_interface import MediaInterface
-from retriever.audio.media_interface import is_media_available
-from retriever.params import AudioChunkParams
-from retriever.params import ASRParams
-from retriever.params import LanceDbParams
-from retriever.params import VdbUploadParams
+from nemo_retriever.audio.chunk_actor import _chunk_one
+from nemo_retriever.audio.media_interface import MediaInterface
+from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.params import AudioChunkParams
+from nemo_retriever.params import ASRParams
+from nemo_retriever.params import LanceDbParams
+from nemo_retriever.params import VdbUploadParams
 
 
 def _make_small_wav(path: Path, duration_sec: float = 0.5, sample_rate: int = 8000) -> None:
@@ -65,12 +65,12 @@ def test_batch_audio_pipeline_with_mocked_asr(tmp_path: Path):
     # Ray workers/raylet resolve path deps from working_dir; use nv-ingest repo root.
     _nv_ingest_root = Path(__file__).resolve().parents[2]
 
-    from retriever.ingest_modes.batch import BatchIngestor
+    from nemo_retriever.ingest_modes.batch import BatchIngestor
 
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "mock transcript for integration test")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         ingestor = (
             BatchIngestor(documents=[])
             .files([str(wav)])
@@ -115,12 +115,12 @@ def test_inprocess_audio_pipeline_with_mocked_asr(tmp_path: Path):
     wav = tmp_path / "small.wav"
     _make_small_wav(wav, duration_sec=0.5)
 
-    from retriever.ingest_modes.inprocess import InProcessIngestor
+    from nemo_retriever.ingest_modes.inprocess import InProcessIngestor
 
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "inprocess mock transcript")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         ingestor = (
             InProcessIngestor(documents=[])
             .files([str(wav)])
@@ -147,13 +147,13 @@ def test_inprocess_audio_pipeline_local_asr_mocked(tmp_path: Path):
     wav = tmp_path / "small.wav"
     _make_small_wav(wav, duration_sec=0.5)
 
-    from retriever.ingest_modes.inprocess import InProcessIngestor
+    from nemo_retriever.ingest_modes.inprocess import InProcessIngestor
 
     mock_model = MagicMock()
     mock_model.transcribe.return_value = ["local asr mock transcript"]
 
-    with patch("retriever.audio.asr_actor._get_client") as mock_get_client:
-        with patch("retriever.model.local.ParakeetCTC1B1ASR", return_value=mock_model):
+    with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get_client:
+        with patch("nemo_retriever.model.local.ParakeetCTC1B1ASR", return_value=mock_model):
             ingestor = (
                 InProcessIngestor(documents=[])
                 .files([str(wav)])
@@ -188,12 +188,12 @@ def test_fused_audio_pipeline_with_mocked_asr(tmp_path: Path):
 
     _nv_ingest_root = Path(__file__).resolve().parents[2]
 
-    from retriever.ingest_modes.fused import FusedIngestor
+    from nemo_retriever.ingest_modes.fused import FusedIngestor
 
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "fused mock transcript")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         ingestor = (
             FusedIngestor(documents=[])
             .files([str(wav)])
@@ -266,12 +266,12 @@ def test_audio_pipeline_with_mp3_dir_mocked_asr(tmp_path: Path):
     lancedb_dir.mkdir()
     _nv_ingest_root = Path(__file__).resolve().parents[2]
 
-    from retriever.ingest_modes.batch import BatchIngestor
+    from nemo_retriever.ingest_modes.batch import BatchIngestor
 
     mock_client = MagicMock()
     mock_client.infer.return_value = ([], "mock transcript from mp3/ integration")
 
-    with patch("retriever.audio.asr_actor._get_client", return_value=mock_client):
+    with patch("nemo_retriever.audio.asr_actor._get_client", return_value=mock_client):
         ingestor = (
             BatchIngestor(documents=[])
             .files(audio_files)

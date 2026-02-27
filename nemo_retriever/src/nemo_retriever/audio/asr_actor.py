@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from retriever.params import ASRParams
+from nemo_retriever.params import ASRParams
 
 
 def _use_remote(params: ASRParams) -> bool:
@@ -132,7 +132,7 @@ class ASRActor:
             self._model = None
         else:
             self._client = None
-            from retriever.model.local import ParakeetCTC1B1ASR
+            from nemo_retriever.model.local import ParakeetCTC1B1ASR
 
             self._model = ParakeetCTC1B1ASR()
 

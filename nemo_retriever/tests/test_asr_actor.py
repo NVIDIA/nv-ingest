@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Unit tests for retriever.audio: ASRActor (with mocked Parakeet client).
+Unit tests for nemo_retriever.audio: ASRActor (with mocked Parakeet client).
 
-Avoids importing retriever.model (and thus torch) by not eagerly loading
-the model package; local-ASR tests inject a fake retriever.model.local
+Avoids importing nemo_retriever.model (and thus torch) by not eagerly loading
+the model package; local-ASR tests inject a fake nemo_retriever.model.local
 into sys.modules so the real module is never loaded.
 """
 
@@ -17,14 +17,14 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from retriever.audio.asr_actor import ASRActor
-from retriever.audio.asr_actor import apply_asr_to_df
-from retriever.params import ASRParams
+from nemo_retriever.audio.asr_actor import ASRActor
+from nemo_retriever.audio.asr_actor import apply_asr_to_df
+from nemo_retriever.params import ASRParams
 
 
 def test_strip_pad_from_transcript():
     """Transformers backend post-process removes <pad> and normalizes spaces."""
-    from retriever.model.local.parakeet_ctc_1_1b_asr import _strip_pad_from_transcript
+    from nemo_retriever.model.local.parakeet_ctc_1_1b_asr import _strip_pad_from_transcript
 
     assert _strip_pad_from_transcript("") == ""
     assert _strip_pad_from_transcript("  ") == ""
@@ -37,7 +37,7 @@ def test_strip_pad_from_transcript():
 
 
 def test_asr_actor_empty_batch():
-    with patch("retriever.audio.asr_actor._get_client") as mock_get:
+    with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get:
         mock_client = MagicMock()
         mock_get.return_value = mock_client
 
@@ -53,7 +53,7 @@ def test_asr_actor_empty_batch():
 
 
 def test_asr_actor_mock_transcribe():
-    with patch("retriever.audio.asr_actor._get_client") as mock_get:
+    with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get:
         mock_client = MagicMock()
         mock_client.infer.return_value = ([], "hello world transcript")
         mock_get.return_value = mock_client
@@ -86,7 +86,7 @@ def test_asr_actor_mock_transcribe():
 
 
 def test_apply_asr_to_df():
-    with patch("retriever.audio.asr_actor._get_client") as mock_get:
+    with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get:
         mock_client = MagicMock()
         mock_client.infer.return_value = ([], "applied transcript")
         mock_get.return_value = mock_client
@@ -117,10 +117,10 @@ def test_local_asr_does_not_call_get_client():
     mock_class = MagicMock(return_value=mock_model)
     mock_local = MagicMock()
     mock_local.ParakeetCTC1B1ASR = mock_class
-    prev_local = sys.modules.get("retriever.model.local")
-    sys.modules["retriever.model.local"] = mock_local
+    prev_local = sys.modules.get("nemo_retriever.model.local")
+    sys.modules["nemo_retriever.model.local"] = mock_local
     try:
-        with patch("retriever.audio.asr_actor._get_client") as mock_get:
+        with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get:
             params = ASRParams(audio_endpoints=(None, None))
             actor = ASRActor(params=params)
 
@@ -152,9 +152,9 @@ def test_local_asr_does_not_call_get_client():
             assert len(call_args) == 1
     finally:
         if prev_local is None:
-            sys.modules.pop("retriever.model.local", None)
+            sys.modules.pop("nemo_retriever.model.local", None)
         else:
-            sys.modules["retriever.model.local"] = prev_local
+            sys.modules["nemo_retriever.model.local"] = prev_local
 
 
 def test_local_asr_apply_asr_to_df():
@@ -164,10 +164,10 @@ def test_local_asr_apply_asr_to_df():
     mock_class = MagicMock(return_value=mock_model)
     mock_local = MagicMock()
     mock_local.ParakeetCTC1B1ASR = mock_class
-    prev_local = sys.modules.get("retriever.model.local")
-    sys.modules["retriever.model.local"] = mock_local
+    prev_local = sys.modules.get("nemo_retriever.model.local")
+    sys.modules["nemo_retriever.model.local"] = mock_local
     try:
-        with patch("retriever.audio.asr_actor._get_client") as mock_get:
+        with patch("nemo_retriever.audio.asr_actor._get_client") as mock_get:
             batch = pd.DataFrame(
                 [
                     {
@@ -188,6 +188,6 @@ def test_local_asr_apply_asr_to_df():
             assert out["text"].iloc[0] == "apply local text"
     finally:
         if prev_local is None:
-            sys.modules.pop("retriever.model.local", None)
+            sys.modules.pop("nemo_retriever.model.local", None)
         else:
-            sys.modules["retriever.model.local"] = prev_local
+            sys.modules["nemo_retriever.model.local"] = prev_local

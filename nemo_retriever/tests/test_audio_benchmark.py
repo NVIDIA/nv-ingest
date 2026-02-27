@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from retriever.audio.media_interface import is_media_available
+from nemo_retriever.audio.media_interface import is_media_available
 
 
 def _make_small_wav(path: Path, duration_sec: float = 0.3, sample_rate: int = 8000) -> None:
@@ -33,7 +33,7 @@ def test_audio_benchmark_run_mock_asr(tmp_path: Path):
 
     from typer.testing import CliRunner
 
-    from retriever.utils.benchmark.audio_extract_actor import app
+    from nemo_retriever.utils.benchmark.audio_extract_actor import app
 
     runner = CliRunner()
     result = runner.invoke(
