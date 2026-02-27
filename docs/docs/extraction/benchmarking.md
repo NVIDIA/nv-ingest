@@ -1,11 +1,11 @@
-# NeMo Retriever Integration Testing Framework
+# NeMo Retriever Library Integration Testing Framework
 
-A configurable, dataset-agnostic testing framework for end-to-end validation of NeMo Retriever pipelines. This framework uses structured YAML configuration for type safety, validation, and parameter management.
+A configurable, dataset-agnostic testing framework for end-to-end validation of NeMo Retriever Library pipelines. This framework uses structured YAML configuration for type safety, validation, and parameter management.
 
 ## Dataset Prerequisites
 
     
-Before you run any benchmarking or evaluation tests, you must first download the benchmark datasets. The three primary datasets used in NeMo Retriever benchmarking and evaluations are the following:
+Before you run any benchmarking or evaluation tests, you must first download the benchmark datasets. The three primary datasets used in NeMo Retriever Library benchmarking and evaluations are the following:
     
 - **Bo20** - 20 PDFs for quick testing
 - **Bo767** - 767 PDFs for comprehensive benchmarking
