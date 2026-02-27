@@ -108,7 +108,7 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 When the `nemotron-parse` model is used in the retriever batch pipeline, the `page-elements` and `nemotron-ocr` stages are skipped in the Ray pipeline, as their functionality is handled by the `nemotron-parse` actor. This behavior applies when running the pipeline from the command line (for instance, using `batch_pipeline.py` in library mode).
 
-To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero (they default to 0, which leaves `nemotron-parse` disabled):
+To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero:
 ​
 - `--nemotron-parse-workers` — number of Ray workers to run nemotron-parse
 - `--gpu-nemotron-parse` — GPU fraction to allocate per worker (for example, 0.25 to run four workers on a single GPU)
