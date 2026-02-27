@@ -28,11 +28,11 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
-from nemo_nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
-from nemo_nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-from nemo_nemo_retriever.page_elements import detect_page_elements_v3
-from nemo_nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, ocr_page_elements
-from nemo_nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
+from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+from nemo_retriever.page_elements import detect_page_elements_v3
+from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, ocr_page_elements
+from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
     from tqdm.auto import tqdm
@@ -316,7 +316,7 @@ def embed_text_main_text_embed(
     **_: Any,
 ) -> Any:
     """
-    Inprocess embedding task implemented via `nemo_nemo_retriever.text_embed.main_text_embed`.
+    Inprocess embedding task implemented via `nemo_retriever.text_embed.main_text_embed`.
 
     This is a thin adapter that preserves the old output columns:
     - `output_column` (payload dict with embedding)
@@ -347,7 +347,7 @@ def embed_text_main_text_embed(
         raise ValueError("Either a local model or an embedding_endpoint must be provided.")
 
     # Resolve NIM aliases to the actual HF model ID.
-    from nemo_nemo_retriever.model import resolve_embed_model
+    from nemo_retriever.model import resolve_embed_model
 
     _resolved_model_name = resolve_embed_model(model_name)
 
@@ -710,7 +710,7 @@ def upload_embeddings_to_lancedb_inprocess(
         pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
         source_id = path or filename or pdf_basename
 
-        # Provide fields compatible with `nemo_nemo_retriever.recall.core` which expects LanceDB hits
+        # Provide fields compatible with `nemo_retriever.recall.core` which expects LanceDB hits
         # to include JSON-encoded `metadata` and `source` strings.
         metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
         if pdf_page:
@@ -787,7 +787,7 @@ def upload_embeddings_to_lancedb_inprocess(
         pa.field("page_number", pa.int32()),
         pa.field("source_id", pa.string()),
         pa.field("path", pa.string()),
-        # Compatibility columns expected by `nemo_nemo_retriever.recall.core`:
+        # Compatibility columns expected by `nemo_retriever.recall.core`:
         pa.field("text", pa.string()),
         pa.field("metadata", pa.string()),
         pa.field("source", pa.string()),
@@ -1390,14 +1390,14 @@ class InProcessIngestor(Ingestor):
 
         model_name_raw = embed_kwargs.pop("model_name", None)
 
-        from nemo_nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
 
         model_id = resolve_embed_model(model_name_raw)
 
         embed_kwargs.setdefault("input_type", "passage")
 
         if is_vl_embed_model(model_name_raw):
-            from nemo_nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
                 LlamaNemotronEmbedVL1BV2Embedder,
             )
 

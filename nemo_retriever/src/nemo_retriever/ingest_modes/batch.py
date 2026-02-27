@@ -24,11 +24,11 @@ from typing import Union
 
 import ray
 import ray.data as rd
-from nemo_nemo_retriever.utils.convert import DocToPdfConversionActor
-from nemo_nemo_retriever.page_elements import PageElementDetectionActor
-from nemo_nemo_retriever.ocr.ocr import OCRActor
-from nemo_nemo_retriever.pdf.extract import PDFExtractionActor
-from nemo_nemo_retriever.pdf.split import PDFSplitActor
+from nemo_retriever.utils.convert import DocToPdfConversionActor
+from nemo_retriever.page_elements import PageElementDetectionActor
+from nemo_retriever.ocr.ocr import OCRActor
+from nemo_retriever.pdf.extract import PDFExtractionActor
+from nemo_retriever.pdf.split import PDFSplitActor
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -260,12 +260,12 @@ class _BatchEmbedActor:
         max_length = int(self._kwargs.get("max_length", 8192))
         model_name_raw = self._kwargs.get("model_name")
 
-        from nemo_nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
 
         model_id = resolve_embed_model(model_name_raw)
 
         if is_vl_embed_model(model_name_raw):
-            from nemo_nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
                 LlamaNemotronEmbedVL1BV2Embedder,
             )
 
@@ -275,7 +275,7 @@ class _BatchEmbedActor:
                 model_id=model_id,
             )
         else:
-            from nemo_nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
+            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
                 LlamaNemotronEmbed1BV2Embedder,
             )
 
@@ -288,7 +288,7 @@ class _BatchEmbedActor:
             )
 
     def __call__(self, batch_df: Any) -> Any:
-        from nemo_nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
+        from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
 
         return embed_text_main_text_embed(batch_df, model=self._model, **self._kwargs)
 
@@ -660,7 +660,7 @@ class BatchIngestor(Ingestor):
         Use with .files("*.txt").extract_txt(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_txt().
         """
-        from nemo_nemo_retriever.txt.ray_data import TxtSplitActor
+        from nemo_retriever.txt.ray_data import TxtSplitActor
 
         self._pipeline_type = "txt"
         resolved = _coerce_params(params, TextChunkParams, kwargs)
@@ -684,7 +684,7 @@ class BatchIngestor(Ingestor):
         Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_html().
         """
-        from nemo_nemo_retriever.html.ray_data import HtmlSplitActor
+        from nemo_retriever.html.ray_data import HtmlSplitActor
 
         self._pipeline_type = "html"
         resolved = _coerce_params(params, HtmlChunkParams, kwargs)
@@ -808,7 +808,7 @@ class BatchIngestor(Ingestor):
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
         from functools import partial
-        from nemo_nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
+        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
 
         _explode_fn = partial(
             explode_content_to_rows,
