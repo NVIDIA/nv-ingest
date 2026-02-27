@@ -82,7 +82,7 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
-    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/opt/conda/envs/nv_…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
+    1b885f37c991  nvcr.io/nvidia/nemo-microservices/nv-ingest:...  "/usr/bin/tini -- /w…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:7670...  nv-ingest-nv-ingest-ms-runtime-1
     14ef31ed7f49  milvusdb/milvus:v2.5.3-gpu                       "/tini -- bash -c 's…"  7 minutes ago   Up 7 minutes (healthy)  0.0.0.0:9091...  milvus-standalone
     dceaf36cc5df  otel/opentelemetry-collector-contrib:...         "/otelcol-contrib --…"  7 minutes ago   Up 7 minutes            0.0.0.0:4317...  nv-ingest-otel-collector-1
     5bd0b48eb71b  nvcr.io/nim/nvidia/nemoretriever-graphic-ele...  "/opt/nvidia/nvidia_…"  7 minutes ago   Up 7 minutes            0.0.0.0:8003...  nv-ingest-graphic-elements-1
@@ -102,18 +102,17 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
 You can interact with the NV-Ingest service from the host, or by using `docker exec` to run commands in the NV-Ingest container.
 
-To interact from the host, you'll need a Python environment that has the client dependencies installed. For example, you can use a Conda environment.
+To interact from the host, you'll need a Python environment that has the client dependencies installed.
 
 ```
-# conda not required but makes it easy to create a fresh Python environment
-conda create --name nv-ingest-dev python=3.12.11
-conda activate nv-ingest-dev
-pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
+uv venv --python 3.12 nv-ingest-dev
+source nv-ingest-dev/bin/activate
+uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 ```
 
 !!! tip
 
-    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+    To confirm that you have activated your virtual environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
 
 
 !!! note
@@ -125,7 +124,7 @@ To work inside the container, run the following code.
 ```bash
 docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
 ```
-This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment includes all necessary Python client libraries. You should see a prompt similar to the following.
+This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-created `nv_ingest_runtime` virtual environment includes all necessary Python client libraries. You should see a prompt similar to the following.
 
 ```bash
 (nv_ingest_runtime) root@your-computer-name:/workspace#
@@ -424,7 +423,7 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
+| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for image captioning of unstructured images and infographics. This profile enables the `caption` method in the Python API to generate text descriptions of visual content. For more information, refer to [Use Multimodal Embedding](vlm-embed.md) and [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images). | 
 
 
 ## Docker Compose override files
@@ -438,6 +437,18 @@ The default [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/
 | `docker-compose.l40s.yaml` | NVIDIA L40S |
 
 For RTX Pro 6000 Server Edition and other GPUs with limited VRAM, use the override that best matches your GPU memory (for example, `docker-compose.l40s.yaml` or `docker-compose.a10g.yaml`).
+
+### Example: Using the VLM Profile for Infographic Captioning
+
+Infographics often combine text, charts, and diagrams into complex visuals. Vision-language model (VLM) captioning generates natural language descriptions that capture this complexity, making the content searchable and more accessible for downstream applications.
+
+To use VLM captioning for infographics, start NeMo Retriever extraction with both the `retrieval` and `vlm` profiles by running the following code.
+```shell
+docker compose \
+  -f docker-compose.yaml \
+  --profile retrieval \
+  --profile vlm up
+```
 
 ### Example with A100 40GB
 

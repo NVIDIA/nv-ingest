@@ -46,7 +46,7 @@ jobs:
       # Only test a random subset (see --random-selection) because running pytest with QEMU emulation can be very slow.
       - name: Run Pytest inside Docker container
         run: |
-          docker run --platform=linux/arm64 nv-ingest:latest pytest -rs -m "not integration" --random-selection 100 tests/service_tests client/client_tests api/api_tests
+          docker run --platform=linux/arm64 nv-ingest:latest bash -lc "python -m pip install --disable-pip-version-check 'pymilvus[milvus_lite]' && pytest -rs -m 'not integration' --random-selection 100 tests/service_tests client/client_tests api/api_tests"
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

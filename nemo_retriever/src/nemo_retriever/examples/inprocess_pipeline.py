@@ -155,6 +155,24 @@ def main(
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),
+    nemotron_parse_workers: float = typer.Option(
+        0.0,
+        "--nemotron-parse-workers",
+        min=0.0,
+        help="Enable Parse-only extraction path when > 0.0 with parse GPU/batch-size.",
+    ),
+    gpu_nemotron_parse: float = typer.Option(
+        0.0,
+        "--gpu-nemotron-parse",
+        min=0.0,
+        help="GPU allocation hint for Parse-only extraction path.",
+    ),
+    nemotron_parse_batch_size: float = typer.Option(
+        0.0,
+        "--nemotron-parse-batch-size",
+        min=0.0,
+        help="Parse stage batch size (enables Parse-only path when > 0.0 with parse workers/GPU).",
+    ),
     embed_modality: str = typer.Option(
         "text",
         "--embed-modality",
@@ -251,6 +269,11 @@ def main(
                     extract_infographics=False,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "nemotron_parse_workers": float(nemotron_parse_workers),
+                        "gpu_nemotron_parse": float(gpu_nemotron_parse),
+                        "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
+                    },
                 )
             )
             .embed(
@@ -287,6 +310,11 @@ def main(
                     extract_infographics=False,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "nemotron_parse_workers": float(nemotron_parse_workers),
+                        "gpu_nemotron_parse": float(gpu_nemotron_parse),
+                        "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
+                    },
                 )
             )
             .embed(

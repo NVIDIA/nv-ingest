@@ -16,7 +16,7 @@ Before you begin using [NeMo Retriever extraction](overview.md), ensure the foll
 - [Docker Buildx](https://docs.docker.com/build/concepts/overview/#buildx) `>= 0.17` (Compose 2.40+ enforces this)
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
+- [UV Python package and environment manager](https://docs.astral.sh/uv/getting-started/installation/)
 
 
 !!! note
