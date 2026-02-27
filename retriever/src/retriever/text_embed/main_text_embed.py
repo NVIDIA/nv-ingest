@@ -50,6 +50,8 @@ from urllib.parse import urlparse  # noqa: F401
 
 import pandas as pd
 
+from retriever.params.models import IMAGE_MODALITIES
+
 logger = logging.getLogger(__name__)
 
 # Keep HTTP client logging quiet by default (parity with API transform).
@@ -81,6 +83,8 @@ class TextEmbeddingConfig:
     metadata_column: str = "metadata"
     # Optional extra output column containing a payload dict (similar to embed_text_1b_v2)
     output_payload_column: Optional[str] = None
+    # Modality: "text" (default), "image", or "text_image"
+    embed_modality: str = "text"
 
 
 # ------------------------------------------------------------------------------
@@ -141,6 +145,108 @@ def _ensure_metadata_dict(row: pd.Series, *, metadata_column: str = "metadata") 
     if isinstance(md, dict):
         return md
     return {}
+
+
+def _image_from_row(row: pd.Series) -> Optional[str]:
+    """Extract ``_image_b64`` column value from a row."""
+    v = row.get("_image_b64")
+    if isinstance(v, str) and v.strip():
+        return v
+    return None
+
+
+def _format_image_input_string(image_b64: str, mime: str = "image/png") -> str:
+    """Format a base64 image as a data URL string for remote NIM embedding."""
+    return f"data:{mime};base64,{image_b64}"
+
+
+def _format_text_image_pair_input_string(text: str, image_b64: str, mime: str = "image/png") -> str:
+    """Combine text and a data URL image for remote NIM text_image embedding."""
+    data_url = f"data:{mime};base64,{image_b64}"
+    return f"{text}\n{data_url}"
+
+
+def _multimodal_callable_runner(
+    df_slice: pd.DataFrame,
+    *,
+    embedder: Any,
+    batch_size: int,
+    embed_modality: str,
+    text_column: str = "text",
+) -> dict:
+    """Run multimodal embedding (image-only or text+image) using a local VL embedder.
+
+    Processes the DataFrame slice in batches, calling
+    ``embedder.embed_images()`` or ``embedder.embed_text_image()``
+    depending on *embed_modality*.
+
+    For ``text_image`` mode, rows that have text but no image are
+    embedded with the text-only ``embedder.embed()`` method as a
+    graceful fallback (e.g. pdfium-extracted text without a rendered
+    page image).  For ``image`` mode, rows without images get ``None``.
+
+    Returns the same ``{"embeddings": [...], "info_msgs": [...]}``
+    structure as ``_callable_runner``.
+    """
+    flat_embeddings: List[Optional[Sequence[float]]] = []
+    flat_info_msgs: List[Optional[dict]] = []
+
+    n = len(df_slice)
+    bs = max(1, int(batch_size))
+    for start in range(0, n, bs):
+        chunk = df_slice.iloc[start : start + bs]
+        size = len(chunk)
+        images_b64 = [_image_from_row(chunk.iloc[i]) or "" for i in range(size)]
+        texts = [_text_from_row(chunk.iloc[i], text_column=text_column) or "" for i in range(size)]
+
+        if embed_modality == "image":
+            vecs = embedder.embed_images(images_b64, batch_size=bs)
+            tolist = getattr(vecs, "tolist", None)
+            vecs_list = tolist() if callable(tolist) else list(vecs)
+
+            if len(vecs_list) == size:
+                flat_embeddings.extend(vecs_list)
+            else:
+                vec_iter = iter(vecs_list)
+                for b64 in images_b64:
+                    flat_embeddings.append(next(vec_iter, None) if b64 else None)
+
+        else:  # text_image
+            # Split rows into those with images (multimodal) and those
+            # without (text-only fallback).
+            has_image = [bool(b) for b in images_b64]
+
+            # multimodal subset
+            mm_texts = [t for t, h in zip(texts, has_image) if h]
+            mm_images = [b for b, h in zip(images_b64, has_image) if h]
+            mm_vecs_list: List[Optional[Sequence[float]]] = []
+            if mm_images:
+                vecs = embedder.embed_text_image(mm_texts, mm_images, batch_size=bs)
+                tolist = getattr(vecs, "tolist", None)
+                mm_vecs_list = tolist() if callable(tolist) else list(vecs)
+
+            # text-only fallback subset
+            fb_texts = [t for t, h in zip(texts, has_image) if not h and t.strip()]
+            fb_vecs_list: List[Optional[Sequence[float]]] = []
+            if fb_texts:
+                vecs = embedder.embed(fb_texts, batch_size=bs)
+                tolist = getattr(vecs, "tolist", None)
+                fb_vecs_list = tolist() if callable(tolist) else list(vecs)
+
+            # reassemble in original order
+            mm_iter = iter(mm_vecs_list)
+            fb_iter = iter(fb_vecs_list)
+            for h, t in zip(has_image, texts):
+                if h:
+                    flat_embeddings.append(next(mm_iter, None))
+                elif t.strip():
+                    flat_embeddings.append(next(fb_iter, None))
+                else:
+                    flat_embeddings.append(None)
+
+        flat_info_msgs.extend([None] * size)
+
+    return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
 
 
 # ------------------------------------------------------------------------------
@@ -284,11 +390,13 @@ def _async_request_handler(
     filter_errors: bool,
     modalities: Optional[List[List[str]]] = None,
     dimensions: Optional[int] = None,
+    max_concurrent: Optional[int] = None,
 ) -> List[dict]:
     if modalities is None:
         modalities = [None] * len(prompts)  # type: ignore[assignment]
 
-    with ThreadPoolExecutor() as executor:
+    pool_size = max_concurrent if max_concurrent and max_concurrent > 0 else None
+    with ThreadPoolExecutor(max_workers=pool_size) as executor:
         futures = [
             executor.submit(
                 _make_async_request,
@@ -321,6 +429,7 @@ def _async_runner(
     filter_errors: bool,
     modalities: Optional[List[List[str]]] = None,
     dimensions: Optional[int] = None,
+    max_concurrent: Optional[int] = None,
 ) -> dict:
     results = _async_request_handler(
         prompts,
@@ -333,6 +442,7 @@ def _async_runner(
         filter_errors,
         modalities=modalities,
         dimensions=dimensions,
+        max_concurrent=max_concurrent,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -465,21 +575,67 @@ def create_text_embeddings_for_df(
     if df_transform_ledger.empty:
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
+    embed_modality = transform_config.embed_modality
+    multimodal_embedder = task_config.get("multimodal_embedder")  # local VL model for image/text_image
+
     # Extract content and normalize empty or non-str to None (adapted for retriever-local schema).
-    extracted_content = df_transform_ledger.apply(
-        lambda r: _text_from_row(r, text_column=str(transform_config.text_column)), axis=1
-    ).apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
+    if embed_modality == "image":
+        # For image-only, valid rows are those with a non-empty _image_b64.
+        extracted_content = df_transform_ledger.apply(lambda r: _image_from_row(r), axis=1).apply(
+            lambda x: x if isinstance(x, str) and x.strip() else None
+        )
+    elif embed_modality == "text_image":
+        # For text_image, a row is valid if it has either text or image (prefer both).
+        def _text_image_content(r: pd.Series) -> Optional[str]:
+            text = _text_from_row(r, text_column=str(transform_config.text_column))
+            image = _image_from_row(r)
+            if text or image:
+                return text or "__image_only__"
+            return None
+
+        extracted_content = df_transform_ledger.apply(_text_image_content, axis=1)
+    else:
+        extracted_content = df_transform_ledger.apply(
+            lambda r: _text_from_row(r, text_column=str(transform_config.text_column)), axis=1
+        ).apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
 
     df_content = df_transform_ledger.copy()
     df_content["_content"] = extracted_content
 
     valid_content_mask = df_content["_content"].notna()
     if valid_content_mask.any():
-        filtered_content_list = df_content.loc[valid_content_mask, "_content"].tolist()
-        filtered_content_batches = _generate_batches(filtered_content_list, batch_size=int(transform_config.batch_size))
-
-        if endpoint_url:
-            # NOTE: this implementation uses HTTP embeddings with an OpenAI-compatible schema.
+        if embed_modality in IMAGE_MODALITIES and multimodal_embedder is not None:
+            # Local multimodal path: use _multimodal_callable_runner
+            content_embeddings = _multimodal_callable_runner(
+                df_content.loc[valid_content_mask],
+                embedder=multimodal_embedder,
+                batch_size=local_batch_size,
+                embed_modality=embed_modality,
+                text_column=str(transform_config.text_column),
+            )
+        elif embed_modality in IMAGE_MODALITIES and endpoint_url:
+            # Remote NIM path: format content as data URLs
+            if embed_modality == "image":
+                filtered_content_list = [
+                    _format_image_input_string(img_b64)
+                    for img_b64 in df_content.loc[valid_content_mask, "_content"].tolist()
+                ]
+            else:  # text_image
+                filtered_content_list = []
+                for _, r in df_content.loc[valid_content_mask].iterrows():
+                    text = _text_from_row(r, text_column=str(transform_config.text_column)) or ""
+                    image = _image_from_row(r) or ""
+                    if image and text.strip():
+                        filtered_content_list.append(_format_text_image_pair_input_string(text, image))
+                    elif image:
+                        # Image without text — send as image-only to avoid
+                        # "Text part must be non-empty for text_image modality" errors.
+                        filtered_content_list.append(_format_image_input_string(image))
+                    else:
+                        filtered_content_list.append(text)
+            filtered_content_batches = _generate_batches(
+                filtered_content_list, batch_size=int(transform_config.batch_size)
+            )
             content_embeddings = _async_runner(
                 filtered_content_batches,
                 api_key,
@@ -491,18 +647,39 @@ def create_text_embeddings_for_df(
                 False,
                 modalities=None,
                 dimensions=dimensions,
-            )
-        elif callable(embedder):
-            content_embeddings = _callable_runner(
-                filtered_content_batches,
-                embedder=embedder,
-                batch_size=local_batch_size,
+                max_concurrent=8,
             )
         else:
-            raise ValueError(
-                "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
-                "and no local embedder was provided in task_config['embedder']."
+            # Text-only path (default)
+            filtered_content_list = df_content.loc[valid_content_mask, "_content"].tolist()
+            filtered_content_batches = _generate_batches(
+                filtered_content_list, batch_size=int(transform_config.batch_size)
             )
+
+            if endpoint_url:
+                content_embeddings = _async_runner(
+                    filtered_content_batches,
+                    api_key,
+                    str(endpoint_url),
+                    str(model_name),
+                    str(transform_config.encoding_format),
+                    str(transform_config.input_type),
+                    str(transform_config.truncate),
+                    False,
+                    modalities=None,
+                    dimensions=dimensions,
+                )
+            elif callable(embedder):
+                content_embeddings = _callable_runner(
+                    filtered_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            else:
+                raise ValueError(
+                    "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
+                    "and no local embedder was provided in task_config['embedder']."
+                )
 
         # Build a simple row index -> embedding map (API parity).
         embeddings_dict = dict(zip(df_content.loc[valid_content_mask].index, content_embeddings.get("embeddings", [])))

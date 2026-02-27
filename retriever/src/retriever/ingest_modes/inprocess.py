@@ -31,7 +31,7 @@ import pandas as pd
 from retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
 from retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from retriever.page_elements import detect_page_elements_v3
-from retriever.ocr.ocr import ocr_page_elements
+from retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, ocr_page_elements
 from retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
@@ -48,6 +48,7 @@ except Exception as e:  # pragma: no cover
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingest import Ingestor
 from ..params import EmbedParams
+from ..params.models import IMAGE_MODALITIES
 from ..params import ExtractParams
 from ..params import HtmlChunkParams
 from ..params import IngestExecuteParams
@@ -110,6 +111,9 @@ def explode_content_to_rows(
     *,
     text_column: str = "text",
     content_columns: Sequence[str] = _CONTENT_COLUMNS,
+    modality: str = "text",
+    text_elements_modality: Optional[str] = None,
+    structured_elements_modality: Optional[str] = None,
 ) -> Any:
     """Expand each page row into multiple rows for per-element embedding.
 
@@ -126,12 +130,44 @@ def explode_content_to_rows(
 
     If a row has no page text *and* no structured content, the original
     row is preserved as-is to maintain batch shape.
+
+    When a row's effective modality is ``"image"`` or ``"text_image"``,
+    the page image (or a cropped region for structured content) is
+    carried in a new ``_image_b64`` column so that the downstream
+    embedding stage can use it for multimodal embeddings.
+
+    Each exploded row is tagged with ``_embed_modality`` so that
+    ``embed_text_main_text_embed`` can embed different element types
+    with different methods (e.g. text-only for page text but
+    text+image for tables).
+
+    Parameters
+    ----------
+    modality : str
+        Base modality for all element types (default ``"text"``).
+    text_elements_modality : str | None
+        Override modality for page-text rows.  Falls back to *modality*.
+    structured_elements_modality : str | None
+        Override modality for table/chart/infographic rows.  Falls back
+        to *modality*.
     """
+    text_mod = text_elements_modality or modality
+    struct_mod = structured_elements_modality or modality
+
     if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
         return batch_df
 
+    # Whether *any* element type requires images.
+    any_images = text_mod in IMAGE_MODALITIES or struct_mod in IMAGE_MODALITIES
+
     # Fast path: if none of the content columns exist there is nothing to explode.
     if not any(c in batch_df.columns for c in content_columns):
+        batch_df = batch_df.copy()
+        if text_mod in IMAGE_MODALITIES and "page_image" in batch_df.columns:
+            batch_df["_image_b64"] = batch_df["page_image"].apply(
+                lambda pi: pi.get("image_b64") if isinstance(pi, dict) else None
+            )
+        batch_df["_embed_modality"] = text_mod
         return batch_df
 
     new_rows: List[Dict[str, Any]] = []
@@ -139,10 +175,20 @@ def explode_content_to_rows(
         row_dict = row.to_dict()
         exploded_any = False
 
+        # Extract page-level image b64 once per source row.
+        page_image = row_dict.get("page_image")
+        page_image_b64: Optional[str] = None
+        if any_images and isinstance(page_image, dict):
+            page_image_b64 = page_image.get("image_b64")
+
         # Row for page text.
         page_text = row_dict.get(text_column)
         if isinstance(page_text, str) and page_text.strip():
-            new_rows.append(_deep_copy_row(row_dict))
+            page_row = _deep_copy_row(row_dict)
+            page_row["_embed_modality"] = text_mod
+            if text_mod in IMAGE_MODALITIES:
+                page_row["_image_b64"] = page_image_b64
+            new_rows.append(page_row)
             exploded_any = True
 
         # One row per structured content item.
@@ -158,14 +204,96 @@ def explode_content_to_rows(
                     continue
                 content_row = _deep_copy_row(row_dict)
                 content_row[text_column] = t.strip()
+                content_row["_embed_modality"] = struct_mod
+                if struct_mod in IMAGE_MODALITIES and page_image_b64:
+                    bbox = item.get("bbox_xyxy_norm")
+                    if bbox and len(bbox) == 4:
+                        cropped_b64, _ = _crop_b64_image_by_norm_bbox(page_image_b64, bbox_xyxy_norm=bbox)
+                        content_row["_image_b64"] = cropped_b64
+                    else:
+                        content_row["_image_b64"] = page_image_b64
+                elif struct_mod in IMAGE_MODALITIES:
+                    content_row["_image_b64"] = None
                 new_rows.append(content_row)
                 exploded_any = True
 
         # Preserve row if nothing was exploded (no text, no content).
         if not exploded_any:
-            new_rows.append(row_dict)
+            preserved = _deep_copy_row(row_dict)
+            preserved["_embed_modality"] = text_mod
+            if text_mod in IMAGE_MODALITIES:
+                preserved["_image_b64"] = page_image_b64
+            new_rows.append(preserved)
 
     return pd.DataFrame(new_rows).reset_index(drop=True)
+
+
+def _embed_group(
+    group_df: pd.DataFrame,
+    *,
+    group_modality: str,
+    model: Any,
+    endpoint: Optional[str],
+    text_column: str,
+    inference_batch_size: int,
+    output_column: str,
+    resolved_model_name: str,
+) -> pd.DataFrame:
+    """Embed a single modality group via ``create_text_embeddings_for_df``.
+
+    This is an internal helper called by ``embed_text_main_text_embed``
+    once per distinct ``_embed_modality`` value found in the batch.
+    """
+    _embed = None
+    _multimodal_embedder = None
+
+    if endpoint is None and model is not None:
+        if group_modality in IMAGE_MODALITIES:
+            _multimodal_embedder = model
+        else:
+            _skip_prefix = hasattr(model, "embed_queries")
+
+            def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:  # noqa: F811
+                batch = texts if _skip_prefix else [f"passage: {t}" for t in texts]
+                vecs = model.embed(batch, batch_size=int(inference_batch_size))
+                tolist = getattr(vecs, "tolist", None)
+                if callable(tolist):
+                    return tolist()
+                return vecs  # type: ignore[return-value]
+
+    # For remote image/text_image embedding, cap the HTTP batch size to avoid
+    # sending huge JSON payloads (each item includes a base64 page image).
+    _DEFAULT_REMOTE_IMAGE_BATCH_SIZE = 4
+    effective_batch_size = inference_batch_size
+    if endpoint is not None and group_modality in IMAGE_MODALITIES:
+        effective_batch_size = min(inference_batch_size, _DEFAULT_REMOTE_IMAGE_BATCH_SIZE)
+
+    cfg = TextEmbeddingConfig(
+        text_column=str(text_column),
+        output_payload_column=str(output_column) if output_column else None,
+        write_embedding_to_metadata=True,
+        metadata_column="metadata",
+        batch_size=int(effective_batch_size),
+        encoding_format="float",
+        input_type="passage",
+        truncate="END",
+        dimensions=None,
+        embedding_nim_endpoint=endpoint or "http://localhost:8012/v1",
+        embedding_model=resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embed_modality=group_modality,
+    )
+
+    out_df, _ = create_text_embeddings_for_df(
+        group_df,
+        task_config={
+            "embedder": _embed,
+            "multimodal_embedder": _multimodal_embedder,
+            "endpoint_url": endpoint,
+            "local_batch_size": int(inference_batch_size),
+        },
+        transform_config=cfg,
+    )
+    return out_df
 
 
 def embed_text_main_text_embed(
@@ -182,6 +310,7 @@ def embed_text_main_text_embed(
     output_column: str = "text_embeddings_1b_v2",
     embedding_dim_column: str = "text_embeddings_1b_v2_dim",
     has_embedding_column: str = "text_embeddings_1b_v2_has_embedding",
+    embed_modality: str = "text",
     **_: Any,
 ) -> Any:
     """
@@ -197,6 +326,12 @@ def embed_text_main_text_embed(
     When *embedding_endpoint* is set (e.g. ``"http://embedding:8000/v1"``), a remote
     NIM endpoint is used instead of the local HF model.  The NIM handles prefixing
     (``input_type="passage"``) server-side.
+
+    Rows are grouped by their ``_embed_modality`` column (populated by
+    ``explode_content_to_rows``) so that different element types can be
+    embedded with different methods (e.g. text-only for page text,
+    text+image for tables).  If no ``_embed_modality`` column exists,
+    *embed_modality* is used uniformly.
     """
     if not isinstance(batch_df, pd.DataFrame):
         raise NotImplementedError("embed_text_main_text_embed currently only supports pandas.DataFrame input.")
@@ -214,53 +349,49 @@ def embed_text_main_text_embed(
 
     _resolved_model_name = resolve_embed_model(model_name)
 
-    # Build an embedder callable compatible with `create_text_embeddings_for_df`.
-    # Only used when running with a local model (no NIM endpoint).
-    _embed = None
-    if _endpoint is None and model is not None:
-
-        # VL model handles formatting internally via encode_documents();
-        # embedqa needs an explicit "passage: " prefix.
-        _skip_prefix = hasattr(model, "embed_queries")
-
-        def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:  # noqa: F811
-            batch = texts if _skip_prefix else [f"passage: {t}" for t in texts]
-            vecs = model.embed(batch, batch_size=int(inference_batch_size))
-            tolist = getattr(vecs, "tolist", None)
-            if callable(tolist):
-                return tolist()
-            return vecs  # type: ignore[return-value]
-
-    cfg = TextEmbeddingConfig(
-        text_column=str(text_column),
-        # Generate the same payload column name as the prior implementation.
-        output_payload_column=str(output_column) if output_column else None,
-        write_embedding_to_metadata=True,
-        metadata_column="metadata",
-        # Match chunking behavior as closely as possible to previous `embed_text_1b_v2`.
-        batch_size=int(inference_batch_size),
-        encoding_format="float",
-        input_type="passage",
-        truncate="END",
-        dimensions=None,
-        embedding_nim_endpoint=_endpoint or "http://localhost:8012/v1",
-        embedding_model=_resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
-    )
-
-    # Rows should already be exploded (one row per page text / table / chart)
-    # by ``explode_content_to_rows`` before reaching this stage.
-    embed_df = batch_df
+    # Determine per-row modalities.  If _embed_modality column exists (set by
+    # explode_content_to_rows), group by it; otherwise fall back to the single
+    # embed_modality parameter.
+    has_per_row_modality = "_embed_modality" in batch_df.columns
+    if has_per_row_modality:
+        modalities = batch_df["_embed_modality"].fillna(embed_modality).unique().tolist()
+    else:
+        modalities = [embed_modality]
 
     try:
-        out_df, _info = create_text_embeddings_for_df(
-            embed_df,
-            task_config={
-                "embedder": _embed,
-                "endpoint_url": _endpoint,
-                "local_batch_size": int(inference_batch_size),
-            },
-            transform_config=cfg,
-        )
+        if len(modalities) == 1:
+            # Fast path: all rows share the same modality — process in one shot.
+            out_df = _embed_group(
+                batch_df,
+                group_modality=modalities[0],
+                model=model,
+                endpoint=_endpoint,
+                text_column=text_column,
+                inference_batch_size=inference_batch_size,
+                output_column=output_column,
+                resolved_model_name=_resolved_model_name,
+            )
+        else:
+            # Multiple modalities: group, embed each, reassemble in original order.
+            parts: List[pd.DataFrame] = []
+            for mod in modalities:
+                mask = batch_df["_embed_modality"] == mod
+                group_df = batch_df.loc[mask]
+                if group_df.empty:
+                    continue
+                part = _embed_group(
+                    group_df,
+                    group_modality=mod,
+                    model=model,
+                    endpoint=_endpoint,
+                    text_column=text_column,
+                    inference_batch_size=inference_batch_size,
+                    output_column=output_column,
+                    resolved_model_name=_resolved_model_name,
+                )
+                parts.append(part)
+            out_df = pd.concat(parts).sort_index()
+
     except BaseException as e:
         # Fail-soft: preserve batch shape and set an error payload per-row.
         import traceback as _tb
@@ -295,6 +426,11 @@ def embed_text_main_text_embed(
         out_df[embedding_dim_column] = [0 for _ in range(len(out_df.index))]
 
     out_df[has_embedding_column] = [bool(int(d) > 0) for d in out_df[embedding_dim_column].tolist()]
+
+    # Drop helper columns after embedding to free memory.
+    for col in ("_image_b64", "_embed_modality"):
+        if col in out_df.columns:
+            out_df = out_df.drop(columns=[col])
 
     return out_df
 
@@ -1184,11 +1320,24 @@ class InProcessIngestor(Ingestor):
         ``"http://embedding:8000/v1"``), a remote NIM endpoint is used for
         embedding instead of the local HF model.
         """
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        embed_modality = resolved.embed_modality
+        text_elements_modality = resolved.text_elements_modality or embed_modality
+        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+
         # Explode content rows before embedding so each table/chart/infographic
         # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
-        self._tasks.append((explode_content_to_rows, {}))
+        self._tasks.append(
+            (
+                explode_content_to_rows,
+                {
+                    "modality": embed_modality,
+                    "text_elements_modality": text_elements_modality,
+                    "structured_elements_modality": structured_elements_modality,
+                },
+            )
+        )
 
-        resolved = _coerce_params(params, EmbedParams, kwargs)
         embed_kwargs = {
             **resolved.model_dump(
                 mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
@@ -1197,6 +1346,9 @@ class InProcessIngestor(Ingestor):
         }
         if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
             embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
+
+        # Ensure embed_modality is forwarded to the embedding function.
+        embed_kwargs["embed_modality"] = embed_modality
 
         # If a remote NIM endpoint is configured, skip local model creation.
         endpoint = (embed_kwargs.get("embedding_endpoint") or embed_kwargs.get("embed_invoke_url") or "").strip()
