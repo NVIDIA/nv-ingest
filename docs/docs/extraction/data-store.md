@@ -80,6 +80,25 @@ NeMo Retriever Library does not provide connections to other data sources.
 
 For more information, refer to [Build a Custom Vector Database Operator](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/building_vdb_operator.ipynb).
 
+Once you have built a data store or will use one provided by a 3rd party, you can create the operator and feed it as input to the vdb_upload function. For example:
+
+```python
+
+from nv_ingest_client.util.vdb.opensearch import OpenSearch
+
+# Initialize the operator with your configuration
+opensearch_vdb = OpenSearch(
+    host="localhost",
+    port=9200,
+    index_name="my_custom_index",
+    dense_dim=2048
+)
+
+# Use in your NV-Ingest pipeline
+ingestor = ingestor.vdb_upload(vdb_op=opensearch_vdb)
+```
+
+
 
 
 ## Related Topics
