@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -68,6 +69,10 @@ def run_datasets(
             print("Services failed to become ready")
             service_manager.stop()
             return 1
+
+        # Warm-up: let services stabilize and connect before running tests
+        print("Services ready! Sleeping 60s for warm-up...")
+        time.sleep(60)
 
     # Run each dataset
     for dataset_name in dataset_list:
@@ -279,14 +284,17 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 
         def write(self, data):
             self.original.write(data)
-            self.file.write(data)
+            if not self.file.closed:
+                self.file.write(data)
 
         def flush(self):
             self.original.flush()
-            self.file.flush()
+            if not self.file.closed:
+                self.file.flush()
 
         def close(self):
-            self.file.close()
+            if not self.file.closed:
+                self.file.close()
 
     tee_stdout = TeeFile(stdout_path, sys.stdout)
     old_stdout = sys.stdout
@@ -369,6 +377,11 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     default=None,
     help="Path to test config YAML (default: tools/harness/test_configs.yaml)",
 )
+@click.option(
+    "--list-datasets",
+    is_flag=True,
+    help="List available datasets and groups, then exit",
+)
 def main(
     case,
     managed,
@@ -382,14 +395,54 @@ def main(
     sku,
     dump_logs,
     test_config_path,
+    list_datasets,
 ):
+    # Handle --list-datasets
+    if list_datasets:
+        from nv_ingest_harness.config import list_datasets as get_datasets
+
+        config_file = test_config_path or str(Path(__file__).resolve().parents[3] / "test_configs.yaml")
+        info = get_datasets(config_file=config_file)
+
+        print("Available Datasets:")
+        print("-" * 50)
+        for name, config in sorted(info["datasets"].items()):
+            if isinstance(config, dict):
+                path = config.get("path", "N/A")
+                recall = config.get("recall_dataset")
+                recall_str = f" [recall: {recall}]" if recall else ""
+            else:
+                path = config
+                recall_str = ""
+            print(f"  {name}: {path}{recall_str}")
+
+        if info.get("groups"):
+            print("\nDataset Groups:")
+            print("-" * 50)
+            for name, members in sorted(info["groups"].items()):
+                print(f"  {name} ({len(members)} datasets):")
+                for m in members:
+                    print(f"    - {m}")
+
+        return 0
 
     if not dataset:
         print("Error: --dataset is required. Use --dataset=<name> or --dataset=<name1>,<name2>", file=sys.stderr)
+        print("       Use --list-datasets to see available datasets and groups", file=sys.stderr)
         return 1
 
-    # Parse dataset(s) - handle both single and comma-separated
-    dataset_list = [d.strip() for d in dataset.split(",") if d.strip()]
+    # Parse dataset(s) - handle single, comma-separated, and groups
+    import yaml
+
+    config_path = (
+        Path(test_config_path) if test_config_path else Path(__file__).resolve().parents[3] / "test_configs.yaml"
+    )
+    with open(config_path) as f:
+        yaml_data = yaml.safe_load(f)
+
+    from nv_ingest_harness.config import expand_dataset_names
+
+    dataset_list = expand_dataset_names(yaml_data, dataset)
     if not dataset_list:
         print("Error: No valid datasets found", file=sys.stderr)
         return 1

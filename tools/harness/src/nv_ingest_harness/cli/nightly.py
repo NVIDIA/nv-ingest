@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -348,7 +349,9 @@ def main(
             service_manager.stop()
             return 1
 
-        print("Services ready!")
+        # Warm-up: let services stabilize and connect before running tests
+        print("Services ready! Sleeping 60s for warm-up...")
+        time.sleep(60)
 
     all_results = []
 

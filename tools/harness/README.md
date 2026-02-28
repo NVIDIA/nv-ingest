@@ -143,6 +143,37 @@ uv run nv-ingest-harness-run --case=e2e --dataset=bo767,earnings,bo20
 
 # Custom path still works (uses active section config)
 uv run nv-ingest-harness-run --case=e2e --dataset=/custom/path
+
+# List available datasets and groups
+uv run nv-ingest-harness-run --list-datasets
+```
+
+#### Dataset Groups
+
+Run multiple related datasets with a single command using dataset groups:
+
+```yaml
+# In test_configs.yaml
+dataset_groups:
+  vidore:           # All 8 Vidore V3 benchmark datasets
+    - vidore_v3_finance_en
+    - vidore_v3_industrial
+    - ...
+  vidore_quick:     # Quick test with smallest datasets
+    - vidore_v3_hr
+    - vidore_v3_industrial
+```
+
+**Usage:**
+```bash
+# Run all Vidore datasets
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=vidore
+
+# Run quick test (smallest 2 datasets)
+uv run nv-ingest-harness-run --case=e2e_recall --dataset=vidore_quick
+
+# Mix groups and individual datasets
+uv run nv-ingest-harness-run --case=e2e --dataset=vidore_quick,bo20
 ```
 
 **Dataset Extraction Settings:**
