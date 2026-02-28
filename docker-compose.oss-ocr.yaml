@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  ocr:
+    build:
+      context: "docker/nemoretriever-ocr-v1"
+      dockerfile: "Dockerfile"
+      args:
+        HF_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
+    shm_size: 16gb
+    ports:
+      - "8009:8000"
+      - "8010:8001"
+      - "8011:8002"
+    user: root
+    environment:
+      - OMP_NUM_THREADS=${OCR_OMP_NUM_THREADS:-1}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    runtime: nvidia
+
+  nv-ingest-ms-runtime:
+    environment:
+      # Self-hosted ocr endpoints.
+      - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
+      - OCR_INFER_PROTOCOL=http
+      - OCR_MODEL_NAME=scene_text_ensemble
