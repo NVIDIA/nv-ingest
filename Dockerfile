@@ -168,6 +168,17 @@ CMD ["/bin/bash"]
 
 FROM nv_ingest_install AS docs
 
+# Install dependencies needed for docs generation
+#
+# NOTE: The nv_ingest_install base image may carry a broken apt/dpkg state
+# (e.g., partially-installed libreoffice dependencies). Installing `make`
+# via conda avoids apt entirely and is more reliable on CI runners.
+# Do not run mamba clean -afy here: /opt/conda/pkgs is a cache mount and
+# cannot be removed (Device or resource busy).
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    source activate nv_ingest_runtime \
+    && mamba install -y make
+
 COPY docs docs
 
 # Docs needs all the source code present so add it to the container
