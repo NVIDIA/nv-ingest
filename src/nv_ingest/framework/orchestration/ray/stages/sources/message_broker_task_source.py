@@ -5,6 +5,7 @@
 import logging
 import uuid
 from typing import Optional, Literal, Dict, Any, Union
+import os
 
 import ray
 import json
@@ -132,6 +133,19 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
 
+        self._state_prefix = "job_state:"
+        self._state_ttl_seconds = int(os.getenv("STATE_TTL_SECONDS", "7200"))
+        self._lease_key_prefix = os.getenv("INGEST_LEASE_PREFIX", "ingest:lease")
+        self._lease_data_prefix = f"{self._lease_key_prefix}:data:"
+        self._lease_index_key = f"{self._lease_key_prefix}:index"
+        self._lease_recover_lock_prefix = f"{self._lease_key_prefix}:recover:"
+        self._lease_sweep_lock_key = f"{self._lease_key_prefix}:sweep_lock"
+        self._lease_ttl_seconds = int(os.getenv("INGEST_LEASE_TTL_SECONDS", "1200"))
+        self._lease_sweep_interval_seconds = float(os.getenv("INGEST_LEASE_SWEEP_INTERVAL_SECONDS", "5"))
+        self._lease_recovery_batch_size = int(os.getenv("INGEST_LEASE_RECOVERY_BATCH_SIZE", "64"))
+        self._lease_max_retries = int(os.getenv("INGEST_LEASE_MAX_RETRIES", "2"))
+        self._last_lease_sweep_ts = 0.0
+
         # Backoff state for graceful retries when broker is unavailable
         self._fetch_failure_count: int = 0
         self._current_backoff_sleep: float = 0.0
@@ -236,6 +250,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             # Add basic metadata
             control_message.set_metadata("response_channel", response_channel)
             control_message.set_metadata("job_id", job_id)
+            control_message.set_metadata("lease_job_id", job_id)
             control_message.set_metadata("timestamp", datetime.now().timestamp())
 
             # Add task definitions to the control message
@@ -289,6 +304,146 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 raise
 
         return control_message
+
+    def _set_job_state(self, job_id: str, state: str) -> None:
+        if not isinstance(self.client, RedisClient):
+            return
+        try:
+            client = self.client.get_client()
+            state_key = f"{self._state_prefix}{job_id}"
+            if not client.exists(state_key):
+                # Avoid creating new state keys for subjobs; v2 parent aggregation
+                # expects missing subjob states and interprets SUBMITTED/PROCESSING
+                # as still in-flight.
+                return
+
+            client.set(
+                state_key,
+                state,
+                ex=self._state_ttl_seconds if self._state_ttl_seconds > 0 else None,
+            )
+        except Exception as exc:
+            self._logger.debug("Failed setting state=%s for job_id=%s: %s", state, job_id, exc)
+
+    def _try_claim_job_lease(self, job: Dict[str, Any]) -> bool:
+        if not isinstance(self.client, RedisClient):
+            return True
+
+        job_id = job.get("job_id")
+        if not job_id:
+            return True
+
+        lease_data_key = f"{self._lease_data_prefix}{job_id}"
+        lease_payload = {
+            "job": job,
+            "attempt": int(job.get("_replay_attempt", 0)),
+            "claimed_at": time.time(),
+            "owner": self.stage_name,
+        }
+        lease_payload_json = json.dumps(lease_payload)
+        expires_at = time.time() + self._lease_ttl_seconds
+
+        try:
+            client = self.client.get_client()
+            claimed = client.set(
+                lease_data_key,
+                lease_payload_json,
+                ex=self._lease_ttl_seconds if self._lease_ttl_seconds > 0 else None,
+                nx=True,
+            )
+            if not claimed:
+                self._logger.warning(
+                    "Lease already exists for job_id=%s. Dropping duplicate delivery to avoid double processing.",
+                    job_id,
+                )
+                return False
+
+            client.zadd(self._lease_index_key, {job_id: expires_at})
+            self._set_job_state(job_id, "PROCESSING")
+            return True
+        except Exception as exc:
+            # Fail-open on lease infra glitches to avoid black-holing dequeued work.
+            # This preserves throughput at the cost of possibly skipping replay semantics
+            # for this one message.
+            self._logger.warning(
+                "Lease claim failed for job_id=%s (processing without lease): %s",
+                job_id,
+                exc,
+            )
+            return True
+
+    def _recover_expired_leases(self) -> None:
+        if not isinstance(self.client, RedisClient):
+            return
+
+        now = time.time()
+        if now - self._last_lease_sweep_ts < self._lease_sweep_interval_seconds:
+            return
+        self._last_lease_sweep_ts = now
+
+        try:
+            client = self.client.get_client()
+            lock_ttl = max(2, int(self._lease_sweep_interval_seconds * 2))
+            if not client.set(self._lease_sweep_lock_key, "1", ex=lock_ttl, nx=True):
+                return
+
+            expired_job_ids = client.zrangebyscore(
+                self._lease_index_key, 0, now, start=0, num=self._lease_recovery_batch_size
+            )
+            for raw_job_id in expired_job_ids:
+                job_id = raw_job_id.decode("utf-8") if isinstance(raw_job_id, bytes) else str(raw_job_id)
+                recover_lock_key = f"{self._lease_recover_lock_prefix}{job_id}"
+                if not client.set(recover_lock_key, "1", ex=30, nx=True):
+                    continue
+
+                lease_data_key = f"{self._lease_data_prefix}{job_id}"
+                raw_payload = client.get(lease_data_key)
+                if raw_payload is None:
+                    client.zrem(self._lease_index_key, job_id)
+                    continue
+
+                payload_text = raw_payload.decode("utf-8") if isinstance(raw_payload, bytes) else str(raw_payload)
+                lease_payload = json.loads(payload_text)
+                attempt = int(lease_payload.get("attempt", 0))
+                job_payload = lease_payload.get("job")
+                if not isinstance(job_payload, dict):
+                    client.delete(lease_data_key)
+                    client.zrem(self._lease_index_key, job_id)
+                    self._set_job_state(job_id, "FAILED")
+                    continue
+
+                if attempt >= self._lease_max_retries:
+                    client.delete(lease_data_key)
+                    client.zrem(self._lease_index_key, job_id)
+                    self._set_job_state(job_id, "FAILED")
+                    self._logger.error(
+                        "Job %s exceeded lease replay retry budget (%d). Marked FAILED.",
+                        job_id,
+                        self._lease_max_retries,
+                    )
+                    continue
+
+                job_payload["_replay_attempt"] = attempt + 1
+                replay_payload = json.dumps(job_payload)
+                effective_ttl = getattr(self.client, "_message_ttl_seconds", None)
+                # Atomically requeue and clear lease so no consumer can pop a replayed
+                # message while the old lease key still exists (which would be dropped
+                # as a duplicate by the next lease claim attempt).
+                pipe = client.pipeline()
+                pipe.rpush(self.task_queue, replay_payload)
+                if effective_ttl is not None and effective_ttl > 0:
+                    pipe.expire(self.task_queue, effective_ttl)
+                pipe.delete(lease_data_key)
+                pipe.zrem(self._lease_index_key, job_id)
+                pipe.execute()
+                self._set_job_state(job_id, "SUBMITTED")
+                self._logger.warning(
+                    "Recovered expired lease for job %s and requeued (attempt=%d).",
+                    job_id,
+                    attempt + 1,
+                )
+        except Exception as exc:
+            self._logger.debug("Lease recovery sweep failed: %s", exc)
 
     def _fetch_message(self, timeout=0):
         """
@@ -368,6 +523,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         Instead of reading from an input edge, fetch a message from the broker.
         """
         self._logger.debug("read_input: calling _fetch_message()")
+        self._recover_expired_leases()
         # Perform a non-blocking sweep across all queues for this cycle
         job = self._fetch_message(timeout=0)
         if job is None:
@@ -386,6 +542,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             return None
 
         self.stats["successful_queue_reads"] += 1
+        if not self._try_claim_job_lease(job):
+            return None
 
         ts_fetched = datetime.now()
         self._logger.debug("read_input: Job fetched, processing message")
