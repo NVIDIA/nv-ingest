@@ -10,7 +10,7 @@ empowering secure, enterprise-grade retrieval.
 NeMo Retriever provides the following:
 
 - **Multimodal Data Extraction** — Quickly extract documents at scale that include text, tables, charts, and infographics.
-- **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into Milvus - accelerated with NVIDIA cuVS.
+- **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into LanceDB (default) or Milvus — accelerated with NVIDIA cuVS.
 - **Retrieval** — Leverage semantic + hybrid search for high accuracy retrieval with the embedding + reranking NIM microservice.
 
 
