@@ -1,0 +1,1524 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest.framework.orchestration.ray.primitives package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest/nv_ingest.framework.orchestration.ray.primitives';</script>
+
+    <link rel="icon" href="../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest.framework.orchestration.ray.stages package" href="nv_ingest.framework.orchestration.ray.stages.html" />
+    <link rel="prev" title="nv_ingest.framework.orchestration.ray.examples package" href="nv_ingest.framework.orchestration.ray.examples.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest.html">nv_ingest package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest.framework.html">nv_ingest.framework package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4 current active"><a class="reference internal" href="nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.html" class="nav-link">nv_ingest package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.html" class="nav-link">nv_ingest.framework package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.orchestration.html" class="nav-link">nv_ingest.framework.orchestration package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.orchestration.ray.html" class="nav-link">nv_ingest.framework.orchestration.ray package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.orchestration.ray.primitives package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-framework-orchestration-ray-primitives-package">
+<h1>nv_ingest.framework.orchestration.ray.primitives package<a class="headerlink" href="#nv-ingest-framework-orchestration-ray-primitives-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives.dataclasses">
+<span id="nv-ingest-framework-orchestration-ray-primitives-dataclasses-module"></span><h2>nv_ingest.framework.orchestration.ray.primitives.dataclasses module<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives.dataclasses" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor">
+<span id="nv-ingest-framework-orchestration-ray-primitives-pipeline-monitor-module"></span><h2>nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor module<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.</span></span><span class="sig-name descname"><span class="pre">DisplayConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_gui</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_monitor.html#DisplayConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration for monitoring display.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig.use_gui">
+<span class="sig-name descname"><span class="pre">use_gui</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig.use_gui" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.</span></span><span class="sig-name descname"><span class="pre">MonitorConfig</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">use_gui</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">use_console</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_monitor.html#MonitorConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration specific to the PipelineMonitor.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.poll_interval">
+<span class="sig-name descname"><span class="pre">poll_interval</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5.0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.poll_interval" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_console">
+<span class="sig-name descname"><span class="pre">use_console</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_console" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_gui">
+<span class="sig-name descname"><span class="pre">use_gui</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_gui" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.</span></span><span class="sig-name descname"><span class="pre">PipelineMonitor</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">pipeline</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig"><span class="pre">MonitorConfig</span></a></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_monitor.html#PipelineMonitor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Monitors a RayPipeline instance and manages its display (GUI or Console).</p>
+<p>Runs in a separate thread, periodically fetching data from the pipeline
+and updating the display based on its own configuration.
+Decoupled from the RayPipeline lifecycle.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_monitor.html#PipelineMonitor.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the monitoring thread and display.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_monitor.html#PipelineMonitor.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.stop" title="Link to this definition">#</a></dt>
+<dd><p>Stops the monitoring thread and cleans up the display.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives.pipeline_topology">
+<span id="nv-ingest-framework-orchestration-ray-primitives-pipeline-topology-module"></span><h2>nv_ingest.framework.orchestration.ray.primitives.pipeline_topology module<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives.pipeline_topology" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.</span></span><span class="sig-name descname"><span class="pre">PipelineTopology</span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Holds the structural definition and runtime state of the pipeline.</p>
+<p>Encapsulates stages, connections, actors, queues, and associated state
+with thread-safe access via internal locking.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_actor_to_stage">
+<span class="sig-name descname"><span class="pre">add_actor_to_stage</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.add_actor_to_stage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_actor_to_stage" title="Link to this definition">#</a></dt>
+<dd><p>Adds a single actor to a stage’s list.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_connection">
+<span class="sig-name descname"><span class="pre">add_connection</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">from_stage</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">to_stage</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.add_connection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_connection" title="Link to this definition">#</a></dt>
+<dd><p>Adds a connection definition between two stages.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_stage">
+<span class="sig-name descname"><span class="pre">add_stage</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo"><span class="pre">StageInfo</span></a></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.add_stage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_stage" title="Link to this definition">#</a></dt>
+<dd><p>Adds a stage definition.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.clear_runtime_state">
+<span class="sig-name descname"><span class="pre">clear_runtime_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.clear_runtime_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.clear_runtime_state" title="Link to this definition">#</a></dt>
+<dd><p>Clears actors, queues, and scaling state. Keeps definitions.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_actor_count">
+<span class="sig-name descname"><span class="pre">get_actor_count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_actor_count"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_actor_count" title="Link to this definition">#</a></dt>
+<dd><p>Returns the number of actors for a specific stage.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_all_actors">
+<span class="sig-name descname"><span class="pre">get_all_actors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_all_actors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_all_actors" title="Link to this definition">#</a></dt>
+<dd><p>Returns a list of all actors across all stages.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_connections">
+<span class="sig-name descname"><span class="pre">get_connections</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_connections"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_connections" title="Link to this definition">#</a></dt>
+<dd><p>Returns a shallow copy of the connection dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_edge_queues">
+<span class="sig-name descname"><span class="pre">get_edge_queues</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_edge_queues"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_edge_queues" title="Link to this definition">#</a></dt>
+<dd><p>Returns a shallow copy of the edge queues’ dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_is_flushing">
+<span class="sig-name descname"><span class="pre">get_is_flushing</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_is_flushing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_is_flushing" title="Link to this definition">#</a></dt>
+<dd><p>Returns the current flushing state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_scaling_state">
+<span class="sig-name descname"><span class="pre">get_scaling_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_scaling_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_scaling_state" title="Link to this definition">#</a></dt>
+<dd><p>Returns a copy of the scaling state dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_actors">
+<span class="sig-name descname"><span class="pre">get_stage_actors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_stage_actors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_actors" title="Link to this definition">#</a></dt>
+<dd><p>Returns a copy of the stage actors dictionary (with copies of actor lists).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_info">
+<span class="sig-name descname"><span class="pre">get_stage_info</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo"><span class="pre">StageInfo</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_stage_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_info" title="Link to this definition">#</a></dt>
+<dd><p>Returns the StageInfo for a specific stage, or None if not found.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_memory_overhead">
+<span class="sig-name descname"><span class="pre">get_stage_memory_overhead</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_stage_memory_overhead"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_memory_overhead" title="Link to this definition">#</a></dt>
+<dd><p>Returns a copy of the stage memory overhead dictionary.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stages_info">
+<span class="sig-name descname"><span class="pre">get_stages_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo"><span class="pre">StageInfo</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.get_stages_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stages_info" title="Link to this definition">#</a></dt>
+<dd><p>Returns a copy of stage info with pending_shutdown flags updated.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.lock_context">
+<span class="sig-name descname"><span class="pre">lock_context</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology"><span class="pre">PipelineTopology</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.lock_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.lock_context" title="Link to this definition">#</a></dt>
+<dd><p>Provides safe access to the topology under lock for complex operations.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.mark_actor_for_removal">
+<span class="sig-name descname"><span class="pre">mark_actor_for_removal</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.mark_actor_for_removal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.mark_actor_for_removal" title="Link to this definition">#</a></dt>
+<dd><p>Marks an actor as pending removal, to be cleaned up by the background thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.remove_actors_from_stage">
+<span class="sig-name descname"><span class="pre">remove_actors_from_stage</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actors_to_remove</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.remove_actors_from_stage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.remove_actors_from_stage" title="Link to this definition">#</a></dt>
+<dd><p>Removes specific actors from a stage’s list immediately.
+Called by the cleanup thread or potentially for forced removal.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_actors_for_stage">
+<span class="sig-name descname"><span class="pre">set_actors_for_stage</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.set_actors_for_stage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_actors_for_stage" title="Link to this definition">#</a></dt>
+<dd><p>Sets the list of actors for a given stage, resetting scaling state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_edge_queues">
+<span class="sig-name descname"><span class="pre">set_edge_queues</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">queues</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.set_edge_queues"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_edge_queues" title="Link to this definition">#</a></dt>
+<dd><p>Sets the dictionary of edge queues.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_flushing">
+<span class="sig-name descname"><span class="pre">set_flushing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_flushing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.set_flushing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_flushing" title="Link to this definition">#</a></dt>
+<dd><p>Sets the pipeline flushing state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_stage_memory_overhead">
+<span class="sig-name descname"><span class="pre">set_stage_memory_overhead</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">overheads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.set_stage_memory_overhead"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_stage_memory_overhead" title="Link to this definition">#</a></dt>
+<dd><p>Sets the estimated memory overhead for stages.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.start_cleanup_thread">
+<span class="sig-name descname"><span class="pre">start_cleanup_thread</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.start_cleanup_thread"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.start_cleanup_thread" title="Link to this definition">#</a></dt>
+<dd><p>Starts the background thread for periodic cleanup tasks.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.stop_cleanup_thread">
+<span class="sig-name descname"><span class="pre">stop_cleanup_thread</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.stop_cleanup_thread"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.stop_cleanup_thread" title="Link to this definition">#</a></dt>
+<dd><p>Stops the background cleanup thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.update_scaling_state">
+<span class="sig-name descname"><span class="pre">update_scaling_state</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#PipelineTopology.update_scaling_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.update_scaling_state" title="Link to this definition">#</a></dt>
+<dd><p>Updates the scaling state for a stage.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.</span></span><span class="sig-name descname"><span class="pre">StageInfo</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">callable</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">config</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">is_source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">is_sink</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_replicas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_replicas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pending_shutdown</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology.html#StageInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives.ray_pipeline">
+<span id="nv-ingest-framework-orchestration-ray-primitives-ray-pipeline-module"></span><h2>nv_ingest.framework.orchestration.ray.primitives.ray_pipeline module<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives.ray_pipeline" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">FlushingConfig</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_flush_interval_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">600</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_flush_drain_timeout_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">300</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">quiet_period_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">consecutive_quiet_cycles_for_flush</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#FlushingConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration for queue flushing behavior.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.consecutive_quiet_cycles_for_flush">
+<span class="sig-name descname"><span class="pre">consecutive_quiet_cycles_for_flush</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.consecutive_quiet_cycles_for_flush" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_drain_timeout_seconds">
+<span class="sig-name descname"><span class="pre">queue_flush_drain_timeout_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">300</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_drain_timeout_seconds" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_interval_seconds">
+<span class="sig-name descname"><span class="pre">queue_flush_interval_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">600</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_interval_seconds" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.quiet_period_threshold">
+<span class="sig-name descname"><span class="pre">quiet_period_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.quiet_period_threshold" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">PipelineInterface</span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#PipelineInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Abstract base class for pipeline implementations.</p>
+<p>Any concrete pipeline must implement start and stop methods.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.start">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">monitor_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">scaling_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#PipelineInterface.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.start" title="Link to this definition">#</a></dt>
+<dd><p>Start the pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>monitor_poll_interval</strong> (<em>float</em>) – Interval in seconds for the monitoring poll (default: 5.0).</p></li>
+<li><p><strong>scaling_poll_interval</strong> (<em>float</em>) – Interval in seconds for scaling decisions (default: 30.0).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.stop">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#PipelineInterface.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.stop" title="Link to this definition">#</a></dt>
+<dd><p>Stop the pipeline and perform any necessary cleanup.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">RayPipeline</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">scaling_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig"><span class="pre">ScalingConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ScalingConfig(dynamic_memory_scaling=True,</span> <span class="pre">dynamic_memory_threshold=0.75,</span> <span class="pre">pid_kp=0.2,</span> <span class="pre">pid_ki=0.01,</span> <span class="pre">pid_kd=0.0,</span> <span class="pre">pid_ema_alpha=0.1,</span> <span class="pre">pid_target_queue_depth=0,</span> <span class="pre">pid_penalty_factor=0.1,</span> <span class="pre">pid_error_boost_factor=1.5,</span> <span class="pre">rcm_memory_safety_buffer_fraction=0.15)</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">flushing_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig"><span class="pre">FlushingConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">FlushingConfig(queue_flush_interval_seconds=600,</span> <span class="pre">queue_flush_drain_timeout_seconds=300,</span> <span class="pre">quiet_period_threshold=0,</span> <span class="pre">consecutive_quiet_cycles_for_flush=3)</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">stats_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig"><span class="pre">StatsConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">StatsConfig(collection_interval_seconds=10.0,</span> <span class="pre">actor_timeout_seconds=5.0,</span> <span class="pre">queue_timeout_seconds=2.0)</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineInterface</span></code></a></p>
+<p>A structured pipeline supporting dynamic scaling and queue flushing.
+Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
+Delegates statistics collection to RayStatsCollector.</p>
+<p>Configuration is managed via dedicated config objects (ScalingConfig, etc.).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_sink">
+<span class="sig-name descname"><span class="pre">add_sink</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">sink_actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BaseModel</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><span class="pre">RayPipeline</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.add_sink"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_sink" title="Link to this definition">#</a></dt>
+<dd><p>Adds a sink stage to the pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the sink stage.</p></li>
+<li><p><strong>sink_actor</strong> (<em>Any</em>) – The actor or callable for the sink stage.</p></li>
+<li><p><strong>config</strong> (<em>BaseModel</em>) – The configuration for the sink stage.</p></li>
+<li><p><strong>min_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The minimum number of replicas for the sink stage, by default 1.</p></li>
+<li><p><strong>max_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The maximum number of replicas for the sink stage, by default 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The pipeline instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline">RayPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_source">
+<span class="sig-name descname"><span class="pre">add_source</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BaseModel</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><span class="pre">RayPipeline</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.add_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_source" title="Link to this definition">#</a></dt>
+<dd><p>Adds a source stage to the pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the source stage.</p></li>
+<li><p><strong>source_actor</strong> (<em>Any</em>) – The actor or callable for the source stage.</p></li>
+<li><p><strong>config</strong> (<em>BaseModel</em>) – The configuration for the source stage.</p></li>
+<li><p><strong>min_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The minimum number of replicas for the source stage, by default 1.</p></li>
+<li><p><strong>max_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The maximum number of replicas for the source stage, by default 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The pipeline instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline">RayPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_stage">
+<span class="sig-name descname"><span class="pre">add_stage</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BaseModel</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_replicas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><span class="pre">RayPipeline</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.add_stage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_stage" title="Link to this definition">#</a></dt>
+<dd><p>Adds a stage to the pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – The name of the stage.</p></li>
+<li><p><strong>stage_actor</strong> (<em>Any</em>) – The actor or callable for the stage.</p></li>
+<li><p><strong>config</strong> (<em>BaseModel</em>) – The configuration for the stage.</p></li>
+<li><p><strong>min_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The minimum number of replicas for the stage, by default 0.</p></li>
+<li><p><strong>max_replicas</strong> (<em>int</em><em>, </em><em>optional</em>) – The maximum number of replicas for the stage, by default 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The pipeline instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline">RayPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.build">
+<span class="sig-name descname"><span class="pre">build</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.build"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.build" title="Link to this definition">#</a></dt>
+<dd><p>Builds the pipeline: configures, instantiates, wires, using topology.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary mapping stage names to lists of actor handles.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, List[Any]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_edge_queues">
+<span class="sig-name descname"><span class="pre">get_edge_queues</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.get_edge_queues"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_edge_queues" title="Link to this definition">#</a></dt>
+<dd><p>Returns a snapshot of the current edge queues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary mapping queue names to tuples of (queue_handle, queue_size).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, Tuple[Any, int]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stage_actors">
+<span class="sig-name descname"><span class="pre">get_stage_actors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.get_stage_actors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stage_actors" title="Link to this definition">#</a></dt>
+<dd><p>Returns a snapshot of the current actors per stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary mapping stage names to lists of actor handles.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dict[str, List[Any]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stages_info">
+<span class="sig-name descname"><span class="pre">get_stages_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo"><span class="pre">StageInfo</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.get_stages_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stages_info" title="Link to this definition">#</a></dt>
+<dd><p>Returns a snapshot of the current stage information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of StageInfo objects from the topology.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>List[<a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo" title="nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo">StageInfo</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.make_edge">
+<span class="sig-name descname"><span class="pre">make_edge</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">from_stage</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">to_stage</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><span class="pre">RayPipeline</span></a></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.make_edge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.make_edge" title="Link to this definition">#</a></dt>
+<dd><p>Creates an edge between two stages in the pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>from_stage</strong> (<em>str</em>) – The name of the source stage.</p></li>
+<li><p><strong>to_stage</strong> (<em>str</em>) – The name of the destination stage.</p></li>
+<li><p><strong>queue_size</strong> (<em>int</em><em>, </em><em>optional</em>) – The size of the queue between the stages, by default 100.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The pipeline instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline">RayPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.request_queue_flush">
+<span class="sig-name descname"><span class="pre">request_queue_flush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.request_queue_flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.request_queue_flush" title="Link to this definition">#</a></dt>
+<dd><p>Requests a queue flush, checking topology state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>force</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to force the flush, by default False.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">monitor_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">scaling_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the pipeline actors and background monitoring threads.</p>
+<p>Assumes the pipeline has already been built via the <cite>build()</cite> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>monitor_poll_interval</strong> (<em>float</em><em>, </em><em>optional</em>) – This parameter is currently unused but is kept for interface compatibility.</p></li>
+<li><p><strong>scaling_poll_interval</strong> (<em>float</em><em>, </em><em>optional</em>) – The interval in seconds for the autoscaling and maintenance thread to run, by default 30.0.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipeline.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.stop" title="Link to this definition">#</a></dt>
+<dd><p>Stops the pipeline and all associated actors and threads.</p>
+<p>This method performs a graceful shutdown by:
+1.  Stopping the autoscaling and statistics collection threads.
+2.  Signaling all actors to stop and waiting for confirmation.
+3.  Stopping the topology cleanup thread.
+4.  Clearing all runtime state from the topology.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">RayPipelineInterface</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">pipeline</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><span class="pre">RayPipeline</span></a></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineInterface</span></code></a></p>
+<p>Pipeline interface for an in-process RayPipeline instance.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">monitor_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">scaling_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineInterface.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the RayPipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>monitor_poll_interval</strong> (<em>float</em>) – Unused here; provided for interface compatibility.</p></li>
+<li><p><strong>scaling_poll_interval</strong> (<em>float</em>) – Unused here; provided for interface compatibility.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineInterface.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.stop" title="Link to this definition">#</a></dt>
+<dd><p>Stops the RayPipeline and shuts down Ray.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">RayPipelineSubprocessInterface</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Process</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineSubprocessInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface" title="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineInterface</span></code></a></p>
+<p>Pipeline interface implementation for a subprocess-based Ray pipeline.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">monitor_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">scaling_poll_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineSubprocessInterface.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.start" title="Link to this definition">#</a></dt>
+<dd><p>Start is not supported because the subprocess is assumed to already be running.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#RayPipelineSubprocessInterface.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.stop" title="Link to this definition">#</a></dt>
+<dd><p>Stops the subprocess pipeline and its entire process group to ensure
+any child processes (e.g., the simple message broker) are terminated.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">ScalingConfig</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_memory_scaling</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">dynamic_memory_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.75</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_kp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.2</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_ki</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_kd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_ema_alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_target_queue_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_penalty_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pid_error_boost_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.5</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">rcm_memory_safety_buffer_fraction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.15</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#ScalingConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration for PID and Resource Constraint Manager based scaling.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_scaling">
+<span class="sig-name descname"><span class="pre">dynamic_memory_scaling</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_scaling" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_threshold">
+<span class="sig-name descname"><span class="pre">dynamic_memory_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.75</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_threshold" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ema_alpha">
+<span class="sig-name descname"><span class="pre">pid_ema_alpha</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.1</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ema_alpha" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_error_boost_factor">
+<span class="sig-name descname"><span class="pre">pid_error_boost_factor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.5</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_error_boost_factor" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kd">
+<span class="sig-name descname"><span class="pre">pid_kd</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kd" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ki">
+<span class="sig-name descname"><span class="pre">pid_ki</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.01</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ki" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kp">
+<span class="sig-name descname"><span class="pre">pid_kp</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.2</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kp" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_penalty_factor">
+<span class="sig-name descname"><span class="pre">pid_penalty_factor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.1</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_penalty_factor" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_target_queue_depth">
+<span class="sig-name descname"><span class="pre">pid_target_queue_depth</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_target_queue_depth" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.rcm_memory_safety_buffer_fraction">
+<span class="sig-name descname"><span class="pre">rcm_memory_safety_buffer_fraction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.15</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.rcm_memory_safety_buffer_fraction" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.</span></span><span class="sig-name descname"><span class="pre">StatsConfig</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">collection_interval_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actor_timeout_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_timeout_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_pipeline.html#StatsConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration for the RayStatsCollector.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.actor_timeout_seconds">
+<span class="sig-name descname"><span class="pre">actor_timeout_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5.0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.actor_timeout_seconds" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.collection_interval_seconds">
+<span class="sig-name descname"><span class="pre">collection_interval_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10.0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.collection_interval_seconds" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.queue_timeout_seconds">
+<span class="sig-name descname"><span class="pre">queue_timeout_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></em><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.queue_timeout_seconds" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector">
+<span id="nv-ingest-framework-orchestration-ray-primitives-ray-stat-collector-module"></span><h2>nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector module<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.</span></span><span class="sig-name descname"><span class="pre">RayStatsCollector</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">pipeline_accessor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">actor_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">queue_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ema_alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_stat_collector.html#RayStatsCollector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Collects statistics from a RayPipeline’s actors and queues in parallel
+using a dedicated background thread.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.collect_stats_now">
+<span class="sig-name descname"><span class="pre">collect_stats_now</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_stat_collector.html#RayStatsCollector.collect_stats_now"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.collect_stats_now" title="Link to this definition">#</a></dt>
+<dd><p>Performs a single collection cycle of statistics from pipeline actors/queues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary mapping stage names to their collected statistics, and a
+boolean indicating if the overall collection was successful.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple[Dict[str, Dict[str, int]], bool]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.get_latest_stats">
+<span class="sig-name descname"><span class="pre">get_latest_stats</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_stat_collector.html#RayStatsCollector.get_latest_stats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.get_latest_stats" title="Link to this definition">#</a></dt>
+<dd><p>Returns the most recently collected statistics, update time, and success status.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A tuple containing:
+- A dictionary mapping stage names to their statistics (or empty if none collected).
+- The timestamp (time.time()) of the last update attempt.
+- A boolean indicating if the last collection was successful.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple[Dict[str, Dict[str, int]], float, bool]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_stat_collector.html#RayStatsCollector.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.start" title="Link to this definition">#</a></dt>
+<dd><p>Starts the dedicated background statistics collection thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest/framework/orchestration/ray/primitives/ray_stat_collector.html#RayStatsCollector.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.stop" title="Link to this definition">#</a></dt>
+<dd><p>Signals the background stats collection thread to stop and waits for it.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.primitives">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.primitives" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest.framework.orchestration.ray.examples.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest.framework.orchestration.ray.examples package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest.framework.orchestration.ray.stages.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest.framework.orchestration.ray.stages package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives.dataclasses">nv_ingest.framework.orchestration.ray.primitives.dataclasses module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor">nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig"><code class="docutils literal notranslate"><span class="pre">DisplayConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.DisplayConfig.use_gui"><code class="docutils literal notranslate"><span class="pre">use_gui</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig"><code class="docutils literal notranslate"><span class="pre">MonitorConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.poll_interval"><code class="docutils literal notranslate"><span class="pre">poll_interval</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_console"><code class="docutils literal notranslate"><span class="pre">use_console</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.MonitorConfig.use_gui"><code class="docutils literal notranslate"><span class="pre">use_gui</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor"><code class="docutils literal notranslate"><span class="pre">PipelineMonitor</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_monitor.PipelineMonitor.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives.pipeline_topology">nv_ingest.framework.orchestration.ray.primitives.pipeline_topology module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology"><code class="docutils literal notranslate"><span class="pre">PipelineTopology</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_actor_to_stage"><code class="docutils literal notranslate"><span class="pre">add_actor_to_stage()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_connection"><code class="docutils literal notranslate"><span class="pre">add_connection()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_stage"><code class="docutils literal notranslate"><span class="pre">add_stage()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.clear_runtime_state"><code class="docutils literal notranslate"><span class="pre">clear_runtime_state()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_actor_count"><code class="docutils literal notranslate"><span class="pre">get_actor_count()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_all_actors"><code class="docutils literal notranslate"><span class="pre">get_all_actors()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_connections"><code class="docutils literal notranslate"><span class="pre">get_connections()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_edge_queues"><code class="docutils literal notranslate"><span class="pre">get_edge_queues()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_is_flushing"><code class="docutils literal notranslate"><span class="pre">get_is_flushing()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_scaling_state"><code class="docutils literal notranslate"><span class="pre">get_scaling_state()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_actors"><code class="docutils literal notranslate"><span class="pre">get_stage_actors()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_info"><code class="docutils literal notranslate"><span class="pre">get_stage_info()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_memory_overhead"><code class="docutils literal notranslate"><span class="pre">get_stage_memory_overhead()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stages_info"><code class="docutils literal notranslate"><span class="pre">get_stages_info()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.lock_context"><code class="docutils literal notranslate"><span class="pre">lock_context()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.mark_actor_for_removal"><code class="docutils literal notranslate"><span class="pre">mark_actor_for_removal()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.remove_actors_from_stage"><code class="docutils literal notranslate"><span class="pre">remove_actors_from_stage()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_actors_for_stage"><code class="docutils literal notranslate"><span class="pre">set_actors_for_stage()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_edge_queues"><code class="docutils literal notranslate"><span class="pre">set_edge_queues()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_flushing"><code class="docutils literal notranslate"><span class="pre">set_flushing()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_stage_memory_overhead"><code class="docutils literal notranslate"><span class="pre">set_stage_memory_overhead()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.start_cleanup_thread"><code class="docutils literal notranslate"><span class="pre">start_cleanup_thread()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.stop_cleanup_thread"><code class="docutils literal notranslate"><span class="pre">stop_cleanup_thread()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.update_scaling_state"><code class="docutils literal notranslate"><span class="pre">update_scaling_state()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo"><code class="docutils literal notranslate"><span class="pre">StageInfo</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives.ray_pipeline">nv_ingest.framework.orchestration.ray.primitives.ray_pipeline module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig"><code class="docutils literal notranslate"><span class="pre">FlushingConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.consecutive_quiet_cycles_for_flush"><code class="docutils literal notranslate"><span class="pre">consecutive_quiet_cycles_for_flush</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_drain_timeout_seconds"><code class="docutils literal notranslate"><span class="pre">queue_flush_drain_timeout_seconds</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.queue_flush_interval_seconds"><code class="docutils literal notranslate"><span class="pre">queue_flush_interval_seconds</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.FlushingConfig.quiet_period_threshold"><code class="docutils literal notranslate"><span class="pre">quiet_period_threshold</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface"><code class="docutils literal notranslate"><span class="pre">PipelineInterface</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.PipelineInterface.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline"><code class="docutils literal notranslate"><span class="pre">RayPipeline</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_sink"><code class="docutils literal notranslate"><span class="pre">add_sink()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_source"><code class="docutils literal notranslate"><span class="pre">add_source()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.add_stage"><code class="docutils literal notranslate"><span class="pre">add_stage()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.build"><code class="docutils literal notranslate"><span class="pre">build()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_edge_queues"><code class="docutils literal notranslate"><span class="pre">get_edge_queues()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stage_actors"><code class="docutils literal notranslate"><span class="pre">get_stage_actors()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.get_stages_info"><code class="docutils literal notranslate"><span class="pre">get_stages_info()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.make_edge"><code class="docutils literal notranslate"><span class="pre">make_edge()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.request_queue_flush"><code class="docutils literal notranslate"><span class="pre">request_queue_flush()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipeline.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface"><code class="docutils literal notranslate"><span class="pre">RayPipelineInterface</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineInterface.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface"><code class="docutils literal notranslate"><span class="pre">RayPipelineSubprocessInterface</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.RayPipelineSubprocessInterface.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig"><code class="docutils literal notranslate"><span class="pre">ScalingConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_scaling"><code class="docutils literal notranslate"><span class="pre">dynamic_memory_scaling</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.dynamic_memory_threshold"><code class="docutils literal notranslate"><span class="pre">dynamic_memory_threshold</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ema_alpha"><code class="docutils literal notranslate"><span class="pre">pid_ema_alpha</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_error_boost_factor"><code class="docutils literal notranslate"><span class="pre">pid_error_boost_factor</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kd"><code class="docutils literal notranslate"><span class="pre">pid_kd</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_ki"><code class="docutils literal notranslate"><span class="pre">pid_ki</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_kp"><code class="docutils literal notranslate"><span class="pre">pid_kp</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_penalty_factor"><code class="docutils literal notranslate"><span class="pre">pid_penalty_factor</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.pid_target_queue_depth"><code class="docutils literal notranslate"><span class="pre">pid_target_queue_depth</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.ScalingConfig.rcm_memory_safety_buffer_fraction"><code class="docutils literal notranslate"><span class="pre">rcm_memory_safety_buffer_fraction</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig"><code class="docutils literal notranslate"><span class="pre">StatsConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.actor_timeout_seconds"><code class="docutils literal notranslate"><span class="pre">actor_timeout_seconds</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.collection_interval_seconds"><code class="docutils literal notranslate"><span class="pre">collection_interval_seconds</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_pipeline.StatsConfig.queue_timeout_seconds"><code class="docutils literal notranslate"><span class="pre">queue_timeout_seconds</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector">nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector"><code class="docutils literal notranslate"><span class="pre">RayStatsCollector</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.collect_stats_now"><code class="docutils literal notranslate"><span class="pre">collect_stats_now()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.get_latest_stats"><code class="docutils literal notranslate"><span class="pre">get_latest_stats()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector.RayStatsCollector.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.primitives">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

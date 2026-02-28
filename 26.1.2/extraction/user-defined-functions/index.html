@@ -1,0 +1,4209 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://docs.nvidia.com/nemo/retriever/latest/extraction/user-defined-functions/">
+      
+      
+        <link rel="prev" href="../ray-logging/">
+      
+      
+        <link rel="next" href="../user-defined-stages/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Add User-defined Functions - NeMo Retriever Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/css/color-schemes.css">
+    
+      <link rel="stylesheet" href="../../assets/css/fonts.css">
+    
+      <link rel="stylesheet" href="../../assets/css/custom-material.css">
+    
+      <link rel="stylesheet" href="../../assets/css/jupyter-themes.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+ 
+    <script src="https://assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="light" data-md-color-primary="custom" data-md-color-accent="lime">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#add-user-defined-functions-to-nemo-retriever-library" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You're not viewing the latest version.
+  <a href="../../.."> 
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../.."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NeMo Retriever Documentation" class="md-header__button md-logo" aria-label="NeMo Retriever Documentation" data-md-component="logo">
+      
+  
+  <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 164 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g>
+        <path d="M160.352,24.069L160.352,23.62L160.64,23.62C160.797,23.62 161.011,23.632 161.011,23.824C161.011,24.032 160.901,24.069 160.715,24.069L160.352,24.069M160.352,24.384L160.544,24.384L160.991,25.168L161.481,25.168L160.987,24.352C161.242,24.333 161.452,24.212 161.452,23.868C161.452,23.441 161.157,23.303 160.659,23.303L159.938,23.303L159.938,25.168L160.352,25.168L160.352,24.384M162.45,24.238C162.45,23.143 161.599,22.508 160.65,22.508C159.695,22.508 158.845,23.143 158.845,24.238C158.845,25.333 159.695,25.971 160.65,25.971C161.598,25.971 162.45,25.333 162.45,24.238M161.93,24.238C161.93,25.036 161.343,25.572 160.65,25.572L160.65,25.566C159.937,25.572 159.361,25.036 159.361,24.238C159.361,23.441 159.938,22.907 160.65,22.907C161.344,22.907 161.93,23.441 161.93,24.238"/>
+        <path d="M96.374,5.707L96.376,25.367L101.928,25.367L101.928,5.707L96.374,5.707ZM52.697,5.681L52.697,25.367L58.3,25.367L58.3,10.086L62.67,10.1C64.107,10.1 65.1,10.445 65.793,11.184C66.672,12.12 67.03,13.628 67.03,16.389L67.03,25.367L72.457,25.367L72.457,14.49C72.457,6.727 67.509,5.68 62.668,5.68L52.698,5.68L52.697,5.681ZM105.314,5.708L105.314,25.367L114.32,25.367C119.118,25.367 120.684,24.569 122.377,22.78C123.575,21.524 124.348,18.766 124.348,15.753C124.348,12.99 123.693,10.525 122.551,8.99C120.494,6.245 117.531,5.708 113.106,5.708L105.314,5.708ZM110.822,9.988L113.209,9.988C116.672,9.988 118.912,11.544 118.912,15.579C118.912,19.616 116.672,21.171 113.209,21.171L110.822,21.171L110.822,9.988ZM88.369,5.708L83.735,21.288L79.295,5.709L73.302,5.708L79.642,25.367L87.645,25.367L94.036,5.708L88.369,5.708ZM126.932,25.367L132.485,25.367L132.485,5.709L126.93,5.708L126.932,25.367ZM142.496,5.715L134.743,25.36L140.218,25.36L141.445,21.888L150.62,21.888L151.781,25.36L157.725,25.36L149.913,5.714L142.496,5.715ZM146.1,9.3L149.464,18.504L142.631,18.504L146.101,9.3L146.1,9.3Z"/>
+        <path d="M16.889,8.985L16.889,6.28C17.151,6.26 17.417,6.247 17.687,6.238C25.087,6.006 29.942,12.597 29.942,12.597C29.942,12.597 24.698,19.879 19.076,19.879C18.333,19.882 17.594,19.764 16.889,19.529L16.889,11.325C19.769,11.673 20.349,12.945 22.081,15.833L25.933,12.585C25.933,12.585 23.121,8.897 18.381,8.897C17.866,8.897 17.373,8.933 16.889,8.985ZM16.889,0.047L16.889,4.09C17.154,4.069 17.42,4.052 17.687,4.042C27.977,3.696 34.682,12.482 34.682,12.482C34.682,12.482 26.982,21.846 18.959,21.846C18.224,21.846 17.535,21.778 16.889,21.663L16.889,24.161C17.442,24.231 18.015,24.273 18.613,24.273C26.078,24.273 31.477,20.461 36.705,15.948C37.572,16.642 41.121,18.331 41.85,19.071C36.879,23.231 25.295,26.586 18.727,26.586C18.113,26.584 17.5,26.552 16.889,26.49L16.889,30L45.264,30L45.264,0.047L16.889,0.047ZM16.889,19.529L16.889,21.662C9.984,20.432 8.067,13.254 8.067,13.254C8.067,13.254 11.383,9.58 16.889,8.985L16.889,11.325L16.878,11.324C13.988,10.977 11.731,13.677 11.731,13.677C11.731,13.677 12.996,18.221 16.889,19.529ZM4.625,12.943C4.625,12.943 8.717,6.903 16.889,6.28L16.889,4.088C7.838,4.815 0,12.48 0,12.48C0,12.48 4.439,25.313 16.889,26.488L16.889,24.16C7.753,23.011 4.625,12.943 4.625,12.943Z" style="fill:rgb(118,185,0);"/>
+    </g>
+</svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NeMo Retriever Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Add User-defined Functions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="light" data-md-color-primary="custom" data-md-color-accent="lime"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="dark" data-md-color-primary="custom" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/NVIDIA/nv-ingest/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NVIDIA/nv-ingest
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+    
+  
+  NeMo Retriever
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NeMo Retriever Documentation" class="md-nav__button md-logo" aria-label="NeMo Retriever Documentation" data-md-component="logo">
+      
+  
+  <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 164 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g>
+        <path d="M160.352,24.069L160.352,23.62L160.64,23.62C160.797,23.62 161.011,23.632 161.011,23.824C161.011,24.032 160.901,24.069 160.715,24.069L160.352,24.069M160.352,24.384L160.544,24.384L160.991,25.168L161.481,25.168L160.987,24.352C161.242,24.333 161.452,24.212 161.452,23.868C161.452,23.441 161.157,23.303 160.659,23.303L159.938,23.303L159.938,25.168L160.352,25.168L160.352,24.384M162.45,24.238C162.45,23.143 161.599,22.508 160.65,22.508C159.695,22.508 158.845,23.143 158.845,24.238C158.845,25.333 159.695,25.971 160.65,25.971C161.598,25.971 162.45,25.333 162.45,24.238M161.93,24.238C161.93,25.036 161.343,25.572 160.65,25.572L160.65,25.566C159.937,25.572 159.361,25.036 159.361,24.238C159.361,23.441 159.938,22.907 160.65,22.907C161.344,22.907 161.93,23.441 161.93,24.238"/>
+        <path d="M96.374,5.707L96.376,25.367L101.928,25.367L101.928,5.707L96.374,5.707ZM52.697,5.681L52.697,25.367L58.3,25.367L58.3,10.086L62.67,10.1C64.107,10.1 65.1,10.445 65.793,11.184C66.672,12.12 67.03,13.628 67.03,16.389L67.03,25.367L72.457,25.367L72.457,14.49C72.457,6.727 67.509,5.68 62.668,5.68L52.698,5.68L52.697,5.681ZM105.314,5.708L105.314,25.367L114.32,25.367C119.118,25.367 120.684,24.569 122.377,22.78C123.575,21.524 124.348,18.766 124.348,15.753C124.348,12.99 123.693,10.525 122.551,8.99C120.494,6.245 117.531,5.708 113.106,5.708L105.314,5.708ZM110.822,9.988L113.209,9.988C116.672,9.988 118.912,11.544 118.912,15.579C118.912,19.616 116.672,21.171 113.209,21.171L110.822,21.171L110.822,9.988ZM88.369,5.708L83.735,21.288L79.295,5.709L73.302,5.708L79.642,25.367L87.645,25.367L94.036,5.708L88.369,5.708ZM126.932,25.367L132.485,25.367L132.485,5.709L126.93,5.708L126.932,25.367ZM142.496,5.715L134.743,25.36L140.218,25.36L141.445,21.888L150.62,21.888L151.781,25.36L157.725,25.36L149.913,5.714L142.496,5.715ZM146.1,9.3L149.464,18.504L142.631,18.504L146.101,9.3L146.1,9.3Z"/>
+        <path d="M16.889,8.985L16.889,6.28C17.151,6.26 17.417,6.247 17.687,6.238C25.087,6.006 29.942,12.597 29.942,12.597C29.942,12.597 24.698,19.879 19.076,19.879C18.333,19.882 17.594,19.764 16.889,19.529L16.889,11.325C19.769,11.673 20.349,12.945 22.081,15.833L25.933,12.585C25.933,12.585 23.121,8.897 18.381,8.897C17.866,8.897 17.373,8.933 16.889,8.985ZM16.889,0.047L16.889,4.09C17.154,4.069 17.42,4.052 17.687,4.042C27.977,3.696 34.682,12.482 34.682,12.482C34.682,12.482 26.982,21.846 18.959,21.846C18.224,21.846 17.535,21.778 16.889,21.663L16.889,24.161C17.442,24.231 18.015,24.273 18.613,24.273C26.078,24.273 31.477,20.461 36.705,15.948C37.572,16.642 41.121,18.331 41.85,19.071C36.879,23.231 25.295,26.586 18.727,26.586C18.113,26.584 17.5,26.552 16.889,26.49L16.889,30L45.264,30L45.264,0.047L16.889,0.047ZM16.889,19.529L16.889,21.662C9.984,20.432 8.067,13.254 8.067,13.254C8.067,13.254 11.383,9.58 16.889,8.985L16.889,11.325L16.878,11.324C13.988,10.977 11.731,13.677 11.731,13.677C11.731,13.677 12.996,18.221 16.889,19.529ZM4.625,12.943C4.625,12.943 8.717,6.903 16.889,6.28L16.889,4.088C7.838,4.815 0,12.48 0,12.48C0,12.48 4.439,25.313 16.889,26.488L16.889,24.16C7.753,23.011 4.625,12.943 4.625,12.943Z" style="fill:rgb(118,185,0);"/>
+    </g>
+</svg>
+
+    </a>
+    NeMo Retriever Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NVIDIA/nv-ingest/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    NVIDIA/nv-ingest
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NeMo Retriever
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    NeMo Retriever
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../.." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Overview
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NeMo Retriever Extraction
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    NeMo Retriever Extraction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releasenotes-nv-ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_3" id="__nav_1_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prerequisites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Support Matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart-library-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Library Mode)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Self-Hosted)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy (Helm Chart)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_4" id="__nav_1_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nv-ingest_cli.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nv-ingest-python-api.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v2-api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use the API (V2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chunking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Split Documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filter Search Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nemoretriever-parse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Visual Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extract Speech
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vlm-embed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Multimodal Embedding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ray-logging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configure Ray Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_5" id="__nav_1_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customize Your Pipeline
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Customize Your Pipeline
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add User-defined Functions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add User-defined Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quickstart
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quickstart">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-write-your-udf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Write Your UDF
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-submit-via-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Submit via CLI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Submit via CLI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inline-function-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline Function String
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-path-with-colon-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Path with Colon (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy-import-path-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Import Path (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-submit-via-python-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Submit via Python Client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comprehensive-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comprehensive Documentation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Comprehensive Documentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-ingestcontrolmessage-icm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding IngestControlMessage (ICM)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding IngestControlMessage (ICM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-icm-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key ICM Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-the-dataframe-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the DataFrame Payload
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding the DataFrame Payload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-dataframe-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core DataFrame Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-dataframe-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example DataFrame Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#top-level-metadata-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-Level Metadata Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-metadata-manipulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Metadata Manipulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Targeting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UDF Targeting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Pipeline Stages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-stage-selection-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Stage Selection Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UDF Function Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signature-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signature Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#essential-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Essential Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-specification-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Specification Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-inline-function-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Inline Function String
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-module-path-with-colon-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Module Path with Colon (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-file-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. File Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-legacy-import-path-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Legacy Import Path (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recommendation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-specification-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Specification Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-with-nvidia-nims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrating with NVIDIA NIMs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integrating with NVIDIA NIMs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-nim-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick NIM Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-nim-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available NIM Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-nim-integrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Custom NIM Integrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#computational-complexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computational Complexity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-stability-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Stability Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debugging-and-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging and Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-udf-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global UDF Control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-udfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing UDFs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing UDFs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-integration-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Integration Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-debugging-techniques" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Debugging Techniques
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Topics
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-defined-stages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add User-defined Stages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nimclient/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NimClient Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Scaling Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_6" id="__nav_1_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../throughput-is-dataset-dependent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Throughput Is Dataset-Dependent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2_7" id="__nav_1_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_1_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ngc-api-key/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate Your NGC Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../content-metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-docs" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshoot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshoot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quickstart
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quickstart">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-write-your-udf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Write Your UDF
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-submit-via-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Submit via CLI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Submit via CLI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inline-function-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline Function String
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-path-with-colon-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Path with Colon (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy-import-path-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Import Path (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-submit-via-python-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Submit via Python Client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comprehensive-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comprehensive Documentation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Comprehensive Documentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-ingestcontrolmessage-icm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding IngestControlMessage (ICM)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding IngestControlMessage (ICM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-icm-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key ICM Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-the-dataframe-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the DataFrame Payload
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding the DataFrame Payload">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-dataframe-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core DataFrame Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-dataframe-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example DataFrame Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#top-level-metadata-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-Level Metadata Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-metadata-manipulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Metadata Manipulation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-targeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Targeting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UDF Targeting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Pipeline Stages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-stage-selection-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Stage Selection Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UDF Function Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#signature-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signature Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#essential-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Essential Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-specification-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Specification Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-inline-function-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Inline Function String
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-module-path-with-colon-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Module Path with Colon (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-file-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. File Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-legacy-import-path-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Legacy Import Path (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recommendation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#udf-function-specification-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UDF Function Specification Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-with-nvidia-nims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrating with NVIDIA NIMs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integrating with NVIDIA NIMs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-nim-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick NIM Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-nim-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available NIM Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-nim-integrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Custom NIM Integrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#computational-complexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computational Complexity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-stability-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Stability Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debugging-and-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging and Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-udf-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global UDF Control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-udfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing UDFs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing UDFs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-integration-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Integration Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-debugging-techniques" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Debugging Techniques
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Topics
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../.." class="md-path__link">
+          
+  <span class="md-ellipsis">
+    NeMo Retriever
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../overview/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    NeMo Retriever Extraction
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Customize Your Pipeline
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+
+    <div style="text-align: right;">
+        <a href="https://surveys.hotjar.com/4904bf71-6484-47a7-83ff-4715cceabdb5" id="openPopupButton">Is this page helpful?</a>
+    </div>
+
+    
+                  
+
+
+  
+  
+
+
+<h1 id="add-user-defined-functions-to-nemo-retriever-library">Add User-Defined Functions to NeMo Retriever Library</h1>
+<p>User-Defined Functions (UDFs) allow you to inject custom processing logic into the <a href="../overview/">NeMo Retriever Library</a> pipeline at specific stages. 
+This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This library is the NeMo Retriever Library.</p>
+</div>
+<h2 id="quickstart">Quickstart</h2>
+<h3 id="1-write-your-udf">1. Write Your UDF</h3>
+<p>Create a Python function that accepts an <code>IngestControlMessage</code> and returns a modified <code>IngestControlMessage</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.internal.primitives.ingest_control_message</span><span class="w"> </span><span class="kn">import</span> <span class="n">IngestControlMessage</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">my_custom_processor</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add custom metadata to all documents.&quot;&quot;&quot;</span>
+    <span class="c1"># Get the DataFrame payload</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="c1"># Add custom metadata to each row</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="k">if</span> <span class="s1">&#39;metadata&#39;</span> <span class="ow">in</span> <span class="n">row</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="c1"># Add your custom field</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;custom_field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;my_custom_value&#39;</span>
+
+    <span class="c1"># Update the payload with modified DataFrame</span>
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h3 id="2-submit-via-cli">2. Submit via CLI</h3>
+<p>The CLI supports all UDF function specification formats. Here are examples of each:</p>
+<h4 id="inline-function-string">Inline Function String</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit inline UDF function</span>
+nemo-retriever<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--doc<span class="w"> </span>/path/to/document.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-directory<span class="w"> </span>./output<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;def my_processor(control_message): print(\&quot;Processing...\&quot;); return control_message&quot;, &quot;udf_function_name&quot;: &quot;my_processor&quot;, &quot;target_stage&quot;: &quot;text_embedder&quot;, &quot;run_before&quot;: true}&#39;</span>
+</code></pre></div>
+<h4 id="module-path-with-colon-recommended">Module Path with Colon (Recommended)</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit UDF from importable module (preserves all imports and context)</span>
+nemo-retriever<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--doc<span class="w"> </span>/path/to/document.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-directory<span class="w"> </span>./output<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;my_package.processors:enhance_metadata&quot;, &quot;target_stage&quot;: &quot;text_embedder&quot;, &quot;run_after&quot;: true}&#39;</span>
+</code></pre></div>
+<h4 id="file-path">File Path</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit UDF from file path</span>
+nemo-retriever<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--doc<span class="w"> </span>/path/to/document.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-directory<span class="w"> </span>./output<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;my_file.py:my_custom_processor&quot;, &quot;target_stage&quot;: &quot;text_embedder&quot;, &quot;run_before&quot;: true}&#39;</span>
+</code></pre></div>
+<h4 id="legacy-import-path-limited">Legacy Import Path (Limited)</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit UDF using legacy dot notation (function only, no imports)</span>
+nemo-retriever<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--doc<span class="w"> </span>/path/to/document.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-directory<span class="w"> </span>./output<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;my_package.processors.basic_processor&quot;, &quot;target_stage&quot;: &quot;text_embedder&quot;, &quot;run_after&quot;: true}&#39;</span>
+</code></pre></div>
+<h3 id="3-submit-via-python-client">3. Submit via Python Client</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.client.interface</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ingestor</span>
+
+<span class="c1"># Create an Ingestor instance with default client</span>
+<span class="n">ingestor</span> <span class="o">=</span> <span class="n">Ingestor</span><span class="p">()</span>
+
+<span class="c1"># Add documents and configure UDF to run before text embedding</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">ingestor</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;/path/to/document.pdf&quot;</span><span class="p">)</span> \
+    <span class="o">.</span><span class="n">extract</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">udf</span><span class="p">(</span>
+        <span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;my_file.py:my_custom_processor&quot;</span><span class="p">,</span>
+        <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;text_embedder&quot;</span><span class="p">,</span>
+        <span class="n">run_before</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span> \
+    <span class="o">.</span><span class="n">embed</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">ingest</span><span class="p">()</span>
+
+<span class="c1"># Alternative: UDF to run after text embedding stage</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">ingestor</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;/path/to/document.pdf&quot;</span><span class="p">)</span> \
+    <span class="o">.</span><span class="n">extract</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">embed</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">udf</span><span class="p">(</span>
+        <span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;my_file.py:my_custom_processor&quot;</span><span class="p">,</span> 
+        <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;text_embedder&quot;</span><span class="p">,</span>
+        <span class="n">run_after</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span> \
+    <span class="o">.</span><span class="n">ingest</span><span class="p">()</span>
+
+<span class="c1"># Using phase-based targeting (legacy approach)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">ingestor</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;/path/to/document.pdf&quot;</span><span class="p">)</span> \
+    <span class="o">.</span><span class="n">extract</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">udf</span><span class="p">(</span>
+        <span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;my_file.py:my_custom_processor&quot;</span><span class="p">,</span>
+        <span class="n">phase</span><span class="o">=</span><span class="s2">&quot;embed&quot;</span>  <span class="c1"># or phase=4</span>
+    <span class="p">)</span> \
+    <span class="o">.</span><span class="n">embed</span><span class="p">()</span> \
+    <span class="o">.</span><span class="n">ingest</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="comprehensive-documentation">Comprehensive Documentation</h2>
+<h3 id="understanding-ingestcontrolmessage-icm">Understanding IngestControlMessage (ICM)</h3>
+<p>The <code>IngestControlMessage</code> is the primary data structure that flows through the NeMo Retriever pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.</p>
+<h4 id="key-icm-methods">Key ICM Methods</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Get the pandas DataFrame payload</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+<span class="c1"># Update the payload with a modified DataFrame</span>
+<span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">modified_df</span><span class="p">)</span>
+
+<span class="c1"># Access metadata</span>
+<span class="n">metadata</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">(</span><span class="s2">&quot;some_key&quot;</span><span class="p">)</span>
+<span class="n">control_message</span><span class="o">.</span><span class="n">set_metadata</span><span class="p">(</span><span class="s2">&quot;some_key&quot;</span><span class="p">,</span> <span class="s2">&quot;some_value&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get tasks (advanced usage)</span>
+<span class="n">tasks</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">get_tasks</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="understanding-the-dataframe-payload">Understanding the DataFrame Payload</h3>
+<p>The DataFrame payload contains the extracted content and metadata for processing. Each row represents a piece of content (text, image, table, etc.).</p>
+<h4 id="core-dataframe-columns">Core DataFrame Columns</h4>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>document_type</code></td>
+<td><code>str</code></td>
+<td>Type of document (pdf, docx, txt, etc.)</td>
+</tr>
+<tr>
+<td><code>source_type</code></td>
+<td><code>str</code></td>
+<td>Source type identifier</td>
+</tr>
+<tr>
+<td><code>source_file</code></td>
+<td><code>str</code></td>
+<td>Path or identifier of the source file</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td><code>str</code></td>
+<td>Unique identifier for this content piece</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td>Rich metadata structure (see below)</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>str</code></td>
+<td>The actual extracted content</td>
+</tr>
+</tbody>
+</table>
+<h4 id="example-dataframe-access">Example DataFrame Access</h4>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_text_content</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="c1"># Access core fields</span>
+        <span class="n">doc_type</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;document_type&#39;</span><span class="p">]</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">]</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Modify content or metadata</span>
+        <span class="k">if</span> <span class="n">doc_type</span> <span class="o">==</span> <span class="s1">&#39;pdf&#39;</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">content</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1000</span><span class="p">:</span>
+            <span class="c1"># Add a summary for long PDF content</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;content_summary&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">content</span><span class="p">[:</span><span class="mi">200</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;...&quot;</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h3 id="metadata-structure">Metadata Structure</h3>
+<p>The <code>metadata</code> field in each DataFrame row contains a rich, nested structure with information about the content. The metadata follows a standardized schema with the following top-level keys:</p>
+<blockquote>
+<p><strong>⚠️ Important Notes:</strong>
+- <strong>Full Modification Access</strong>: UDFs can modify any field defined by the MetadataSchema. However, corrupting or removing data expected by downstream stages may cause job failures.
+- <strong>Custom Content Field</strong>: The top-level <code>metadata</code> object includes an unvalidated <code>custom_content</code> dictionary where you can place any valid, JSON-serializable data for your custom use cases.</p>
+</blockquote>
+<h4 id="top-level-metadata-structure">Top-Level Metadata Structure</h4>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;The extracted text content&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;custom_content&quot;</span><span class="p">:</span> <span class="p">{},</span>  <span class="c1"># Your custom JSON-serializable data goes here</span>
+    <span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;text|image|audio|structured&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;page_number&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;Content description&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;hierarchy&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">},</span>  <span class="c1"># Content hierarchy information</span>
+        <span class="s2">&quot;subtype&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="c1"># ... other content-specific fields</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;source_metadata&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="s2">&quot;unique_source_identifier&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="s2">&quot;document.pdf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;source_location&quot;</span><span class="p">:</span> <span class="s2">&quot;/path/to/document.pdf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;collection_id&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;date_created&quot;</span><span class="p">:</span> <span class="s2">&quot;2024-01-01T00:00:00&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;last_modified&quot;</span><span class="p">:</span> <span class="s2">&quot;2024-01-01T00:00:00&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;partition_id&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;access_level&quot;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;text_metadata&quot;</span><span class="p">:</span> <span class="p">{</span>  <span class="c1"># Present when content_metadata.type == &quot;text&quot;</span>
+        <span class="s2">&quot;text_type&quot;</span><span class="p">:</span> <span class="s2">&quot;document&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;keywords&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;language&quot;</span><span class="p">:</span> <span class="s2">&quot;unknown&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;text_location&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;text_location_max_dimensions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;image_metadata&quot;</span><span class="p">:</span> <span class="p">{</span>  <span class="c1"># Present when content_metadata.type == &quot;image&quot;</span>
+        <span class="s2">&quot;image_type&quot;</span><span class="p">:</span> <span class="s2">&quot;png&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;structured_image_type&quot;</span><span class="p">:</span> <span class="s2">&quot;none&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;image_location&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;image_location_max_dimensions&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="s2">&quot;uploaded_image_url&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;audio_metadata&quot;</span><span class="p">:</span> <span class="p">{</span>  <span class="c1"># Present when content_metadata.type == &quot;audio&quot;</span>
+        <span class="s2">&quot;audio_type&quot;</span><span class="p">:</span> <span class="s2">&quot;wav&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;audio_transcript&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;error_metadata&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>  <span class="c1"># Contains error information if processing failed</span>
+    <span class="s2">&quot;debug_metadata&quot;</span><span class="p">:</span> <span class="p">{}</span>     <span class="c1"># Arbitrary debug information</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="example-metadata-manipulation">Example Metadata Manipulation</h4>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">enhance_metadata</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Add custom fields to source metadata</span>
+        <span class="k">if</span> <span class="s1">&#39;source_metadata&#39;</span> <span class="ow">in</span> <span class="n">metadata</span><span class="p">:</span>
+            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;source_metadata&#39;</span><span class="p">][</span><span class="s1">&#39;custom_processing_date&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;source_metadata&#39;</span><span class="p">][</span><span class="s1">&#39;custom_processor_version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1.0.0&quot;</span>
+
+        <span class="c1"># Add content-specific enhancements</span>
+        <span class="k">if</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;content_metadata&#39;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;text&#39;</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;content&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="c1"># Add word count</span>
+            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;text_metadata&#39;</span><span class="p">][</span><span class="s1">&#39;word_count&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
+
+        <span class="c1"># Update the row</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;metadata&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metadata</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<blockquote>
+<p><strong>📖 For detailed metadata schema documentation, see:</strong> <a href="metadata_documentation.md">metadata_documentation.md</a></p>
+</blockquote>
+<h3 id="udf-targeting">UDF Targeting</h3>
+<p>UDFs can be executed at different stages of the pipeline by specifying the <code>target_stage</code> parameter. The following stages are available in the default pipeline configuration:</p>
+<h4 id="available-pipeline-stages">Available Pipeline Stages</h4>
+<p><strong>Pre processing Stages (Phase 0):</strong>
+- <code>metadata_injector</code> - Metadata injection stage</p>
+<p><strong>Extraction Stages (Phase 1):</strong>
+- <code>pdf_extractor</code> - PDF content extraction
+- <code>audio_extractor</code> - Audio content extraction<br />
+- <code>docx_extractor</code> - DOCX document extraction
+- <code>pptx_extractor</code> - PowerPoint presentation extraction
+- <code>image_extractor</code> - Image content extraction
+- <code>html_extractor</code> - HTML document extraction
+- <code>infographic_extractor</code> - Infographic content extraction
+- <code>table_extractor</code> - Table structure extraction
+- <code>chart_extractor</code> - Chart and graphic extraction</p>
+<p><strong>Post-processing Stages (Phase 2):</strong></p>
+<blockquote>
+<p><strong>Note:</strong> There are currently no Phase 2 stages in the default pipeline. This phase is reserved for future use and may include stages for content validation, quality assessment, or intermediate processing steps between extraction and mutation phases.</p>
+</blockquote>
+<p><strong>Mutation Stages (Phase 3):</strong>
+- <code>image_filter</code> - Image filtering and validation
+- <code>image_dedup</code> - Image deduplication</p>
+<p><strong>Transform Stages (Phase 4):</strong>
+- <code>text_splitter</code> - Text chunking and splitting
+- <code>image_caption</code> - Image captioning and description
+- <code>text_embedder</code> - Text embedding generation</p>
+<p><strong>Storage Stages (Phase 5):</strong>
+- <code>image_storage</code> - Image storage and management
+- <code>embedding_storage</code> - Embedding storage and indexing
+- <code>broker_response</code> - Response message handling
+- <code>otel_tracer</code> - OpenTelemetry tracing</p>
+<blockquote>
+<p><strong>Note:</strong> For the complete and up-to-date list of pipeline stages, see the <a href="../../../config/default_pipeline.yaml">default_pipeline.yaml</a> configuration file.</p>
+</blockquote>
+<h4 id="target-stage-selection-examples">Target Stage Selection Examples</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># CLI examples for different target stages</span>
+nemo-retriever<span class="w"> </span>--doc<span class="w"> </span>file.pdf<span class="w"> </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;processor.py:validate_input&quot;, &quot;target_stage&quot;: &quot;pdf_extractor&quot;, &quot;run_before&quot;: true}&#39;</span>
+nemo-retriever<span class="w"> </span>--doc<span class="w"> </span>file.pdf<span class="w"> </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;processor.py:extract_custom&quot;, &quot;target_stage&quot;: &quot;text_embedder&quot;, &quot;run_after&quot;: true}&#39;</span>
+nemo-retriever<span class="w"> </span>--doc<span class="w"> </span>file.pdf<span class="w"> </span>--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;processor.py:enhance_output&quot;, &quot;target_stage&quot;: &quot;embedding_storage&quot;, &quot;run_before&quot;: true}&#39;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Python client examples</span>
+<span class="n">ingestor</span> <span class="o">=</span> <span class="n">Ingestor</span><span class="p">()</span>
+
+<span class="n">ingestor</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span><span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;processor.py:validate_input&quot;</span><span class="p">,</span> <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;pdf_extractor&quot;</span><span class="p">,</span> <span class="n">run_before</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span><span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;processor.py:extract_custom&quot;</span><span class="p">,</span> <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;text_embedder&quot;</span><span class="p">,</span> <span class="n">run_after</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span><span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;processor.py:enhance_output&quot;</span><span class="p">,</span> <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;embedding_storage&quot;</span><span class="p">,</span> <span class="n">run_before</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="udf-function-requirements">UDF Function Requirements</h3>
+<h4 id="signature-requirements">Signature Requirements</h4>
+<p>Your UDF function <strong>must</strong>:</p>
+<ol>
+<li>Accept exactly one parameter named <code>control_message</code> with type annotation <code>IngestControlMessage</code></li>
+<li>Return an <code>IngestControlMessage</code></li>
+<li>Have proper type annotations</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># ✅ Correct signature</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="c1"># Your processing logic</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+
+<span class="c1"># ❌ Incorrect - missing type annotations</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+
+<span class="c1"># ❌ Incorrect - wrong parameter name</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">message</span>
+
+<span class="c1"># ❌ Incorrect - multiple parameters</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h4 id="essential-patterns">Essential Patterns</h4>
+<p><strong>Always return the control message:</strong>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="c1"># ... your processing ...</span>
+    <span class="k">return</span> <span class="n">control_message</span>  <span class="c1"># Don&#39;t forget this!</span>
+</code></pre></div></p>
+<p><strong>Update the payload after DataFrame modifications:</strong>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">my_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="c1"># Modify the DataFrame</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;new_column&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;new_value&#39;</span>
+
+    <span class="c1"># IMPORTANT: Update the payload</span>
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div></p>
+<h3 id="udf-function-specification-formats">UDF Function Specification Formats</h3>
+<p>NeMo Retriever supports four different formats for specifying UDF functions:</p>
+<h3 id="1-inline-function-string">1. Inline Function String</h3>
+<p>Define your function directly as a string:</p>
+<div class="highlight"><pre><span></span><code><span class="n">udf_function</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">def my_custom_processor(control_message):</span>
+<span class="s2">    # Your processing logic here</span>
+<span class="s2">    payload = control_message.payload()</span>
+<span class="s2">    # Modify the payload as needed</span>
+<span class="s2">    return control_message</span>
+<span class="s2">&quot;&quot;&quot;</span>
+</code></pre></div>
+<h3 id="2-module-path-with-colon-recommended">2. Module Path with Colon (Recommended)</h3>
+<p>Reference a function from an importable module while preserving all imports and context:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Format: &#39;module.submodule:function_name&#39;</span>
+<span class="n">udf_function</span> <span class="o">=</span> <span class="s2">&quot;my_package.processors.text_utils:enhance_metadata&quot;</span>
+</code></pre></div>
+<p><strong>Benefits:</strong>
+- ✅ Preserves all module-level imports (<code>import pandas as pd</code>, etc.)
+- ✅ Includes helper functions and variables the UDF depends on
+- ✅ Maintains full execution context
+- ✅ Best for complex UDFs with dependencies</p>
+<h3 id="3-file-path">3. File Path</h3>
+<p>Reference a function from a specific Python file:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># With function name: &#39;path/to/file.py:function_name&#39;</span>
+<span class="n">udf_function</span> <span class="o">=</span> <span class="s2">&quot;/path/to/my_udfs.py:my_custom_processor&quot;</span>
+
+<span class="c1"># Without function name (assumes &#39;process&#39; function)</span>
+<span class="n">udf_function</span> <span class="o">=</span> <span class="s2">&quot;/path/to/my_udfs.py&quot;</span>
+</code></pre></div>
+<p><strong>Benefits:</strong>
+- ✅ Preserves all file-level imports and context
+- ✅ Works with files not in Python path
+- ✅ Good for standalone UDF files</p>
+<h3 id="4-legacy-import-path-limited">4. Legacy Import Path (Limited)</h3>
+<p>Reference a function using dot notation (legacy format):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Format: &#39;module.submodule.function_name&#39;</span>
+<span class="n">udf_function</span> <span class="o">=</span> <span class="s2">&quot;my_package.processors.text_utils.enhance_metadata&quot;</span>
+</code></pre></div>
+<p><strong>Limitations:</strong>
+- ⚠️ Only extracts the function source code
+- ⚠️ Does NOT include module imports or dependencies
+- ⚠️ May fail if function depends on imports
+- ⚠️ Use format #2 instead for better reliability</p>
+<h2 id="recommendation">Recommendation</h2>
+<p><strong>Use format #2 (Module Path with Colon)</strong> for most use cases as it provides the best balance of functionality and reliability by preserving the complete execution context your UDF needs.</p>
+<h3 id="udf-function-specification-examples">UDF Function Specification Examples</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># CLI usage</span>
+--task<span class="w"> </span><span class="s1">&#39;udf:{&quot;udf_function&quot;: &quot;path/to/my_processors.py:process_documents&quot;}&#39;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Python client usage</span>
+<span class="n">ingestor</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span><span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;my_package.processors.text_utils:enhance_metadata&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="integrating-with-nvidia-nims">Integrating with NVIDIA NIMs</h2>
+<p>NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The <code>NimClient</code> class offers a unified interface for connecting to and using NIMs within the NeMo Retriever pipeline.</p>
+<h3 id="quick-nim-integration">Quick NIM Integration</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.internal.primitives.control_message</span><span class="w"> </span><span class="kn">import</span> <span class="n">IngestControlMessage</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.util.nim</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_inference_client</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.internal.primitives.nim.model_interface.vlm</span><span class="w"> </span><span class="kn">import</span> <span class="n">VLMModelInterface</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">document_analysis_with_nim</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UDF that uses a NIM to analyze document content.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Create NIM client for text analysis</span>
+    <span class="n">model_interface</span> <span class="o">=</span> <span class="n">VLMModelInterface</span><span class="p">()</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">create_inference_client</span><span class="p">(</span>
+        <span class="n">endpoints</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;ANALYSIS_NIM_GRPC&quot;</span><span class="p">,</span> <span class="s2">&quot;grpc://analysis-nim:8001&quot;</span><span class="p">),</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;ANALYSIS_NIM_HTTP&quot;</span><span class="p">,</span> <span class="s2">&quot;http://analysis-nim:8000&quot;</span><span class="p">)</span>
+        <span class="p">),</span>
+        <span class="n">model_interface</span><span class="o">=</span><span class="n">model_interface</span><span class="p">,</span>
+        <span class="n">auth_token</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;NGC_API_KEY&quot;</span><span class="p">),</span>
+        <span class="n">infer_protocol</span><span class="o">=</span><span class="s2">&quot;http&quot;</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Perform NIM inference</span>
+                <span class="n">results</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">infer</span><span class="p">(</span>
+                    <span class="n">data</span><span class="o">=</span><span class="p">{</span>
+                        <span class="s2">&quot;base64_images&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;image_data&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)],</span>
+                        <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Analyze this document: </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">][:</span><span class="mi">500</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">},</span>
+                    <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;llava-1.5-7b-hf&quot;</span>
+                <span class="p">)</span>
+
+                <span class="c1"># Add analysis to DataFrame</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s2">&quot;nim_analysis&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">results</span> <span class="k">else</span> <span class="s2">&quot;No analysis&quot;</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NIM inference failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s2">&quot;nim_analysis&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Analysis failed&quot;</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h3 id="environment-configuration">Environment Configuration</h3>
+<p>Set these environment variables for your NIM endpoints:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># NIM service endpoints</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ANALYSIS_NIM_GRPC</span><span class="o">=</span><span class="s2">&quot;grpc://your-nim-service:8001&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ANALYSIS_NIM_HTTP</span><span class="o">=</span><span class="s2">&quot;http://your-nim-service:8000&quot;</span>
+
+<span class="c1"># Authentication (if required)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">NGC_API_KEY</span><span class="o">=</span><span class="s2">&quot;your-ngc-api-key&quot;</span>
+</code></pre></div>
+<h3 id="available-nim-interfaces">Available NIM Interfaces</h3>
+<p>NeMo Retriever provides several pre-built model interfaces:</p>
+<ul>
+<li><strong>VLMModelInterface</strong>: Vision-Language Models for image analysis and captioning</li>
+<li><strong>EmbeddingModelInterface</strong>: Text embedding generation</li>
+<li><strong>OCRModelInterface</strong>: Optical Character Recognition</li>
+<li><strong>YoloxModelInterface</strong>: Object detection and page element extraction</li>
+</ul>
+<h3 id="creating-custom-nim-integrations">Creating Custom NIM Integrations</h3>
+<p>For detailed guidance on creating custom NIM integrations, including:</p>
+<ul>
+<li>Custom ModelInterface implementation</li>
+<li>Protocol handling (gRPC vs HTTP)</li>
+<li>Batch processing optimization</li>
+<li>Error handling and debugging</li>
+<li>Performance best practices</li>
+</ul>
+<p>See the comprehensive <a href="nimclient_usage.md"><strong>NimClient Usage Guide</strong></a>.</p>
+<h3 id="error-handling">Error Handling</h3>
+<p>The NeMo Retriever system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:</p>
+<ol>
+<li>Annotate the job with appropriate error information</li>
+<li>Mark the job as failed</li>
+<li>Return the failed job to you with error details</li>
+<li>Failures that are not caught by the system, or unhandled exceptions (segfaults) from acceleration libraries may leave the pipeline in an unstable state </li>
+</ol>
+<p>You do not need to implement extensive error handling within your UDF - focus on your core processing logic and let the system handle failures gracefully.</p>
+<h3 id="performance-considerations">Performance Considerations</h3>
+<p>UDFs execute within the NeMo Retriever pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.</p>
+<h4 id="pipeline-impact">Pipeline Impact</h4>
+<p><strong>Global Slowdown on Congested Stages:</strong>
+- UDFs run synchronously within pipeline stages, blocking other processing until completion
+- Heavy-weight UDFs on high-traffic stages (e.g., <code>text_embedder</code>, <code>pdf_extractor</code>) can create bottlenecks
+- A single slow UDF can reduce throughput for the entire pipeline
+- Consider the stage's typical workload when designing UDF complexity</p>
+<p><strong>Stage Selection Strategy:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># ❌ Avoid heavy processing on high-throughput stages</span>
+<span class="n">ingestor</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span>
+    <span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;heavy_ml_processing.py:complex_analysis&quot;</span><span class="p">,</span>
+    <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;text_embedder&quot;</span><span class="p">,</span>  <span class="c1"># High-traffic stage - will slow everything down</span>
+    <span class="n">run_before</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+
+<span class="c1"># ✅ Better: Use less congested stages or run after processing</span>
+<span class="n">ingestor</span><span class="o">.</span><span class="n">udf</span><span class="p">(</span>
+    <span class="n">udf_function</span><span class="o">=</span><span class="s2">&quot;heavy_ml_processing.py:complex_analysis&quot;</span><span class="p">,</span> 
+    <span class="n">target_stage</span><span class="o">=</span><span class="s2">&quot;embedding_storage&quot;</span><span class="p">,</span>  <span class="c1"># Lower-traffic stage</span>
+    <span class="n">run_before</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</code></pre></div></p>
+<h4 id="memory-management">Memory Management</h4>
+<p><strong>Memory Consumption:</strong>
+- UDFs share memory with the pipeline worker processes
+- Excessive memory usage can trigger out-of-memory (OOM) kills
+- Large DataFrame modifications can cause memory spikes
+- Memory leaks in UDFs accumulate over time and destabilize workers</p>
+<p><strong>Best Practices:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># ❌ Memory-intensive operations</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">memory_heavy_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="c1"># Creates large temporary objects</span>
+    <span class="n">large_temp_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">expensive_computation</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">itertuples</span><span class="p">()]</span>
+
+    <span class="c1"># Multiple DataFrame copies</span>
+    <span class="n">df_copy1</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df_copy2</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df_copy3</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">control_message</span>
+
+<span class="c1"># ✅ Memory-efficient approach</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">memory_efficient_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Load model once and reuse (consider caching)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">get_cached_model</span><span class="p">()</span>
+
+        <span class="c1"># Batch processing with error handling</span>
+        <span class="n">batch_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="n">chunk_size</span><span class="p">):</span>
+            <span class="n">chunk</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="n">chunk_size</span><span class="p">]</span>
+            <span class="c1"># Process chunk in-place</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">chunk</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;new_field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">efficient_computation</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">])</span>
+
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch_results</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;UDF failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># Return original message on failure</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Explicit cleanup if needed</span>
+        <span class="n">cleanup_resources</span><span class="p">()</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div></p>
+<h4 id="computational-complexity">Computational Complexity</h4>
+<p><strong>CPU-Intensive Operations:</strong>
+- Complex algorithms can monopolize CPU resources
+- Long-running computations block the pipeline stage
+- Consider computational complexity relative to document size</p>
+<p><strong>I/O Operations:</strong>
+- File system access, network requests, and database queries add latency
+- Synchronous I/O blocks the entire pipeline stage
+- External service dependencies introduce failure points</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># ❌ Blocking I/O in UDF</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">blocking_io_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="c1"># Blocks pipeline for each external call</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;https://api.example.com/process/</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;external_data&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+
+<span class="c1"># ✅ Batch processing with timeouts</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">efficient_io_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="c1"># Batch requests and set reasonable timeouts</span>
+    <span class="n">ids</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+            <span class="s2">&quot;https://api.example.com/batch_process&quot;</span><span class="p">,</span>
+            <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ids&quot;</span><span class="p">:</span> <span class="n">ids</span><span class="p">},</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mf">5.0</span>  <span class="c1"># Prevent hanging</span>
+        <span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+        <span class="c1"># Update DataFrame efficiently</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;external_data&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">RequestException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;External API failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;external_data&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Graceful fallback</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h4 id="system-stability-risks">System Stability Risks</h4>
+<p><strong>Segmentation Faults:</strong>
+- Native library crashes (C extensions) can kill worker processes
+- Segfaults may leave the pipeline in an unstable state
+- Worker restarts cause job failures and processing delays</p>
+<p><strong>Resource Exhaustion:</strong>
+- File descriptor leaks from unclosed resources
+- Thread pool exhaustion from concurrent operations</p>
+<p><strong>Common Stability Issues:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1"># ❌ Potential stability risks</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">risky_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UDF with potential stability risks.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> documents&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Load model repeatedly (memory intensive)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">load_large_ml_model</span><span class="p">()</span>
+
+        <span class="c1"># Native library calls without error handling</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">unsafe_native_function</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">])</span>  <span class="c1"># Could segfault</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;result&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;UDF processing completed successfully&quot;</span><span class="p">)</span>
+        <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;UDF failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Return original message on failure</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># No explicit cleanup</span>
+        <span class="k">pass</span>
+
+<span class="c1"># ✅ Stable approach with resource management</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">stable_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UDF with proper resource management.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> documents&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Load model once and reuse (consider caching)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">get_cached_model</span><span class="p">()</span>
+
+        <span class="c1"># Batch processing with error handling</span>
+        <span class="n">batch_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="n">chunk_size</span><span class="p">):</span>
+            <span class="n">chunk</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="n">chunk_size</span><span class="p">]</span>
+            <span class="c1"># Process chunk in-place</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">chunk</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;new_field&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">efficient_computation</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">idx</span><span class="p">,</span> <span class="s1">&#39;content&#39;</span><span class="p">])</span>
+
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch_results</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;UDF processing completed successfully&quot;</span><span class="p">)</span>
+        <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;UDF failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Return original message on failure</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Explicit cleanup if needed</span>
+        <span class="n">cleanup_resources</span><span class="p">()</span>
+</code></pre></div></p>
+<h4 id="performance-monitoring">Performance Monitoring</h4>
+<p><strong>Key Metrics to Monitor:</strong>
+- UDF execution time per document
+- Memory usage during UDF execution
+- Pipeline stage throughput before/after UDF deployment
+- Worker process restart frequency
+- Job failure rates</p>
+<p><strong>Profiling UDFs:</strong>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">psutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">profiled_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UDF with profiling.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">start_memory</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">()</span><span class="o">.</span><span class="n">memory_info</span><span class="p">()</span><span class="o">.</span><span class="n">rss</span> <span class="o">/</span> <span class="mi">1024</span> <span class="o">/</span> <span class="mi">1024</span>  <span class="c1"># MB</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">()</span>
+
+    <span class="c1"># Your UDF logic here</span>
+    <span class="c1"># ... processing ...</span>
+
+    <span class="n">end_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">end_memory</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">()</span><span class="o">.</span><span class="n">memory_info</span><span class="p">()</span><span class="o">.</span><span class="n">rss</span> <span class="o">/</span> <span class="mi">1024</span> <span class="o">/</span> <span class="mi">1024</span>  <span class="c1"># MB</span>
+
+    <span class="n">execution_time</span> <span class="o">=</span> <span class="n">end_time</span> <span class="o">-</span> <span class="n">start_time</span>
+    <span class="n">memory_delta</span> <span class="o">=</span> <span class="n">end_memory</span> <span class="o">-</span> <span class="n">start_memory</span>
+
+    <span class="k">if</span> <span class="n">execution_time</span> <span class="o">&gt;</span> <span class="mf">5.0</span><span class="p">:</span>  <span class="c1"># Log slow UDFs</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slow UDF execution: </span><span class="si">{</span><span class="n">execution_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">memory_delta</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>  <span class="c1"># Log high memory usage</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;High memory usage: </span><span class="si">{</span><span class="n">memory_delta</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">MB&quot;</span><span class="p">)</span>
+
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div></p>
+<h4 id="recommendations">Recommendations</h4>
+<p><strong>Development Guidelines:</strong>
+1. <strong>Profile Early:</strong> Test UDFs with realistic data volumes
+2. <strong>Optimize for Stage:</strong> Consider the target stage's typical workload
+3. <strong>Limit Complexity:</strong> Keep UDFs focused and lightweight
+4. <strong>Handle Errors:</strong> Implement graceful fallbacks for external dependencies
+5. <strong>Monitor Impact:</strong> Track pipeline performance after UDF deployment</p>
+<p><strong>Production Deployment:</strong>
+1. <strong>Gradual Rollout:</strong> Deploy UDFs to a subset of documents first
+2. <strong>Resource Limits:</strong> Set appropriate memory and CPU limits
+3. <strong>Monitoring:</strong> Implement alerting for performance degradation
+4. <strong>Rollback Plan:</strong> Have a quick way to disable problematic UDFs</p>
+<p><strong>When to Avoid UDFs:</strong>
+- For simple metadata additions that could be done post-processing
+- When external service dependencies are unreliable
+- For computationally expensive operations that could be batched offline
+- When the processing logic changes frequently</p>
+<p>Remember: UDFs are powerful but should be used judiciously. Poor UDF design can significantly impact the entire pipeline's performance and stability.</p>
+<h3 id="debugging-and-testing">Debugging and Testing</h3>
+<h2 id="global-udf-control">Global UDF Control</h2>
+<p>You can globally disable all UDF processing using an environment variable:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Disable all UDF execution across the entire pipeline</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span><span class="m">1</span>
+</code></pre></div>
+<p><strong>When to Use:</strong>
+Setting <code>INGEST_DISABLE_UDF_PROCESSING</code> to any non-empty value will disable all UDF processing across the entire pipeline. This is useful for:</p>
+<ul>
+<li><strong>Debugging:</strong> Isolate pipeline issues by removing UDF interference</li>
+<li><strong>Performance Testing:</strong> Measure baseline pipeline throughput without UDF overhead</li>
+<li><strong>Emergency Situations:</strong> Quickly disable UDFs causing instability or crashes</li>
+<li><strong>Maintenance:</strong> Temporary bypass during troubleshooting or system updates</li>
+<li><strong>Rollback:</strong> Quick way to disable problematic UDFs in production</li>
+</ul>
+<p><strong>Behavior:</strong>
+When disabled, all UDF tasks remain in control messages but are not executed. The pipeline runs normally without any UDF processing overhead, allowing you to verify that issues are UDF-related.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Examples of values that disable UDF processing</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span><span class="m">1</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span><span class="nb">true</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span>disable
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span>any_non_empty_value
+
+<span class="c1"># UDF processing is enabled (default behavior)</span>
+<span class="nb">unset</span><span class="w"> </span>INGEST_DISABLE_UDF_PROCESSING
+<span class="c1"># OR</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INGEST_DISABLE_UDF_PROCESSING</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+</code></pre></div>
+<h2 id="testing-udfs">Testing UDFs</h2>
+<p>When developing and testing UDFs, consider these approaches:</p>
+<h3 id="local-testing">Local Testing</h3>
+<p>Test your UDF functions in isolation before deploying them to the pipeline:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nemo_retriever.internal.primitives.ingest_control_message</span><span class="w"> </span><span class="kn">import</span> <span class="n">IngestControlMessage</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_my_udf</span><span class="p">():</span>
+    <span class="c1"># Create test data</span>
+    <span class="n">test_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;test document 1&#39;</span><span class="p">,</span> <span class="s1">&#39;test document 2&#39;</span><span class="p">],</span>
+        <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">[{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="s1">&#39;test1&#39;</span><span class="p">},</span> <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="s1">&#39;test2&#39;</span><span class="p">}]</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Create control message</span>
+    <span class="n">control_message</span> <span class="o">=</span> <span class="n">IngestControlMessage</span><span class="p">()</span>
+    <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">test_df</span><span class="p">)</span>
+
+    <span class="c1"># Test your UDF</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">my_custom_processor</span><span class="p">(</span><span class="n">control_message</span><span class="p">)</span>
+
+    <span class="c1"># Verify results</span>
+    <span class="n">result_df</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">result_df</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="s1">&#39;custom_field&#39;</span> <span class="ow">in</span> <span class="n">result_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+
+<span class="c1"># Run the test</span>
+<span class="n">test_my_udf</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="pipeline-integration-testing">Pipeline Integration Testing</h3>
+<p>Test UDFs in a controlled pipeline environment:</p>
+<ol>
+<li><strong>Start with small datasets</strong> to verify basic functionality</li>
+<li><strong>Use the disable flag</strong> to compare pipeline behavior with/without UDFs</li>
+<li><strong>Monitor resource usage</strong> during UDF execution</li>
+<li><strong>Test error scenarios</strong> to ensure graceful failure handling</li>
+</ol>
+<h3 id="common-debugging-techniques">Common Debugging Techniques</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">debug_udf</span><span class="p">(</span><span class="n">control_message</span><span class="p">:</span> <span class="n">IngestControlMessage</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IngestControlMessage</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UDF with comprehensive debugging.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">control_message</span><span class="o">.</span><span class="n">get_payload</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> documents&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Log input data structure</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DataFrame columns: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sample row: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Your processing logic here</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing row </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;content&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)[:</span><span class="mi">50</span><span class="p">]</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="c1"># ... your logic ...</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;UDF processing completed successfully&quot;</span><span class="p">)</span>
+        <span class="n">control_message</span><span class="o">.</span><span class="n">payload</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;UDF failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Return original message on failure</span>
+        <span class="k">return</span> <span class="n">control_message</span>
+</code></pre></div>
+<h2 id="related-topics">Related Topics</h2>
+<ul>
+<li><a href="https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md">NeMo Retriever UDF Examples</a></li>
+<li><a href="../user-defined-stages/">User-Defined Stages for NeMo Retriever Library</a></li>
+<li><a href="../nimclient/">NimClient Usage</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+
+    
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../ray-logging/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Configure Ray Logging">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Configure Ray Logging
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../user-defined-stages/" class="md-footer__link md-footer__link--next" aria-label="Next: Add User-defined Stages">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Add User-defined Stages
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; Copyright 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/NVIDIA/nv-ingest/" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+
+    <script type="text/javascript">if (typeof _satellite !== "undefined") {_satellite.pageBottom();}</script>
+ 
+
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.annotate", "navigation.tabs", "navigation.indexes", "navigation.instant", "navigation.path", "navigation.instant.prefetch", "navigation.top", "navigation.footer", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
