@@ -13,6 +13,10 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
+from nv_ingest_api.data_handlers.data_writer import (
+    IngestDataWriter,
+    RedisDestinationConfig,
+)
 
 from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
@@ -86,6 +90,10 @@ class MessageBrokerTaskSinkStage(RayActorStage):
 
         # Create the appropriate broker client (e.g., Redis or Simple).
         self.client = self._create_client()
+
+        # Create the data writer for external system outputs (Redis routing)
+        self.data_writer = IngestDataWriter.get_instance(max_workers=4)
+
         self.start_time = None
         self.message_count = 0
 
@@ -187,21 +195,41 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         """
         Pushes JSON payloads to the broker channel, retrying on failure.
         """
+        # Validate payload sizes
         for payload in json_payloads:
-            payload_size = sys.getsizeof(payload)
+            payload_size = len(payload.encode("utf-8"))
             size_limit = 2**28  # 256 MB
             if payload_size > size_limit:
                 raise ValueError(f"Payload size {payload_size} exceeds limit of {size_limit / 1e6} MB.")
-        for attempt in range(retry_count):
-            try:
-                for payload in json_payloads:
-                    self.client.submit_message(response_channel, payload)
-                logger.debug(f"Sink forwarded message to channel '{response_channel}'.")
-                return
-            except ValueError as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
-                if attempt == retry_count - 1:
-                    raise
+
+        # Route via data_writer to Redis
+        broker_config = self.config.broker_client
+        dest_config = RedisDestinationConfig(
+            host=getattr(broker_config, "host", "localhost"),
+            port=getattr(broker_config, "port", 6379),
+            db=getattr(getattr(broker_config, "broker_params", broker_config), "db", 0),
+            password=None,
+            channel=response_channel,
+        )
+
+        # Add lightweight callbacks for observability
+        def _on_success(data, cfg):
+            logger.debug("Published %d fragment(s) to Redis channel '%s'", len(data), getattr(cfg, "channel", "?"))
+
+        def _on_failure(data, cfg, exc):
+            logger.exception(
+                "Failed publishing %d fragment(s) to Redis channel '%s': %s",
+                len(data),
+                getattr(cfg, "channel", "?"),
+                exc,
+            )
+
+        self.data_writer.write_async(
+            json_payloads,
+            dest_config,
+            on_success=_on_success,
+            on_failure=_on_failure,
+        )
 
     def _handle_failure(
         self, response_channel: str, json_result_fragments: List[Dict[str, Any]], e: Exception, mdf_size: int
@@ -216,13 +244,22 @@ class MessageBrokerTaskSinkStage(RayActorStage):
         )
         logger.error(error_description)
         fail_msg = {
-            "data": None,
+            "data": [],
             "status": "failed",
             "description": error_description,
             "trace": json_result_fragments[0].get("trace", {}) if json_result_fragments else {},
         }
 
-        self.client.submit_message(response_channel, json.dumps(fail_msg))
+        # Use data_writer to post failure back to Redis
+        broker_config = self.config.broker_client
+        dest_config = RedisDestinationConfig(
+            host=getattr(broker_config, "host", "localhost"),
+            port=getattr(broker_config, "port", 6379),
+            db=getattr(getattr(broker_config, "broker_params", broker_config), "db", 0),
+            password=None,
+            channel=response_channel,
+        )
+        self.data_writer.write_async([json.dumps(fail_msg)], dest_config)
 
     # --- Public API Methods for message broker sink ---
 
