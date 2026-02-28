@@ -1,20 +1,20 @@
-# Use the NeMo Retriever Library Python API
+# Python API Reference
 
 The [NeMo Retriever Library](overview.md) Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    This library is the NeMo Retriever Library.
 
 !!! tip
 
-    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Summary of Key Methods
 
-The main class in the Python API is `Ingestor`. 
-The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
+The main class in the NeMo Retriever Library Python API is `Ingestor`.
+The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking.
 
 ### Ingestor Methods
 
@@ -31,7 +31,7 @@ The following table describes methods of the `Ingestor` class.
 | `save_to_disk` | Save ingestion results to disk instead of memory. |
 | `store`        | Persist extracted images/structured renderings to an fsspec-compatible backend. |
 | `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `vdb_upload`   | Push extraction results to the vector database (LanceDB by default, or Milvus). For more information, refer to [Data Upload](data-store.md). |
+| `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
 
 
 ### Extract Method Options
@@ -65,7 +65,7 @@ The caption task can call a vision-language model (VLM) with the following optio
 
 Example:
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -83,7 +83,7 @@ ingestor = (
 
 ## Track Job Progress
 
-For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+For large document batches, you can enable a progress bar by setting `show_progress` to true.
 Use the following code.
 
 ```python
@@ -97,7 +97,7 @@ print(len(results), "successful documents")
 
 ## Capture Job Failures
 
-You can capture job failures by setting `return_failures` to true. 
+You can capture job failures by setting `return_failures` to true.
 Use the following code.
 
 ```python
@@ -110,14 +110,14 @@ if failures:
     print("Failures:", failures[:1])
 ```
 
-When you use the `vdb_upload` method, uploads are performed after ingestion completes. 
+When you use the `vdb_upload` method, uploads are performed after ingestion completes.
 The behavior of the upload depends on the following values of `return_failures`:
 
 - **False** – If any job fails, the `ingest` method raises a runtime error and does not upload any data (all-or-nothing data upload). This is the default setting.
 - **True** – If any jobs succeed, the results from those jobs are uploaded, and no errors are raised (partial data upload). The `ingest` method returns a failures object that contains the details for any jobs that failed. You can inspect the failures object and selectively retry or remediate the failed jobs.
 
 
-The following example uploads data to the vector database (LanceDB by default; use `milvus_uri` for Milvus) and returns any failures.
+The following example uploads data to Milvus and returns any failures.
 
 ```python
 ingestor = (
@@ -149,7 +149,7 @@ The `extract` method enables different types of data to be extracted.
 Use the following code to extract a single PDF file.
 
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 # Initialize Ingestor with a local PDF file
 ingestor = Ingestor().files("path/to/document.pdf")
@@ -176,7 +176,7 @@ for doc in result:
 
 ### Extract Specific Elements from PDFs
 
-By default, the `extract` method extracts all supported content types. 
+By default, the `extract` method extracts all supported content types.
 You can customize the extraction behavior by using the following code.
 
 ```python
@@ -221,7 +221,7 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Extract Office Documents (DOCX and PPTX)
 
-NeMo Retriever Library offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
+The NeMo Retriever Library offers the following two extraction methods for Microsoft Office documents (.docx and .pptx), to balance performance and layout fidelity:
 
 - Native extraction
 - Render as PDF
@@ -257,8 +257,8 @@ ingestor = ingestor.extract(
 
 ### PDF Extraction Strategies
 
-NeMo Retriever Library offers specialized strategies for PDF processing to handle various document qualities.
-You can select the strategy by using the following `extract_method` parameter values. 
+The NeMo Retriever Library offers specialized strategies for PDF processing to handle various document qualities.
+You can select the strategy by using the following `extract_method` parameter values.
 For the full list of `extract_method` options, refer to [Extract Method Options](#extract-method-options).
 
 - **ocr** – Bypasses native text extraction and processes every page using the full OCR pipeline. Use this for fully scanned documents or when native text is corrupt.
@@ -280,18 +280,18 @@ results = ingestor.ingest()
 
 ## Work with Large Datasets: Save to Disk
 
-By default, NeMo Retriever Library stores the results from every document in system memory (RAM). 
-When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error. 
+By default, the NeMo Retriever Library stores the results from every document in system memory (RAM).
+When you process a very large dataset with thousands of documents, you might encounter an Out-of-Memory (OOM) error.
 The `save_to_disk` method configures the extraction pipeline to write the output for each document to a separate JSONL file on disk.
 
 
 ### Basic Usage: Save to a Directory
 
 To save results to disk, simply chain the `save_to_disk` method to your ingestion task.
-By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects, 
+By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects,
 which are memory-efficient proxies that read from the result files on disk.
 
-In the following example, the results are saved to a directory named `my_ingest_results`. 
+In the following example, the results are saved to a directory named `my_ingest_results`.
 You are responsible for managing the created files.
 
 ```python
@@ -310,8 +310,8 @@ print("Ingestion results saved in ./my_ingest_results")
 
 ### Managing Disk Space with Automatic Cleanup
 
-When you use `save_to_disk`, NeMo Retriever Library creates intermediate files. 
-For workflows where these files are temporary, NeMo Retriever Library provides two automatic cleanup mechanisms.
+When you use `save_to_disk`, the NeMo Retriever Library creates intermediate files.
+For workflows where these files are temporary, the NeMo Retriever Library provides two automatic cleanup mechanisms.
 
 - **Directory Cleanup with Context Manager** — While not required for general use, the Ingestor can be used as a context manager (`with` statement). This enables the automatic cleanup of the entire output directory when `save_to_disk(cleanup=True)` is set (which is the default).
 
@@ -322,12 +322,12 @@ You can also configure the output directory by using the `NV_INGEST_CLIENT_SAVE_
 
 #### Example (Fully Automatic Cleanup)
 
-Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed. 
+Fully Automatic cleanup is the recommended pattern for ingest-and-upload workflows where the intermediate files are no longer needed.
 The entire process is temporary, and no files are left on disk.
-The following example includes automatic file purge. 
+The following example includes automatic file purge.
 
 ```python
-# After the 'with' block finishes, 
+# After the 'with' block finishes,
 # the temporary directory and all its contents are automatically deleted.
 
 with (
@@ -345,11 +345,11 @@ with (
 
 #### Example (Preserve Results on Disk)
 
-In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features. 
-The following example disables automatic file purge. 
+In scenarios where you need to inspect or use the intermediate `jsonl` files, you can disable the cleanup features.
+The following example disables automatic file purge.
 
 ```python
-# After the 'with' block finishes, 
+# After the 'with' block finishes,
 # the './permanent_results' directory and all jsonl files are preserved for inspection or other uses.
 
 with (
@@ -367,7 +367,7 @@ with (
 
 ## Extract Captions from Images
 
-The `caption` method generates image captions by using a VLM. 
+The `caption` method generates image captions by using a VLM.
 You can use this to generate descriptions of unstructured images, infographics, and other visual content extracted from documents.
 
 !!! note
@@ -433,7 +433,7 @@ The caption task can call a VLM with optional prompt and system prompt overrides
 
 Example:
 ```python
-from nv_ingest_client.client.interface import Ingestor
+from nemo_retriever.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -451,7 +451,7 @@ ingestor = (
 
 ## Extract Embeddings
 
-The `embed` method in the library generates text embeddings for document content.
+The `embed` method in the NeMo Retriever Library generates text embeddings for document content.
 
 ```python
 ingestor = ingestor.embed()
@@ -503,17 +503,17 @@ The `store` task uses [fsspec](https://filesystem-spec.readthedocs.io/) for stor
 | Amazon S3 | `s3://` | `s3://my-bucket/extracted-images` |
 | Google Cloud Storage | `gs://` | `gs://my-bucket/images` |
 | Azure Blob Storage | `abfs://` | `abfs://container@account.dfs.core.windows.net/images` |
-| MinIO (S3-compatible) | `s3://` | `s3://nv-ingest/artifacts/store/images` (default) |
+| MinIO (S3-compatible) | `s3://` | `s3://nemo-retriever/artifacts/store/images` (default) |
 
 !!! tip
 
-    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nv-ingest/...`). If you change that variable—for example to a host-mounted `file://` path—restart the runtime so the container picks up the new value.
+    `storage_uri` defaults to the server-side `IMAGE_STORAGE_URI` environment variable (commonly `s3://nemo-retriever/...`). If you change that variable—for example to a host-mounted `file://` path—restart the NeMo Retriever Library runtime so the container picks up the new value.
 
 When `public_base_url` is provided, the metadata returned from `ingest()` surfaces that HTTP(S) link while still recording the underlying storage URI. Leave it unset when the storage endpoint itself is already publicly reachable.
 
 ### Docker Volume Mounts for Local Storage
 
-When running the pipeline via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
+When running the NeMo Retriever Library via Docker and using `file://` storage URIs, the path must be within a mounted volume for files to persist on the host machine.
 
 By default, the `docker-compose.yaml` mounts a single volume:
 
@@ -545,18 +545,18 @@ ingestor = ingestor.store(
 
 ```bash
 # Set DATASET_ROOT before starting services
-export DATASET_ROOT=/raid/my-project/nv-ingest-data
+export DATASET_ROOT=/raid/my-project/nemo-retriever-data
 docker compose up -d
 ```
 
 ```python
-# Now /workspace/data maps to /raid/my-project/nv-ingest-data
+# Now /workspace/data maps to /raid/my-project/nemo-retriever-data
 ingestor = ingestor.store(
     structured=True,
     images=True,
     storage_uri="file:///workspace/data/extracted-images"
 )
-# Files save to /raid/my-project/nv-ingest-data/extracted-images on host
+# Files save to /raid/my-project/nemo-retriever-data/extracted-images on host
 ```
 
 For more information on environment variables, refer to [Environment Variables](environment-config.md).
@@ -568,7 +568,7 @@ For more information on environment variables, refer to [Environment Variables](
 Use the following code to extract mp3 audio content.
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nemo_retriever.client import Ingestor
 
 ingestor = Ingestor().files("audio_file.mp3")
 
@@ -594,7 +594,7 @@ results = ingestor.ingest()
 ## Related Topics
 
 - [Split Documents](chunking.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
 - [Advanced Visual Parsing](nemoretriever-parse.md)
-- [Use NeMo Retriever Library with Riva for Audio Processing](audio.md)
+- [Use the NeMo Retriever Library with Riva for Audio Processing](audio.md)
 - [Use Multimodal Embedding](vlm-embed.md)

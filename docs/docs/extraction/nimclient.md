@@ -5,14 +5,14 @@ This documentation demonstrates how to create custom NIM integrations for use in
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    This library is the NeMo Retriever Library.
 
 The NimClient architecture consists of two main components:
 
 1. **NimClient**: The client class that handles communication with NIM endpoints via gRPC or HTTP protocols
 2. **ModelInterface**: An abstract base class that defines how to format input data, parse output responses, and process inference results for specific models
 
-For advanced usage patterns, see the existing model interfaces in `api/src/nv_ingest_api/internal/primitives/nim/model_interface/`.
+For advanced usage patterns, see the existing model interfaces in `api/src/nemo_retriever/internal/primitives/nim/model_interface/`.
 
 
 ## Quick Start
@@ -20,8 +20,8 @@ For advanced usage patterns, see the existing model interfaces in `api/src/nv_in
 ### Basic NimClient Creation
 
 ```python
-from nv_ingest_api.util.nim import create_inference_client
-from nv_ingest_api.internal.primitives.nim import ModelInterface
+from nemo_retriever.util.nim import create_inference_client
+from nemo_retriever.internal.primitives.nim import ModelInterface
 
 # Create a custom model interface (see examples below)
 model_interface = MyCustomModelInterface()
@@ -48,7 +48,7 @@ results = client.infer(data, model_name="your-model-name")
 
 ```python
 import os
-from nv_ingest_api.util.nim import create_inference_client
+from nemo_retriever.util.nim import create_inference_client
 
 # Use environment variables for configuration
 auth_token = os.getenv("NGC_API_KEY")
@@ -71,7 +71,7 @@ To integrate a new NIM, you need to create a custom `ModelInterface` subclass th
 ```python
 from typing import Dict, Any, List, Tuple, Optional
 import numpy as np
-from nv_ingest_api.internal.primitives.nim import ModelInterface
+from nemo_retriever.internal.primitives.nim import ModelInterface
 
 class MyCustomModelInterface(ModelInterface):
     """
@@ -305,7 +305,7 @@ class TextGenerationModelInterface(ModelInterface):
 
 ```python
 import base64
-from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
+from nemo_retriever.util.image_processing.transforms import numpy_to_base64
 
 class ImageAnalysisModelInterface(ModelInterface):
     """Interface for image analysis NIMs (e.g., vision models)."""
@@ -382,8 +382,8 @@ class ImageAnalysisModelInterface(ModelInterface):
 ### Basic UDF with NimClient
 
 ```python
-from nv_ingest_api.internal.primitives.control_message import IngestControlMessage
-from nv_ingest_api.util.nim import create_inference_client
+from nemo_retriever.internal.primitives.control_message import IngestControlMessage
+from nemo_retriever.util.nim import create_inference_client
 import os
 
 def analyze_document_with_nim(control_message: IngestControlMessage) -> IngestControlMessage:
@@ -570,7 +570,7 @@ If memory issues persist, you can reduce the `NIM_TRITON_RATE_LIMIT` value — e
 import logging
 
 # Enable debug logging
-logging.getLogger("nv_ingest_api.internal.primitives.nim").setLevel(logging.DEBUG)
+logging.getLogger("nemo_retriever.internal.primitives.nim").setLevel(logging.DEBUG)
 
 # Test your model interface separately
 model_interface = MyCustomModelInterface()

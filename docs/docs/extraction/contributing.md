@@ -1,4 +1,4 @@
-# Contributing to NV-Ingest
+# Contributing to NeMo Retriever
 
-External contributions to NV-Ingest will be welcome soon, and they are greatly appreciated! 
-For more information, refer to [Contributing to NV-Ingest](https://github.com/NVIDIA/nv-ingest/blob/main/CONTRIBUTING.md).
+External contributions to NeMo Retriever will be welcome soon, and they are greatly appreciated! 
+For more information, refer to [Contributing to NeMo Retriever](https://github.com/NVIDIA/NeMo-Retriever/blob/main/CONTRIBUTING.md).

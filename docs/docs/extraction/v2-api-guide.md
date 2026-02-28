@@ -29,7 +29,7 @@ The V2 API automatically splits large PDFs into smaller chunks before processing
 ### Minimal Example
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nemo_retriever.client import Ingestor
 
 # Two-step configuration
 ingestor = Ingestor(
@@ -50,7 +50,7 @@ print(f"Processed {results['metadata']['total_pages']} pages")
 ### CLI Usage
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --api_version v2 \
   --pdf_split_page_count 64 \
   --doc large_document.pdf \
@@ -114,7 +114,7 @@ PDF_SPLIT_PAGE_COUNT=64
 ```yaml
 # docker-compose.yaml (already configured)
 services:
-  nv-ingest-ms-runtime:
+  nemo-retriever-ms-runtime:
     environment:
       - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
 ```
@@ -370,11 +370,11 @@ ingestor = Ingestor(
 
 ### Test Script Pattern
 
-For test scripts like `tools/harness/src/nv_ingest_harness/cases/e2e.py`:
+For test scripts like `tools/harness/src/nemo_retriever_harness/cases/e2e.py`:
 
 ```python
 import os
-from nv_ingest_client.client import Ingestor
+from nemo_retriever.client import Ingestor
 
 # Read from environment
 api_version = os.getenv("API_VERSION", "v1")
@@ -469,16 +469,16 @@ WARNING: Client requested split_page_count=1000; clamped to 128
 ### Key Files
 
 **Server Implementation:**
-- `src/nv_ingest/api/v2/ingest.py` - V2 endpoints
-- `src/nv_ingest/framework/util/service/impl/ingest/redis_ingest_service.py` - Redis state management
+- `src/nemo_retriever/api/v2/ingest.py` - V2 endpoints
+- `src/nemo_retriever/framework/util/service/impl/ingest/redis_ingest_service.py` - Redis state management
 
 **Client Implementation:**
-- `client/src/nv_ingest_client/client/interface.py` - Ingestor class
-- `client/src/nv_ingest_client/util/util.py` - Configuration utilities
-- `client/src/nv_ingest_client/client/ingest_job_handler.py` - Job handling
+- `client/src/nemo_retriever/client/interface.py` - Ingestor class
+- `client/src/nemo_retriever/util/util.py` - Configuration utilities
+- `client/src/nemo_retriever/client/ingest_job_handler.py` - Job handling
 
 **Schemas:**
-- `api/src/nv_ingest_api/internal/schemas/meta/ingest_job_schema.py` - PdfConfigSchema
+- `api/src/nemo_retriever/internal/schemas/meta/ingest_job_schema.py` - PdfConfigSchema
 
 ---
 

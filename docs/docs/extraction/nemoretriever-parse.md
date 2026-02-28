@@ -12,14 +12,14 @@ to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    This library is the NeMo Retriever Library.
 
 
 ## Limitations
 
-Currently, the limitations to using `nemotron-parse` with NeMo Retriever Library are the following:
+Currently, the limitations to using `nemotron-parse` with the NeMo Retriever Library are the following:
 
-- Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+- Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot NeMo Retriever Library](troubleshoot.md).
 - `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).
 
 
@@ -32,7 +32,7 @@ Use the following procedure to run the NIM locally.
     Due to limitations in available VRAM controls in the current release of nemotron-parse, it must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set nemotron-parse's device_id to a dedicated GPU: device_ids: ["1"] or higher.
 
 
-1. Start the retriever services with the `nemotron-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
+1. Start the NeMo Retriever services with the `nemotron-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
 
     - The --profile nemotron-parse flag ensures that vision-language retrieval services are launched.  For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
@@ -40,11 +40,11 @@ Use the following procedure to run the NIM locally.
     docker compose --profile nemotron-parse up
     ```
 
-2. After the services are running, you can interact with the pipeline by using Python.
+2. After the services are running, you can interact with NeMo Retriever by using Python.
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells the pipeline to use `nemotron-parse` for extracting text and metadata from images.
+    - The `extract` method tells NeMo Retriever to use `nemotron-parse` for extracting text and metadata from images.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -60,12 +60,12 @@ Use the following procedure to run the NIM locally.
 
     !!! tip
 
-        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+        For more Python examples, refer to [NeMo Retriever: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Using NVCF Endpoints for Cloud-Based Inference
 
-Instead of running the pipeline locally, you can use NVCF to perform inference by using remote endpoints.
+Instead of running NeMo Retriever locally, you can use NVCF to perform inference by using remote endpoints.
 
 1. Set the authentication token in the `.env` file.
 
@@ -85,7 +85,7 @@ Instead of running the pipeline locally, you can use NVCF to perform inference b
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells the pipeline to use `nemotron-parse` for extracting text and metadata from images.
+    - The `extract` method tells NeMo Retriever to use `nemotron-parse` for extracting text and metadata from images.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -101,12 +101,12 @@ Instead of running the pipeline locally, you can use NVCF to perform inference b
 
     !!! tip
 
-        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+        For more Python examples, refer to [NeMo Retriever: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the Python API](nv-ingest-python-api.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
+- [Use the NeMo Retriever Python API](python-api-reference.md)

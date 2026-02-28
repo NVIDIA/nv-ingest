@@ -9,7 +9,7 @@ to extract speech from audio files.
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    NVIDIA Ingest and nv-ingest is now known as the NeMo Retriever Library.
 
 Currently, you can extract speech from the following file types:
 
@@ -22,8 +22,8 @@ Currently, you can extract speech from the following file types:
 
 [NeMo Retriever Library](overview.md) supports extracting speech from audio files for Retrieval Augmented Generation (RAG) applications. 
 Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
-NeMo Retriever leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
-to transcribe speech to text, which is then embedded by using the NeMo Retriever embedding NIM. 
+NeMo Retriever Library leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
+to transcribe speech to text, which is then embedded by using the Nemotron embedding NIM. 
 
 !!! important
 
@@ -62,17 +62,17 @@ Use the following procedure to run the NIM locally.
     NGC_API_KEY=<your-ngc-key>
     ```
 
-3. Start the retriever services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command. The `--profile audio` flag ensures that speech-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
+3. Start the NeMo Retriever Library services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command. The `--profile audio` flag ensures that speech-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
     ```shell
     docker compose --profile retrieval --profile audio up
     ```
 
-4. After the services are running, you can interact with the pipeline by using Python.
+4. After the services are running, you can interact with NeMo Retriever Library by using Python.
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells the pipeline to extract information from WAV audio files.
+    - The `extract` method tells NeMo Retriever Library to extract information from WAV audio files.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -89,12 +89,12 @@ Use the following procedure to run the NIM locally.
 
     !!! tip
 
-        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+        For more Python examples, refer to [NeMo Retriever Library: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Use NVCF Endpoints for Cloud-Based Inference
 
-Instead of running the pipeline locally, you can use NVCF to perform inference by using remote endpoints.
+Instead of running NeMo Retriever Library locally, you can use NVCF to perform inference by using remote endpoints.
 
 1. NVCF requires an authentication token and a function ID for access. Ensure you have these credentials ready before making API calls.
 
@@ -102,7 +102,7 @@ Instead of running the pipeline locally, you can use NVCF to perform inference b
 
     - The `Ingestor` object initializes the ingestion process.
     - The `files` method specifies the input files to process.
-    - The `extract` method tells the pipeline to extract information from WAV audio files.
+    - The `extract` method tells NeMo Retriever Library to extract information from WAV audio files.
     - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
     ```python
@@ -124,12 +124,12 @@ Instead of running the pipeline locally, you can use NVCF to perform inference b
 
     !!! tip
 
-        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+        For more Python examples, refer to [NeMo Retriever Library: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Troubleshoot Nemo Retriever Extraction](troubleshoot.md)
-- [Use the Python API](nv-ingest-python-api.md)
+- [Troubleshoot NeMo Retriever Library](troubleshoot.md)
+- [Use the NeMo Retriever Library Python API](python-api-reference.md)

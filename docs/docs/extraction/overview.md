@@ -6,21 +6,21 @@ to find, contextualize, and extract text, tables, charts and infographics that y
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    This library is the NeMo Retriever Library.
 
 NeMo Retriever Library enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever Library can optionally manage computation of embeddings for the extracted content, 
-and optionally manage storing into a vector database ([LanceDB](https://lancedb.com/) by default, or [Milvus](https://milvus.io/)).
+and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 !!! note
 
-    Cached and Deplot are deprecated. Instead, NeMo Retriever Library now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Library on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Library 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+    Cached and Deplot are deprecated. Instead, NeMo Retriever Library now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Library on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Library 24.12.1 release](https://github.com/NVIDIA/NeMo-Retriever/tree/24.12.1).
 
 
 
 ## What NeMo Retriever Library Is ✔️
 
-The following diagram shows the retriever pipeline.
+The following diagram shows the NeMo Retriever Library pipeline.
 
 ![Overview diagram](images/overview-extraction.png)
 

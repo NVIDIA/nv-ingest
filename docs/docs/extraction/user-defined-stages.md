@@ -8,7 +8,7 @@ and operate on a well-defined DataFrame payload and metadata structure.
 
 !!! note
 
-    NeMo Retriever Library is also known as NVIDIA Ingest.
+    This library is the NeMo Retriever Library.
 
 
 To add user-defined stages to your pipeline, you need the following:
@@ -21,7 +21,7 @@ To add user-defined stages to your pipeline, you need the following:
 
 - **A DataFrame payload** — The `control_message.payload` field must be a [pandas.DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html). For more information, refer to [Create a DataFrame Payload](#create-a-dataframe-payload).
 
-- **Valid metadata** — The `metadata` field must conform to the [content metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
+- **Valid metadata** — The `metadata` field must conform to the [NeMo Retriever metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
 
 
 
@@ -44,8 +44,8 @@ The following example demonstrates how to create a valid Lambda function and con
 ```python
 import pandas as pd
 from pydantic import BaseModel
-from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
-from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
+from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
+from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
 
 # Config schema for your stage
 class MyToyConfig(BaseModel):
@@ -160,13 +160,13 @@ When the pipeline runs it does the following:
 ## Update and Validate Metadata
 
 The `metadata` column in each row is a dictionary (JSON object), 
-and must conform to the [content metadata schema](content-metadata.md). 
+and must conform to the [NeMo Retriever metadata schema](content-metadata.md). 
 
 After you change any metadata, you can validate it by using the `validate_metadata` function 
 as demonstrated in the following code example.
 
 ```python
-from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
+from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
 
 def edit_metadata(control_message: IngestControlMessage, stage_config: MyToyConfig) -> IngestControlMessage:
   df = control_message.payload()
@@ -235,8 +235,8 @@ The  following example adds user-defined stages to your NeMo Retriever Library p
     ```python
     # my_pipeline/stages.py
     from pydantic import BaseModel
-    from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
-    from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
+    from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
+    from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
 
     class DoubleConfig(BaseModel):
     multiply_by: int = 2
