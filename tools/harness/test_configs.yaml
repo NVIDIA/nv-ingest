@@ -18,6 +18,7 @@ active:
   # Docker Compose configuration
   compose:
     profiles:
+      - table-structure # Required for table structure extraction in 25.9.0
       - retrieval
       - reranker  # Required for recall evaluation
 
