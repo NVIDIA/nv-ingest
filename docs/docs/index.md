@@ -1,13 +1,13 @@
-# What is NVIDIA NeMo Retriever?
+# What is NVIDIA NeMo Retriever Library?
 
-NVIDIA NeMo Retriever is a collection of microservices 
+NVIDIA NeMo Retriever Library is a collection of microservices 
 for building and scaling multimodal data extraction, embedding, and reranking pipelines 
 with high accuracy and maximum data privacy – built with NVIDIA NIM. 
-NeMo Retriever, part of the [NVIDIA NeMo](https://www.nvidia.com/en-us/ai-data-science/products/nemo/) software suite for managing the AI agent lifecycle, 
+NeMo Retriever Library, part of the [NVIDIA NeMo](https://www.nvidia.com/en-us/ai-data-science/products/nemo/) software suite for managing the AI agent lifecycle, 
 ensures data privacy and seamlessly connects to proprietary data wherever it resides, 
 empowering secure, enterprise-grade retrieval.
 
-NeMo Retriever provides the following:
+NeMo Retriever Library provides the following:
 
 - **Multimodal Data Extraction** — Quickly extract documents at scale that include text, tables, charts, and infographics.
 - **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into LanceDB (default) or Milvus — accelerated with NVIDIA cuVS.
@@ -19,18 +19,18 @@ NeMo Retriever provides the following:
 
 ## Enterprise-Ready Features
 
-NVIDIA NeMo Retriever comes with enterprise-ready features, including the following:
+NVIDIA NeMo Retriever Library comes with enterprise-ready features, including the following:
 
-- **High Accuracy** — NeMo Retriever exhibits a high level of accuracy when retrieving across various modalities through enterprise documents. 
-- **High Throughput** — NeMo Retriever is capable of extracting, embedding, indexing and retrieving across hundreds of thousands of documents at scale with high throughput. 
-- **Decomposable/Customizable** — NeMo Retriever consists of modules that can be separately used and deployed in your own environment. 
-- **Enterprise-Grade Security** — NeMo Retriever NIMs come with security features such as the use of [safetensors](https://huggingface.co/docs/safetensors/index), continuous patching of CVEs, and more. 
+- **High Accuracy** — NeMo Retriever Library exhibits a high level of accuracy when retrieving across various modalities through enterprise documents. 
+- **High Throughput** — NeMo Retriever Library is capable of extracting, embedding, indexing and retrieving across hundreds of thousands of documents at scale with high throughput. 
+- **Decomposable/Customizable** — NeMo Retriever Library consists of modules that can be separately used and deployed in your own environment. 
+- **Enterprise-Grade Security** — NeMo Retriever Library NIMs come with security features such as the use of [safetensors](https://huggingface.co/docs/safetensors/index), continuous patching of CVEs, and more. 
 
 
 
 ## Applications
 
-The following are some applications that use NVIDIA NeMo Retriever:
+The following are some applications that use NVIDIA NeMo Retriever Library:
 
 - [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
 - [Build an Enterprise RAG pipeline](https://build.nvidia.com/nvidia/build-an-enterprise-rag-pipeline/blueprintcard) (NVIDIA AI Blueprint)
@@ -43,7 +43,7 @@ The following are some applications that use NVIDIA NeMo Retriever:
 
 ## Related Topics
 
-- [NeMo Retriever Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html)
-- [NeMo Retriever Text Reranking NIM](https://docs.nvidia.com/nim/nemo-retriever/text-reranking/latest/overview.html)
+- [NeMo Retriever Library Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html)
+- [NeMo Retriever Library Text Reranking NIM](https://docs.nvidia.com/nim/nemo-retriever/text-reranking/latest/overview.html)
 - [NVIDIA NIM for Object Detection](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html)
 - [NVIDIA NIM for Image OCR](https://docs.nvidia.com/nim/ingestion/table-extraction/latest/overview.html)

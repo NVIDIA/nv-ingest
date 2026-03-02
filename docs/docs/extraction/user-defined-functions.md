@@ -5,7 +5,7 @@ This guide covers how to write, validate, and submit UDFs using both the CLI and
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 
@@ -121,7 +121,7 @@ results = ingestor.files("/path/to/document.pdf") \
 
 ### Understanding IngestControlMessage (ICM)
 
-The `IngestControlMessage` is the primary data structure that flows through the NeMo Retriever pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
+The `IngestControlMessage` is the primary data structure that flows through the NeMo Retriever Library pipeline. Your UDF receives an ICM and must return a (potentially modified) ICM.
 
 #### Key ICM Methods
 
@@ -379,7 +379,7 @@ def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ### UDF Function Specification Formats
 
-NeMo Retriever supports four different formats for specifying UDF functions:
+NeMo Retriever Library supports four different formats for specifying UDF functions:
 
 ### 1. Inline Function String
 Define your function directly as a string:
@@ -456,7 +456,7 @@ ingestor.udf(udf_function="my_package.processors.text_utils:enhance_metadata")
 
 ## Integrating with NVIDIA NIMs
 
-NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NeMo Retriever pipeline.
+NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can be seamlessly integrated into your UDFs. The `NimClient` class offers a unified interface for connecting to and using NIMs within the NeMo Retriever Library pipeline.
 
 ### Quick NIM Integration
 
@@ -521,7 +521,7 @@ export NGC_API_KEY="your-ngc-api-key"
 
 ### Available NIM Interfaces
 
-NeMo Retriever provides several pre-built model interfaces:
+NeMo Retriever Library provides several pre-built model interfaces:
 
 - **VLMModelInterface**: Vision-Language Models for image analysis and captioning
 - **EmbeddingModelInterface**: Text embedding generation
@@ -542,7 +542,7 @@ See the comprehensive [**NimClient Usage Guide**](nimclient_usage.md).
 
 ### Error Handling
 
-The NeMo Retriever system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
+The NeMo Retriever Library system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
 
 1. Annotate the job with appropriate error information
 2. Mark the job as failed
@@ -553,7 +553,7 @@ You do not need to implement extensive error handling within your UDF - focus on
 
 ### Performance Considerations
 
-UDFs execute within the NeMo Retriever pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
+UDFs execute within the NeMo Retriever Library pipeline and can significantly impact overall system performance and stability. Understanding these considerations is crucial for maintaining optimal pipeline throughput and reliability.
 
 #### Pipeline Impact
 
@@ -941,6 +941,6 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ## Related Topics
 
-- [NeMo Retriever UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md)
+- [NeMo Retriever Library UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md)
 - [User-Defined Stages for NeMo Retriever Library](user-defined-stages.md)
 - [NimClient Usage](nimclient.md)
