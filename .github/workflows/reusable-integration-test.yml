@@ -23,29 +23,6 @@ on:
         required: false
         type: string
         default: 'main'
-    secrets:
-      AUDIO_FUNCTION_ID:
-        required: true
-      EMBEDDING_NIM_MODEL_NAME:
-        required: true
-      NEMOTRON_PARSE_MODEL_NAME:
-        required: true
-      NGC_API_KEY:
-        required: true
-      NVIDIA_API_KEY:
-        required: true
-      PADDLE_HTTP_ENDPOINT:
-        required: true
-      VLM_CAPTION_ENDPOINT:
-        required: true
-      VLM_CAPTION_MODEL_NAME:
-        required: true
-      YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT:
-        required: true
-      YOLOX_HTTP_ENDPOINT:
-        required: true
-      YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT:
-        required: true
 
 jobs:
   test:
