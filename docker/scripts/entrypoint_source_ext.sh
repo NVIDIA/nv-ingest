@@ -19,12 +19,12 @@ fi
 
 # Install audio dependencies
 if ! python -c "import pkg_resources; pkg_resources.require('librosa')" 2>/dev/null; then
-  echo "Installing librosa using conda..."
-  mamba install -y -c conda-forge librosa
+  echo "Installing librosa with uv..."
+  uv pip install librosa
 fi
 
-# If MEM_TRACE is set in the environment, use mamba to install memray
+# If MEM_TRACE is set in the environment, install memray
 if [ -n "$MEM_TRACE" ]; then
-  echo "MEM_TRACE is set. Installing memray via mamba..."
-  mamba install -y conda-forge::memray
+  echo "MEM_TRACE is set. Installing memray with uv..."
+  uv pip install memray
 fi

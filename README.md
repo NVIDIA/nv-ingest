@@ -98,7 +98,7 @@ Library mode deployment of nv-ingest requires:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended) or MacOS
 - Python 3.12
-- We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
+- We strongly advise using an isolated Python virtual env with [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ### Step 1: Prepare Your Environment
 
@@ -361,7 +361,6 @@ The following is a description of the folders in the GitHub repository.
 - [api](https://github.com/NVIDIA/nv-ingest/tree/main/api) — Core API logic shared across python modules
 - [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci) — Scripts used to build the nv-ingest container and other packages
 - [client](https://github.com/NVIDIA/nv-ingest/tree/main/client) — Readme, examples, and source code for the nv-ingest-cli utility
-- [conda](https://github.com/NVIDIA/nv-ingest/tree/main/conda) — Conda environment and packaging definitions
 - [config](https://github.com/NVIDIA/nv-ingest/tree/main/config) — Various .yaml files defining configuration for OTEL, Prometheus
 - [data](https://github.com/NVIDIA/nv-ingest/tree/main/data) — Sample PDFs for testing
 - [deploy](https://github.com/NVIDIA/nv-ingest/tree/main/deploy) — Brev.dev-hosted launchable

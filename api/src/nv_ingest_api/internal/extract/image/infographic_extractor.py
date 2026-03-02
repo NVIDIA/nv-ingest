@@ -180,7 +180,7 @@ def _local_nemotron_ocr_text_predictions(
 ) -> List[Tuple[str, Optional[Any], Optional[Any]]]:
     """
     Local OCR fallback using the Nemotron OCR v1 pipeline via:
-      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+      `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
 
     Returns list of tuples aligned with base64_images:
       (base64_image, bounding_boxes_or_none, text_predictions_or_none)
@@ -196,13 +196,13 @@ def _local_nemotron_ocr_text_predictions(
         or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
     )
 
-    # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
+    # Import locally to avoid making `nv-ingest-api` hard-depend on nemo-retriever unless needed.
     try:
-        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local infographic OCR fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+            "Local infographic OCR fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
         ) from e
 
     if trace_info is not None:

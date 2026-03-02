@@ -41,8 +41,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./retriever
-          file: ./retriever/Dockerfile
+          context: ./nemo_retriever
+          file: ./nemo_retriever/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |

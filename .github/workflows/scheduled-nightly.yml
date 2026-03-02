@@ -11,11 +11,6 @@ on:
         required: false
         type: boolean
         default: false
-      skip-conda:
-        description: 'Skip Conda build/publish'
-        required: false
-        type: boolean
-        default: false
       skip-pypi:
         description: 'Skip PyPI build/publish'
         required: false
@@ -75,27 +70,6 @@ jobs:
             -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.docker-tag }} \
             .
 
-  # Build and publish Conda packages
-  conda-build:
-    name: Conda Nightly Build
-    if: ${{ !inputs.skip-conda }}
-    uses: ./.github/workflows/reusable-conda-build.yml
-    with:
-      source-ref: 'main'
-      runner: 'linux-large-disk'
-      upload-artifacts: true
-
-  conda-publish:
-    name: Conda Nightly Publish
-    if: ${{ !inputs.skip-conda }}
-    needs: conda-build
-    uses: ./.github/workflows/reusable-conda-publish.yml
-    with:
-      channel: 'dev'
-      force-upload: true
-    secrets:
-      NVIDIA_CONDA_TOKEN: ${{ secrets.NVIDIA_CONDA_TOKEN }}
-
   # Build and publish PyPI wheels
   pypi-build:
     name: PyPI Nightly Build
@@ -124,7 +98,6 @@ jobs:
     needs:
       - determine-version
       - docker-build-publish
-      - conda-publish
       - pypi-publish
     runs-on: ubuntu-latest
     if: always()
@@ -133,5 +106,4 @@ jobs:
         run: |
           echo "Nightly build completed for version: ${{ needs.determine-version.outputs.version }}"
           echo "Docker: ${{ needs.docker-build-publish.result }}"
-          echo "Conda: ${{ needs.conda-publish.result }}"
           echo "PyPI: ${{ needs.pypi-publish.result }}"

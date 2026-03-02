@@ -347,7 +347,7 @@ def _local_nemotron_ocr_boxes_texts(
 ) -> List[Tuple[str, Any, Any, Any]]:
     """
     Local OCR fallback using the Nemotron OCR v1 pipeline via:
-      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+      `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
 
     Returns a list aligned with base64_images:
       (base64_image, cell_predictions=None, bounding_boxes, text_predictions)
@@ -372,11 +372,11 @@ def _local_nemotron_ocr_boxes_texts(
 
     # Lazy import to avoid hard dependency when running pure API package.
     try:
-        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local table OCR fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+            "Local table OCR fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
         ) from e
 
     if trace_info is not None:
@@ -515,7 +515,7 @@ def _local_nemotron_table_structure_cell_predictions(
 ) -> List[Optional[Dict[str, Any]]]:
     """
     Local table-structure fallback using:
-      `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`
+      `nemo_retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`
 
     Returns a list aligned with base64_images where each element is either:
       - None (failed / skipped), or
@@ -530,11 +530,11 @@ def _local_nemotron_table_structure_cell_predictions(
 
     # Lazy import to avoid hard dependency when running pure API package.
     try:
-        from retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local table-structure fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`."
+            "Local table-structure fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`."
         ) from e
 
     try:

@@ -1,7 +1,0 @@
-name: retriever_libcudart
-channels:
-  - conda-forge
-dependencies:
-  - python=3.12.*
-  - cuda-cudart=13.*
-  - uv
