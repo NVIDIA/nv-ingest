@@ -46,6 +46,9 @@ class RecallConfig:
     local_hf_device: Optional[str] = None
     local_hf_cache_dir: Optional[str] = None
     local_hf_batch_size: int = 64
+    # When True and an HTTP embedding endpoint is set, use vLLM-compatible minimal
+    # payload (no input_type/truncate). Set this when the endpoint is a vLLM server.
+    embedding_use_vllm_compat: bool = False
 
 
 def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -104,6 +107,28 @@ def _resolve_embedding_endpoint(cfg: RecallConfig) -> Tuple[Optional[str], Optio
         return single, (not single.lower().startswith("http"))
 
     return None, None
+
+
+def _embed_queries_vllm_http(
+    queries: List[str],
+    *,
+    endpoint: str,
+    model: str,
+    api_key: str,
+    batch_size: int = 256,
+) -> List[List[float]]:
+    """Embed queries via vLLM-compatible HTTP (minimal payload, no input_type/truncate)."""
+    from nemo_retriever.text_embed.vllm_http import embed_via_vllm_http
+
+    # llama-nemotron-embed-1b-v2 expects "query: " prefix for queries (see model README).
+    return embed_via_vllm_http(
+        queries,
+        endpoint_url=endpoint,
+        model_name=model,
+        api_key=(api_key or "").strip() or None,
+        batch_size=batch_size,
+        prefix="query: ",
+    )
 
 
 def _embed_queries_nim(
@@ -297,13 +322,22 @@ def retrieve_and_score(
 
     endpoint, use_grpc = _resolve_embedding_endpoint(cfg)
     if endpoint is not None and use_grpc is not None:
-        vectors = _embed_queries_nim(
-            queries,
-            endpoint=endpoint,
-            model=cfg.embedding_model,
-            api_key=cfg.embedding_api_key,
-            grpc=bool(use_grpc),
-        )
+        if bool(cfg.embedding_use_vllm_compat) and not use_grpc:
+            vectors = _embed_queries_vllm_http(
+                queries,
+                endpoint=endpoint,
+                model=cfg.embedding_model,
+                api_key=cfg.embedding_api_key,
+                batch_size=256,
+            )
+        else:
+            vectors = _embed_queries_nim(
+                queries,
+                endpoint=endpoint,
+                model=cfg.embedding_model,
+                api_key=cfg.embedding_api_key,
+                grpc=bool(use_grpc),
+            )
     else:
         vectors = _embed_queries_local_hf(
             queries,

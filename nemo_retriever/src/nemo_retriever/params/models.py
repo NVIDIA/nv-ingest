@@ -181,6 +181,7 @@ class EmbedParams(_ParamsModel):
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
+    embed_use_vllm_compat: bool = False  # Use vLLM-compatible HTTP payload when using remote endpoint
     input_type: str = "passage"
     embed_modality: str = "text"  # "text", "image", or "text_image" — default for all element types
     text_elements_modality: Optional[str] = None  # per-type override for page-text rows

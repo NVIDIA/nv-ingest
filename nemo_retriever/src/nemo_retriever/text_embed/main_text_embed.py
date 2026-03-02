@@ -455,6 +455,42 @@ def _async_runner(
     return flat_results
 
 
+def _vllm_compat_runner(
+    prompts: List[List[str]],
+    api_key: Optional[str],
+    endpoint_url: str,
+    embedding_model: str,
+    encoding_format: str,
+    dimensions: Optional[int] = None,
+    batch_size: int = 256,
+) -> dict:
+    """
+    Request embeddings using vLLM-compatible minimal payload (no input_type/truncate).
+    Returns the same {"embeddings": [...], "info_msgs": [...]} shape as _async_runner.
+    """
+    from nemo_retriever.text_embed.vllm_http import embed_via_vllm_http
+
+    flat_prompts: List[str] = []
+    for batch in prompts:
+        flat_prompts.extend(batch)
+    if not flat_prompts:
+        return {"embeddings": [], "info_msgs": []}
+    # llama-nemotron-embed-1b-v2 expects "passage: " for documents (see model README).
+    vectors = embed_via_vllm_http(
+        flat_prompts,
+        endpoint_url=endpoint_url,
+        model_name=embedding_model,
+        api_key=api_key,
+        dimensions=dimensions,
+        encoding_format=encoding_format,
+        batch_size=batch_size,
+        prefix="passage: ",
+    )
+    # Normalize to list of list (or None for missing)
+    embeddings = [v if v else None for v in vectors]
+    return {"embeddings": embeddings, "info_msgs": [None] * len(embeddings)}
+
+
 def _callable_runner(
     prompts: List[List[str]],
     *,
@@ -656,7 +692,17 @@ def create_text_embeddings_for_df(
                 filtered_content_list, batch_size=int(transform_config.batch_size)
             )
 
-            if endpoint_url:
+            if endpoint_url and task_config.get("use_vllm_compat"):
+                content_embeddings = _vllm_compat_runner(
+                    filtered_content_batches,
+                    api_key=api_key,
+                    endpoint_url=str(endpoint_url),
+                    embedding_model=str(model_name),
+                    encoding_format=str(transform_config.encoding_format),
+                    dimensions=dimensions,
+                    batch_size=int(transform_config.batch_size),
+                )
+            elif endpoint_url:
                 content_embeddings = _async_runner(
                     filtered_content_batches,
                     api_key,

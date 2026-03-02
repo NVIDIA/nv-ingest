@@ -122,3 +122,45 @@ To stop and remove both stacks:
 docker compose -p ingest-gpu0 down
 docker compose -p ingest-gpu1 down
 ```
+
+## Embedding backends
+
+Embeddings can be served by a **remote HTTP endpoint** (NIM, vLLM, or any OpenAI-compatible server) or by a **local HuggingFace model** when no endpoint is configured.
+
+- **Config**: Set `embedding_nim_endpoint` in `ingest-config.yaml` or stage config (e.g. `http://localhost:8000/v1`). Leave empty or null to use the local HF embedder.
+- **CLI**: Use `--embed-invoke-url` (inprocess/batch pipelines) or `--embedding-endpoint` / `--embedding-http-endpoint` (recall CLI) to point at a remote server.
+
+### Using vLLM for embeddings
+
+You can serve an embedding model with [vLLM](https://docs.vllm.ai/) and point the retriever at it. vLLM exposes an OpenAI-compatible `/v1/embeddings` API. Set the embedding endpoint to the vLLM base URL (e.g. `http://localhost:8000/v1`).
+
+**vLLM compatibility**: The default NIM-style client sends `input_type` and `truncate` in the request body; some vLLM versions or configs may not accept these. When using a **vLLM** server, enable the vLLM-compatible payload:
+
+- **Ingest**: `--embed-use-vllm-compat` (inprocess pipeline) or set `embed_use_vllm_compat: true` in `EmbedParams`.
+- **Recall**: `--embedding-use-vllm-compat` (recall CLI).
+
+This sends only `model`, `input`, and `encoding_format` (minimal OpenAI-compatible payload).
+
+### llama-nemotron-embed-1b-v2 with vLLM
+
+For **nvidia/llama-nemotron-embed-1b-v2**, follow the model’s official vLLM instructions:
+
+1. Use **vllm==0.11.0**.
+2. Clone the [model repo](https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2) and **overwrite `config.json` with `config_vllm.json`** from that repo.
+3. Start the server (replace `<path_to_the_cloned_repository>` and `<num_gpus_to_use>`):
+
+   ```bash
+   vllm serve \
+       <path_to_the_cloned_repository> \
+       --trust-remote-code \
+       --runner pooling \
+       --model-impl vllm \
+       --override-pooler-config '{"pooling_type": "MEAN"}' \
+       --data-parallel-size <num_gpus_to_use> \
+       --dtype float32 \
+       --port 8000
+   ```
+
+4. Set the retriever embedding endpoint to `http://localhost:8000/v1` and use `--embed-use-vllm-compat` / `--embedding-use-vllm-compat` as above.
+
+See the [model README](https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2) for the canonical vLLM setup and client example.

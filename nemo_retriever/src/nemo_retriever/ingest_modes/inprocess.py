@@ -240,6 +240,7 @@ def _embed_group(
     inference_batch_size: int,
     output_column: str,
     resolved_model_name: str,
+    use_vllm_compat: bool = False,
 ) -> pd.DataFrame:
     """Embed a single modality group via ``create_text_embeddings_for_df``.
 
@@ -285,14 +286,17 @@ def _embed_group(
         embed_modality=group_modality,
     )
 
+    task_config = {
+        "embedder": _embed,
+        "multimodal_embedder": _multimodal_embedder,
+        "endpoint_url": endpoint,
+        "local_batch_size": int(inference_batch_size),
+    }
+    if use_vllm_compat:
+        task_config["use_vllm_compat"] = True
     out_df, _ = create_text_embeddings_for_df(
         group_df,
-        task_config={
-            "embedder": _embed,
-            "multimodal_embedder": _multimodal_embedder,
-            "endpoint_url": endpoint,
-            "local_batch_size": int(inference_batch_size),
-        },
+        task_config=task_config,
         transform_config=cfg,
     )
     return out_df
@@ -307,6 +311,7 @@ def embed_text_main_text_embed(
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
     embed_invoke_url: Optional[str] = None,
+    embed_use_vllm_compat: bool = False,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -372,6 +377,7 @@ def embed_text_main_text_embed(
                 inference_batch_size=inference_batch_size,
                 output_column=output_column,
                 resolved_model_name=_resolved_model_name,
+                use_vllm_compat=bool(embed_use_vllm_compat),
             )
         else:
             # Multiple modalities: group, embed each, reassemble in original order.
@@ -390,6 +396,7 @@ def embed_text_main_text_embed(
                     inference_batch_size=inference_batch_size,
                     output_column=output_column,
                     resolved_model_name=_resolved_model_name,
+                    use_vllm_compat=bool(embed_use_vllm_compat),
                 )
                 parts.append(part)
             out_df = pd.concat(parts).sort_index()
