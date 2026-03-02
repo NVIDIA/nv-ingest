@@ -1,7 +1,7 @@
 name: Test Nv-Ingest Library Mode
 
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
@@ -9,11 +9,11 @@ on:
       # Adding 'labeled' to the list of activity types that trigger this event
       # (default: opened, synchronize, reopened) so that we can run this
       # workflow when the 'ok-to-test' label is added.
-      # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target
+      # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request
       - labeled
   push:
     branches:
-      - main
+      - release/26.1.2
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
       - name: Check access
         if:
           ${{
-            github.event_name == 'pull_request_target' &&
+            github.event_name == 'pull_request' &&
             github.event.pull_request.author_association != 'MEMBER' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
@@ -37,9 +37,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # For pull_request_target, checkout the PR head SHA.
+          # For pull_request, checkout the PR head SHA.
           # For push, checkout the pushed commit SHA.
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Build Conda Packages
         run: |
@@ -65,7 +65,7 @@ jobs:
       - name: Check access
         if:
           ${{
-            github.event_name == 'pull_request_target' &&
+            github.event_name == 'pull_request' &&
             github.event.pull_request.author_association != 'MEMBER' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
