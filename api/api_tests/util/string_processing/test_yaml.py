@@ -56,7 +56,8 @@ class TestSubstituteEnvVarsInYamlContent:
         """When primary var is set but empty, treat as unset and use default (avoids invalid YAML in lists)."""
         with patch.dict(os.environ, {"YOLOX_HTTP_ENDPOINT": ""}, clear=True):
             result = substitute_env_vars_in_yaml_content(
-                'yolox_endpoints: [$GRPC|"page-elements:8001", $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"]'
+                "yolox_endpoints: "
+                '[$GRPC|"page-elements:8001", $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"]'
             )
             assert result == 'yolox_endpoints: ["page-elements:8001", "http://page-elements:8000/v1/infer"]'
 
