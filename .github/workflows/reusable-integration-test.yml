@@ -72,6 +72,7 @@ jobs:
           uv venv .venv
           source .venv/bin/activate
           uv pip install -e ./src -e ./api -e ./client
+          # block pulling in breaking changes in pypdfium2 v5
           uv pip install \
             opencv-python \
             llama-index-embeddings-nvidia \
@@ -80,7 +81,7 @@ jobs:
             'milvus-lite==2.4.12' \
             'nvidia-riva-client==2.20.0' \
             'unstructured-client>=0.25.9' \
-            'pypdfium2<5' \ # block pulling in breaking changes in pypdfium2 v5
+            'pypdfium2<5' \
             tritonclient \
             markitdown \
             glom
@@ -109,4 +110,4 @@ jobs:
           source .venv/bin/activate
           echo 'Running integration tests...'
           unset LD_LIBRARY_PATH
-          python -m pytest -rsx tests/integration
+          python -m pytest -rsx -m integration tests/integration
