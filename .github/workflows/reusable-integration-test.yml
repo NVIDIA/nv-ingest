@@ -110,4 +110,4 @@ jobs:
           source .venv/bin/activate
           echo 'Running integration tests...'
           unset LD_LIBRARY_PATH
-          python -m pytest -rsx tests/integration
+          python -m pytest -rsx -m integration tests/integration
