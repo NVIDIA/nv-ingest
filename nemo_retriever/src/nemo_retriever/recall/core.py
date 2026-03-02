@@ -196,6 +196,8 @@ def _search_lancedb(
         if effective_nprobes <= 0:
             effective_nprobes = 16  # safe fallback matching default index config
 
+    if hybrid:
+        logger.info("Recall search using hybrid mode (dense + FTS + RRF rerank)")
     results: List[List[Dict[str, Any]]] = []
     for i, v in enumerate(query_vectors):
         q = np.asarray(v, dtype="float32")
