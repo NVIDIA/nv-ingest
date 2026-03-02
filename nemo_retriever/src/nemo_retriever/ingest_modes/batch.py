@@ -29,6 +29,9 @@ from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
+from nemo_retriever.ingest_modes.resource_heuristics import get_cluster_or_local_resources
+from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_worker_heuristic
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -314,10 +317,10 @@ class BatchIngestor(Ingestor):
         ctx.enable_rich_progress_bars = True
         ctx.use_ray_tqdm = False
 
-        # Query available resources so extract() can auto-size worker pools.
-        resources = ray.available_resources()
-        self._num_gpus = int(resources.get("GPU", 0))
-        self._num_cpus = int(resources.get("CPU", os.cpu_count() or 4))
+        # Query Ray cluster resources when available, otherwise local resources.
+        system_resources = get_cluster_or_local_resources()
+        self._num_gpus = int(system_resources.gpu_count)
+        self._num_cpus = int(system_resources.cpu_count)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -440,10 +443,18 @@ class BatchIngestor(Ingestor):
         gpu_ocr = float(kwargs.pop("gpu_ocr", gpu_ocr))
         gpu_embed = float(kwargs.pop("gpu_embed", gpu_embed))
 
-        # Each GPU stage gets 1 worker by default (each worker holds 1 model).
-        page_elements_workers = kwargs.pop("page_elements_workers", 1)
-        ocr_workers = kwargs.pop("ocr_workers", 1)
-        detect_workers = kwargs.pop("detect_workers", ocr_workers)
+        # Resolve worker defaults from system resources unless user overrides are set.
+        user_page_elements_workers = kwargs.pop("page_elements_workers", None)
+        user_ocr_workers = kwargs.pop("ocr_workers", None)
+        user_detect_workers = kwargs.pop("detect_workers", user_ocr_workers)
+        worker_heuristic = resolve_worker_heuristic(
+            num_cpus=self._num_cpus,
+            num_gpus=self._num_gpus,
+            page_elements_workers=user_page_elements_workers,
+            detect_workers=user_detect_workers,
+        )
+        page_elements_workers = int(worker_heuristic.page_elements_workers)
+        detect_workers = int(worker_heuristic.detect_workers)
         page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
         ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", 1))
 
@@ -468,6 +479,15 @@ class BatchIngestor(Ingestor):
                 int(ocr_endpoints),
             )
             detect_workers = int(ocr_endpoints)
+
+        self._page_elements_workers = int(page_elements_workers)
+        self._detect_workers = int(detect_workers)
+        pretty_print_worker_heuristic_summary(
+            worker_heuristic,
+            final_page_elements_workers=self._page_elements_workers,
+            final_detect_workers=self._detect_workers,
+            final_embed_workers=getattr(self, "_embed_workers", worker_heuristic.embed_workers),
+        )
 
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
         if use_nemotron_parse_only:
@@ -830,7 +850,13 @@ class BatchIngestor(Ingestor):
                 return 0
             return len([p for p in s.split(",") if p.strip()])
 
-        embed_workers = kwargs.pop("embed_workers", 1)
+        user_embed_workers = kwargs.pop("embed_workers", None)
+        worker_heuristic = resolve_worker_heuristic(
+            num_cpus=self._num_cpus,
+            num_gpus=self._num_gpus,
+            embed_workers=user_embed_workers,
+        )
+        embed_workers = int(worker_heuristic.embed_workers)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
         embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
 
@@ -846,6 +872,14 @@ class BatchIngestor(Ingestor):
                 int(endpoint_count),
             )
             embed_workers = int(endpoint_count)
+
+        self._embed_workers = int(embed_workers)
+        pretty_print_worker_heuristic_summary(
+            worker_heuristic,
+            final_page_elements_workers=getattr(self, "_page_elements_workers", None),
+            final_detect_workers=getattr(self, "_detect_workers", None),
+            final_embed_workers=self._embed_workers,
+        )
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality

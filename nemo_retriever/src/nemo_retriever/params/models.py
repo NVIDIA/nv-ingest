@@ -116,12 +116,12 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
     detect_batch_size: int = 24
-    page_elements_workers: int = 1
-    ocr_workers: int = 1
+    page_elements_workers: Optional[int] = None
+    ocr_workers: Optional[int] = None
     detect_workers: Optional[int] = None
     page_elements_cpus_per_actor: float = 1
     ocr_cpus_per_actor: float = 1
-    embed_workers: int = 1
+    embed_workers: Optional[int] = None
     embed_batch_size: int = 256
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None

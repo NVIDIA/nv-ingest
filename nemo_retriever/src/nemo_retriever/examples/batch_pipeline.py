@@ -413,17 +413,17 @@ def main(
         min=1,
         help="Ray Data batch size for page-elements stage.",
     ),
-    ocr_workers: int = typer.Option(
-        1,
+    ocr_workers: Optional[int] = typer.Option(
+        None,
         "--ocr-workers",
         min=1,
-        help="Actor count for OCR stage.",
+        help="Actor count for OCR stage. Omit to use resource heuristic.",
     ),
-    page_elements_workers: int = typer.Option(
-        1,
+    page_elements_workers: Optional[int] = typer.Option(
+        None,
         "--page-elements-workers",
         min=1,
-        help="Actor count for page-elements stage.",
+        help="Actor count for page-elements stage. Omit to use resource heuristic.",
     ),
     ocr_batch_size: int = typer.Option(
         16,
@@ -443,11 +443,11 @@ def main(
         min=0.1,
         help="CPUs reserved per OCR actor.",
     ),
-    embed_workers: int = typer.Option(
-        1,
+    embed_workers: Optional[int] = typer.Option(
+        None,
         "--embed-workers",
         min=1,
-        help="Actor count for embedding stage.",
+        help="Actor count for embedding stage. Omit to use resource heuristic.",
     ),
     embed_batch_size: int = typer.Option(
         256,
@@ -695,8 +695,8 @@ def main(
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
                             "page_elements_batch_size": int(page_elements_batch_size),
-                            "page_elements_workers": int(page_elements_workers),
-                            "detect_workers": int(ocr_workers),
+                            "page_elements_workers": page_elements_workers,
+                            "detect_workers": ocr_workers,
                             "detect_batch_size": int(ocr_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
@@ -717,7 +717,7 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         batch_tuning={
-                            "embed_workers": int(embed_workers),
+                            "embed_workers": embed_workers,
                             "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
@@ -758,8 +758,8 @@ def main(
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
                             "page_elements_batch_size": int(page_elements_batch_size),
-                            "page_elements_workers": int(page_elements_workers),
-                            "detect_workers": int(ocr_workers),
+                            "page_elements_workers": page_elements_workers,
+                            "detect_workers": ocr_workers,
                             "detect_batch_size": int(ocr_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
@@ -780,7 +780,7 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         batch_tuning={
-                            "embed_workers": int(embed_workers),
+                            "embed_workers": embed_workers,
                             "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },

@@ -46,12 +46,14 @@ class NemotronParseV12(BaseModel):
         ).to(self._device)
         self._model.eval()
 
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_path, cache_dir=hf_cache_dir)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._model_path, cache_dir=hf_cache_dir, trust_remote_code=True
+        )
         self._processor = AutoProcessor.from_pretrained(
-            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir
+            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir, trust_remote_code=True
         )
         self._generation_config = GenerationConfig.from_pretrained(
-            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir
+            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir, trust_remote_code=True
         )
 
     def preprocess(self, input_data: Union[torch.Tensor, np.ndarray, Image.Image, str, Path]) -> Image.Image:
