@@ -50,10 +50,10 @@ class NemotronParseV12(BaseModel):
             self._model_path, cache_dir=hf_cache_dir, trust_remote_code=True
         )
         self._processor = AutoProcessor.from_pretrained(
-            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir, trust_remote_code=True
+            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir
         )
         self._generation_config = GenerationConfig.from_pretrained(
-            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir, trust_remote_code=True
+            self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir
         )
 
     def preprocess(self, input_data: Union[torch.Tensor, np.ndarray, Image.Image, str, Path]) -> Image.Image:
