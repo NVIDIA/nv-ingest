@@ -164,15 +164,11 @@ results = ingestor.ingest()
 ## Example 5: Full Page as Text+Image
 
 For the best retrieval quality on full-page content, you can embed each page as a paired text+image.
-When `image_elements_modality="text_image"` is set, the pipeline automatically aggregates text and structured content
-(tables, charts) from each page and pairs the aggregated text with the page image.
+When `image_elements_modality="text_image"` is set, the pipeline automatically aggregates text content
+from each page and pairs it with the page image for joint embedding.
 
-This auto-enables the `image_elements_aggregate_page_content` behavior, which collects TEXT and STRUCTURED content
-from each page and stores it alongside the page image for joint embedding.
-
-- The `extract` method extracts both page images and text content. The text and structured content are used for aggregation.
+- The `extract` method extracts page images and text content. Text content is aggregated and paired with the page image.
 - The `embed` method processes the page images with `image_elements_modality="text_image"`.
-- When page content is aggregated, TEXT and STRUCTURED element embeddings are automatically skipped to avoid duplication.
 
 ```python
 ingestor = (
@@ -180,8 +176,8 @@ ingestor = (
     .files("./data/*.pdf")
     .extract(
         extract_text=True,
-        extract_tables=True,
-        extract_charts=True,
+        extract_tables=False,
+        extract_charts=False,
         extract_images=False,
         extract_page_as_image=True,
     )
