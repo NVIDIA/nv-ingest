@@ -116,6 +116,7 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
     detect_batch_size: int = 24
+    ocr_inference_batch_size: Optional[int] = None
     page_elements_workers: Optional[int] = None
     ocr_workers: Optional[int] = None
     detect_workers: Optional[int] = None

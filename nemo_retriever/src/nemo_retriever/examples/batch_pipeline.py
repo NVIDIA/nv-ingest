@@ -437,6 +437,12 @@ def main(
         min=1,
         help="Ray Data batch size for OCR stage.",
     ),
+    ocr_inference_batch_size: int = typer.Option(
+        8,
+        "--ocr-inference-batch-size",
+        min=1,
+        help="Model inference chunk size for OCRActor only.",
+    ),
     page_elements_cpus_per_actor: float = typer.Option(
         1.0,
         "--page-elements-cpus-per-actor",
@@ -705,6 +711,7 @@ def main(
                             "page_elements_workers": page_elements_workers,
                             "detect_workers": ocr_workers,
                             "detect_batch_size": int(ocr_batch_size),
+                            "ocr_inference_batch_size": int(ocr_inference_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
                             "gpu_page_elements": float(gpu_page_elements),
@@ -769,6 +776,7 @@ def main(
                             "page_elements_workers": page_elements_workers,
                             "detect_workers": ocr_workers,
                             "detect_batch_size": int(ocr_batch_size),
+                            "ocr_inference_batch_size": int(ocr_inference_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
                             "gpu_page_elements": float(gpu_page_elements),

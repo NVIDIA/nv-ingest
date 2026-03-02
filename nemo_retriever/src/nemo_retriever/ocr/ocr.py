@@ -585,6 +585,7 @@ class OCRActor:
         "_api_key",
         "_request_timeout_s",
         "_remote_retry",
+        "_inference_batch_size",
     )
 
     def __init__(
@@ -597,6 +598,7 @@ class OCRActor:
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
+        inference_batch_size: int = 8,
         remote_max_pool_workers: int = 16,
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
@@ -609,6 +611,7 @@ class OCRActor:
             remote_max_retries=int(remote_max_retries),
             remote_max_429_retries=int(remote_max_429_retries),
         )
+        self._inference_batch_size = int(inference_batch_size)
         if self._invoke_url:
             self._model = None
         else:
@@ -630,6 +633,7 @@ class OCRActor:
                 extract_tables=self._extract_tables,
                 extract_charts=self._extract_charts,
                 extract_infographics=self._extract_infographics,
+                inference_batch_size=self._inference_batch_size,
                 remote_retry=self._remote_retry,
                 **override_kwargs,
             )
