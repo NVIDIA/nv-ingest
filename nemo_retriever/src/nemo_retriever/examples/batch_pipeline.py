@@ -413,6 +413,12 @@ def main(
         min=1,
         help="Ray Data batch size for page-elements stage.",
     ),
+    page_elements_inference_batch_size: int = typer.Option(
+        8,
+        "--page-elements-inference-batch-size",
+        min=1,
+        help="Model inference chunk size for PageElementDetectionActor only.",
+    ),
     ocr_workers: Optional[int] = typer.Option(
         None,
         "--ocr-workers",
@@ -686,6 +692,7 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        inference_batch_size=int(page_elements_inference_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -749,6 +756,7 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        inference_batch_size=int(page_elements_inference_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
