@@ -6,11 +6,6 @@ on:
       - opened
       - synchronize
       - reopened
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
       - labeled
 
 concurrency:
@@ -50,7 +45,6 @@ jobs:
   # Library mode integration tests (requires approval for external contributors)
   library-mode-check-access:
     name: Check Library Mode Test Access
-    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     outputs:
       has-access: ${{ steps.check.outputs.has-access }}
@@ -70,9 +64,7 @@ jobs:
   library-mode-test:
     name: Test Library Mode
     needs: library-mode-check-access
-    if: |
-      github.event_name == 'pull_request_target' &&
-      needs.library-mode-check-access.outputs.has-access == 'true'
+    if: needs.library-mode-check-access.outputs.has-access == 'true'
     uses: ./.github/workflows/reusable-integration-test.yml
     with:
       runner: 'ubuntu-latest'
