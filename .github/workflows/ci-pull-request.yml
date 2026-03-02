@@ -73,7 +73,7 @@ jobs:
       runner: 'ubuntu-latest'
       timeout-minutes: 60
       source-ref: ${{ github.event.pull_request.head.sha }}
-    env:
+    secrets:
       AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
       EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
       NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
