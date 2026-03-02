@@ -1,33 +1,33 @@
-# Use the NV-Ingest Command Line Interface
+# CLI Reference
 
-After you install the Python dependencies, you can use the [NV-Ingest](overview.md) command line interface (CLI). 
-To use the CLI, use the `nv-ingest-cli` command.
+After you install the Python dependencies, you can use the [NeMo Retriever Library](overview.md) command line interface (CLI).
+To use the CLI, use the `nemo-retriever` command.
 
 To check the version of the CLI that you have installed, run the following command.
 
 ```bash
-nv-ingest-cli --version
+nemo-retriever --version
 ```
 
 To get a list of the current CLI commands and their options, run the following command.
 
 ```bash
-nv-ingest-cli --help
+nemo-retriever --help
 ```
 
 !!! tip
 
-    There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
+    There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
 
 ## Examples
 
-Use the following code examples to submit a document to the `nv-ingest-ms-runtime` service.
+Use the following code examples to submit a document to the `nemo-retriever-ms-runtime` service.
 
-Each of the following commands can be run from the host machine, or from within the `nv-ingest-ms-runtime` container.
+Each of the following commands can be run from the host machine, or from within the `nemo-retriever-ms-runtime` container.
 
-- Host: `nv-ingest-cli ...`
-- Container: `nv-ingest-cli ...`
+- Host: `nemo-retriever ...`
+- Container: `nemo-retriever ...`
 
 
 ### Example: Text File With No Splitting
@@ -39,7 +39,7 @@ To submit a text file with no splitting, run the following code.
     You receive a response that contains a single document, which is the entire text file. The data that is returned is wrapped in the appropriate [metadata structure](content-metadata.md).
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --client_host=localhost \
   --client_port=7670
@@ -51,7 +51,7 @@ nv-ingest-cli \
 To submit a .pdf file with only a splitting task, run the following code.
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='split' \
@@ -68,7 +68,7 @@ To submit a .pdf file with both a splitting task and an extraction task, run the
     Currently, `split` only works for pdfium, nemotron-parse, and Unstructured.io.
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
@@ -82,16 +82,16 @@ nv-ingest-cli \
 
 ### Example: PDF File With Custom Split Page Count
 
-To submit a PDF file with a custom split page count, use the `--pdf_split_page_count` option. 
+To submit a PDF file with a custom split page count, use the `--pdf_split_page_count` option.
 This allows you to control how many pages are included in each PDF chunk during processing.
 
 !!! note
-    The `--pdf_split_page_count` option requires using the V2 API (set via `--api_version v2` or environment variable `NV_INGEST_API_VERSION=v2`).
+    The `--pdf_split_page_count` option requires using the V2 API (set via `--api_version v2` or environment variable `NEMO_RETRIEVER_API_VERSION=v2`).
     It accepts values between 1 and 128 pages per chunk (default is server default, typically 32).
     Smaller chunks provide more parallelism but increase overhead, while larger chunks reduce overhead but limit concurrency.
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_text": "true"}' \
@@ -106,7 +106,7 @@ nv-ingest-cli \
 To invoke image captioning and control reasoning:
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_images": "true"}' \
   --task='caption:{"prompt": "Caption the content of this image:", "reasoning": true}' \
@@ -119,14 +119,14 @@ nv-ingest-cli \
 
 !!! tip
 
-  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+  The caption service uses a default VLM which you can override by selecting other vision-language models to better match your image captioning needs. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
 
 Alternatively, you can use an environment variable to set the API version:
 
 ```bash
-export NV_INGEST_API_VERSION=v2
+export NEMO_RETRIEVER_API_VERSION=v2
 
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_text": "true"}' \
@@ -138,11 +138,11 @@ nv-ingest-cli \
 
 ### Example: Process a Dataset
 
-To submit a dataset for processing, run the following code. 
+To submit a dataset for processing, run the following code.
 To create a dataset, refer to [Command Line Dataset Creation with Enumeration and Sampling](#command-line-dataset-creation-with-enumeration-and-sampling).
 
 ```shell
-nv-ingest-cli \
+nemo-retriever \
   --dataset dataset.json \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
@@ -154,7 +154,7 @@ nv-ingest-cli \
 Submit a PDF file with extraction tasks and upload extracted images to MinIO.
 
 ```bash
-nv-ingest-cli \
+nemo-retriever \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
@@ -166,7 +166,7 @@ nv-ingest-cli \
 
 ## Command Line Dataset Creation with Enumeration and Sampling
 
-The `gen_dataset.py` script samples files from a specified source directory according to defined proportions and a total size target. 
+The `gen_dataset.py` script samples files from a specified source directory according to defined proportions and a total size target.
 It offers options for caching the file list, outputting a sampled file list, and validating the output.
 
 ```shell

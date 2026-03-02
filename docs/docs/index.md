@@ -10,7 +10,7 @@ empowering secure, enterprise-grade retrieval.
 NeMo Retriever provides the following:
 
 - **Multimodal Data Extraction** — Quickly extract documents at scale that include text, tables, charts, and infographics.
-- **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into Milvus - accelerated with NVIDIA cuVS.
+- **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into LanceDB (default) or Milvus — accelerated with NVIDIA cuVS.
 - **Retrieval** — Leverage semantic + hybrid search for high accuracy retrieval with the embedding + reranking NIM microservice.
 
 
@@ -30,7 +30,7 @@ NVIDIA NeMo Retriever comes with enterprise-ready features, including the follow
 
 ## Applications
 
-The following are some applications that use NVIDIA Nemo Retriever:
+The following are some applications that use NVIDIA NeMo Retriever:
 
 - [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
 - [Build an Enterprise RAG pipeline](https://build.nvidia.com/nvidia/build-an-enterprise-rag-pipeline/blueprintcard) (NVIDIA AI Blueprint)
