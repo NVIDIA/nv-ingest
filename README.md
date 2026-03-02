@@ -4,7 +4,8 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-> **Default branch:** The repository default branch is **`main`** (development). For the latest **release** branch and tagged releases, see the [releases](https://github.com/NVIDIA/nv-ingest/releases) page or switch to a release branch (e.g. `release/26.1.2`) in the branch dropdown. Documentation: [https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/](https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/).
+> [!Note]
+> **Default branch:** The repository default branch is **`main`** (development). For the latest **release** branch and tagged releases, see the [releases](https://github.com/NVIDIA/nv-ingest/releases) page or switch to a release branch (e.g. `release/26.1.2`) in the branch dropdown. **Documentation:** [https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/](https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/).
 
 # What is NeMo Retriever Extraction?
 
