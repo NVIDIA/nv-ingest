@@ -44,17 +44,12 @@ dependencies = [
   "numpy>=1.26.0",
   "debugpy>=1.8.0",
   "python-multipart>=0.0.9",
-<<<<<<< HEAD:retriever/pyproject.toml
-  "transformers==4.57.6",
-  "tokenizers>=0.20.3,<0.22.0",
-=======
   # transformers>=5 enables loading nvidia/parakeet-ctc-1.1b via pipeline (see
   # parakeet-ctc-1.1b README). If using llama_nemotron_embed_1b_v2, verify
   # compatibility with transformers 5 (it previously relied on HybridCache).
   "transformers>=5.0.0",
   "tokenizers>=0.20.3",
   "accelerate>=1.1.0",
->>>>>>> nvidia/main:nemo_retriever/pyproject.toml
   "torch~=2.9.1",
   "torchvision>=0.24,<0.25",
   "einops",
