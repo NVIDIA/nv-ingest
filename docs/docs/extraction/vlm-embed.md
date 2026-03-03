@@ -172,8 +172,9 @@ ingestor = (
     .files("./data/*.pdf")
     .extract(
         extract_text=True,
-        extract_tables=False,
-        extract_charts=False,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
         extract_images=False,
         extract_page_as_image=True,
     )
