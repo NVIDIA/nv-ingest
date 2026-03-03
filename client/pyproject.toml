@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel>=0.46.2"]
+requires = ["setuptools>=80.10.0", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -28,7 +28,7 @@ dependencies = [
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "requests>=2.28.2",
-    "setuptools>=78.1.1",
+    "setuptools>=80.10.0",
     "tqdm>=4.67.1",
     "lancedb>=0.25.3",
 ]
