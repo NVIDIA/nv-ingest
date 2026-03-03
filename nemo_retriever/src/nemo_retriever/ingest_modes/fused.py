@@ -26,6 +26,7 @@ from ..params import ExtractParams
 from ..params import PdfSplitParams
 from .batch import _BatchEmbedActor
 from .batch import BatchIngestor
+from .inprocess import collapse_content_to_page_rows
 from .inprocess import embed_text_main_text_embed
 from .inprocess import explode_content_to_rows
 
@@ -66,6 +67,8 @@ class _FusedModelActor:
         self._extract_tables = bool(kwargs.get("extract_tables", False))
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
+        self._embed_granularity = str(kwargs.get("embed_granularity", "element"))
+        self._embed_modality = str(kwargs.get("embed_modality", "text"))
         self._embed_kwargs = {
             "model_name": kwargs.get("model_name"),
             "text_column": str(kwargs.get("text_column", "text")),
@@ -107,8 +110,13 @@ class _FusedModelActor:
             extract_charts=self._extract_charts,
             extract_infographics=self._extract_infographics,
         )
-        exploded = explode_content_to_rows(ocred, text_column=str(self._embed_kwargs["text_column"]))
-        embedded = embed_text_main_text_embed(exploded, model=self._embed_model, **self._embed_kwargs)
+        if self._embed_granularity == "page":
+            prepared = collapse_content_to_page_rows(
+                ocred, text_column=str(self._embed_kwargs["text_column"]), modality=self._embed_modality
+            )
+        else:
+            prepared = explode_content_to_rows(ocred, text_column=str(self._embed_kwargs["text_column"]))
+        embedded = embed_text_main_text_embed(prepared, model=self._embed_model, **self._embed_kwargs)
         return embedded
 
 
@@ -200,8 +208,13 @@ class FusedIngestor(BatchIngestor):
             embed_batch_size = int(kwargs.get("embed_batch_size", 256))
             embed_cpus_per_actor = float(kwargs.get("embed_cpus_per_actor", 1))
             self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
+            _row_fn = (
+                collapse_content_to_page_rows
+                if resolved.embed_granularity == "page"
+                else explode_content_to_rows
+            )
             self._rd_dataset = self._rd_dataset.map_batches(
-                explode_content_to_rows,
+                _row_fn,
                 batch_size=embed_batch_size,
                 batch_format="pandas",
                 num_cpus=1,

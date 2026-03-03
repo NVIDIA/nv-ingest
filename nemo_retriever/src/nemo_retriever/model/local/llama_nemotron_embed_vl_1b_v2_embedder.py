@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -83,7 +84,8 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         texts_list = [str(t) for t in texts if str(t).strip()]
         if not texts_list:
             return torch.empty((0, 2048), dtype=torch.float32)
-        with torch.inference_mode():
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("text")
             out = self._model.encode_documents(texts=texts_list)
         if isinstance(out, torch.Tensor):
@@ -95,7 +97,8 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         texts_list = [str(t) for t in texts]
         if not texts_list:
             return torch.empty((0, 2048), dtype=torch.float32)
-        with torch.inference_mode():
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             out = self._model.encode_queries(texts_list)
         if isinstance(out, torch.Tensor):
             return _l2_normalize(out.detach().cpu())
@@ -110,7 +113,8 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         image_dicts = [{"base64": b64} for b64 in images_b64 if b64]
         if not image_dicts:
             return torch.empty((0, 2048), dtype=torch.float32)
-        with torch.inference_mode():
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("image")
             out = self._model.encode_documents(images=image_dicts)
         if isinstance(out, torch.Tensor):
@@ -134,7 +138,8 @@ class LlamaNemotronEmbedVL1BV2Embedder:
                 paired_images.append({"base64": b64})
         if not paired_images:
             return torch.empty((0, 2048), dtype=torch.float32)
-        with torch.inference_mode():
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("text_image")
             out = self._model.encode_documents(texts=paired_texts, images=paired_images)
         if isinstance(out, torch.Tensor):
