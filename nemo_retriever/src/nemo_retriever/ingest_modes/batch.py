@@ -849,25 +849,31 @@ class BatchIngestor(Ingestor):
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
-        text_elements_modality = resolved.text_elements_modality or embed_modality
-        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        embed_granularity = resolved.embed_granularity
         self._tasks.append(("embed", dict(kwargs)))
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        # Prepare content rows before embedding.
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
         from functools import partial
-        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
+        from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
-        _explode_fn = partial(
-            explode_content_to_rows,
-            modality=embed_modality,
-            text_elements_modality=text_elements_modality,
-            structured_elements_modality=structured_elements_modality,
-        )
+        if embed_granularity == "page":
+            _row_fn = partial(
+                collapse_content_to_page_rows,
+                modality=embed_modality,
+            )
+        else:
+            text_elements_modality = resolved.text_elements_modality or embed_modality
+            structured_elements_modality = resolved.structured_elements_modality or embed_modality
+            _row_fn = partial(
+                explode_content_to_rows,
+                modality=embed_modality,
+                text_elements_modality=text_elements_modality,
+                structured_elements_modality=structured_elements_modality,
+            )
         self._rd_dataset = self._rd_dataset.map_batches(
-            _explode_fn,
+            _row_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,

@@ -141,7 +141,7 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
     """Extract a picklable model config from live kwargs, or None."""
     from nemo_retriever.page_elements import detect_page_elements_v3
     from nemo_retriever.ocr.ocr import nemotron_parse_page_elements, ocr_page_elements
-    from .inprocess import embed_text_main_text_embed, explode_content_to_rows
+    from .inprocess import collapse_content_to_page_rows, embed_text_main_text_embed, explode_content_to_rows
 
     if func is detect_page_elements_v3:
         if kwargs.get("invoke_url"):
@@ -177,6 +177,9 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
         )
 
     if func is explode_content_to_rows:
+        return None  # CPU-only, no model
+
+    if func is collapse_content_to_page_rows:
         return None  # CPU-only, no model
 
     return None
