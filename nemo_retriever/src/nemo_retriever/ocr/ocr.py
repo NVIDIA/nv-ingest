@@ -603,6 +603,11 @@ class OCRActor:
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
     ) -> None:
+        import warnings
+
+        if Image is not None:
+            warnings.filterwarnings("ignore", category=Image.DecompressionBombWarning)
+
         self._invoke_url = (ocr_invoke_url or invoke_url or "").strip()
         self._api_key = api_key
         self._request_timeout_s = float(request_timeout_s)

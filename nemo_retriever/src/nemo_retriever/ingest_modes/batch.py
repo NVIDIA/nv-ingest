@@ -243,6 +243,14 @@ class _BatchEmbedActor:
     """
 
     def __init__(self, params: EmbedParams) -> None:
+        import warnings
+
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*`input_embeds` is deprecated.*create_bidirectional_mask.*",
+            category=FutureWarning,
+        )
+
         self._params = params
         self._kwargs = {
             **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
