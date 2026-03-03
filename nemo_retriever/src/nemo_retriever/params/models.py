@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from typing import Literal, Optional, Sequence, Tuple
 
+import warnings
+
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 RunMode = Literal["inprocess", "batch", "fused", "online"]
@@ -201,6 +204,7 @@ class EmbedParams(_ParamsModel):
     embed_invoke_url: Optional[str] = None
     input_type: str = "passage"
     embed_modality: str = "text"  # "text", "image", or "text_image" — default for all element types
+    embed_granularity: Literal["element", "page"] = "element"  # "element" = per-element rows, "page" = one row per page
     text_elements_modality: Optional[str] = None  # per-type override for page-text rows
     structured_elements_modality: Optional[str] = None  # per-type override for table/chart/infographic rows
     text_column: str = "text"
@@ -221,6 +225,19 @@ class EmbedParams(_ParamsModel):
         if v == "image_text":
             return "text_image"
         return v
+
+    @model_validator(mode="after")
+    def _warn_page_granularity_overrides(self) -> "EmbedParams":
+        if self.embed_granularity == "page" and (
+            self.text_elements_modality is not None or self.structured_elements_modality is not None
+        ):
+            warnings.warn(
+                "text_elements_modality and structured_elements_modality are ignored when "
+                "embed_granularity='page' (only embed_modality is used).",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
 
 
 class VdbUploadParams(_ParamsModel):
