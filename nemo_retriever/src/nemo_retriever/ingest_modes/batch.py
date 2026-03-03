@@ -925,7 +925,7 @@ class BatchIngestor(Ingestor):
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=embed_cpus_per_actor,
-            num_gpus=0.25,
+            num_gpus=0.1,
             compute=rd.ActorPoolStrategy(size=embed_workers),
             fn_constructor_kwargs={"params": resolved},
         )
