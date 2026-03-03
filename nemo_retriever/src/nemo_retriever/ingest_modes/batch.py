@@ -321,6 +321,8 @@ class BatchIngestor(Ingestor):
         system_resources = get_cluster_or_local_resources()
         self._num_gpus = int(system_resources.gpu_count)
         self._num_cpus = int(system_resources.cpu_count)
+        base_heuristic = resolve_worker_heuristic(num_cpus=self._num_cpus, num_gpus=self._num_gpus)
+        self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -424,25 +426,6 @@ class BatchIngestor(Ingestor):
         else:
             gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
 
-        # Per-stage GPU allocation: give OCR (the bottleneck) a full GPU;
-        # page-elements (lightweight YOLOX) and embedding share 0.5 each.
-        # Total = 0.5 + 1.0 + 0.5 = 2.0, so all 3 stages run concurrently.
-        num_gpus = self._num_gpus
-        if num_gpus >= 2 and gpu_stage_count == 3:
-            gpu_page_elements = 0.5
-            gpu_ocr = 1.0
-            gpu_embed = 0.5
-        else:
-            gpu_per_stage = min(1.0, num_gpus / max(1, gpu_stage_count))
-            gpu_page_elements = gpu_per_stage
-            gpu_ocr = gpu_per_stage
-            gpu_embed = gpu_per_stage
-
-        # Allow explicit per-stage GPU overrides for controlled experiments.
-        gpu_page_elements = float(kwargs.pop("gpu_page_elements", gpu_page_elements))
-        gpu_ocr = float(kwargs.pop("gpu_ocr", gpu_ocr))
-        gpu_embed = float(kwargs.pop("gpu_embed", gpu_embed))
-
         # Resolve worker defaults from system resources unless user overrides are set.
         user_page_elements_workers = kwargs.pop("page_elements_workers", None)
         user_ocr_workers = kwargs.pop("ocr_workers", None)
@@ -452,7 +435,12 @@ class BatchIngestor(Ingestor):
             num_gpus=self._num_gpus,
             page_elements_workers=user_page_elements_workers,
             detect_workers=user_detect_workers,
+            gpu_stage_count=gpu_stage_count,
         )
+        cpu_only_stage_num_gpus = float(worker_heuristic.cpu_only_stage_num_gpus)
+        gpu_page_elements = float(kwargs.pop("gpu_page_elements", worker_heuristic.page_elements_num_gpus))
+        gpu_ocr = float(kwargs.pop("gpu_ocr", worker_heuristic.detect_num_gpus))
+        gpu_embed = float(kwargs.pop("gpu_embed", worker_heuristic.embed_num_gpus))
         page_elements_workers = int(worker_heuristic.page_elements_workers)
         detect_workers = int(worker_heuristic.detect_workers)
         page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
@@ -611,7 +599,7 @@ class BatchIngestor(Ingestor):
             DocToPdfConversionActor,
             batch_size=1,
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=cpu_only_stage_num_gpus,
             batch_format="pandas",
         )
 
@@ -627,7 +615,7 @@ class BatchIngestor(Ingestor):
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=cpu_only_stage_num_gpus,
             batch_format="pandas",
         )
 
@@ -638,7 +626,7 @@ class BatchIngestor(Ingestor):
             batch_size=pdf_extract_batch_size,
             batch_format="pandas",
             num_cpus=pdf_extract_num_cpus,
-            num_gpus=0,
+            num_gpus=cpu_only_stage_num_gpus,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
@@ -680,7 +668,7 @@ class BatchIngestor(Ingestor):
                 batch_size=page_elements_batch_size,
                 batch_format="pandas",
                 num_cpus=page_elements_cpus_per_actor,
-                num_gpus=0.05,
+                num_gpus=gpu_page_elements,
                 compute=rd.ActorPoolStrategy(size=page_elements_workers*2),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
@@ -718,7 +706,7 @@ class BatchIngestor(Ingestor):
                     batch_size=detect_batch_size,
                     batch_format="pandas",
                     num_cpus=ocr_cpus_per_actor,
-                    num_gpus=0.05,
+                    num_gpus=gpu_ocr,
                     compute=rd.ActorPoolStrategy(size=detect_workers*2),
                     fn_constructor_kwargs=ocr_flags,
                 )
@@ -744,7 +732,7 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": TextChunkParams(**self._extract_txt_kwargs)},
         )
         return self
@@ -768,7 +756,7 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
         )
         return self
@@ -806,7 +794,7 @@ class BatchIngestor(Ingestor):
             batch_size=audio_chunk_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -814,7 +802,7 @@ class BatchIngestor(Ingestor):
             batch_size=asr_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
@@ -857,8 +845,10 @@ class BatchIngestor(Ingestor):
             num_cpus=self._num_cpus,
             num_gpus=self._num_gpus,
             embed_workers=user_embed_workers,
+            gpu_stage_count=1,
         )
         embed_workers = int(worker_heuristic.embed_workers)
+        cpu_only_stage_num_gpus = float(worker_heuristic.cpu_only_stage_num_gpus)
         embed_batch_size = kwargs.pop("embed_batch_size", 256)
         embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
 
@@ -907,25 +897,22 @@ class BatchIngestor(Ingestor):
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=cpu_only_stage_num_gpus,
         )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
-            gpu_per_stage = 0
+            embed_actor_num_gpus = cpu_only_stage_num_gpus
         else:
-            # Embedding is GPU-bound; only needs modest CPU for tokenisation.
-            # Requesting all CPUs would prevent this stage from overlapping with
-            # upstream extraction/detection in Ray Data's streaming pipeline.
-            gpu_per_stage = getattr(self, "_gpu_embed", 1.0)
+            embed_actor_num_gpus = float(getattr(self, "_gpu_embed", worker_heuristic.embed_num_gpus))
 
         self._rd_dataset = self._rd_dataset.map_batches(
             _BatchEmbedActor,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=embed_cpus_per_actor,
-            num_gpus=0.1,
+            num_gpus=embed_actor_num_gpus,
             # compute=rd.ActorPoolStrategy(size=embed_workers),
             compute=rd.ActorPoolStrategy(min_size=1, max_size=4),
             fn_constructor_kwargs={"params": resolved},
@@ -962,7 +949,7 @@ class BatchIngestor(Ingestor):
             _LanceDBWriteActor,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
+            num_gpus=self._cpu_only_stage_num_gpus,
             compute=rd.ActorPoolStrategy(size=1),
             fn_constructor_kwargs={"params": p},
         )

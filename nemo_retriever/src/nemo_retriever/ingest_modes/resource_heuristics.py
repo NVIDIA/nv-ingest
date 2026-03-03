@@ -16,6 +16,17 @@ def _read_env_int(name: str, default: int, *, minimum: int = 0) -> int:
     return max(minimum, value)
 
 
+def _read_env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw.strip())
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, value)
+
+
 CPU_THRESHOLD_WORKERS = _read_env_int("NEMO_RETRIEVER_BATCH_CPU_THRESHOLD_WORKERS", 64, minimum=1)
 
 HIGH_CPU_PAGE_ELEMENTS_PER_GPU = _read_env_int("NEMO_RETRIEVER_BATCH_HIGH_CPU_PAGE_ELEMENTS_PER_GPU", 4, minimum=1)
@@ -25,6 +36,14 @@ HIGH_CPU_EMBED_PER_GPU = _read_env_int("NEMO_RETRIEVER_BATCH_HIGH_CPU_EMBED_PER_
 LOW_CPU_PAGE_ELEMENTS_PER_GPU = _read_env_int("NEMO_RETRIEVER_BATCH_LOW_CPU_PAGE_ELEMENTS_PER_GPU", 3, minimum=1)
 LOW_CPU_OCR_PER_GPU = _read_env_int("NEMO_RETRIEVER_BATCH_LOW_CPU_OCR_PER_GPU", 3, minimum=1)
 LOW_CPU_EMBED_PER_GPU = _read_env_int("NEMO_RETRIEVER_BATCH_LOW_CPU_EMBED_PER_GPU", 3, minimum=1)
+
+CPU_ONLY_STAGE_NUM_GPUS = _read_env_float("NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS", 0.0, minimum=0.0)
+HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS = _read_env_float(
+    "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS", 0.5, minimum=0.0
+)
+HIGH_OVERLAP_OCR_NUM_GPUS = _read_env_float("NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS", 1.0, minimum=0.0)
+HIGH_OVERLAP_EMBED_NUM_GPUS = _read_env_float("NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS", 0.5, minimum=0.0)
+MAX_GPU_PER_STAGE = _read_env_float("NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE", 1.0, minimum=0.0)
 
 
 @dataclass(frozen=True)
@@ -51,6 +70,10 @@ class WorkerHeuristicResult:
     page_elements_override: Optional[int]
     detect_override: Optional[int]
     embed_override: Optional[int]
+    cpu_only_stage_num_gpus: float
+    page_elements_num_gpus: float
+    detect_num_gpus: float
+    embed_num_gpus: float
 
 
 def _detect_local_gpu_count() -> int:
@@ -106,6 +129,7 @@ def resolve_worker_heuristic(
     page_elements_workers: Optional[int] = None,
     detect_workers: Optional[int] = None,
     embed_workers: Optional[int] = None,
+    gpu_stage_count: Optional[int] = None,
 ) -> WorkerHeuristicResult:
     if num_cpus is None or num_gpus is None:
         detected = get_cluster_or_local_resources()
@@ -144,6 +168,17 @@ def resolve_worker_heuristic(
     final_detect_workers = int(detect_workers) if detect_workers is not None else heuristic_detect_workers
     final_embed_workers = int(embed_workers) if embed_workers is not None else heuristic_embed_workers
 
+    effective_gpu_stage_count = max(1, int(gpu_stage_count if gpu_stage_count is not None else 1))
+    if gpu_count >= 2 and effective_gpu_stage_count == 3:
+        page_elements_num_gpus = float(HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS)
+        detect_num_gpus = float(HIGH_OVERLAP_OCR_NUM_GPUS)
+        embed_num_gpus = float(HIGH_OVERLAP_EMBED_NUM_GPUS)
+    else:
+        gpu_per_stage = min(float(MAX_GPU_PER_STAGE), float(gpu_count) / float(effective_gpu_stage_count))
+        page_elements_num_gpus = float(max(0.0, gpu_per_stage))
+        detect_num_gpus = float(max(0.0, gpu_per_stage))
+        embed_num_gpus = float(max(0.0, gpu_per_stage))
+
     return WorkerHeuristicResult(
         cpu_count=cpu_count,
         gpu_count=gpu_count,
@@ -160,6 +195,10 @@ def resolve_worker_heuristic(
         page_elements_override=page_elements_workers,
         detect_override=detect_workers,
         embed_override=embed_workers,
+        cpu_only_stage_num_gpus=float(CPU_ONLY_STAGE_NUM_GPUS),
+        page_elements_num_gpus=page_elements_num_gpus,
+        detect_num_gpus=detect_num_gpus,
+        embed_num_gpus=embed_num_gpus,
     )
 
 
@@ -204,6 +243,13 @@ def format_worker_heuristic_summary(
                 f"PageElementDetectionActor={effective_page_elements}, "
                 f"OCRActor={effective_detect}, "
                 f"_BatchEmbedActor={effective_embed}"
+            ),
+            (
+                "  gpu_stage_allocation: "
+                f"cpu_only={result.cpu_only_stage_num_gpus}, "
+                f"PageElementDetectionActor={result.page_elements_num_gpus}, "
+                f"OCRActor={result.detect_num_gpus}, "
+                f"_BatchEmbedActor={result.embed_num_gpus}"
             ),
         ]
     )
