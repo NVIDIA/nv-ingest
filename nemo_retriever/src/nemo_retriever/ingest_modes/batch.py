@@ -254,6 +254,11 @@ class _BatchEmbedActor:
             self._model = None
             return
 
+        # When using vLLM offline, no local HF model; embed_text_main_text_embed uses vLLM.
+        if self._kwargs.get("embed_use_vllm_offline"):
+            self._model = None
+            return
+
         device = self._kwargs.get("device")
         hf_cache_dir = self._kwargs.get("hf_cache_dir")
         normalize = bool(self._kwargs.get("normalize", True))
