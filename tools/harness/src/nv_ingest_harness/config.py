@@ -65,8 +65,11 @@ class TestConfig:
     extract_charts: bool = True
     extract_images: bool = False
     extract_infographics: bool = True
+    extract_page_as_image: bool = False
+    extract_method: Optional[str] = None
     text_depth: str = "page"
     table_output_format: str = "markdown"
+    image_elements_modality: Optional[str] = None
 
     # Optional pipeline steps
     enable_caption: bool = False
@@ -95,6 +98,8 @@ class TestConfig:
     recall_top_k: int = 10
     ground_truth_dir: Optional[str] = None
     recall_dataset: Optional[str] = None
+    enable_beir: bool = False  # Enable BEIR metrics (NDCG, MAP, Precision)
+    language_filter: Optional[str] = None  # Filter queries by language (e.g., "english")
 
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors"""
@@ -329,7 +334,10 @@ def _load_env_overrides() -> dict:
         "EXTRACT_CHARTS": ("extract_charts", parse_bool),
         "EXTRACT_IMAGES": ("extract_images", parse_bool),
         "EXTRACT_INFOGRAPHICS": ("extract_infographics", parse_bool),
+        "EXTRACT_PAGE_AS_IMAGE": ("extract_page_as_image", parse_bool),
+        "EXTRACT_METHOD": ("extract_method", str),
         "TEXT_DEPTH": ("text_depth", str),
+        "IMAGE_ELEMENTS_MODALITY": ("image_elements_modality", str),
         "TABLE_OUTPUT_FORMAT": ("table_output_format", str),
         "ENABLE_CAPTION": ("enable_caption", parse_bool),
         "CAPTION_PROMPT": ("caption_prompt", str),
@@ -346,6 +354,8 @@ def _load_env_overrides() -> dict:
         "RECALL_TOP_K": ("recall_top_k", parse_int),
         "GROUND_TRUTH_DIR": ("ground_truth_dir", str),
         "RECALL_DATASET": ("recall_dataset", str),
+        "ENABLE_BEIR": ("enable_beir", parse_bool),
+        "LANGUAGE_FILTER": ("language_filter", str),
     }
 
     overrides = {}
@@ -359,14 +369,55 @@ def _load_env_overrides() -> dict:
     return overrides
 
 
+def expand_dataset_names(yaml_data: dict, dataset_input: str) -> List[str]:
+    """
+    Expand a dataset input string to a list of dataset names.
+
+    Handles:
+    - Single dataset name: "bo767" -> ["bo767"]
+    - Comma-separated: "bo767,earnings" -> ["bo767", "earnings"]
+    - Group name: "vidore" -> ["vidore_v3_finance_en", "vidore_v3_industrial", ...]
+    - Mixed: "vidore_quick,bo767" -> ["vidore_v3_hr", "vidore_v3_industrial", "bo767"]
+
+    Args:
+        yaml_data: Parsed YAML data containing datasets and dataset_groups
+        dataset_input: Raw dataset input string
+
+    Returns:
+        List of individual dataset names (expanded from groups)
+    """
+    dataset_groups = yaml_data.get("dataset_groups", {})
+
+    raw_names = [name.strip() for name in dataset_input.split(",") if name.strip()]
+
+    expanded = []
+    for name in raw_names:
+        if name in dataset_groups:
+            expanded.extend(dataset_groups[name])
+        else:
+            expanded.append(name)
+
+    seen = set()
+    result = []
+    for name in expanded:
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+
+    return result
+
+
 def list_datasets(config_file: str = "test_configs.yaml") -> dict:
-    """List available dataset shortcuts"""
-    config_path = Path(__file__).parent / config_file
+    """List available dataset shortcuts and groups"""
+    config_path = Path(__file__).resolve().parents[2] / config_file
 
     with open(config_path) as f:
         yaml_data = yaml.safe_load(f)
 
-    return yaml_data.get("datasets", {})
+    return {
+        "datasets": yaml_data.get("datasets", {}),
+        "groups": yaml_data.get("dataset_groups", {}),
+    }
 
 
 def list_presets(config_file: str = "test_configs.yaml") -> List[str]:
