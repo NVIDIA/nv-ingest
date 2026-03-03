@@ -4,6 +4,9 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
+> [!Note]
+> **Default branch:** The repository default branch is **`main`** (development). For the latest **release** branch and tagged releases, use the [releases](https://github.com/NVIDIA/nv-ingest/releases) page or select a release branch (for example, `release/26.1.2`) from the branch dropdown.For **Documentation:**, see: [https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/](https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/).
+
 # What is NeMo Retriever Extraction?
 
 NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
